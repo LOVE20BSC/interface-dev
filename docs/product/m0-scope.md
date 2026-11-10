@@ -2,17 +2,17 @@
 
 M0 的目标不是“把协议画出来”，而是**让一个没有钱包的人在手机上打开、看懂、接上钱包、找到自己的身份**，同时把后面所有里程碑都要依赖的工程底座（分层、设计系统、路由、错误文案层、三环境构建、一条命令起链）一次性立住。
 
-M0 结束时的可演示路径（新用户漏斗，顺序固定）：打开页面 → 连接钱包 → 首页（当前身份欢迎）→ 我的 NFT（枚举并切换身份）→ MemberNFT 铸造（动态价格预览、LOVE20 余额是否足够的预判、名字唯一性预检查、空投/兑换引导）→ 空投领取（有资格时）→ 代币兑换（无空投资格时，用原生币买入，仅买入方向）。分支规则：**铸造所需代币不足 → 若有空投资格则引导空投领取 → 否则引导代币兑换**。
+M0 结束时的可演示路径（新用户漏斗，顺序固定）：打开页面 → 连接钱包 → 首页（当前身份欢迎）→ 我的 NFT（枚举并用「使用此身份」选择当前身份）→ MemberNFT 铸造（动态价格预览、LOVE20 余额是否足够的预判、名字唯一性预检查、空投/兑换引导）→ 铸造空投份额页（有资格时）→ 代币兑换（无空投资格时，用原生币买入，仅买入方向）。分支规则：**铸造所需代币不足 → 若有空投资格则引导铸造空投份额 → 否则引导代币兑换**。
 
 ## 范围内
 
 | # | 交付 | 完成标志 |
 | --- | --- | --- |
 | 1 | **导航骨架** | 移动端底部标签栏、桌面端左侧竖栏，同一份配置自动适配；首个标签 = 首页；其余标签为占位页（可见、可导航、标注“即将上线”）。不允许用两套导航组件 |
-| 2 | **右上角连接按钮** | 一个入口三个面板：钱包（连接/断开/切换地址）、代币社区切换、身份切换；按钮只呈现三态（未连接 / 已连接·无身份 / 已连接·身份名）。不提供网络选择器 |
-| 3 | **新用户漏斗** | 顺序固定：首页（当前身份欢迎）→ 我的 NFT（枚举并切换身份）→ MemberNFT 铸造（动态价格预览、LOVE20 余额是否足够的预判、名字唯一性预检查、空投/兑换引导）→ 空投领取（有资格时）→ 代币兑换（无空投资格时，用原生币买入，仅买入方向）。分支规则：**铸造所需代币不足 → 若有空投资格则引导空投领取 → 否则引导代币兑换**。身份每次加载按 `ownerOf` 重校验，失效即清除并回落 |
+| 2 | **右上角连接按钮** | 一个入口三个面板：钱包（连接/断开；换地址 = 断开再连，不提供地址列表）、代币社区切换、身份入口（跳转「我的 NFT」，切换由该页「使用此身份」完成）；按钮只呈现三态（未连接 / 已连接·无身份 / 已连接·身份名）。不提供网络选择器 |
+| 3 | **新用户漏斗** | 顺序固定：首页（当前身份欢迎）→ 我的 NFT（枚举并用「使用此身份」选择当前身份）→ MemberNFT 铸造（动态价格预览、LOVE20 余额是否足够的预判、名字唯一性预检查、空投/兑换引导）→ 铸造空投份额页（有资格时）→ 代币兑换（无空投资格时，用原生币买入，仅买入方向）。分支规则：**铸造所需代币不足 → 若有空投资格则引导铸造空投份额 → 否则引导代币兑换**。身份每次加载按 `ownerOf` 重校验，失效即清除并回落 |
 | 4 | **工程底座** | 分层架构（展示 / 领域 / 链访问三层，链访问不向上泄漏 viem 类型）；设计系统（颜色、字号、间距、按钮、骨架屏、空状态、错误态）；路由（browser router + 构建期 `404.html`）；错误文案映射层（消费 `registry/errors.json` 约定：selector → 英文错误名 → 中文人话 + 下一步动作）；三种构建模式；GitHub Actions → Pages |
-| 5 | **一条命令起全栈** | `WETH + Uniswap V2（Factory/Router，feeToSetter=0）+ core/action/group-chat + Airdrop + Multicall3`，随后导出 `addresses.json` + `deployment.json` + ABI + 空投快照及证明，并跑 `cast` 断言（链 id、每个地址有代码、`router.factory()/WETH()`、`factory.feeTo()==0`、`token.MINTER()`、`launch.FIRST_TOKEN_ADDRESS()`、pair 储备非零、`airdrop.merkleRoot()` 与快照一致、`phase.currentPhase()>=1`）。**Airdrop 必须是 share + Merkle 语义**（`claim(token, account, share, proof)`，与生产一致），不采用旧前端里金额制或改名的副本；**Multicall3 必须真的部署**，不能只导出接口 ABI |
+| 5 | **一条命令起全栈** | `WETH + Uniswap V2（Factory/Router，feeToSetter=0）+ core/action/group-chat + Airdrop + Multicall3`，按 ADR-0004 seed 首币池 **200,000 LOVE20 + 100 WETH**（`SEED_LIQUIDITY_TOKEN_AMOUNT=2e23`、`SEED_LIQUIDITY_PARENT_TOKEN_AMOUNT=1e20`），随后导出 `anvil/export/deployments/anvil31337_dev.json`（单文件地址簿）+ `anvil/export/abis/*.json` + 空投快照及证明，并跑 `cast` 断言（链 id、每个地址有代码、`router.factory()/WETH()`、`factory.feeTo()==0`、`token.MINTER()`、`launch.FIRST_TOKEN_ADDRESS()`、pair 储备非零、`airdrop.merkleRoot()` 与快照一致、`phase.currentPhase()>=1`）。**Airdrop 必须是 share + Merkle 语义**（`claim(token, account, share, proof)`，与生产一致），不采用旧前端里金额制或改名的副本；**Multicall3 必须真的部署**，不能只导出接口 ABI |
 | 6 | **文案纪律落地** | 界面所有中文过一遍 `GLOSSARY.md` 的六条纪律；“激励/铸造激励/预留/销毁”不得写成“奖励/发放/领取”；同一概念一页一个叫法 |
 
 ## 明确不在 M0
@@ -25,23 +25,30 @@ M0 结束时的可演示路径（新用户漏斗，顺序固定）：打开页�
 
 ## 依赖与验收
 
-- **前置**：本地全栈可一键起（第 5 项；`dex/build` 被 gitignore，脚本必须自己 `make build`，不能假定产物存在）；ABI 与地址由导出产物提供，前端**不得**硬编码地址；`registry/errors.json` 约定可用。
+- **前置**：本地全栈可一键起（第 5 项；`dex/build` 被 gitignore，脚本必须自己 `make build`，不能假定产物存在）；dev 的 ABI 与地址只由 `anvil/export/deployments/anvil31337_dev.json` 与 `anvil/export/abis/*.json` 提供（test/prod 见 ADR-0002），前端**不得**硬编码地址；`registry/errors.json` 约定可用。
 - **批量读取**：初始身份 NFT 资产与链上数据均通过 Multicall3 批量读取（部署见第 5 项），不逐 token 串行请求。
-- **构建**：dev / test / prod 三次构建，各自 `--base` 正确、`404.html` 由构建生成、`.nojekyll` 存在；首屏 JS gzip ≤ 150 kB，eager chunk 内无 WalletConnect/AppKit。
+- **构建**：dev / test / prod 三次构建，各自 `--base` 正确、`404.html` 由构建生成、`.nojekyll` 存在；首屏 JS gzip **warn 160 kB / 硬失败 200 kB**（`scripts/check-bundle.mjs`），所有 shipped chunk（含懒加载）经字节扫描不得含 WalletConnect/AppKit。
 - **E2E**：Playwright 跑 `vite preview --base=/<repo>/` 的产物（不是 dev server），覆盖“连接 → 身份欢迎 / 引导”两条主路径与一次错误文案展示。
 - **人工验收**：手机真机走一遍身份流；桌面走一遍导航适配；文案抽查 10 条对照 `GLOSSARY.md`。
 
-## 假设清单（待用户确认）
+## 已定（不再是假设）
 
-**已解决，不再是假设：NFT 发现与身份枚举。** 每个协议部署只有一个全局 MemberNFT（`ERC721Enumerable`）；环境包给一个种子 core 合约地址，前端读其 `MEMBER_NFT_ADDRESS()` 定位 MemberNFT，再用 `balanceOf(wallet)` + `tokenOfOwnerByIndex(wallet, i)` 枚举该钱包的全部身份。原“已知合约白名单 + 手动填地址兜底”作废；无需事件扫描、后端索引器或合约改动。
+**仓库拓扑、环境选择与发布同步。** 三仓为 `LOVE20BSC/interface-dev`（唯一开发地，dev）、`LOVE20BSC/interface-test`（test）、`LOVE20BSC/interface`（prod）；三仓各只有一条长期 `main`，共享同一个 commit。环境变体在 CI 里按**完整 `owner/repo` 精确匹配**选择（其余一律 prod），仓库变量 `VITE_ENV` 可显式覆盖。同步是 `pnpm release:test` / `pnpm release:prod` 的 fast-forward 推送（preflight：干净工作区 → CI 绿 → 目标 `main` 是 `HEAD` 的祖先）；tag 只标里程碑，不是同步的前置条件。发布命令不写任何文件，**仓内不维护发布日志**；审计痕迹由三仓相同的 commit SHA、Actions run 历史与 Pages deployments 记录承担（见 ADR-0002）。
+
+**NFT 发现与身份枚举。** 每个协议部署只有一个全局 MemberNFT（`ERC721Enumerable`）；环境包给一个种子 core 合约地址，前端读其 `MEMBER_NFT_ADDRESS()` 定位 MemberNFT，再用 `balanceOf(wallet)` + `tokenOfOwnerByIndex(wallet, i)` 枚举该钱包的全部身份。原“已知合约白名单 + 手动填地址兜底”作废；无需事件扫描、后端索引器或合约改动。
+
+**代币切换。** 只切 URL 里的 `?symbol=`：不切链、不清身份、不离开当前页；「当前代币」不持久化（UX Spec §2.1–§2.4）。
+
+**桌面导航。** `<md` 底部标签栏、`≥md` 左侧可折叠竖栏，同一份导航配置自动适配（UX Spec §1.1）。
+
+**生产托管。** GitHub Pages + 可选自定义域名（项目路径与自定义域名分别构建）。与其绑定的是：无自定义响应头、无 rewrite、`index.html` 最多陈旧 600 s、WalletConnect 只能验一个域名、换域名即清空本地存储；若日后要求邮件/社交登录，Pages 缺 COOP 头，必须换能设响应头的静态托管（Cloudflare Pages / Netlify / Vercel），构建已保持中立。见 ADR-0001。
+
+## 假设清单（仍待确认）
 
 | # | 假设 | 影响 | 若不成立 |
 | --- | --- | --- | --- |
-| 1 | **代币切换** = 只切“当前代币社区”，不切链、不清身份 | 决定按钮面板的语义与缓存键 | 若要“切社区即清身份”，身份与社区变成强绑定，缓存与首屏回落逻辑要改 |
-| 2 | **桌面导航** = 左侧竖栏 | 决定布局断点与设计系统组件 | 若改为顶部横向导航，底部栏/竖栏的自动适配要重做 |
-| 3 | **用户可见角色**由 16 个链上角色收敛为 6 个：访客 / 持币人 / 成员 / 行动参与者 / 验证者 / 发射者 | 决定首页文案、引导路径、帮助页结构；链群 owner 并入“成员 + 管理权限”，推举/投票并入“成员动作”，LP 提供者并入“行动参与者”，distributor / Proposal Target / Executor 不面向用户，群聊角色排 M2，部署与运维不出现在界面 | 若角色必须一一对应，界面将出现 16 套状态与文案，与“非加密原生用户”目标直接冲突 |
-| 4 | **群聊**排到 M2 | 决定导航占位项的说明文案 | 若群聊提前，需要成员资格判定、分页读取与消息渲染，M0 工期不成立 |
-| 5 | **生产托管** = GitHub Pages + 可选自定义域名 | 与其绑定的是：无自定义响应头、无 rewrite、WalletConnect 只能验一个域名、换域名即清空本地存储 | 若要求邮件/社交登录，Pages 缺 COOP 头，必须换能设响应头的静态托管（Cloudflare Pages / Netlify / Vercel），构建已保持中立、只差一个配置文件 |
+| 1 | **用户可见角色**由 16 个链上角色收敛为 6 个：访客 / 持币人 / 成员 / 行动参与者 / 验证者 / 发射者 | 决定首页文案、引导路径、帮助页结构；链群 owner 并入“成员 + 管理权限”，推举/投票并入“成员动作”，LP 提供者并入“行动参与者”，distributor / Proposal Target / Executor 不面向用户，群聊角色排 M2，部署与运维不出现在界面 | 若角色必须一一对应，界面将出现 16 套状态与文案，与“非加密原生用户”目标直接冲突 |
+| 2 | **群聊**排到 M2 | 决定导航占位项的说明文案 | 若群聊提前，需要成员资格判定、分页读取与消息渲染，M0 工期不成立 |
 
 ## 已知技术风险（不是假设，是事实）
 
