@@ -76,15 +76,16 @@ owner 同时否决了在仓内追加发布日志（`docs/release-log.md`）：�
 | `LOVE20BSC/interface-test` | 测试环境 | test |
 | `LOVE20BSC/interface` | 生产环境 | prod |
 
-同步不是 tag 事件，而是一条命令：`pnpm release-to <target>`。`target` 只回答**推到哪里**，接受三种写法：
+同步不是 tag 事件，而是一条命令：`pnpm release-to <target>`。`target` 只回答**推到哪里**，接受四种写法，按以下顺序解析：
 
 | `target` 写法 | 解析为 |
 | --- | --- |
 | `owner/repo`（如 `LOVE20BSC/interface-test`） | `https://github.com/<target>.git` |
 | 完整 git URL（`https://…` 或 `git@…`） | 原样使用 |
-| 本地路径（绝对或相对） | 原样使用（离线演练、镜像仓、第二条工作树） |
+| 本地路径（`/…`、`./…`、`../…` 或已存在的目录） | 原样使用（离线演练、镜像仓、第二条工作树） |
+| 不带斜杠的裸仓库名（如 `interface-test`） | 运行时从当前 checkout 的 `origin` 远端读出 owner，展开为 `https://github.com/<origin-owner>/<name>.git`；没有 `origin`（或它不是 GitHub URL）时命令失败，并提示改传 `owner/repo`。便捷别名因此不含组织名 |
 
-脚本里**没有 test / prod 词汇，也不做任何环境分类**：环境变体只由 CI 按仓库名关键字决定（§5），发布命令只负责把一个已绿的 commit fast-forward 推出去。命令按固定顺序执行，任一步失败即中止：
+`pnpm release-to-interface-test` / `pnpm release-to-interface` 只是这条通用命令的薄别名：它们只传裸仓库名（`interface-test` / `interface`），owner 仍按上面的 origin 规则补全；pnpm 会原样转发该参数，不需要 `--`。别名不改变脚本的不变量：干净工作区、CI 绿门禁、只允许 fast-forward、打印 SHA + 目标 + commit subject、`RELEASE_YES=1` 仅跳过确认、零文件写入、不打 tag、不 force。脚本里**没有 test / prod 词汇，也不做任何环境分类**：环境变体只由 CI 按仓库名关键字决定（§5），发布命令只负责把一个已绿的 commit fast-forward 推出去。命令按固定顺序执行，任一步失败即中止：
 
 1. 工作区干净（含未跟踪文件）。
 2. 当前 `HEAD` 的 CI 已绿（同一个 SHA）。
@@ -92,7 +93,7 @@ owner 同时否决了在仓内追加发布日志（`docs/release-log.md`）：�
 4. 在终端打印**源 commit SHA**、**解析后的目标**与**commit subject**，要求操作者确认；拒绝确认或非交互环境即中止，`RELEASE_YES=1` 只跳过这一步确认。
 5. 推送 `HEAD:main` 到目标。
 
-命令**只读本仓与远端状态（CI、目标仓 `main`），只推目标仓，不写任何文件**：不追加日志、不建 commit、不打 tag、不 amend、不 force-push；发布前后本仓的 `HEAD` 与工作区都不变（变化只发生在目标仓的 `main`）。不提供 `--force`；目标只来自位置参数，脚本不按名字解释它（`interface-test` 与 `someone/interface-dev` 都只是 URL 的一部分，不改变构建变体）。
+命令**只读本仓与远端状态（CI、目标仓 `main`），只推目标仓，不写任何文件**：不追加日志、不建 commit、不打 tag、不 amend、不 force-push；发布前后本仓的 `HEAD` 与工作区都不变（变化只发生在目标仓的 `main`）。不提供 `--force`；目标只来自位置参数，脚本不按名字解释它（`interface-test` 只是要推送到的仓库名，`someone/interface-dev` 只是 URL 的一部分，都不改变构建变体）。
 
 发布记录**不放在任何仓里**。三仓共享同一条历史，任何仓内文件都会被原样推到下一个仓，无法说明它记的是哪个仓的发布——这正是 owner 否决 `docs/release-log.md` 的原因（Context）。审计痕迹由三件仓外证据构成：
 
