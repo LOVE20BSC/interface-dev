@@ -89,7 +89,7 @@ love20:v1:<chainId>:<contractAddress>:<wallet>:<businessKey>
 
 - `?symbol=` 是当前社区的唯一事实源；**不持久化「当前代币」**，刷新、分享、返回都只认 URL。缺省或空时读环境包 `firstTokenAddress` 的 `symbol()`，用 `history.replaceState` 补上，不新增历史记录。
 - 切换 = 原地 `replace` 当前路径 + 新 `?symbol=`，保留其他 query（如 `?tx=`），不整页刷新；未知路由 `replace` 首页 + 新 symbol；目标是当前社区时只关弹层，不发请求。
-- **身份不受影响**：不切链、不清已选身份、不改身份列表；切换后**不重取**钱包与链、身份、LOVE20 余额、MemberNFT 铸造报价与空投资格（这些与社区无关）。只重取按 `tokenAddress` 隔离的数据：`symbol()` / `name()` / `decimals()`、`parentToken()`、`childTokens()`、池子储备、报价与当前币余额。
+- **身份不受影响**：不切链、不清已选身份、不改身份列表；切换后**不重取**钱包与链、身份、LOVE20 余额、MemberNFT 铸造报价与空投资格（这些与社区无关）。只重取按 `tokenAddress` 隔离的数据：`symbol()` / `decimals()`（`name()` 只在技术详情/调试需要时读取，不参与显示）、`parentToken()`、`childTokens()`、池子储备、报价与当前币余额。
 - 有 pending 交易时允许切换，任务继续；页面正处于报价/输入时中止在途请求、清空金额输入、回页面骨架。
 
 | 待定项 | 已知约束 | 为什么现在不决定 |

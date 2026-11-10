@@ -89,8 +89,10 @@ Set `defaultSymbol` to the first token's on-chain `symbol()` (dev may carry a te
 Do not hard-code addresses anywhere else. Missing or zero addresses are treated as “not
 configured” by `isConfiguredAddress()`.
 
-Brand strings come from the current community token's on-chain `name()` / `symbol()`
-(`entities/community-token`); `LOVE20` is only the fallback when the chain cannot be read.
+Brand and community labels come only from the current community token's on-chain `symbol()`
+(`entities/community-token`); `LOVE20` is the fallback when no community is known. `name()`
+(a code-level `<child symbol>@<parent symbol>` composite) is read only for technical
+details/debug and is never shown as the community name.
 
 ## Community context and identity
 
