@@ -9,3 +9,8 @@ pnpm-lock.yaml
 docs
 src/config/errors.generated.ts
 src/config/build-id.generated.ts
+
+# Read-only product inputs (do not reformat)
+GLOSSARY.md
+docs
+.research
