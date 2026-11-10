@@ -45,7 +45,7 @@ vendored 的 Airdrop（来自 `LOVE20TKM/burn`）没有实现 `ILaunchDistributo
 
 默认且规范端口是 **`127.0.0.1:8545`**：`make bootstrap` 与 `make anvil` 都按它起链，前端环境包的 `rpcUrls` 只能有一条，规范值就是这条 8545。`make anvil` 只在能确认“这是自己启动的链”时才复用（`.anvil/anvil.pid` 与端点匹配）；否则拒绝附着，并打印“停掉它”或“换端口”两条出路。`PORT=` / `HOST=` 会同时移动 anvil 进程与所有 RPC URL，但只作一次性逃生口。
 
-**早前在 8555 上完成验证，是因为外来 anvil 占着 8545（历史原因，不是第二个默认值）**：一次验证运行时，一个更早的前端 checkout 留下的 anvil 已在 8545 上跑了一整天，因此那次用 `PORT=8555` 完成；`export/deployments/anvil31337_dev.json` 仍写该 profile 的规范 `rpcUrl`（8545），地址与块高来自 8555 的那次运行，且在全新链上可复现。**同一时刻只允许一条本地链**：前端只指向一个 RPC，两条 anvil 并行会让导出地址与页面读数分属两条链。端口冲突时先停掉占用 8545 的进程，再 `make bootstrap`；本仓不杀不是自己启动的进程。
+**8555 只用于一次历史验证，不是第二个默认值**：早前的一次验证运行时，一个更早的前端 checkout 留下的 anvil 占着 8545 跑了一整天，因此那次用 `PORT=8555` 完成。后来该外来进程已停掉，规范链重新在 8545 上 `make bootstrap` 并在 8545 上验证；`export/deployments/anvil31337_dev.json` 与前端地址簿的地址、块高都来自这一规范运行，且在全新链上可复现。**同一时刻只允许一条本地链**：前端只指向一个 RPC，两条 anvil 并行会让导出地址与页面读数分属两条链。端口冲突时先停掉占用 8545 的进程，再 `make bootstrap`；本仓不杀不是自己启动的进程。
 
 ### 6. Export 契约
 

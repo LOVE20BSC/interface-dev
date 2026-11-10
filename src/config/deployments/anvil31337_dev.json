@@ -2,7 +2,7 @@
   "variant": "dev",
   "chainId": 31337,
   "chainName": "Anvil Local",
-  "rpcUrls": ["http://127.0.0.1:8555"],
+  "rpcUrls": ["http://127.0.0.1:8545"],
   "nativeCurrency": { "name": "BNB", "symbol": "BNB", "decimals": 18 },
   "blockExplorerUrl": null,
   "defaultSymbol": "TestLOVE20",
@@ -12,9 +12,9 @@
     "docsUrl": "https://love20bsc.github.io/docs/"
   },
   "testnet": true,
-  "notes": "地址簿复制自 anvil/export/deployments/anvil31337_dev.json（make bootstrap PORT=8555 的部署）。rpc 指向 8555：本机 8545 已被其他项目的 anvil 占用。defaultSymbol 是 URL 种子，链上 symbol() 为准。",
+  "notes": "地址簿复制自 anvil/export/deployments/anvil31337_dev.json（make bootstrap 默认 8545 的部署）。rpc 指向 8545：本机唯一规范链。defaultSymbol 是 URL 种子，链上 symbol() 为准。",
   "deployment": {
-    "blockNumber": 30
+    "blockNumber": 25
   },
   "addresses": {
     "tokenAddress": "0x8aCd85898458400f7Db866d53FCFF6f0D49741FF",

@@ -22,7 +22,7 @@ const deployment = JSON.parse(
   };
 };
 
-const RPC_URL = process.env.E2E_ANVIL_RPC ?? deployment.rpcUrls[0] ?? 'http://127.0.0.1:8555';
+const RPC_URL = process.env.E2E_ANVIL_RPC ?? deployment.rpcUrls[0] ?? 'http://127.0.0.1:8545';
 const CHAIN_ID = deployment.chainId;
 const CHAIN_HEX = `0x${CHAIN_ID.toString(16)}`;
 const MEMBER_NFT = deployment.addresses.memberNFT;
