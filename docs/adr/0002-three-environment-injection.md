@@ -1,6 +1,6 @@
 # 0002 三环境注入：一个代码库，零环境分支
 
-同一份代码按 dev / test / prod 构建三次，产出分别部署到 `LOVE20BSC/interface-dev`、`LOVE20BSC/interface-test`、`LOVE20BSC/interface`。三仓各只有一条长期 `main`，且共享**同一个 commit 对象**：开发只在 `interface-dev` 进行，发布用 `pnpm release:test` / `pnpm release:prod` 做 fast-forward 推送（preflight：干净工作区 → CI 绿 → 目标 `main` 是 `HEAD` 的祖先），tag 只标里程碑、从不是同步的前置条件；环境变体在 CI 按仓库标识选择，仓库变量 `VITE_ENV` 可显式覆盖。所有环境差异只通过一个**构建期环境包**注入（chainId、RPC、合约地址簿、ABI 产物清单、品牌串、dev 开关），组件与数据层**不得出现任何按环境分支的代码**；地址来源按环境分开——`anvil/` 只拥有本地链部署，testnet/mainnet 地址只来自合约仓的 `script/network/<chain>_<type>/addresses.*.params`。ABI 采用“生成后提交 + 修订号清单 + CI 漂移门禁”，而不是手抄或运行时拉取。发布命令**不写任何文件**：审计痕迹由三仓 `main` 上相同的 commit SHA、GitHub Actions 的 run 历史与 GitHub Pages 的原生部署历史构成，仓内不维护第二份日志。
+同一份代码按 dev / test / prod 构建三次，产出分别部署到 `LOVE20BSC/interface-dev`、`LOVE20BSC/interface-test`、`LOVE20BSC/interface`。三仓各只有一条长期 `main`，且共享**同一个 commit 对象**：开发只在 `interface-dev` 进行，发布用 `pnpm release-to <target>` 做 fast-forward 推送（preflight：干净工作区 → CI 绿 → 目标 `main` 是 `HEAD` 的祖先），tag 只标里程碑、从不是同步的前置条件；环境变体在 CI 按仓库名关键字选择（名字含 `dev` → dev，否则含 `test` → test，否则 prod），仓库变量 `VITE_ENV` 可显式覆盖。所有环境差异只通过一个**构建期环境包**注入（chainId、RPC、合约地址簿、ABI 产物清单、品牌串、dev 开关），组件与数据层**不得出现任何按环境分支的代码**；地址来源按环境分开——`anvil/` 只拥有本地链部署，testnet/mainnet 地址只来自合约仓的 `script/network/<chain>_<type>/addresses.*.params`。ABI 采用“生成后提交 + 修订号清单 + CI 漂移门禁”，而不是手抄或运行时拉取。发布命令**不写任何文件**：审计痕迹由三仓 `main` 上相同的 commit SHA、GitHub Actions 的 run 历史与 GitHub Pages 的原生部署历史构成，仓内不维护第二份日志。
 
 - **Status**: Accepted
 - **Date**: 2026-11-11
@@ -35,7 +35,7 @@ owner 同时否决了在仓内追加发布日志（`docs/release-log.md`）：�
 | `contracts` | 地址簿：`tokenAddress`、`memberNFT`、`stake`、`submit`、`vote`、`mint`、`launch`、`actionTarget`、三个 executor、`groupChat` 系列、`weth`、`factory`、`router`、`multicall3`、`airdrop` | 字段名沿用跨仓唯一写法（`tokenAddress`、`memberId`、`groupId`、`actionId`、`proposalId`、`verifierId`、`providerId`） |
 | `deployment` | 部署块高、Phase 参数摘要、`firstTokenAddress` | 供分页与“合同已上线”判断使用 |
 | `abis` | 产物清单：文件名、ABI 条目数、**来源仓库 + 提交 SHA** | 生成物提交进仓，见 §3 |
-| `brand` | 站点名、`VITE_SITE_ORIGIN`、测试网横幅文案、生产「正式版」徽章 | test / dev 必须在页头常驻“测试网，无真实价值”；prod 必须常驻可见的「正式版」徽章（fork 也会按 prod 构建，见 §5） |
+| `brand` | 站点名、`VITE_SITE_ORIGIN`、测试网横幅文案、生产「正式版」徽章 | test / dev 必须在页头常驻“测试网，无真实价值”；prod 必须常驻可见的「正式版」徽章（名字不含 `dev` / `test` 的 fork 也会按 prod 构建，见 §5） |
 | `flags` | 仅 dev/test：高级视图默认展开、显示 anvil 地址、E2E 断言开关 | 严禁“生产功能靠 flag 关掉” |
 
 **形态**：构建期静态导入，`vite build` 时通过 alias 解析到唯一一份环境包；三份环境包同时存在于仓内，但打进产物的只有被选中的那一份。**不允许**运行时 `fetch` 配置，**不允许** `config.json` 后备路径（陈旧地址的代价高于一次构建）。
@@ -76,15 +76,23 @@ owner 同时否决了在仓内追加发布日志（`docs/release-log.md`）：�
 | `LOVE20BSC/interface-test` | 测试环境 | test |
 | `LOVE20BSC/interface` | 生产环境 | prod |
 
-同步不是 tag 事件，而是一条命令：`pnpm release:test` / `pnpm release:prod`。命令按固定顺序执行，任一步失败即中止（不提供 `--force`，目标仓由脚本写死，不允许临时改）：
+同步不是 tag 事件，而是一条命令：`pnpm release-to <target>`。`target` 只回答**推到哪里**，接受三种写法：
+
+| `target` 写法 | 解析为 |
+| --- | --- |
+| `owner/repo`（如 `LOVE20BSC/interface-test`） | `https://github.com/<target>.git` |
+| 完整 git URL（`https://…` 或 `git@…`） | 原样使用 |
+| 本地路径（绝对或相对） | 原样使用（离线演练、镜像仓、第二条工作树） |
+
+脚本里**没有 test / prod 词汇，也不做任何环境分类**：环境变体只由 CI 按仓库名关键字决定（§5），发布命令只负责把一个已绿的 commit fast-forward 推出去。命令按固定顺序执行，任一步失败即中止：
 
 1. 工作区干净（含未跟踪文件）。
 2. 当前 `HEAD` 的 CI 已绿（同一个 SHA）。
-3. 目标 `main` 是 `HEAD` 的祖先（`git merge-base --is-ancestor`），即只允许 fast-forward。
-4. 在终端打印**源 commit SHA** 与**目标仓**（如 `LOVE20BSC/interface-test`），要求操作者确认；拒绝确认或非交互环境即中止。
-5. 推送 `HEAD:main` 到目标仓。
+3. 目标 `main` 是 `HEAD` 的祖先（先 fetch，再 `git merge-base --is-ancestor`），即只允许 fast-forward。
+4. 在终端打印**源 commit SHA**、**解析后的目标**与**commit subject**，要求操作者确认；拒绝确认或非交互环境即中止，`RELEASE_YES=1` 只跳过这一步确认。
+5. 推送 `HEAD:main` 到目标。
 
-命令**只读本仓与远端状态（CI、目标仓 `main`），只推目标仓，不写任何文件**：不追加日志、不建 commit、不打 tag、不 amend、不 force-push；发布前后本仓的 `HEAD` 与工作区都不变（变化只发生在目标仓的 `main`）。
+命令**只读本仓与远端状态（CI、目标仓 `main`），只推目标仓，不写任何文件**：不追加日志、不建 commit、不打 tag、不 amend、不 force-push；发布前后本仓的 `HEAD` 与工作区都不变（变化只发生在目标仓的 `main`）。不提供 `--force`；目标只来自位置参数，脚本不按名字解释它（`interface-test` 与 `someone/interface-dev` 都只是 URL 的一部分，不改变构建变体）。
 
 发布记录**不放在任何仓里**。三仓共享同一条历史，任何仓内文件都会被原样推到下一个仓，无法说明它记的是哪个仓的发布——这正是 owner 否决 `docs/release-log.md` 的原因（Context）。审计痕迹由三件仓外证据构成：
 
@@ -100,7 +108,7 @@ Git tag 只用于标记里程碑，**不是同步的前置条件**；同步只�
 
 环境变体在 CI 里选择，不在仓里分叉：
 
-- CI 从**仓库标识**选择变体：`LOVE20BSC/interface-dev` → `dev`，`LOVE20BSC/interface-test` → `test`，**其余一律 `prod`**（fork 天然落在这一支，因为它们不叫这两个官方仓库名）。匹配必须用**完整标识 `owner/repo`**，不能只用裸仓库名——fork 可能叫 `someone/interface-dev`，裸名匹配会让它误命中 dev。
+- CI 从**仓库名关键字**选择变体：仓库名（`github.repository` 中 `/` 之后的部分，转小写后）含 `dev` → `dev`；否则含 `test` → `test`；否则 `prod`。判定按 `dev` → `test` → `prod` 顺序短路，同一仓库名永远得到同一结果。**已接受的代价**：名字含 `dev` 的 fork（如 `someone/interface-dev`）会构建 dev 变体；owner 明确接受这一点，换取 `interface1` / `interface2` / `interface3` 这类用于拆分带宽的仓库（名字不含 `dev` 或 `test`）自动落 `prod`。
 - 仓库变量 `VITE_ENV`（`dev|test|prod`）可显式覆盖上述规则；它只影响构建，不改变代码。
 - 选择结果只决定 `vite build` 用哪份环境包；组件、hook、数据层仍然零环境分支（§2）。
 
@@ -109,7 +117,7 @@ Git tag 只用于标记里程碑，**不是同步的前置条件**；同步只�
 - 任一仓上做 merge（包括网页上的 “Merge pull request”）都会产生别的仓没有的 commit，破坏同一性；目标仓不接受 merge。
 - 目标仓禁止 force-push：它改写历史，使源 `HEAD` 不再是目标 `main` 的后续，发布随即失败。
 - 目标 `main` 若被他人推进，fast-forward 检查失败；处理方式是查清原因、恢复目标后重跑，**不得用 merge / force 绕过**。
-- fork 没有匹配的仓库标识，默认按 prod 构建；因此 prod 变体的页头必须常驻可见的**「正式版」徽章**，让用户能区分官方站点与 fork。徽章是提示，不是安全边界。
+- 名字不含 `dev` / `test` 的 fork 按 prod 构建；因此 prod 变体的页头必须常驻可见的**「正式版」徽章**，让用户能区分官方站点与 fork（名字含 `dev` 的 fork 走 dev 变体，显示测试网横幅而不是「正式版」）。徽章是提示，不是安全边界。
 
 ## Consequences
 
@@ -120,9 +128,9 @@ Git tag 只用于标记里程碑，**不是同步的前置条件**；同步只�
 - **仓内没有发布历史**：查“某个 commit 什么时候进了 test/prod”要去 GitHub 的 Actions run 列表与 Pages `deployments` 页，不能在仓库里 `git log docs/…`。这是刻意取舍：仓内日志会被推到下一个仓并产生归属歧义（Context），而共享 SHA + GitHub 记录不需要额外维护。
 - 每次上游合约变更都要重跑生成器并提交产物，否则门禁红；这是刻意的摩擦。
 - 漂移门禁不能跑在前端仓自己的 CI 里（没有 `forge`、没有兄弟仓），必须挂在能检出源码的 job 上；前端仓只能校验 manifest 格式与来源 SHA 的存在性。这个分工要写进 workflow 注释，否则下一个人会以为门禁不存在。
-- 发布只能 fast-forward：任何热修都必须先落 `interface-dev`，再逐级 `release:test` / `release:prod`；不能在目标仓直接改，也不能靠 merge 把目标仓的提交带回。
+- 发布只能 fast-forward：任何热修都必须先落 `interface-dev`，再逐级 `pnpm release-to LOVE20BSC/interface-test`、`pnpm release-to LOVE20BSC/interface`；不能在目标仓直接改，也不能靠 merge 把目标仓的提交带回。
 - 不变量依赖分支保护：三仓都要禁止 force-push、禁止在 `main` 上 merge / 直接提交；任一仓的网页 merge 都会让下一次发布失败。
-- fork 默认构建 prod，必须显示「正式版」徽章；徽章只是提示，不能阻止 fork 复制代码或地址。
+- 名字不含 `dev` / `test` 的 fork 按 prod 构建并显示「正式版」徽章；名字含 `dev` 的 fork 构建 dev 变体（§5 的已接受代价）。徽章只是提示，不能阻止 fork 复制代码或地址。
 - 地址来源分离：dev 依赖 anvil 的 export（会随重建变化），test/prod 依赖合约仓的一次性 `addresses.*.params`；当前合约仓只有 `anvil31337_dev` 目录，test/prod 地址文件尚未生成，发布前必须补齐。
 - 环境包全部公开：地址、chainId、WalletConnect `projectId` 都是公开标识，但每个变体要用自己的 `projectId` 并把 origin 精确加进 allowlist（生效约 15 分钟）；且**只有一个域名能被钱包标记为已验证**，多域名（项目路径 + 自定义域名）里只能选一个。
 - 本地 dev 变体（31337）无法可靠地给手机用：钱包按规范须拒绝 `http:` RPC，且同一 `chainId` 不能被添加两次——地址/端口一改，用户只能手动删网络。

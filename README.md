@@ -37,8 +37,8 @@ pnpm gen:errors     # regenerate src/config/errors.generated.ts
 - fails if any shipped chunk contains WalletConnect / AppKit / MetaMask SDK bytes.
 
 Current entry: **~152 kB gzip** (React 19.1 + viem is most of it). Overlay code and secondary
-routes are split so the first paint stays inside the budget. The stricter 150 kB line in
-ADR-0001 is missed by ~2 kB; see “Decisions” below.
+routes are split so the first paint stays inside the budget; this is under ADR-0001's 160 kB
+warning line, with the 200 kB hard gate as the actual failure.
 
 ## Layout
 
@@ -65,7 +65,10 @@ Dependency direction is **app → pages → widgets → features → entities �
 
 ## Environment injection (ADR-0002)
 
-Only one switch exists: `VITE_ENV` (`dev` | `test` | `prod`), falling back to the Vite mode.
+The only explicit switch is `VITE_ENV` (`dev` | `test` | `prod`), falling back to the Vite mode;
+in CI the default comes from the repository name (contains `dev` → dev; else contains `test` →
+test; else prod; ADR-0002 §5), and `vars.VITE_ENV` overrides it. A fork whose name contains
+`dev` therefore builds dev — an accepted consequence of the keyword rule.
 `vite.config.ts` aliases `@deployments` to exactly one of:
 
 | variant | file                                          | chain                                   |
@@ -79,10 +82,12 @@ endpoints. The address book has an explicit slot for every ADR-0002 contract
 (`tokenAddress`, `memberNFT`, `launch`, executors, group chat, WETH/factory/router,
 multicall3, airdrop, …) plus `phase`.
 
-**To fill it:** run the anvil repo export, copy `addresses.json` fields into the matching
-deployment file, set `defaultSymbol` to the first token's on-chain `symbol()` (dev may carry
-a test prefix), then set `deployment.blockNumber`. Do not hard-code addresses anywhere else.
-Missing or zero addresses are treated as “not configured” by `isConfiguredAddress()`.
+**To fill it:** run `make bootstrap` in the anvil repo, then copy from the single address book
+`anvil/export/deployments/anvil31337_dev.json` (its `addresses` / `contracts` object, `chainId`
+and block height) into the matching deployment file; ABIs come from `anvil/export/abis/*.json`.
+Set `defaultSymbol` to the first token's on-chain `symbol()` (dev may carry a test prefix).
+Do not hard-code addresses anywhere else. Missing or zero addresses are treated as “not
+configured” by `isConfiguredAddress()`.
 
 Brand strings come from the current community token's on-chain `name()` / `symbol()`
 (`entities/community-token`); `LOVE20` is only the fallback when the chain cannot be read.
@@ -157,10 +162,11 @@ and a separate `awaiting-phase-end` state models the current round’s mint. Bou
   a blocking “有新版本，请刷新” sheet. `vite:preloadError` reloads once per tab, then falls back to
   the same mismatch notice.
 - No service worker, no PWA manifest, no runtime config fetch, no custom headers.
-- `.github/workflows/deploy.yml` builds → uploads `dist` → deploys Pages. It expects repo variables
-  `VITE_ENV`, `VITE_BASE`, `VITE_SITE_ORIGIN`; defaults contain `__GH_OWNER__` / `__GH_REPO__`
-  placeholders that must be replaced. The ABI drift gate must run in the contract/anvil job
-  (this repo has no forge and no sibling repos).
+- `.github/workflows/deploy.yml` builds → uploads `dist` → deploys Pages. The variant is derived
+  from the repository name (contains `dev` → dev; else contains `test` → test; else prod); repo
+  variables `VITE_ENV`, `VITE_BASE`, `VITE_SITE_ORIGIN` are overrides, and there are no
+  `__GH_OWNER__` / `__GH_REPO__` placeholders. The ABI drift gate must run in the contract/anvil
+  job (this repo has no forge and no sibling repos).
 
 ## What is stubbed / next agent checklist
 

@@ -7,7 +7,7 @@
 
 ## Context
 
-部署面是固定的：三个环境各一个仓库，各自一个 GitHub Pages 站点（dev 对应本地 anvil / 测试网，test 对应公开测试合约，prod 对应生产）。没有后端，没有服务端渲染，没有自己的 HTTP 服务器。评测依据是 `.research/static-hosting-and-ux.md` 的实测结果（2026-11-11，Node 24.12.0 / pnpm 11.5.1 / anvil 1.8.1 / vite 6.4.5），关键几条：
+部署面是固定的：三个环境各一个仓库，各自一个 GitHub Pages 站点（dev 只对应本地 anvil 31337，test 对应公开测试合约，prod 对应生产；测试网属于 test 变体，不属于 dev）。没有后端，没有服务端渲染，没有自己的 HTTP 服务器。评测依据是 `.research/static-hosting-and-ux.md` 的实测结果（2026-11-11，Node 24.12.0 / pnpm 11.5.1 / anvil 1.8.1 / vite 6.4.5），关键几条：
 
 | 事实 | 数值 / 表现 |
 | --- | --- |

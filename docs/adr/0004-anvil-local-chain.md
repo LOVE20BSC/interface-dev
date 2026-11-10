@@ -31,9 +31,9 @@
 
 seed 不使用 `deal`、`anvil_setStorageAt` 或任何状态伪造；每个测试账户用自己的私钥签交易，顺序是：
 
-**空投 claim → 用领到的 LOVE20 铸造 MemberNFT → `Stake.stakeLiquidity` 注入首个池子**。
+**铸造空投份额（合约 `claim`）→ 用铸造到的 LOVE20 铸造 MemberNFT → `Stake.stakeLiquidity` 注入首个池子**。
 
-原因：`Launch` 只 `createPair`，交易对按设计是**零储备**的，所以第一个可交易的池子只能由成员主动质押流动性产生。fixture 覆盖 10 个账户（各 1e17 share）；前 5 个领空投并铸造身份，member 0 再质押 2e23 首币 + 1e20 WETH，得到 200,000 token / 100 WETH 的初始池。这条路径同时证明“空投 → 身份 → 流动性 → 治理权重”的 onboarding 漏斗可达：`Stake` 把 `liquidityShares` 记为 `govVotes`，seed 出的成员可以直接投票/提交。
+原因：`Launch` 只 `createPair`，交易对按设计是**零储备**的，所以第一个可交易的池子只能由成员主动质押流动性产生。fixture 覆盖 10 个账户（各 1e17 share）；前 5 个铸造空投份额并铸造身份，member 0 再质押 2e23 首币 + 1e20 WETH，得到 200,000 token / 100 WETH 的初始池。这条路径同时证明“空投 → 身份 → 流动性 → 治理权重”的 onboarding 漏斗可达：`Stake` 把 `liquidityShares` 记为 `govVotes`，seed 出的成员可以直接投票/提交。
 
 ### 4. Airdrop 必须先于 core
 
@@ -43,9 +43,9 @@ vendored 的 Airdrop（来自 `LOVE20TKM/burn`）没有实现 `ILaunchDistributo
 
 ### 5. 端口策略
 
-默认 `127.0.0.1:8545`。`make anvil` 只在能确认“这是自己启动的链”时才复用（`.anvil/anvil.pid` 与端点匹配）；否则拒绝附着，并打印“停掉它”或“换端口”两条出路。`PORT=` / `HOST=` 会同时移动 anvil 进程与所有 RPC URL。
+默认且规范端口是 **`127.0.0.1:8545`**：`make bootstrap` 与 `make anvil` 都按它起链，前端环境包的 `rpcUrls` 只能有一条，规范值就是这条 8545。`make anvil` 只在能确认“这是自己启动的链”时才复用（`.anvil/anvil.pid` 与端点匹配）；否则拒绝附着，并打印“停掉它”或“换端口”两条出路。`PORT=` / `HOST=` 会同时移动 anvil 进程与所有 RPC URL，但只作一次性逃生口。
 
-**已观察到的冲突（不是设计）**：一次验证运行时，一个更早的前端 checkout 留下的 anvil 占着 8545 已有一整天，因此实际验证在 8555 上完成。本仓不杀不是自己启动的进程；`export/deployments/anvil31337_dev.json` 仍写该 profile 的规范 `rpcUrl`（8545），地址与块高来自 8555 的那次运行，且在全新链上可复现。端口冲突应通过 `PORT=` 或停掉占用者解决，不能把 8555 当成默认值。
+**早前在 8555 上完成验证，是因为外来 anvil 占着 8545（历史原因，不是第二个默认值）**：一次验证运行时，一个更早的前端 checkout 留下的 anvil 已在 8545 上跑了一整天，因此那次用 `PORT=8555` 完成；`export/deployments/anvil31337_dev.json` 仍写该 profile 的规范 `rpcUrl`（8545），地址与块高来自 8555 的那次运行，且在全新链上可复现。**同一时刻只允许一条本地链**：前端只指向一个 RPC，两条 anvil 并行会让导出地址与页面读数分属两条链。端口冲突时先停掉占用 8545 的进程，再 `make bootstrap`；本仓不杀不是自己启动的进程。
 
 ### 6. Export 契约
 
@@ -69,7 +69,7 @@ dev profile 以 **100 块/phase** 为准；`--block-time 1` 下一 phase ≈ **1
 
 - 仅用于本地：没有 BSC profile，也不能替代 testnet/mainnet 的一次性部署；那些地址仍来自合约仓的 `addresses.*.params`（ADR-0002）。
 - `dex/build` 必须先存在；`make bootstrap` 约 75 秒；`deploy` + `seed` 每个部署只能跑一次，重跑会得到新地址。
-- 地址只在全新链上确定，块高不确定；端口 8545 可能被别的 anvil 占用（见 §5）。
+- 地址只在全新链上确定，块高不确定；规范端口 8545 可能被别的 anvil 占用，先停掉占用者再 `make bootstrap`（见 §5）。
 - 本地链无法可靠给手机钱包用（钱包拒绝 `http:` RPC），移动端验收仍走测试网或 HTTPS 隧道（ADR-0001）。
 - 当前导出文件的 `params` 与 `deployer` 是空/零，README §5 的示例却给了值；地址消费不受影响，但不要把它们当环境参数来源。
 - 已知漂移：phase 块数 120 → 100 尚未落到 anvil 仓（§7）；修正前，`make verify` 报的 `Phase.ORIGIN_PHASE_BLOCKS()` 与本文档不一致。
