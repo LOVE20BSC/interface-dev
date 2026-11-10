@@ -188,10 +188,10 @@ and a separate `awaiting-phase-end` state models the current round’s mint. Bou
 
 ## Decisions where the ADRs/spec were silent or conflicting
 
-- **Bottom-nav center tab**: the task asked for a raised center action tab; the later
-  `docs/product/m0-ux-spec.md` says not to raise it because the action feature is a placeholder.
-  This build follows the task instruction and raises 行动, while the four other tabs are plain.
-  Reverting is a one-line change in `app/shell/bottom-nav.tsx`.
+- **Bottom-nav center tab**: all five tabs share one plain treatment. The original task asked
+  for a raised center action tab, but M0's 行动 page is only a placeholder; a raised
+  primary-action disc would over-promise, so the owner chose no raised tab (matching
+  `docs/product/m0-ux-spec.md`).
 - **Route names**: used `/gov`, `/act`, `/group`, `/me` per the task, not the longer
   `/governance`, `/actions`, `/groups` from the UX spec.
 - **React pin**: 19.1.0 instead of latest 19.3.x to hold the first-screen budget; typing stays

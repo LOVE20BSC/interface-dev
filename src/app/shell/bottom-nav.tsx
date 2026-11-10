@@ -8,9 +8,11 @@ function navTo(item: NavItem, search: string) {
 }
 
 /**
- * Mobile tab bar: five tabs, center tab raised. This is the only mobile nav;
- * the desktop sidebar is a separate component (never a CSS-converted bottom bar).
- * The bar reserves env(safe-area-inset-bottom) for iPhones.
+ * Mobile tab bar: five tabs with one shared treatment. The center 行动 tab is a
+ * placeholder in M0, so it is deliberately not raised — a primary-action disc
+ * would over-promise a feature that does not exist yet. This is the only mobile
+ * nav; the desktop sidebar is a separate component (never a CSS-converted bottom
+ * bar). The bar reserves env(safe-area-inset-bottom) for iPhones.
  */
 export function BottomNav() {
   const location = useLocation();
@@ -35,22 +37,11 @@ export function BottomNav() {
                   active ? 'text-brand-strong' : 'text-muted',
                 )}
               >
-                {item.raised === true ? (
-                  <span
-                    className={cn(
-                      '-mt-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-b from-brand to-indigo-600 text-white shadow-lg ring-4 ring-background transition-transform',
-                      active ? 'scale-105' : 'group-active:scale-95',
-                    )}
-                  >
-                    <Icon className="h-[22px] w-[22px]" aria-hidden="true" />
-                  </span>
-                ) : (
-                  <Icon
-                    className={cn('h-[22px] w-[22px]', active ? 'stroke-[2.4]' : 'stroke-2')}
-                    aria-hidden="true"
-                  />
-                )}
-                <span className={cn(item.raised === true && '-mt-0.5')}>{item.label}</span>
+                <Icon
+                  className={cn('h-[22px] w-[22px]', active ? 'stroke-[2.4]' : 'stroke-2')}
+                  aria-hidden="true"
+                />
+                <span>{item.label}</span>
                 {item.placeholder ? (
                   <span className="sr-only">（{copy.common.comingSoon}）</span>
                 ) : null}

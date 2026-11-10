@@ -169,7 +169,7 @@ export const copy = {
     identityInvalidated: '这个身份已不属于当前钱包',
     chooseIdentityTitle: '还没有选择当前身份',
     chooseIdentityBody: '这个钱包持有身份。去「我的 NFT」选一个作为当前身份。',
-    eligibilityTitle: '您参与了销毁活动，获得空投铸造资格',
+    eligibilityTitle: '你参与了销毁活动，获得空投铸造资格',
     mintAirdrop: '铸造空投份额',
     eligibilityUnavailable: '空投资格暂时读不到',
     balanceLabel: (symbol: string) => `${symbol} 余额`,

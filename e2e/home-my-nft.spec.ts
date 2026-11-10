@@ -182,7 +182,7 @@ test('home: connected without identity offers 我的 NFT only', async ({ page })
   await expect(page.getByRole('link', { name: '去我的 NFT' })).toBeVisible();
   await expect(page.getByRole('button', { name: '铸造身份' })).toHaveCount(0);
   await expect(page.getByText('无需操作')).toHaveCount(0);
-  await expect(page.getByText('您参与了销毁活动，获得空投铸造资格')).toHaveCount(0);
+  await expect(page.getByText('你参与了销毁活动，获得空投铸造资格')).toHaveCount(0);
   expect(await countSolidButtons(page)).toBe(0);
 
   await shot(page, 'home-connected-no-identity.png');
@@ -211,7 +211,7 @@ test('home: eligible wallet sees the airdrop card', async ({ page }) => {
   await page.goto('/');
   await connect(page);
 
-  const title = page.getByText('您参与了销毁活动，获得空投铸造资格');
+  const title = page.getByText('你参与了销毁活动，获得空投铸造资格');
   await expect(title).toBeVisible({ timeout: 20_000 });
   const card = page.locator('section[aria-labelledby="airdrop-eligibility-title"]');
   await expect(card.getByRole('link', { name: '铸造空投份额' })).toBeVisible();
@@ -230,7 +230,7 @@ test('home: a non-eligible account never sees the airdrop card', async ({ page }
   await page.goto('/');
   await connect(page);
   await snapshotLoaded;
-  await expect(page.getByText('您参与了销毁活动，获得空投铸造资格')).toHaveCount(0);
+  await expect(page.getByText('你参与了销毁活动，获得空投铸造资格')).toHaveCount(0);
   await expect(page.getByText('无需操作')).toHaveCount(0);
 });
 

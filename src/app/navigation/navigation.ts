@@ -12,8 +12,6 @@ export interface NavItem {
   readonly icon: LucideIcon;
   /** M0: only 首页 has real content; the rest are labelled placeholders. */
   readonly placeholder: boolean;
-  /** The raised center tab on mobile. */
-  readonly raised?: boolean;
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -40,7 +38,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
     ariaLabel: copy.nav.actAria,
     icon: ListChecks,
     placeholder: true,
-    raised: true,
   },
   {
     key: 'group',

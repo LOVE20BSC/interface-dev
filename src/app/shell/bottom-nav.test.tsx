@@ -25,7 +25,8 @@ describe('BottomNav', () => {
       '链群',
       '我的',
     ]);
-    expect(NAV_ITEMS.filter((item) => item.raised).map((item) => item.key)).toEqual(['act']);
+    // M0: the 行动 page is a placeholder, so this build has no raised center tab.
+    expect(NAV_ITEMS.some((item) => 'raised' in item)).toBe(false);
   });
 
   it('marks the active tab and preserves ?symbol= on every link', () => {
@@ -37,10 +38,14 @@ describe('BottomNav', () => {
     }
   });
 
-  it('keeps the center action tab labelled and reachable', () => {
+  it('renders the center action tab as a normal tab, not a raised disc', () => {
     const nav = renderAt('/?symbol=LOVE20');
     const action = within(nav).getByRole('link', { name: /行动/ });
+    const peer = within(nav).getByRole('link', { name: /治理/ });
     expect(action.getAttribute('href')).toContain('/act');
     expect(action.getAttribute('href')).toContain('symbol=LOVE20');
+    // Same treatment as every other tab: no disc wrapper, no extra label offset.
+    expect(action.className).toBe(peer.className);
+    expect(action.querySelector('span')?.className).toBe(peer.querySelector('span')?.className);
   });
 });
