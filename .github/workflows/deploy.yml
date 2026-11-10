@@ -1,12 +1,28 @@
 name: deploy-pages
 
-# Static hosting only: build → upload-pages-artifact → deploy-pages.
-# No server, no secrets, no third-party API calls.
+# Deploy exactly one build variant per repository to GitHub Pages (ADR-0002 §5).
 #
-# Replace __GH_OWNER__ / __GH_REPO__ with the real owner/repo (or set the repo
-# variables VITE_ENV / VITE_BASE / VITE_SITE_ORIGIN in Settings → Variables).
-# One artifact serves one hosting shape (project path vs custom domain), so the
-# base must be provided at build time.
+# Environment selection is by full repository identity, never by branch:
+#   LOVE20BSC/interface-dev   -> dev   (base /interface-dev/)
+#   LOVE20BSC/interface-test  -> test  (base /interface-test/)
+#   everything else (forks)   -> prod  (base /)
+# `vars.VITE_ENV` (dev|test|prod) explicitly overrides the environment and
+# `vars.VITE_BASE` overrides the base path. Only the `prepare` job branches;
+# the build receives plain VITE_ENV / VITE_BASE / VITE_SITE_ORIGIN values.
+#
+# Placeholders: none. All three repository names and the LOVE20BSC owner are
+# known today, so the base paths and the default site origin are real values,
+# not __GH_OWNER__ / __GH_REPO__ placeholders. When prod moves to a custom
+# domain, set the repository variable VITE_SITE_ORIGIN (e.g.
+# https://love20.example) instead of editing this file.
+#
+# release-guard (comment only, no enforcement): production deploys of
+# LOVE20BSC/interface are supposed to arrive only through `pnpm release:prod`,
+# i.e. a fast-forward push whose commit was already released to test
+# (ADR-0002 §4). Actions cannot tell that push apart from a direct push or a
+# web-UI merge, so nothing in this workflow enforces the rule. The invariant
+# relies on branch protection in all three repositories: no direct pushes to
+# `main`, no pull-request merges, no force-pushes.
 
 on:
   push:
@@ -23,7 +39,83 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  prepare:
+    name: Resolve build variant
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.resolve.outputs.environment }}
+      base_path: ${{ steps.resolve.outputs.base_path }}
+      site_origin: ${{ steps.resolve.outputs.site_origin }}
+    steps:
+      - name: Resolve environment and base path
+        id: resolve
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          VITE_ENV_OVERRIDE: ${{ vars.VITE_ENV }}
+          VITE_BASE_OVERRIDE: ${{ vars.VITE_BASE }}
+          VITE_SITE_ORIGIN_OVERRIDE: ${{ vars.VITE_SITE_ORIGIN }}
+        run: |
+          set -euo pipefail
+
+          # ADR-0002 §5: match the complete owner/repo identifier, never a bare
+          # repository name (a fork may be named someone/interface-dev).
+          if [[ -n "${VITE_ENV_OVERRIDE}" ]]; then
+            environment="${VITE_ENV_OVERRIDE}"
+          else
+            case "${REPOSITORY}" in
+              LOVE20BSC/interface-dev) environment="dev" ;;
+              LOVE20BSC/interface-test) environment="test" ;;
+              *) environment="prod" ;;
+            esac
+          fi
+
+          # Base path follows the repository being deployed, not the VITE_ENV
+          # override: it is the Pages project path this repo serves from. Forks
+          # resolve to prod and default to root; set vars.VITE_BASE if a fork is
+          # deployed as a project site.
+          case "${REPOSITORY}" in
+            LOVE20BSC/interface-dev) default_base="/interface-dev/" ;;
+            LOVE20BSC/interface-test) default_base="/interface-test/" ;;
+            *) default_base="/" ;;
+          esac
+          base_path="${VITE_BASE_OVERRIDE:-${default_base}}"
+          [[ "${base_path}" == /* ]] || base_path="/${base_path}"
+          [[ "${base_path}" == */ ]] || base_path="${base_path}/"
+
+          case "${environment}" in
+            dev|test|prod) ;;
+            *)
+              echo "::error::vars.VITE_ENV must be dev, test or prod (got '${environment}')."
+              exit 1
+              ;;
+          esac
+
+          if [[ -n "${VITE_SITE_ORIGIN_OVERRIDE}" ]]; then
+            site_origin="${VITE_SITE_ORIGIN_OVERRIDE}"
+          else
+            # tr instead of ${VAR,,} so the script also runs on bash 3.2 (macOS)
+            # while producing the same lowercase Pages host.
+            owner_lower="$(printf '%s' "${REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+            site_origin="https://${owner_lower}.github.io"
+          fi
+
+          {
+            echo "environment=${environment}"
+            echo "base_path=${base_path}"
+            echo "site_origin=${site_origin}"
+          } >> "${GITHUB_OUTPUT}"
+
+          {
+            echo "### Build variant"
+            echo ""
+            echo "| repository | vars.VITE_ENV | environment | base path | site origin |"
+            echo "| --- | --- | --- | --- | --- |"
+            echo "| \`${REPOSITORY}\` | \`${VITE_ENV_OVERRIDE:-<unset>}\` | \`${environment}\` | \`${base_path}\` | \`${site_origin}\` |"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  check:
+    name: Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,21 +132,45 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
-
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
 
       - name: Unit tests
         run: pnpm test
 
-      - name: Build (bundle budget + wallet SDK gate inside)
+      - name: Build
+        run: pnpm build
+
+  build:
+    name: Build
+    needs: [prepare, check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # No conditionals here: prepare already resolved the variant and base.
+      # `pnpm build` runs typecheck, vite build, postbuild and the bundle budget.
+      - name: Build
         run: pnpm build
         env:
-          VITE_ENV: ${{ vars.VITE_ENV || 'dev' }}
-          VITE_BASE: ${{ vars.VITE_BASE || '/__GH_REPO__/' }}
-          VITE_SITE_ORIGIN: ${{ vars.VITE_SITE_ORIGIN || 'https://__GH_OWNER__.github.io' }}
+          VITE_ENV: ${{ needs.prepare.outputs.environment }}
+          VITE_BASE: ${{ needs.prepare.outputs.base_path }}
+          VITE_SITE_ORIGIN: ${{ needs.prepare.outputs.site_origin }}
 
       # The ABI drift gate (ADR-0002 §3.4) cannot run here: this checkout has no
       # forge and no sibling contract repos. It belongs in the anvil/contracts
@@ -63,14 +179,18 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
-    needs: build
+    name: Deploy to GitHub Pages
+    needs: [check, build]
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
