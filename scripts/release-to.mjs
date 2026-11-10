@@ -1,8 +1,18 @@
 #!/usr/bin/env node
-// Fast-forward release helper for the three-repository model (ADR-0002 §4).
+// Generic fast-forward release helper: push this exact commit to that repository.
 //
-//   pnpm release:test   -> LOVE20BSC/interface-test (git remote "test")
-//   pnpm release:prod   -> LOVE20BSC/interface      (git remote "prod")
+//   node scripts/release-to.mjs [--dry-run] <target>
+//
+// <target> answers one question only: where should HEAD be pushed? It is never
+// interpreted as an environment. Accepted forms, resolved in this order:
+//
+//   1. owner/repo     -> https://github.com/owner/repo.git
+//   2. full git URL   -> used verbatim (contains "://" or starts with "git@")
+//   3. local path     -> used verbatim (starts with /, ./, ../, or exists)
+//   4. bare repo name -> the owner is read from the "origin" remote at runtime:
+//                        https://github.com/<origin-owner>/<name>.git
+//                        If origin is missing or not a GitHub URL the command
+//                        fails and asks for an explicit owner/repo.
 //
 // The command is deliberately write-free: it never commits, tags, amends,
 // force-pushes, or writes a log file. Preflight order:
@@ -10,28 +20,19 @@
 //   1. working tree clean, including untracked files
 //   2. CI green for this exact SHA (or a loud RELEASE_SKIP_CI_CHECK=1)
 //   3. target main is an ancestor of HEAD (fetch first; fast-forward only)
-//   4. print SHA / target / commit summary and ask for confirmation
-//   5. git push <remote> HEAD:main
-//
-// Remote resolution, so releases work before the GitHub repositories exist:
-//   1. RELEASE_REMOTE_URL_<TEST|PROD>  direct URL or path (highest precedence)
-//   2. RELEASE_REMOTE_<TEST|PROD>      configured remote name, or a URL/path
-//   3. a git remote literally named "test" / "prod"
-// A missing remote is an error, never a silent no-op.
+//   4. print source SHA / resolved target / commit subject(s), then confirm
+//   5. git push <target> HEAD:main
 //
 // RELEASE_YES=1 skips only the final confirmation. RELEASE_SKIP_CI_CHECK=1
 // skips only the CI gate (with a prominent warning). --dry-run runs every
-// preflight and prints the plan, never pushes and never prompts; it still
+// preflight and prints the plan, but never pushes and never prompts; it still
 // aborts on a dirty tree, a non-fast-forward, or an unreadable target.
 
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { stdin as input, stdout as output } from 'node:process';
 import { createInterface } from 'node:readline/promises';
-
-const TARGETS = Object.freeze({
-  test: Object.freeze({ repo: 'LOVE20BSC/interface-test', remote: 'test' }),
-  prod: Object.freeze({ repo: 'LOVE20BSC/interface', remote: 'prod' }),
-});
 
 const EXIT = Object.freeze({
   OK: 0,
@@ -40,7 +41,7 @@ const EXIT = Object.freeze({
   DIRTY: 3,
   CI: 4,
   NOT_FAST_FORWARD: 5,
-  REMOTE: 6,
+  TARGET: 6,
   FETCH: 7,
   CONFIRM: 8,
   PUSH: 9,
@@ -58,6 +59,7 @@ const CI_BAD_CONCLUSIONS = new Set([
 // they never reach a commit, so they must not block a release.
 const LOCAL_ONLY_PREFIXES = Object.freeze(['.research/', 'dist/']);
 
+const MAX_SUBJECTS = 20;
 const MAX_BUFFER = 10 * 1024 * 1024;
 
 // Set once main() has parsed its arguments, so `--help` also works outside a
@@ -133,6 +135,11 @@ function isInteractive() {
   return Boolean(input.isTTY);
 }
 
+function shellArg(value) {
+  if (/^[A-Za-z0-9_./:@%+=,-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 function git(args, options = {}) {
   const { allowFailure = false, timeoutMs = 120_000 } = options;
   const result = spawnSync('git', args, {
@@ -161,26 +168,25 @@ function git(args, options = {}) {
 
 function usageText() {
   return [
-    'Usage: node scripts/release.mjs --target <test|prod> [--dry-run]',
+    'Usage: node scripts/release-to.mjs [--dry-run] <target>',
+    '',
+    '  <target>  where to push this commit. Four forms, resolved in order:',
+    '              owner/repo    GitHub repository -> https://github.com/owner/repo.git',
+    '              <git URL>     used verbatim (https://..., ssh://..., git@host:...)',
+    '              <local path>  /abs, ./rel, ../rel, or an existing path; used verbatim',
+    '              <bare name>   https://github.com/<owner-of-origin>/<name>.git',
+    "            A bare name reads the owner from the current repository's",
+    '            "origin" remote; origin must be a GitHub URL.',
     '',
     '  --dry-run  run every preflight and print the plan, but never push or prompt.',
     '',
-    'Targets:',
-    '  test  LOVE20BSC/interface-test  (default git remote "test")',
-    '  prod  LOVE20BSC/interface       (default git remote "prod")',
-    '',
-    'Overrides:',
-    '  RELEASE_REMOTE_TEST / RELEASE_REMOTE_PROD          remote name or URL/path',
-    '  RELEASE_REMOTE_URL_TEST / RELEASE_REMOTE_URL_PROD  direct URL/path (wins)',
+    'Environment:',
     '  RELEASE_SKIP_CI_CHECK=1  skip the CI-green gate (prints a loud warning)',
     '  RELEASE_YES=1            skip the final interactive confirmation',
     '',
-    'A missing remote is an error. Configuration wins in this order:',
-    '  RELEASE_REMOTE_URL_<TARGET> > RELEASE_REMOTE_<TARGET> > remote "test"/"prod".',
-    '',
     'Exit codes:',
     '  0 success   1 internal error   2 usage   3 dirty tree',
-    '  4 CI not green or unverified   5 not fast-forward   6 remote not configured',
+    '  4 CI not green or unverified   5 not fast-forward   6 target not resolvable',
     '  7 fetch failed   8 confirmation refused/unavailable   9 push failed',
     '',
     'The command writes no files: no log, no commit, no tag, no amend, no force.',
@@ -190,34 +196,185 @@ function usageText() {
 function parseArgs(argv) {
   let target;
   let dryRun = false;
+  let optionsEnded = false;
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === '--dry-run') {
+    if (!optionsEnded && arg === '--') {
+      optionsEnded = true;
+    } else if (!optionsEnded && arg === '--dry-run') {
       dryRun = true;
-    } else if (arg === '--target') {
-      target = argv[index + 1];
-      index += 1;
-      if (target === undefined || target.startsWith('-')) {
-        fail(EXIT.USAGE, '--target requires a value (test or prod).', [
-          'Run with --help for usage.',
-        ]);
-      }
-    } else if (arg.startsWith('--target=')) {
-      target = arg.slice('--target='.length);
-    } else if (arg === '--help' || arg === '-h') {
+    } else if (!optionsEnded && (arg === '--help' || arg === '-h')) {
       console.log(usageText());
       return null;
+    } else if (!optionsEnded && arg.startsWith('-') && arg !== '-') {
+      fail(EXIT.USAGE, `Unknown option: ${arg}`, ['Run with --help for usage.']);
+    } else if (target !== undefined) {
+      fail(EXIT.USAGE, `Unexpected extra argument: ${arg}`, ['Exactly one <target> is accepted.']);
     } else {
-      fail(EXIT.USAGE, `Unknown argument: ${arg}`, ['Run with --help for usage.']);
+      target = arg;
     }
   }
-  if (target === undefined || target.length === 0) {
-    fail(EXIT.USAGE, 'Missing --target.', ['Expected --target test or --target prod.']);
+  if (target === undefined || target.trim().length === 0) {
+    fail(EXIT.USAGE, 'Missing <target>: where should this commit be pushed?', [
+      'Examples:',
+      '  node scripts/release-to.mjs owner/repo',
+      '  node scripts/release-to.mjs https://github.com/owner/repo.git',
+      '  node scripts/release-to.mjs ../mirror.git',
+      '  node scripts/release-to.mjs <bare-repository-name>',
+    ]);
   }
-  if (!Object.hasOwn(TARGETS, target)) {
-    fail(EXIT.USAGE, `Unknown target "${target}".`, ['Expected "test" or "prod".']);
+  return { target: target.trim(), dryRun };
+}
+
+const OWNER_REPO_RE = /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/;
+const BARE_NAME_RE = /^[A-Za-z0-9._-]+$/;
+
+function stripGitSuffix(value) {
+  return value.endsWith('.git') ? value.slice(0, -4) : value;
+}
+
+function isGitUrl(value) {
+  return value.includes('://') || /^git@[^/\s]+:/.test(value);
+}
+
+function isPathLike(value) {
+  return (
+    value.startsWith('/') ||
+    value.startsWith('./') ||
+    value.startsWith('../') ||
+    value === '.' ||
+    value === '..' ||
+    existsSync(resolve(process.cwd(), value))
+  );
+}
+
+function parseGitHubRepo(value) {
+  const raw = String(value).trim();
+  if (raw.length === 0) return null;
+
+  let host;
+  let owner;
+  let repo;
+  if (raw.startsWith('git@')) {
+    const match = /^git@([^:/\s]+):(.+)$/.exec(raw);
+    if (match === null) return null;
+    host = match[1];
+    const segments = match[2].replace(/^\/+/, '').split('/');
+    if (segments.length !== 2) return null;
+    [owner, repo] = segments;
+  } else {
+    let url;
+    try {
+      url = new URL(raw);
+    } catch {
+      return null;
+    }
+    if (!/^(https?|ssh|git):$/.test(url.protocol)) return null;
+    host = url.hostname;
+    const segments = url.pathname.replace(/^\/+|\/+$/g, '').split('/');
+    if (segments.length !== 2) return null;
+    [owner, repo] = segments;
   }
-  return { target, dryRun };
+
+  if (host.toLowerCase() !== 'github.com') return null;
+  owner = stripGitSuffix(owner);
+  repo = stripGitSuffix(repo);
+  if (!BARE_NAME_RE.test(owner) || !BARE_NAME_RE.test(repo)) return null;
+  return { owner, repo };
+}
+
+function originUrl() {
+  const remote = git(['remote', 'get-url', 'origin'], { allowFailure: true });
+  if (remote.ok && remote.stdout.trim() !== '') return remote.stdout.trim();
+  const config = git(['config', '--get', 'remote.origin.url'], { allowFailure: true });
+  if (config.ok && config.stdout.trim() !== '') return config.stdout.trim();
+  return '';
+}
+
+function resolveBareName(name) {
+  const repo = stripGitSuffix(name);
+  const origin = originUrl();
+  if (origin === '') {
+    fail(
+      EXIT.TARGET,
+      `Cannot expand bare target "${name}": this checkout has no "origin" remote.`,
+      [
+        'Pass the repository explicitly instead:',
+        `  node scripts/release-to.mjs <owner>/${repo}`,
+        `  node scripts/release-to.mjs https://github.com/<owner>/${repo}.git`,
+        'Or add an origin remote so the owner can be derived:',
+        '  git remote add origin git@github.com:<owner>/<repository>.git',
+      ],
+    );
+  }
+
+  const parsed = parseGitHubRepo(origin);
+  if (parsed === null) {
+    fail(
+      EXIT.TARGET,
+      `Cannot expand bare target "${name}": "origin" is not a GitHub URL (${origin}).`,
+      [
+        'Pass the repository explicitly instead:',
+        `  node scripts/release-to.mjs <owner>/${repo}`,
+        `  node scripts/release-to.mjs https://github.com/<owner>/${repo}.git`,
+      ],
+    );
+  }
+
+  return {
+    argument: name,
+    target: `https://github.com/${parsed.owner}/${repo}.git`,
+    display: `https://github.com/${parsed.owner}/${repo}.git`,
+    source: `bare name "${name}", owner "${parsed.owner}" from origin`,
+  };
+}
+
+function resolveTarget(raw) {
+  const value = String(raw).trim();
+
+  // 1. owner/repo. Path-like strings such as "." and ".." are excluded even
+  // though they match the loose segment pattern.
+  if (OWNER_REPO_RE.test(value)) {
+    const segments = value.split('/');
+    const pathLikeSegment = segments.some((segment) => segment === '.' || segment === '..');
+    if (!pathLikeSegment && !isGitUrl(value)) {
+      const owner = segments[0];
+      const repo = stripGitSuffix(segments[1]);
+      const target = `https://github.com/${owner}/${repo}.git`;
+      return { argument: value, target, display: target, source: 'owner/repo' };
+    }
+  }
+
+  // 2. Full git URL, used verbatim.
+  if (isGitUrl(value)) {
+    return { argument: value, target: value, display: value, source: 'git URL (verbatim)' };
+  }
+
+  // 3. Local path, used verbatim. Relative paths are anchored to the caller's
+  // cwd (not the repository root) and passed to git as an absolute path so the
+  // form keeps working from a subdirectory.
+  if (isPathLike(value)) {
+    const absolute = resolve(process.cwd(), value);
+    return {
+      argument: value,
+      target: absolute,
+      display: absolute,
+      source: value === absolute ? 'local path (verbatim)' : `local path "${value}" (verbatim)`,
+    };
+  }
+
+  // 4. Bare repository name, with the owner read from origin at runtime.
+  if (!value.includes('/') && BARE_NAME_RE.test(stripGitSuffix(value))) {
+    return resolveBareName(value);
+  }
+
+  fail(EXIT.TARGET, `Cannot resolve target "${value}".`, [
+    'Accepted forms, in order:',
+    '  owner/repo              e.g. owner/repository',
+    '  full git URL            e.g. https://github.com/owner/repository.git',
+    '  local path              e.g. ../mirror.git or /srv/repository.git',
+    '  bare repository name    e.g. repository (owner read from "origin")',
+  ]);
 }
 
 function resolveHead() {
@@ -313,7 +470,7 @@ function queryCi(sha) {
       state: 'missing',
       message: `No GitHub Actions run found for ${sha}; CI cannot be proven green.`,
       hints: [
-        'Push the commit to LOVE20BSC/interface-dev, wait for CI, then retry.',
+        'Push the commit to the source repository, wait for CI, then retry.',
         'To bypass deliberately: RELEASE_SKIP_CI_CHECK=1 (loud warning).',
       ],
     };
@@ -362,7 +519,7 @@ async function assertCiGreen(sha, dryRun) {
   if (readEnv('RELEASE_SKIP_CI_CHECK') === '1') {
     warn('CI green gate skipped by RELEASE_SKIP_CI_CHECK=1.', [
       'This commit is being released without proof that CI passed.',
-      'CI evidence must come from the same SHA (ADR-0002 §4).',
+      'CI evidence must come from the same SHA.',
     ]);
     console.log('[release] 2/4 CI check skipped on purpose.');
     return;
@@ -396,110 +553,46 @@ async function assertCiGreen(sha, dryRun) {
   }
 }
 
-function listRemotes() {
-  return git(['remote'])
-    .stdout.split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-}
-
-function looksLikeRemote(value) {
-  return (
-    /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ||
-    /^[^\s/]+@[^\s:]+:/.test(value) ||
-    value.startsWith('/') ||
-    value.startsWith('./') ||
-    value.startsWith('../')
-  );
-}
-
-function resolveRemote(targetKey, target) {
-  const suffix = targetKey.toUpperCase();
-  const remotes = listRemotes();
-  const urlOverride = readEnv(`RELEASE_REMOTE_URL_${suffix}`);
-  const namedOverride = readEnv(`RELEASE_REMOTE_${suffix}`);
-
-  if (urlOverride !== '') {
-    return { arg: urlOverride, label: urlOverride, source: `RELEASE_REMOTE_URL_${suffix}` };
-  }
-  if (namedOverride !== '') {
-    if (remotes.includes(namedOverride)) {
-      return { arg: namedOverride, label: namedOverride, source: `RELEASE_REMOTE_${suffix}` };
-    }
-    if (looksLikeRemote(namedOverride)) {
-      return { arg: namedOverride, label: namedOverride, source: `RELEASE_REMOTE_${suffix}` };
-    }
-    fail(
-      EXIT.REMOTE,
-      `RELEASE_REMOTE_${suffix}="${namedOverride}" is neither a configured git remote ` +
-        'nor a git URL/path.',
-      [
-        `Existing remotes: ${remotes.length > 0 ? remotes.join(', ') : '(none)'}`,
-        `Set RELEASE_REMOTE_URL_${suffix} to an explicit URL/path instead.`,
-      ],
-    );
-  }
-  if (remotes.includes(target.remote)) {
-    return { arg: target.remote, label: target.remote, source: 'default remote name' };
-  }
-  fail(
-    EXIT.REMOTE,
-    `No git remote named "${target.remote}" for ${target.repo}, and no override is set.`,
-    [
-      'Configure one of the following, then retry:',
-      `  git remote add ${target.remote} git@github.com:${target.repo}.git`,
-      `  RELEASE_REMOTE_${suffix}=${target.remote} pnpm release:${targetKey}`,
-      `  RELEASE_REMOTE_URL_${suffix}=git@github.com:${target.repo}.git pnpm release:${targetKey}`,
-      `Existing remotes: ${remotes.length > 0 ? remotes.join(', ') : '(none)'}`,
-    ],
-  );
-}
-
-function checkFastForward(head, targetKey) {
-  const target = TARGETS[targetKey];
-  const remote = resolveRemote(targetKey, target);
-  console.log(`[release] Remote: ${remote.label} (from ${remote.source})`);
-
-  const fetched = git(['fetch', '--no-tags', remote.arg, 'main'], { allowFailure: true });
+function checkFastForward(target, head) {
+  console.log(`[release] Fetching "main" from ${target.display} ...`);
+  const fetched = git(['fetch', '--no-tags', target.target, 'main'], { allowFailure: true });
   if (!fetched.ok) {
     const details = firstLines(fetched.stderr || fetched.stdout, 8);
     if (/couldn't find remote ref|could not find remote ref/i.test(details)) {
       fail(
         EXIT.FETCH,
-        `Target ${target.repo} has no "main" branch (empty or not initialised).`,
+        `Target ${target.display} has no "main" branch (empty or not initialised).`,
         [
-          'ADR-0002 expects three long-lived main branches. Seed target main once,',
-          'then every release afterwards must be a fast-forward.',
+          'All participating repositories need one long-lived main branch.',
+          'Seed the target main once, then every release afterwards must be a fast-forward.',
           details,
         ].filter(Boolean),
       );
     }
     fail(
       EXIT.FETCH,
-      `Could not fetch "main" from ${target.repo} via ${remote.label}.`,
+      `Could not fetch "main" from ${target.display}.`,
       [
         details,
-        `Check access: git ls-remote ${remote.arg} main`,
-        `Check the repository exists: gh repo view ${target.repo}`,
+        `Check that the target exists and is readable: git ls-remote ${shellArg(target.target)} main`,
+        'For a local path, check that it exists and is a git repository.',
       ].filter(Boolean),
     );
   }
 
   const targetMain = git(['rev-parse', '--verify', 'FETCH_HEAD^{commit}']).stdout.trim();
-  const ancestor = git(['merge-base', '--is-ancestor', targetMain, head], { allowFailure: true });
+  const ancestor = git(['merge-base', '--is-ancestor', targetMain, 'HEAD'], {
+    allowFailure: true,
+  });
   if (ancestor.status === 1) {
-    const targetOnly = git(['rev-list', '--count', `${head}..${targetMain}`], {
+    const targetOnly = git(['rev-list', '--count', `HEAD..${targetMain}`], {
       allowFailure: true,
     }).stdout.trim();
-    fail(
-      EXIT.NOT_FAST_FORWARD,
-      `Target main ${short(targetMain)} is not an ancestor of HEAD ${short(head)}.`,
-      [
-        `Target-only commit(s): ${targetOnly || 'unknown'}.`,
-        'Fast-forward only: merging or force-pushing is forbidden (ADR-0002 §4/§5).',
-        'Find out who advanced the target, restore it, then re-run the release.',
-      ],
-    );
+    fail(EXIT.NOT_FAST_FORWARD, `Target main ${short(targetMain)} is not an ancestor of HEAD.`, [
+      `Target-only commit(s): ${targetOnly || 'unknown'}.`,
+      'Fast-forward only: merging or force-pushing is forbidden.',
+      'Find out who advanced the target, restore it, then re-run the release.',
+    ]);
   }
   if (ancestor.status !== 0) {
     fail(
@@ -512,51 +605,67 @@ function checkFastForward(head, targetKey) {
     `[release] 3/4 fast-forward check passed: ${short(targetMain)} is an ancestor of HEAD ` +
       `${short(head)}.`,
   );
-  return { target, remote, targetMain };
+  return { targetMain };
 }
 
 function summarizeCommits(targetMain, head) {
-  const count = Number.parseInt(
-    git(['rev-list', '--count', `${targetMain}..${head}`]).stdout.trim(),
-    10,
-  );
+  const raw = git(['rev-list', '--count', `${targetMain}..${head}`]).stdout.trim();
+  const count = Number.parseInt(raw, 10);
   if (!Number.isFinite(count) || count === 0) {
-    return { count: 0, line: 'none (target main already contains HEAD)' };
+    return { count: 0, subjects: [], truncated: false };
   }
-  const newest = git(['log', '--no-decorate', '--format=%h %s', `${targetMain}..${head}`])
+  const subjects = git([
+    'log',
+    '--no-decorate',
+    '--format=%h %s',
+    `--max-count=${MAX_SUBJECTS}`,
+    `${targetMain}..${head}`,
+  ])
     .stdout.split('\n')
-    .filter((line) => line.length > 0)[0];
-  const suffix = count > 1 ? ` (+${count - 1} earlier)` : '';
-  return {
-    count,
-    line: `${count} commit${count === 1 ? '' : 's'} ${short(targetMain)}..${short(head)}: ${newest}${suffix}`,
-  };
+    .filter((line) => line.length > 0);
+  return { count, subjects, truncated: count > subjects.length };
 }
 
-function printPlan(head, target, remote, targetMain, summary) {
+function printPlan(head, target, targetMain, summary) {
   console.log(`[release] Source HEAD  : ${head}`);
-  console.log(`[release] Target repo  : ${target.repo}`);
-  console.log(`[release] Remote       : ${remote.label} (from ${remote.source})`);
+  console.log(`[release] Target       : ${target.display}`);
+  if (target.argument !== target.display) {
+    console.log(`[release] Target arg   : ${target.argument}`);
+  }
+  console.log(`[release] Resolution   : ${target.source}`);
   console.log(`[release] Target main  : ${targetMain}`);
-  console.log(`[release] FF check     : PASS (target main is an ancestor of HEAD)`);
-  console.log(`[release] Commits      : ${summary.line}`);
-  console.log(`[release] Push command : git push ${remote.arg} HEAD:main`);
+  console.log('[release] FF check     : PASS (target main is an ancestor of HEAD)');
+  if (summary.count === 0) {
+    console.log('[release] Commits      : none (target main already contains HEAD)');
+  } else {
+    console.log(
+      `[release] Commits      : ${summary.count} commit${summary.count === 1 ? '' : 's'} ` +
+        `${short(targetMain)}..${short(head)}`,
+    );
+    for (const subject of summary.subjects) {
+      console.log(`[release]   ${subject}`);
+    }
+    if (summary.truncated) {
+      console.log(`[release]   ... and ${summary.count - summary.subjects.length} more`);
+    }
+  }
+  console.log(`[release] Push command : git push ${shellArg(target.target)} HEAD:main`);
 }
 
 async function main(argv) {
   const parsed = parseArgs(argv);
   if (parsed === null) return;
   repoRoot = findRepoRoot();
-  const { target: targetKey, dryRun } = parsed;
-  const target = TARGETS[targetKey];
+  const { target: targetArgument, dryRun } = parsed;
+  const target = resolveTarget(targetArgument);
 
-  console.log(`[release] Target ${targetKey} -> ${target.repo}${dryRun ? ' (DRY RUN)' : ''}`);
+  console.log(`[release] ${dryRun ? 'DRY RUN — ' : ''}push HEAD to ${target.display}`);
   const head = resolveHead();
   assertCleanWorktree();
   await assertCiGreen(head, dryRun);
-  const { remote, targetMain } = checkFastForward(head, targetKey);
+  const { targetMain } = checkFastForward(target, head);
   const summary = summarizeCommits(targetMain, head);
-  printPlan(head, target, remote, targetMain, summary);
+  printPlan(head, target, targetMain, summary);
 
   if (summary.count === 0) {
     console.log('[release] Target main already points at HEAD; nothing to push (explicit no-op).');
@@ -576,17 +685,19 @@ async function main(argv) {
         'Re-run in a terminal, or set RELEASE_YES=1 to confirm non-interactively.',
       ]);
     }
-    const proceed = await askYesNo(`Push ${short(head)} to ${target.repo} main?`);
+    const proceed = await askYesNo(
+      `Fast-forward ${target.display} main to ${short(head)} (${summary.count} commit(s))?`,
+    );
     if (!proceed) {
       fail(EXIT.CONFIRM, 'Release aborted by the operator; target main was not updated.');
     }
   }
 
-  const pushed = git(['push', remote.arg, 'HEAD:main'], { allowFailure: true });
+  const pushed = git(['push', target.target, 'HEAD:main'], { allowFailure: true });
   if (!pushed.ok) {
     fail(
       EXIT.PUSH,
-      `git push ${remote.arg} HEAD:main failed (exit ${pushed.status}).`,
+      `git push ${shellArg(target.target)} HEAD:main failed (exit ${pushed.status}).`,
       [
         firstLines(pushed.stderr || pushed.stdout, 10),
         'Common causes: target main advanced since the fetch, branch protection, or auth.',
@@ -594,8 +705,7 @@ async function main(argv) {
       ].filter(Boolean),
     );
   }
-  console.log(`[release] Pushed ${head} to ${target.repo} main.`);
-  console.log(`[release] Verify: gh run list --repo ${target.repo} --commit ${head}`);
+  console.log(`[release] Pushed ${head} to ${target.display} main.`);
 }
 
 main(process.argv.slice(2)).catch((error) => {

@@ -19,8 +19,9 @@
     "typecheck": "node scripts/gen-build-id.mjs && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "e2e": "playwright test",
     "gen:errors": "node scripts/gen-errors.mjs",
-    "release:test": "node scripts/release.mjs --target test",
-    "release:prod": "node scripts/release.mjs --target prod"
+    "release-to": "node scripts/release-to.mjs",
+    "release-to-interface-test": "node scripts/release-to.mjs interface-test",
+    "release-to-interface": "node scripts/release-to.mjs interface"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.3.1",

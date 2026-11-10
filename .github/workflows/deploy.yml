@@ -2,11 +2,18 @@ name: deploy-pages
 
 # Deploy exactly one build variant per repository to GitHub Pages (ADR-0002 §5).
 #
-# Environment selection is by full repository identity, never by branch:
-#   LOVE20BSC/interface-dev   -> dev   (base /interface-dev/)
-#   LOVE20BSC/interface-test  -> test  (base /interface-test/)
-#   everything else (forks)   -> prod  (base /)
-# `vars.VITE_ENV` (dev|test|prod) explicitly overrides the environment and
+# Environment selection is by repository-name keyword, never by branch:
+#   name contains "dev"   -> dev   (base /interface-dev/)
+#   else contains "test"  -> test  (base /interface-test/)
+#   else                  -> prod  (base /)
+# The lowercased name after the final "/" is tested in that order
+# (dev -> test -> prod), so every repository always resolves to one variant.
+# Accepted consequence: a fork whose name contains "dev" (for example
+# someone/interface-dev) builds the dev variant. The owner accepted this in
+# exchange for interface1 / interface2 / interface3 and other
+# bandwidth-splitting repositories (no dev/test keyword) falling through to
+# prod automatically.
+# `vars.VITE_ENV` (dev|test|prod) explicitly overrides the keyword and
 # `vars.VITE_BASE` overrides the base path. Only the `prepare` job branches;
 # the build receives plain VITE_ENV / VITE_BASE / VITE_SITE_ORIGIN values.
 #
@@ -17,12 +24,13 @@ name: deploy-pages
 # https://love20.example) instead of editing this file.
 #
 # release-guard (comment only, no enforcement): production deploys of
-# LOVE20BSC/interface are supposed to arrive only through `pnpm release:prod`,
-# i.e. a fast-forward push whose commit was already released to test
-# (ADR-0002 §4). Actions cannot tell that push apart from a direct push or a
-# web-UI merge, so nothing in this workflow enforces the rule. The invariant
-# relies on branch protection in all three repositories: no direct pushes to
-# `main`, no pull-request merges, no force-pushes.
+# LOVE20BSC/interface are supposed to arrive only through
+# `pnpm release-to LOVE20BSC/interface`, i.e. a fast-forward push whose commit
+# was already released to the earlier repositories (ADR-0002 §4). Actions
+# cannot tell that push apart from a direct push or a web-UI merge, so nothing
+# in this workflow enforces the rule. The invariant relies on branch protection
+# in every participating repository: no direct pushes to `main`, no
+# pull-request merges, no force-pushes.
 
 on:
   push:
@@ -58,38 +66,37 @@ jobs:
         run: |
           set -euo pipefail
 
-          # ADR-0002 §5: match the complete owner/repo identifier, never a bare
-          # repository name (a fork may be named someone/interface-dev).
+          # ADR-0002 §5: match keywords in the repository name, never the full
+          # owner/repo identity and never a branch. Lowercasing the segment
+          # after the final "/" makes the rule deterministic for forks and for
+          # interface1 / interface2 / interface3. Order matters: dev wins over
+          # test, test wins over prod.
+          repo_name="$(printf '%s' "${REPOSITORY##*/}" | tr '[:upper:]' '[:lower:]')"
           if [[ -n "${VITE_ENV_OVERRIDE}" ]]; then
-            environment="${VITE_ENV_OVERRIDE}"
+            environment="$(printf '%s' "${VITE_ENV_OVERRIDE}" | tr '[:upper:]' '[:lower:]')"
+          elif [[ "${repo_name}" == *dev* ]]; then
+            environment="dev"
+          elif [[ "${repo_name}" == *test* ]]; then
+            environment="test"
           else
-            case "${REPOSITORY}" in
-              LOVE20BSC/interface-dev) environment="dev" ;;
-              LOVE20BSC/interface-test) environment="test" ;;
-              *) environment="prod" ;;
-            esac
+            environment="prod"
           fi
 
-          # Base path follows the repository being deployed, not the VITE_ENV
-          # override: it is the Pages project path this repo serves from. Forks
-          # resolve to prod and default to root; set vars.VITE_BASE if a fork is
-          # deployed as a project site.
-          case "${REPOSITORY}" in
-            LOVE20BSC/interface-dev) default_base="/interface-dev/" ;;
-            LOVE20BSC/interface-test) default_base="/interface-test/" ;;
-            *) default_base="/" ;;
-          esac
-          base_path="${VITE_BASE_OVERRIDE:-${default_base}}"
-          [[ "${base_path}" == /* ]] || base_path="/${base_path}"
-          [[ "${base_path}" == */ ]] || base_path="${base_path}/"
-
+          # Base path follows the resolved variant, not the repository's owner.
+          # vars.VITE_BASE still wins; normalize it to /prefix/ with one leading
+          # and one trailing slash.
           case "${environment}" in
-            dev|test|prod) ;;
+            dev) default_base="/interface-dev/" ;;
+            test) default_base="/interface-test/" ;;
+            prod) default_base="/" ;;
             *)
               echo "::error::vars.VITE_ENV must be dev, test or prod (got '${environment}')."
               exit 1
               ;;
           esac
+          base_path="${VITE_BASE_OVERRIDE:-${default_base}}"
+          [[ "${base_path}" == /* ]] || base_path="/${base_path}"
+          [[ "${base_path}" == */ ]] || base_path="${base_path}/"
 
           if [[ -n "${VITE_SITE_ORIGIN_OVERRIDE}" ]]; then
             site_origin="${VITE_SITE_ORIGIN_OVERRIDE}"
