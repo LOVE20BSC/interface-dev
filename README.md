@@ -89,10 +89,12 @@ Set `defaultSymbol` to the first token's on-chain `symbol()` (dev may carry a te
 Do not hard-code addresses anywhere else. Missing or zero addresses are treated as “not
 configured” by `isConfiguredAddress()`.
 
-Brand and community labels come only from the current community token's on-chain `symbol()`
-(`entities/community-token`); `LOVE20` is the fallback when no community is known. `name()`
-(a code-level `<child symbol>@<parent symbol>` composite) is read only for technical
-details/debug and is never shown as the community name.
+Brand and community labels use the current community token's on-chain `symbol()`
+(`entities/community-token`). When no community is selected or known, the label is
+`LOVE20协议` — the protocol name, not a token community. A selected community keeps its
+on-chain `symbol()`: the LOVE20 community shows `LOVE20`, any other community shows its own
+symbol. `name()` (a code-level `<child symbol>@<parent symbol>` composite) is read only for
+technical details/debug and is never shown as the community name.
 
 ## Community context and identity
 
