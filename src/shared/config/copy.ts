@@ -269,6 +269,114 @@ export const copy = {
       noQuote: '暂无报价',
     },
   },
+  /**
+   * 铸造身份 (UX spec §3.3). Kept in its own namespace so the page has a single
+   * source of copy and the shared 我的 NFT / wallet strings stay untouched.
+   */
+  mintIdentity: {
+    name: {
+      label: '给身份起个名字',
+      placeholder: '给身份起个名字',
+      bytes: (used: string, max: string) => `${used}/${max} 字节`,
+      rule: '中文 3 字节、英文与数字 1 字节；名字越短，价格越高',
+      // CI-004 only: remove together with lib/dev-name-prefix.ts once fixed.
+      devPrefix: (effectiveName: string) =>
+        `测试环境会在链上名字前加 Test，实际名称为「${effectiveName}」。`,
+      check: {
+        checking: '检查中…',
+        available: '✓ 可以用',
+        taken: (memberId?: string) =>
+          memberId === undefined ? '✗ 这个名字已经被用了' : `✗ 这个名字已经被用了（#${memberId}）`,
+        tooLong: (maxBytes: string) => `✗ 太长了（最多 ${maxBytes} 字节）`,
+        invalid: '✗ 含有不可用的字符',
+        error: '暂时检查不了这个名字',
+        retry: '重新检查',
+      },
+    },
+    cost: {
+      priceLabel: '铸造价格',
+      estimate: (amount: string, symbol: string) => `预计 ${amount} ${symbol}`,
+      balanceLabel: (symbol: string) => `我的 ${symbol}`,
+      balanceLabelFallback: '余额',
+      swapLink: '去兑换代币',
+      short: (amount: string, symbol: string) => `余额不足，还需要 ${amount} ${symbol}`,
+      note: (symbol: string) =>
+        `费用以创世代币 ${symbol} 计价，与当前社区无关；价格随已铸造数量变化，提交时以链上为准。`,
+      readFailed: '价格暂时读不到',
+    },
+    branch: {
+      airdrop: (amount: string | undefined, symbol: string) =>
+        amount === undefined
+          ? '你还有空投份额可以铸造，铸造后就够了。'
+          : `你还有空投份额可以铸造，预计 ${amount} ${symbol}，铸造后就够了。`,
+      airdropCta: '铸造空投份额',
+      swap: (symbol: string) => `${symbol} 不够。可以用 BNB 换一些，再回来铸造。`,
+      swapCta: '用 BNB 兑换',
+      unknown: '暂时确认不了你的空投资格。',
+      retry: '重试',
+      swapFirst: '先兑换',
+      checking: '正在确认你的空投资格…',
+    },
+    ladder: {
+      approve: '1. 授权',
+      approving: '授权中…',
+      approvePending: '确认中…',
+      approved: '已授权',
+      mintStep: '2. 铸造身份',
+      mint: '铸造身份',
+      minting: '铸造中…',
+      mintPending: '确认中…',
+      pendingNote: '交易已经提交，等待上链。',
+      approvalShort: '授权额度不够这次使用，需要再授权一次。',
+      why: '为什么要两次确认？',
+      whyBody: '第一次只是允许合约最多扣这么多，不会立刻扣钱；第二次才是铸造。',
+    },
+    receipt: {
+      title: '铸造成功',
+      memberId: (id: string) => `身份 #${id}`,
+      nameLabel: '名称',
+      burnedLabel: '已销毁',
+      value: (amount: string, symbol: string) => `${amount} ${symbol}`,
+      hashLabel: '交易哈希',
+      explorerLink: '在区块浏览器里查看',
+      copyHash: '复制交易哈希',
+      notSelected: '这个身份还没有设为当前身份，到「我的 NFT」里选择它。',
+      goMyNft: '去我的 NFT 使用这个身份',
+      backHome: '回首页',
+      mintAnother: '再铸造一个身份',
+      pendingTitle: '已提交，等待上链',
+      pendingBody: '交易已经提交，正在等待确认。刷新页面也会继续读取这笔交易。',
+      revertedTitle: '这次铸造没有成功',
+      revertedBody: '交易已经上链，但合约没有接受这次铸造。名字和余额都没有变化。',
+      missingTitle: '读不到身份编号',
+      missingBody: '交易已经上链，但回执里没有身份编号。可以去「我的 NFT」确认。',
+    },
+    states: {
+      notDeployedTitle: '铸造还没有接入',
+      notDeployedBody: '地址簿里还没有 MemberNFT 合约。填充部署地址后才能铸造身份。',
+      connectTitle: '连接钱包后铸造身份。',
+      connectBody: '铸造需要一个名字和少量 LOVE20。连接后可以先看到价格和余额。',
+      wrongChainTitle: '当前钱包连接的网络不对。',
+      wrongChainBody: '切换到这个应用使用的网络后再铸造。',
+      errorTitle: '铸造配置暂时读不到。',
+      errorBody: '网络可能不稳，你的资产没有变化。',
+      retry: '重试',
+      backHome: '回首页',
+      goMyNft: '我的 NFT',
+      readFailed: '读不到',
+    },
+    errors: {
+      rejected: '你在钱包里点了取消，没有扣款。',
+      nameTaken: '这个名字已经被用了。',
+      nameTooLong: '名字太长，请缩短。',
+      nameInvalid: '含有不可用的字符，请修改名字。',
+      nameEmpty: '请填写名字。',
+      allowanceShort: '授权额度不够这次使用。',
+      balanceShort: (symbol: string) => `${symbol} 不够。`,
+      reverted: '交易上链了，但没有成功。你的资产没有变化。',
+      generic: '这次操作没有完成，请稍后重试。',
+    },
+  },
   placeholders: {
     gov: {
       title: '治理',
