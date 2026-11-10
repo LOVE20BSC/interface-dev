@@ -284,10 +284,12 @@ function parseGitHubRepo(value) {
 }
 
 function originUrl() {
-  const remote = git(['remote', 'get-url', 'origin'], { allowFailure: true });
-  if (remote.ok && remote.stdout.trim() !== '') return remote.stdout.trim();
+  // Read the raw config first: `git remote get-url` applies url.*.insteadOf
+  // rewrites, which can hide the GitHub owner behind a local mirror path.
   const config = git(['config', '--get', 'remote.origin.url'], { allowFailure: true });
   if (config.ok && config.stdout.trim() !== '') return config.stdout.trim();
+  const remote = git(['remote', 'get-url', 'origin'], { allowFailure: true });
+  if (remote.ok && remote.stdout.trim() !== '') return remote.stdout.trim();
   return '';
 }
 
