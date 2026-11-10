@@ -3,12 +3,17 @@
   "chainId": 56,
   "chainName": "BNB Smart Chain",
   "rpcUrls": ["https://bsc-dataseed.bnbchain.org", "https://bsc-dataseed1.bnbchain.org"],
-  "nativeCurrency": { "name": "BNB", "symbol": "BNB", "decimals": 18 },
+  "nativeCurrency": {
+    "name": "BNB",
+    "symbol": "BNB",
+    "decimals": 18
+  },
   "blockExplorerUrl": "https://bscscan.com",
   "defaultSymbol": "LOVE20",
   "brand": {
     "name": "LOVE20",
-    "tagline": "身份、社区与行动"
+    "tagline": "身份、社区与行动",
+    "docsUrl": "https://love20bsc.github.io/docs/"
   },
   "testnet": false,
   "notes": "地址簿为空：生产部署导出后填入。在地址填好之前，所有依赖链上数据的入口都显示「未配置」且不会发起请求。",
@@ -36,6 +41,7 @@
     "router": "0x0000000000000000000000000000000000000000",
     "multicall3": "0x0000000000000000000000000000000000000000",
     "airdrop": "0x0000000000000000000000000000000000000000",
-    "firstTokenAddress": "0x0000000000000000000000000000000000000000"
+    "firstTokenAddress": "0x0000000000000000000000000000000000000000",
+    "pair": "0x0000000000000000000000000000000000000000"
   }
 }

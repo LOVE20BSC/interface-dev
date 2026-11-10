@@ -43,19 +43,23 @@ describe('deployment documents', () => {
     ['dev', devJson, 31337],
     ['test', testJson, 97],
     ['prod', prodJson, 56],
-  ] as const)(
-    '%s parses with chain %i and a complete zero address book',
-    (variant, json, chainId) => {
-      const parsed = parseDeployment(json, variant);
-      expect(parsed.chainId).toBe(chainId);
-      expect(parsed.rpcUrls.length).toBeGreaterThan(0);
-      expect(parsed.nativeCurrency.symbol).toBe('BNB');
-      expect(parsed.defaultSymbol.length).toBeGreaterThan(0);
-      const addresses = Object.values(parsed.addresses);
-      expect(addresses.length).toBeGreaterThanOrEqual(20);
+  ] as const)('%s parses with chain %i and a complete address book', (variant, json, chainId) => {
+    const parsed = parseDeployment(json, variant);
+    expect(parsed.chainId).toBe(chainId);
+    expect(parsed.rpcUrls.length).toBeGreaterThan(0);
+    expect(parsed.nativeCurrency.symbol).toBe('BNB');
+    expect(parsed.defaultSymbol.length).toBeGreaterThan(0);
+    expect(parsed.brand.docsUrl).toMatch(/^https?:\/\//);
+    const addresses = Object.values(parsed.addresses);
+    expect(addresses.length).toBeGreaterThanOrEqual(20);
+    if (variant === 'dev') {
+      // The dev file is the real anvil export: every key must be filled.
+      expect(addresses.some((address) => address === ZERO_ADDRESS)).toBe(false);
+    } else {
+      // test/prod stay deliberately empty until a real deployment publishes.
       expect(addresses.every((address) => address === ZERO_ADDRESS)).toBe(true);
-    },
-  );
+    }
+  });
 
   it('rejects a variant mismatch so a wrong address book cannot ship', () => {
     expect(() => parseDeployment(devJson, 'prod')).toThrow(/variant mismatch/);
@@ -79,17 +83,17 @@ describe('deployment documents', () => {
 });
 
 describe('active environment package (vitest pins VITE_ENV=dev)', () => {
-  it('loads the dev address book through the build alias', () => {
+  it('loads the real anvil address book through the build alias', () => {
     expect(DEPLOYMENT.variant).toBe('dev');
-    expect(DEFAULT_SYMBOL).toBe('LOVE20');
-    expect(isConfiguredAddress(ADDRESSES.tokenAddress)).toBe(false);
-    expect(seedCoreAddress()).toBeUndefined();
+    expect(DEFAULT_SYMBOL).toBe('TestLOVE20');
+    expect(isConfiguredAddress(ADDRESSES.tokenAddress)).toBe(true);
+    expect(seedCoreAddress()).toBe(ADDRESSES.launch);
   });
 
-  it('reports 0 configured addresses without inventing data', () => {
+  it('reports the complete dev address book without inventing data', () => {
     const status = addressBookStatus();
-    expect(status.configured).toBe(0);
     expect(status.total).toBeGreaterThanOrEqual(20);
-    expect(status.isConfigured).toBe(false);
+    expect(status.configured).toBe(status.total);
+    expect(status.isConfigured).toBe(true);
   });
 });

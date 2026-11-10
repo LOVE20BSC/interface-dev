@@ -1,4 +1,3 @@
-import type { CommunityToken } from '@/entities/community-token/model/use-community-token';
 import type { MemberIdentityState } from '@/entities/member-identity/model/use-member-identity';
 import { copy } from '@/shared/config/copy';
 import { CommunityMenuContent } from '@/widgets/connect-pill/community-menu-content';
@@ -15,7 +14,6 @@ export interface ConnectPillMenusProps {
   readonly symbol: string;
   readonly onSwitchSymbol: (symbol: string) => void;
   readonly address: `0x${string}`;
-  readonly token: CommunityToken;
   readonly identity: MemberIdentityState;
   readonly onDisconnect: () => void;
 }
@@ -32,7 +30,6 @@ export function ConnectPillMenus({
   symbol,
   onSwitchSymbol,
   address,
-  token,
   identity,
   onDisconnect,
 }: ConnectPillMenusProps) {
@@ -69,7 +66,7 @@ export function ConnectPillMenus({
     >
       <WalletMenuContent
         address={address}
-        token={token}
+        symbol={symbol}
         identity={identity}
         onDisconnect={onDisconnect}
         onNavigate={onClose}

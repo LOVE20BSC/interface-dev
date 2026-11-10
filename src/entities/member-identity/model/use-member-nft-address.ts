@@ -1,5 +1,5 @@
 import { useReadContract } from 'wagmi';
-import { memberNftAddressAbi } from '@/config/abis';
+import { launchAbi } from '@/config/abis';
 import {
   configuredAddress,
   isConfiguredAddress,
@@ -25,7 +25,7 @@ export function useMemberNftAddress(): MemberNftAddressState {
   const seed = seedCoreAddress();
   const read = useReadContract({
     address: seed,
-    abi: memberNftAddressAbi,
+    abi: launchAbi,
     functionName: 'MEMBER_NFT_ADDRESS',
     query: { enabled: configured === undefined && seed !== undefined },
   });

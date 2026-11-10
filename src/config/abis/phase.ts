@@ -1,0 +1,288 @@
+/**
+ * Phase ABI, copied verbatim from the anvil31337_dev export
+ * (anvil/export/abis/Phase.json). Generated file: do not hand-edit.
+ * Regenerate from the anvil export when the contract changes.
+ */
+export const phaseAbi = [
+  {
+    type: 'constructor',
+    inputs: [
+      {
+        name: 'originBlocks',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'originPhaseBlocks',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'targetSeconds',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'adjustThreshold',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'syncObservationLimit',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'ADJUST_THRESHOLD',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'ORIGIN_BLOCKS',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'ORIGIN_PHASE_BLOCKS',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'SYNC_OBSERVATION_LIMIT',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'TARGET_SECONDS',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'currentPhase',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'currentPhaseBlocks',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'lastSyncPhase',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'observations',
+    inputs: [
+      {
+        name: 'offset',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'limit',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'reverse',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    outputs: [
+      {
+        name: 'blockNumbers',
+        type: 'uint256[]',
+        internalType: 'uint256[]',
+      },
+      {
+        name: 'blockTimestamps',
+        type: 'uint256[]',
+        internalType: 'uint256[]',
+      },
+      {
+        name: 'totalCount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'phaseAtBlock',
+    inputs: [
+      {
+        name: 'blockNumber',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'phaseInfo',
+    inputs: [
+      {
+        name: 'phaseNumber',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [
+      {
+        name: 'startBlock',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'phaseBlocks',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'sync',
+    inputs: [],
+    outputs: [
+      {
+        name: 'adjusted',
+        type: 'bool',
+        internalType: 'bool',
+      },
+      {
+        name: 'newPhaseBlocks',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    name: 'PhaseSynchronized',
+    inputs: [
+      {
+        name: 'phase',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
+      },
+      {
+        name: 'currentPhaseBlocks',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'nextPhaseBlocks',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'error',
+    name: 'InvalidKeyOrder',
+    inputs: [
+      {
+        name: 'key',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'lastKey',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'PhaseNotStarted',
+    inputs: [],
+  },
+] as const;

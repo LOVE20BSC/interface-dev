@@ -1,0 +1,911 @@
+/**
+ * Launch ABI, copied verbatim from the anvil31337_dev export
+ * (anvil/export/abis/Launch.json). Generated file: do not hand-edit.
+ * Regenerate from the anvil export when the contract changes.
+ */
+export const launchAbi = [
+  {
+    type: 'constructor',
+    inputs: [
+      {
+        name: 'params',
+        type: 'tuple',
+        internalType: 'struct LaunchInitParams',
+        components: [
+          {
+            name: 'mintAddress',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'memberNFTAddress',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'rootParentTokenAddress',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'pairFactoryAddress',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'distributor',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'launchCountThresholdRatio',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'maxLaunchCount',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'tokenSymbolLength',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'launchAmount',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'maxSupply',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'name',
+            type: 'string',
+            internalType: 'string',
+          },
+          {
+            name: 'symbol',
+            type: 'string',
+            internalType: 'string',
+          },
+        ],
+      },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'FIRST_TOKEN_ADDRESS',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'LAUNCH_AMOUNT',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'LAUNCH_COUNT_THRESHOLD_RATIO',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'MAX_LAUNCH_COUNT',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'MAX_SUPPLY',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'MAX_TOKEN_NAME_LENGTH',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'MAX_TOKEN_SYMBOL_LENGTH',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'MEMBER_NFT_ADDRESS',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'MINT_ADDRESS',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'PAIR_FACTORY_ADDRESS',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'ROOT_PARENT_TOKEN_ADDRESS',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'TEST_PREFIX_BYTES',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'TOKEN_SYMBOL_LENGTH',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'addLaunchCount',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'memberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'count',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'childTokens',
+    inputs: [
+      {
+        name: 'parentTokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'offset',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'limit',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'reverse',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    outputs: [
+      {
+        name: 'tokenList',
+        type: 'address[]',
+        internalType: 'address[]',
+      },
+      {
+        name: 'totalCount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'isLOVE20Token',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'issuedLaunchCount',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'launchToken',
+    inputs: [
+      {
+        name: 'tokenSymbol',
+        type: 'string',
+        internalType: 'string',
+      },
+      {
+        name: 'parentTokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'memberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'distributor',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'distributorMode',
+        type: 'uint8',
+        internalType: 'enum DistributorMode',
+      },
+      {
+        name: 'distributorData',
+        type: 'bytes[]',
+        internalType: 'bytes[]',
+      },
+    ],
+    outputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'mergeLaunchCount',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'sourceMemberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'targetMemberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'count',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'parentToken',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'remainingLaunchCount',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'memberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'tokenAddressBySymbol',
+    inputs: [
+      {
+        name: 'symbol',
+        type: 'string',
+        internalType: 'string',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'tokens',
+    inputs: [
+      {
+        name: 'offset',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'limit',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'reverse',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    outputs: [
+      {
+        name: 'tokenList',
+        type: 'address[]',
+        internalType: 'address[]',
+      },
+      {
+        name: 'totalCount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    name: 'GenesisTokenCreated',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'parentTokenAddress',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'distributor',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
+      },
+      {
+        name: 'name',
+        type: 'string',
+        indexed: false,
+        internalType: 'string',
+      },
+      {
+        name: 'symbol',
+        type: 'string',
+        indexed: false,
+        internalType: 'string',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'LaunchCountAdded',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'memberId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
+      },
+      {
+        name: 'count',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'issuedCount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'memberRemaining',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'LaunchCountConsumed',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'memberId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
+      },
+      {
+        name: 'remaining',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'LaunchCountMerged',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'sourceMemberId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
+      },
+      {
+        name: 'targetMemberId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
+      },
+      {
+        name: 'count',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'sourceRemaining',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'targetRemaining',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'TokenLaunched',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'parentTokenAddress',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'launcherMemberId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
+      },
+      {
+        name: 'distributor',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
+      },
+      {
+        name: 'distributorMode',
+        type: 'uint8',
+        indexed: false,
+        internalType: 'enum DistributorMode',
+      },
+      {
+        name: 'name',
+        type: 'string',
+        indexed: false,
+        internalType: 'string',
+      },
+      {
+        name: 'symbol',
+        type: 'string',
+        indexed: false,
+        internalType: 'string',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'error',
+    name: 'DistributorNotContract',
+    inputs: [
+      {
+        name: 'distributor',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'InsufficientLaunchCount',
+    inputs: [
+      {
+        name: 'memberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'required',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'available',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'InvalidTokenSymbolCharacters',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidTokenSymbolLength',
+    inputs: [
+      {
+        name: 'length',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'expected',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'LaunchCountLimitExceeded',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'requested',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'remaining',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'NotMemberOwner',
+    inputs: [
+      {
+        name: 'memberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'NotMintContract',
+    inputs: [
+      {
+        name: 'caller',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'PairCreationFailed',
+    inputs: [
+      {
+        name: 'parentTokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'ParentTokenNotRegistered',
+    inputs: [
+      {
+        name: 'parentTokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'SourceEqualsTarget',
+    inputs: [
+      {
+        name: 'sourceMemberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'TokenNameEmpty',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'TokenNameTooLong',
+    inputs: [
+      {
+        name: 'length',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'maxLength',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'TokenNotRegistered',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'TokenSymbolAlreadyExists',
+    inputs: [
+      {
+        name: 'symbolHash',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'TokenSymbolEmpty',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'TokenSymbolTooLong',
+    inputs: [
+      {
+        name: 'length',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'maxLength',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'ZeroCount',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'ZeroDistributorAddress',
+    inputs: [],
+  },
+] as const;

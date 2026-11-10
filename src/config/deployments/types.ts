@@ -29,6 +29,7 @@ export interface AddressBook {
   readonly multicall3: HexAddress;
   readonly airdrop: HexAddress;
   readonly firstTokenAddress: HexAddress;
+  readonly pair: HexAddress;
 }
 
 export interface NativeCurrency {
@@ -49,6 +50,8 @@ export interface DeploymentConfig {
   readonly brand: {
     readonly name: string;
     readonly tagline: string;
+    /** Docs link for the footer; environment data, never hardcoded in a page. */
+    readonly docsUrl: string;
   };
   readonly testnet: boolean;
   readonly notes: string;
@@ -80,6 +83,7 @@ const ADDRESS_KEYS = [
   'multicall3',
   'airdrop',
   'firstTokenAddress',
+  'pair',
 ] as const satisfies readonly (keyof AddressBook)[];
 
 const HEX_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -183,6 +187,7 @@ export function parseDeployment(input: unknown, expectedVariant?: EnvVariant): D
     brand: {
       name: string(brand.name, 'brand.name'),
       tagline: string(brand.tagline, 'brand.tagline'),
+      docsUrl: string(brand.docsUrl, 'brand.docsUrl'),
     },
     testnet: root.testnet === true,
     notes: typeof root.notes === 'string' ? root.notes : '',

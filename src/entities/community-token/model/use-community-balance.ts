@@ -1,5 +1,5 @@
 import { useAccount, useBalance, useReadContract } from 'wagmi';
-import { communityTokenAbi } from '@/config/abis';
+import { love20TokenAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 
 export type BalanceStatus = 'disconnected' | 'unconfigured' | 'loading' | 'ready' | 'error';
@@ -17,7 +17,7 @@ export function useCommunityBalance(
   const { address: account } = useAccount();
   const read = useReadContract({
     address: tokenAddress,
-    abi: communityTokenAbi,
+    abi: love20TokenAbi,
     functionName: 'balanceOf',
     args: account !== undefined ? [account] : ['0x0000000000000000000000000000000000000000'],
     query: { enabled: tokenAddress !== undefined && account !== undefined },

@@ -23,10 +23,23 @@ export const DEPLOYMENT: DeploymentConfig = parseDeployment(deploymentJson, APP_
 
 export const ADDRESSES: AddressBook = DEPLOYMENT.addresses;
 
+/**
+ * Local dev chains often move ports (a sibling project may own 8545).
+ * VITE_ANVIL_RPC overrides the dev address book only; test/prod always use the
+ * endpoints baked into their own file. Anything non-http is ignored.
+ */
+const ANVIL_RPC_OVERRIDE =
+  DEPLOYMENT.variant === 'dev' ? (import.meta.env.VITE_ANVIL_RPC ?? '').trim() : '';
+
+const RPC_URLS_RESOLVED: readonly string[] =
+  ANVIL_RPC_OVERRIDE.length > 0 && /^https?:\/\//.test(ANVIL_RPC_OVERRIDE)
+    ? [ANVIL_RPC_OVERRIDE]
+    : DEPLOYMENT.rpcUrls;
+
 export const NETWORK = Object.freeze({
   chainId: DEPLOYMENT.chainId,
   name: DEPLOYMENT.chainName,
-  rpcUrls: DEPLOYMENT.rpcUrls,
+  rpcUrls: RPC_URLS_RESOLVED,
   nativeCurrency: DEPLOYMENT.nativeCurrency,
   blockExplorerUrl: DEPLOYMENT.blockExplorerUrl,
   testnet: DEPLOYMENT.testnet,
@@ -41,7 +54,10 @@ export const BRAND_FALLBACK = Object.freeze({
   tagline: DEPLOYMENT.brand.tagline,
 });
 
-export const RPC_URLS: readonly string[] = DEPLOYMENT.rpcUrls;
+/** Footer docs link comes from the environment package, never a hardcoded page constant. */
+export const BRAND_DOCS_URL: string = DEPLOYMENT.brand.docsUrl;
+
+export const RPC_URLS: readonly string[] = RPC_URLS_RESOLVED;
 
 /** Zero address means "this deployment has not provided the contract yet". */
 export function isConfiguredAddress(value: string | null | undefined): value is HexAddress {
@@ -89,6 +105,7 @@ export const ADDRESS_BOOK_KEYS = [
   'multicall3',
   'airdrop',
   'firstTokenAddress',
+  'pair',
 ] as const satisfies readonly (keyof AddressBook)[];
 
 export function addressBookStatus(): {

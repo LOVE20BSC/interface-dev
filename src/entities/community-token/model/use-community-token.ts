@@ -1,5 +1,6 @@
-import { useReadContract } from 'wagmi';
-import { communityTokenAbi, launchAbi } from '@/config/abis';
+import { useMemo } from 'react';
+import { useReadContract, useReadContracts } from 'wagmi';
+import { launchAbi, love20TokenAbi } from '@/config/abis';
 import {
   BRAND_FALLBACK,
   DEFAULT_SYMBOL,
@@ -24,7 +25,7 @@ export interface CommunityToken {
 
 /**
  * Resolve the current community token:
- *   1. address book's default token for the default symbol;
+ *   1. the address book's default token when ?symbol= names the genesis symbol;
  *   2. otherwise Launch.tokenAddressBySymbol(?symbol=);
  *   3. brand falls back to LOVE20 only when the chain cannot be read.
  *
@@ -49,44 +50,55 @@ export function useCommunityToken(symbol: string): CommunityToken {
       ? lookup.data
       : undefined;
 
-  const nameRead = useReadContract({
-    address: tokenAddress,
-    abi: communityTokenAbi,
-    functionName: 'name',
-    query: { enabled: tokenAddress !== undefined },
-  });
-  const symbolRead = useReadContract({
-    address: tokenAddress,
-    abi: communityTokenAbi,
-    functionName: 'symbol',
-    query: { enabled: tokenAddress !== undefined },
-  });
-  const decimalsRead = useReadContract({
-    address: tokenAddress,
-    abi: communityTokenAbi,
-    functionName: 'decimals',
-    query: { enabled: tokenAddress !== undefined },
+  const metadataContracts = useMemo(() => {
+    if (tokenAddress === undefined) return [];
+    return [
+      { address: tokenAddress, abi: love20TokenAbi, functionName: 'name' as const },
+      { address: tokenAddress, abi: love20TokenAbi, functionName: 'symbol' as const },
+      { address: tokenAddress, abi: love20TokenAbi, functionName: 'decimals' as const },
+    ];
+  }, [tokenAddress]);
+
+  const metadataRead = useReadContracts({
+    contracts: metadataContracts,
+    query: { enabled: metadataContracts.length > 0 },
   });
 
   const refetch = () => {
     lookup.refetch();
-    nameRead.refetch();
-    symbolRead.refetch();
-    decimalsRead.refetch();
+    metadataRead.refetch();
   };
 
-  const isMetadataLoading =
-    tokenAddress !== undefined &&
-    (nameRead.isLoading || symbolRead.isLoading || decimalsRead.isLoading);
+  const results = metadataRead.data;
+  const nameResult = results?.[0];
+  const symbolResult = results?.[1];
+  const decimalsResult = results?.[2];
+  const readName =
+    nameResult?.status === 'success' && typeof nameResult.result === 'string'
+      ? nameResult.result
+      : undefined;
+  const readSymbol =
+    symbolResult?.status === 'success' && typeof symbolResult.result === 'string'
+      ? symbolResult.result
+      : undefined;
+  const readDecimals =
+    decimalsResult?.status === 'success' && typeof decimalsResult.result === 'number'
+      ? decimalsResult.result
+      : undefined;
+
+  const isMetadataLoading = tokenAddress !== undefined && metadataRead.isLoading;
 
   const metadataError =
-    tokenAddress !== undefined && (nameRead.isError || symbolRead.isError || decimalsRead.isError);
+    tokenAddress !== undefined &&
+    (metadataRead.isError ||
+      nameResult?.status === 'failure' ||
+      symbolResult?.status === 'failure' ||
+      decimalsResult?.status === 'failure');
 
   let status: CommunityTokenStatus;
   if (tokenAddress !== undefined) {
     status = 'ready';
   } else if (symbol !== DEFAULT_SYMBOL && launchAddress === undefined) {
-    // Without Launch there is no way to resolve a non-default symbol.
     status = 'unconfigured';
   } else if (lookup.isLoading) {
     status = 'loading';
@@ -98,18 +110,15 @@ export function useCommunityToken(symbol: string): CommunityToken {
     status = defaultAddress === undefined ? 'unconfigured' : 'unknown';
   }
 
+  const name = readName !== undefined && readName.length > 0 ? readName : BRAND_FALLBACK.name;
+  const chainSymbol = readSymbol !== undefined && readSymbol.length > 0 ? readSymbol : undefined;
+
   return {
     status,
     address: tokenAddress,
-    name:
-      nameRead.data !== undefined && nameRead.data.length > 0 ? nameRead.data : BRAND_FALLBACK.name,
-    symbol:
-      symbolRead.data !== undefined && symbolRead.data.length > 0
-        ? symbolRead.data
-        : symbol.length > 0
-          ? symbol
-          : DEFAULT_SYMBOL,
-    decimals: decimalsRead.data,
+    name,
+    symbol: chainSymbol ?? (symbol.length > 0 ? symbol : BRAND_FALLBACK.symbol),
+    decimals: readDecimals,
     isMetadataLoading,
     metadataError,
     refetch,

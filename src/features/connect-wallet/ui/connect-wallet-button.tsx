@@ -2,7 +2,7 @@ import { Wallet } from '@/shared/ui/icons';
 import { Suspense, useState } from 'react';
 import { copy } from '@/shared/config/copy';
 import { toWalletErrorMessage } from '@/features/connect-wallet/lib/wallet-errors';
-import { Button } from '@/shared/ui/button';
+import { Button, type ButtonSize, type ButtonVariant } from '@/shared/ui/button';
 import { hasInjectedProvider } from '@/features/connect-wallet/lib/injected';
 import { useInjectedWalletStatus } from '@/features/connect-wallet/model/use-injected-wallet-status';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
@@ -12,11 +12,22 @@ import {
   preloadWalletDialogs,
 } from '@/features/connect-wallet/ui/lazy-dialogs';
 
+export interface ConnectWalletButtonProps {
+  /** The header pill is outline/secondary so a page CTA stays the only solid button. */
+  readonly variant?: ButtonVariant;
+  readonly size?: ButtonSize;
+  readonly className?: string;
+}
+
 /**
  * Disconnected state: one button, no fake disabled affordances.
  * If no provider is found within 3 s, clicking opens the fallback sheet.
  */
-export function ConnectWalletButton() {
+export function ConnectWalletButton({
+  variant = 'primary',
+  size = 'md',
+  className,
+}: ConnectWalletButtonProps = {}) {
   const walletStatus = useInjectedWalletStatus();
   const { connect, isConnecting } = useWalletConnection();
   const [localBusy, setLocalBusy] = useState(false);
@@ -54,6 +65,9 @@ export function ConnectWalletButton() {
   return (
     <>
       <Button
+        variant={variant}
+        size={size}
+        className={className}
         onClick={() => {
           preloadWalletDialogs();
           void runConnect();

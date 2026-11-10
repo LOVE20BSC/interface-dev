@@ -1,8 +1,9 @@
-import { ChevronDown, Loader2 } from '@/shared/ui/icons';
+import { ChevronDown } from '@/shared/ui/icons';
 import { lazy, Suspense, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { copy } from '@/shared/config/copy';
 import { shortenAddress } from '@/shared/lib/format';
-import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
+import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
 import { WrongNetworkButton } from '@/features/connect-wallet/ui/wrong-network-button';
@@ -29,15 +30,19 @@ const preloadMenus = () => {
  * and the connected pill has two independent triggers.
  */
 export function ConnectPill() {
+  const location = useLocation();
+  const isCompactViewport = useMediaQuery('(max-width: 479px)');
+  const compactChip = location.pathname !== '/' && isCompactViewport;
   const wallet = useWalletConnection();
   const { symbol, switchSymbol } = useCommunityContext();
-  const token = useCommunityToken(symbol);
   const identity = useMemberIdentity();
   const [openMenu, setOpenMenu] = useState<ConnectPillMenu | null>(null);
   const [communityAnchor, setCommunityAnchor] = useState<HTMLButtonElement | null>(null);
   const [walletAnchor, setWalletAnchor] = useState<HTMLButtonElement | null>(null);
 
-  if (!wallet.isConnected) return <ConnectWalletButton />;
+  if (!wallet.isConnected) {
+    return <ConnectWalletButton variant="secondary" className="rounded-full" />;
+  }
   if (wallet.isWrongChain) return <WrongNetworkButton />;
   if (wallet.address === undefined) return null;
   const address = wallet.address;
@@ -46,7 +51,7 @@ export function ConnectPill() {
     identity.status === 'loading'
       ? copy.wallet.identityReading
       : identity.selected !== null
-        ? identity.selected.name
+        ? (identity.selected.name ?? copy.common.unknown)
         : identity.status === 'unconfigured'
           ? copy.wallet.identityNotDeployed
           : identity.status === 'empty'
@@ -72,20 +77,25 @@ export function ConnectPill() {
         onClick={() => toggleMenu('community')}
         onPointerEnter={preloadMenus}
         onFocus={preloadMenus}
-        aria-label={copy.community.chipAria(token.symbol)}
+        aria-label={copy.community.chipAria(symbol)}
         aria-expanded={openMenu === 'community'}
         aria-haspopup="dialog"
         title={copy.community.menuTitle}
         className="flex min-w-0 items-center gap-1 pl-3 pr-2 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40"
       >
-        <span className="max-w-[96px] truncate font-mono text-[13px] font-semibold text-foreground">
-          {token.symbol}
-        </span>
-        {token.isMetadataLoading ? (
-          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-muted" aria-hidden="true" />
+        {compactChip ? (
+          <span
+            aria-hidden="true"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-soft font-mono text-xs font-semibold text-brand-strong"
+          >
+            {symbol.slice(0, 1)}
+          </span>
         ) : (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />
+          <span className="max-w-[96px] truncate font-mono text-[13px] font-semibold text-foreground">
+            {symbol}
+          </span>
         )}
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />
       </button>
 
       <span className="my-2 w-px shrink-0 bg-line" aria-hidden="true" />
@@ -99,7 +109,7 @@ export function ConnectPill() {
         aria-label={copy.wallet.walletMenuAria}
         aria-expanded={openMenu === 'wallet'}
         aria-haspopup="dialog"
-        className="grid min-w-[132px] grid-cols-[minmax(0,1fr)_14px] grid-rows-2 items-center gap-x-1.5 px-2.5 py-1.5 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40"
+        className="grid w-[144px] grid-cols-[minmax(0,1fr)_14px] grid-rows-2 items-center gap-x-1.5 px-2.5 py-1.5 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40 md:w-[176px]"
       >
         <span className="truncate font-mono text-[13px] leading-4 text-foreground">
           {shortenAddress(address)}
@@ -121,7 +131,6 @@ export function ConnectPill() {
             symbol={symbol}
             onSwitchSymbol={switchSymbol}
             address={address}
-            token={token}
             identity={identity}
             onDisconnect={wallet.disconnect}
           />

@@ -1,0 +1,386 @@
+/**
+ * Airdrop ABI, copied verbatim from the anvil31337_dev export
+ * (anvil/export/abis/Airdrop.json). Generated file: do not hand-edit.
+ * Regenerate from the anvil export when the contract changes.
+ */
+export const airdropAbi = [
+  {
+    type: 'constructor',
+    inputs: [
+      {
+        name: 'sourceChainId_',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'sourceBlockNumber_',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'sourceBurnAddress_',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'merkleRoot_',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+      {
+        name: 'totalShare_',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'claim',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'account',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'share',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'proof',
+        type: 'bytes32[]',
+        internalType: 'bytes32[]',
+      },
+    ],
+    outputs: [
+      {
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'claimableAmount',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'account',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'share',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'proof',
+        type: 'bytes32[]',
+        internalType: 'bytes32[]',
+      },
+    ],
+    outputs: [
+      {
+        name: 'amount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'claimedShare',
+    inputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'isClaimed',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'account',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bool',
+        internalType: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'leafHash',
+    inputs: [
+      {
+        name: 'account',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'share',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+    stateMutability: 'pure',
+  },
+  {
+    type: 'function',
+    name: 'merkleRoot',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'bytes32',
+        internalType: 'bytes32',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'remainingShare',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'sourceBlockNumber',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'sourceBurnAddress',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'sourceChainId',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'totalShare',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    name: 'AirdropClaimed',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'account',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'share',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'amount',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'remainingShare',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'error',
+    name: 'AirdropAlreadyClaimed',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidAccount',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidMerkleRoot',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidProof',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidShare',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidSourceBlock',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidSourceChainId',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidToken',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'InvalidTotalShare',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'NoClaimableAmount',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'ReentrancyGuardReentrantCall',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'SafeERC20FailedOperation',
+    inputs: [
+      {
+        name: 'token',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'ShareExceedsRemaining',
+    inputs: [
+      {
+        name: 'share',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'remainingShare',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'UnauthorizedClaimer',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'ZeroAddress',
+    inputs: [],
+  },
+] as const;

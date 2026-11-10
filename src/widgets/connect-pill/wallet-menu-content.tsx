@@ -10,7 +10,7 @@ import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Separator } from '@/shared/ui/separator';
 import { Skeleton } from '@/shared/ui/skeleton';
-import type { CommunityToken } from '@/entities/community-token/model/use-community-token';
+import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
 import {
   useCommunityBalance,
   useNativeBalance,
@@ -19,7 +19,7 @@ import type { MemberIdentityState } from '@/entities/member-identity/model/use-m
 
 export interface WalletMenuContentProps {
   readonly address: `0x${string}`;
-  readonly token: CommunityToken;
+  readonly symbol: string;
   readonly identity: MemberIdentityState;
   readonly onDisconnect: () => void;
   readonly onNavigate: () => void;
@@ -44,12 +44,13 @@ function BalanceValue({
 
 export function WalletMenuContent({
   address,
-  token,
+  symbol,
   identity,
   onDisconnect,
   onNavigate,
 }: WalletMenuContentProps) {
   const [copied, setCopied] = useState(false);
+  const token = useCommunityToken(symbol);
   const tokenBalance = useCommunityBalance(token.address, token.decimals);
   const nativeBalance = useNativeBalance(NETWORK.nativeCurrency.symbol);
 

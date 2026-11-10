@@ -26,6 +26,11 @@ export default defineConfig({
     timeout: 180_000,
     env: {
       VITE_BASE: BASE_PATH,
+      // 首页 / 我的 NFT 验收必须跑在本地 anvil 地址簿上。
+      VITE_ENV: 'dev',
+      ...(process.env.E2E_ANVIL_RPC !== undefined
+        ? { VITE_ANVIL_RPC: process.env.E2E_ANVIL_RPC }
+        : {}),
     },
   },
   projects: [

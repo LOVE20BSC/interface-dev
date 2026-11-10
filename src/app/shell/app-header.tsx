@@ -32,17 +32,9 @@ export function AppHeader() {
             <Link
               to="/"
               aria-label={copy.header.brandAria}
-              className="flex min-w-0 items-center gap-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 md:hidden"
+              className="flex shrink-0 items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 md:hidden"
             >
-              <span
-                aria-hidden="true"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-strong to-indigo-600 text-[11px] font-bold text-white shadow-sm"
-              >
-                L20
-              </span>
-              <span className="truncate text-base font-semibold tracking-tight">
-                {copy.brand.wordmark}
-              </span>
+              <span className="text-base font-semibold tracking-tight">{copy.brand.wordmark}</span>
             </Link>
             <span className="hidden text-sm font-medium text-muted md:inline">{copy.nav.home}</span>
           </>

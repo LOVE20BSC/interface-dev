@@ -1,193 +1,160 @@
-import { ArrowRight, RefreshCw } from '@/shared/ui/icons';
-import { useEffect } from 'react';
+import { ArrowRight, ArrowUpLeft, RefreshCw } from '@/shared/ui/icons';
+import { lazy, Suspense, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAccount } from 'wagmi';
 import { BUILD_ID } from '@/config/build-id.generated';
 import { APP_ENV } from '@/config/env';
-import { DEFAULT_SYMBOL, NETWORK, addressBookStatus, configuredAddress } from '@/config/networks';
+import { BRAND_DOCS_URL, DEFAULT_SYMBOL, NETWORK, configuredAddress } from '@/config/networks';
 import { variantLabel } from '@/config/variant';
 import { copy } from '@/shared/config/copy';
-import { formatBuildId, formatPhase } from '@/shared/lib/format';
-import { Badge } from '@/shared/ui/badge';
-import { Button } from '@/shared/ui/button';
-import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
+import { formatAmount, formatBuildId, UNKNOWN } from '@/shared/lib/format';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
+import { useFirstToken } from '@/entities/community-token/model/use-first-token';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
-import { useCurrentPhase } from '@/entities/phase/model/use-current-phase';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
 import { IdentityWelcome } from '@/features/select-identity/ui/identity-welcome';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
+import { TechnicalDetails } from '@/widgets/contract-addresses/technical-details';
 
-const QUICK_ACTIONS = [
-  { key: 'myNft', to: '/my-nft', ...copy.home.cards.myNft },
-  { key: 'mint', to: '/mint', ...copy.home.cards.mint },
-  { key: 'airdrop', to: '/airdrop', ...copy.home.cards.airdrop },
-  { key: 'swap', to: '/swap', ...copy.home.cards.swap },
-] as const;
+// The snapshot + Airdrop ABI live in a separate chunk: they must never block the
+// identity area (UX spec §3.1 "快照加载与资格卡显隐").
+const AirdropEligibilitySection = lazy(async () => {
+  const module = await import('@/features/claim-airdrop/ui/airdrop-eligibility-section');
+  return { default: module.AirdropEligibilitySection };
+});
+
+const TEXT_LINK =
+  'inline-flex items-center text-sm font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40';
+
+function queryFor(pathname: string, symbol: string) {
+  return { pathname, search: `?symbol=${encodeURIComponent(symbol)}` } as const;
+}
 
 export function HomePage() {
-  const { symbol, switchSymbol } = useCommunityContext();
-  const token = useCommunityToken(symbol);
+  const { address: account } = useAccount();
   const identity = useMemberIdentity();
-  const phase = useCurrentPhase();
-  const book = addressBookStatus();
+  const firstToken = useFirstToken();
+  const { symbol, fromUrl, switchSymbol } = useCommunityContext();
 
+  // §2.1: the URL seed comes from the chain's symbol(), not a frontend constant.
   useEffect(() => {
-    document.title =
-      token.name === copy.brand.wordmark
-        ? copy.brand.wordmark
-        : `${token.name} · ${copy.brand.wordmark}`;
-  }, [token.name]);
+    if (fromUrl) return;
+    if (firstToken.symbol !== undefined && firstToken.symbol !== symbol) {
+      switchSymbol(firstToken.symbol);
+    }
+  }, [firstToken.symbol, fromUrl, symbol, switchSymbol]);
+
+  const displaySymbol = firstToken.symbol ?? DEFAULT_SYMBOL;
+  const balanceText =
+    account === undefined
+      ? UNKNOWN
+      : firstToken.status === 'ready' &&
+          firstToken.balance !== undefined &&
+          firstToken.decimals !== undefined
+        ? formatAmount(firstToken.balance, firstToken.decimals, 2)
+        : UNKNOWN;
 
   return (
-    <div className="space-y-6">
-      <section>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-strong">
-          {copy.home.heroKicker}
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground">{token.name}</h1>
-        <p className="mt-1 text-sm text-muted">{copy.brand.eyebrow}</p>
-        <p className="mt-3 text-sm leading-6 text-foreground/90">{copy.home.heroBody}</p>
-        {token.status === 'ready' && token.symbol !== token.name ? (
-          <p className="mt-2 font-mono text-xs text-muted">${token.symbol}</p>
-        ) : null}
-      </section>
-
-      {token.status === 'unknown' ? (
-        <Card className="border-warning/30 bg-warning-soft/40">
-          <CardTitle>{copy.community.unknownTitle}</CardTitle>
-          <CardDescription>{copy.community.unknownDescription(symbol)}</CardDescription>
-          <div className="mt-4">
-            <Button onClick={() => switchSymbol(DEFAULT_SYMBOL)}>
-              {copy.community.unknownAction}
-            </Button>
-          </div>
-        </Card>
-      ) : null}
-
-      {token.status === 'error' ? (
-        <Card>
-          <CardTitle>{copy.community.addressLookupFailed}</CardTitle>
-          <CardDescription>{copy.errors.network}</CardDescription>
-          <div className="mt-4">
-            <Button
-              variant="secondary"
-              leadingIcon={<RefreshCw className="h-4 w-4" />}
-              onClick={token.refetch}
-            >
-              {copy.common.retry}
-            </Button>
-          </div>
-        </Card>
-      ) : null}
-
+    <div className="space-y-5">
       <IdentityWelcome
         identity={identity}
         connectAction={<ConnectWalletButton />}
         onRetry={identity.refetch}
       />
 
-      <section aria-labelledby="quick-actions-title">
-        <div className="mb-3">
-          <h2 id="quick-actions-title" className="text-sm font-semibold text-foreground">
-            {copy.home.quickTitle}
-          </h2>
-          <p className="mt-1 text-xs leading-5 text-muted">{copy.home.quickSubtitle}</p>
+      {account !== undefined ? (
+        <Suspense fallback={null}>
+          <AirdropEligibilitySection />
+        </Suspense>
+      ) : null}
+
+      <section
+        aria-label={copy.home.balanceLabel(displaySymbol)}
+        className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5"
+      >
+        <div className="min-w-0">
+          <p className="text-xs text-muted">{copy.home.balanceLabel(displaySymbol)}</p>
+          {account !== undefined && firstToken.status === 'loading' ? (
+            <Skeleton className="mt-1.5 h-5 w-24" />
+          ) : account !== undefined && firstToken.status === 'error' ? (
+            <p className="mt-1 flex items-center gap-2 text-sm text-muted">
+              {copy.home.balanceError}
+              <button
+                type="button"
+                onClick={firstToken.refetch}
+                className="inline-flex items-center gap-1 text-xs font-medium text-brand-strong underline-offset-4 hover:underline"
+              >
+                <RefreshCw className="h-3 w-3" aria-hidden="true" />
+                {copy.common.retry}
+              </button>
+            </p>
+          ) : (
+            <p className="mt-0.5 truncate font-mono text-lg font-semibold text-foreground">
+              {balanceText}
+            </p>
+          )}
         </div>
-        <div className="grid grid-cols-2 gap-2.5">
-          {QUICK_ACTIONS.map((action) => (
-            <Link
-              key={action.key}
-              to={action.to}
-              className="group flex flex-col justify-between gap-3 rounded-2xl border border-line bg-surface p-3.5 shadow-sm transition-colors hover:border-brand/30 hover:bg-brand-soft/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-            >
-              <div>
-                <p className="text-sm font-semibold text-foreground">{action.title}</p>
-                <p className="mt-1 text-[11px] leading-4 text-muted">{action.body}</p>
-              </div>
-              <ArrowRight
-                className="h-4 w-4 self-end text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-brand-strong"
-                aria-hidden="true"
-              />
-            </Link>
-          ))}
-        </div>
+        <Link
+          to={{ pathname: '/swap', search: `?symbol=${encodeURIComponent(displaySymbol)}` }}
+          className={TEXT_LINK}
+        >
+          {copy.home.swap}
+        </Link>
       </section>
 
-      <section aria-labelledby="explain-title">
-        <h2 id="explain-title" className="mb-3 text-sm font-semibold text-foreground">
-          {copy.home.explainTitle}
-        </h2>
-        <div className="space-y-2.5">
-          {copy.home.explainItems.map((item) => (
-            <div key={item.title} className="rounded-2xl border border-line bg-surface p-4">
-              <p className="text-sm font-semibold text-foreground">{item.title}</p>
-              <p className="mt-1 text-xs leading-5 text-muted">{item.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <nav
+        aria-label={copy.home.entriesLabel}
+        className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface"
+      >
+        <Link
+          to={queryFor('/my-nft', symbol)}
+          className="flex items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-foreground transition-colors hover:bg-brand-soft/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40"
+        >
+          {copy.home.entries.myNft.title}
+          <ArrowRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+        </Link>
+        <Link
+          to={queryFor('/airdrop', symbol)}
+          className="flex items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-foreground transition-colors hover:bg-brand-soft/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40"
+        >
+          {copy.home.entries.airdrop.title}
+          <ArrowRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+        </Link>
+        <Link
+          to={queryFor('/swap', symbol)}
+          className="flex items-center justify-between gap-3 px-4 py-3.5 text-sm font-medium text-foreground transition-colors hover:bg-brand-soft/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40"
+        >
+          {copy.home.entries.swap.title}
+          <ArrowRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+        </Link>
+      </nav>
+      <footer className="space-y-3 border-t border-line pt-4">
+        <a
+          href={BRAND_DOCS_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline"
+        >
+          {copy.home.docs}
+          <ArrowUpLeft className="h-3.5 w-3.5" aria-hidden="true" />
+        </a>
 
-      <details className="group rounded-2xl border border-line bg-surface/70 p-4">
-        <summary className="cursor-pointer list-none text-sm font-medium text-foreground marker:hidden">
-          <span className="inline-flex items-center gap-2">
-            {copy.home.advancedSummary}
-            <span className="text-xs font-normal text-muted group-open:hidden">＋</span>
-            <span className="hidden text-xs font-normal text-muted group-open:inline">－</span>
-          </span>
-        </summary>
-        <dl className="mt-4 space-y-2.5 text-xs">
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-muted">{copy.home.advancedVariant}</dt>
-            <dd className="font-mono">{variantLabel(APP_ENV.variant)}</dd>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-muted">{copy.home.advancedChain}</dt>
-            <dd className="font-mono">{NETWORK.chainId}</dd>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-muted">{copy.home.advancedPhase}</dt>
-            <dd className="font-mono">
-              {phase.status === 'ready' ? (
-                formatPhase(phase.phase)
-              ) : phase.status === 'loading' ? (
-                <Skeleton className="h-3 w-10" />
-              ) : phase.status === 'error' ? (
-                copy.common.readFailed
-              ) : (
-                copy.common.notConfigured
-              )}
-            </dd>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-muted">{copy.home.advancedAddressBook}</dt>
-            <dd>
-              <Badge tone={book.isConfigured ? 'success' : 'warning'}>
-                {book.isConfigured ? copy.home.statusConfigured : copy.home.statusNotConfigured}
-              </Badge>
-              <span className="ml-2 font-mono text-[11px] text-muted">
-                {copy.home.statusCount(book.configured, book.total)}
-              </span>
-            </dd>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-muted">{copy.home.advancedBuild}</dt>
-            <dd className="font-mono">{formatBuildId(BUILD_ID)}</dd>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <dt className="text-muted">{copy.common.testnet}</dt>
-            <dd>{NETWORK.testnet ? copy.banners.testnet : copy.common.unknown}</dd>
-          </div>
-        </dl>
-        {token.status === 'ready' && token.address !== undefined ? (
-          <p className="mt-4 break-all rounded-xl bg-slate-50 p-2.5 font-mono text-[10px] leading-4 text-muted">
-            tokenAddress: {token.address}
-          </p>
-        ) : null}
-        {configuredAddress('phase') === undefined ? (
-          <p className="mt-3 text-[11px] leading-5 text-muted">{copy.home.advancedNoPhase}</p>
-        ) : null}
-      </details>
+        <TechnicalDetails
+          entries={[
+            { label: displaySymbol, address: firstToken.address },
+            { label: 'MemberNFT', address: configuredAddress('memberNFT') },
+            { label: 'Airdrop', address: configuredAddress('airdrop') },
+            { label: 'Router', address: configuredAddress('router') },
+            { label: 'Pair', address: configuredAddress('pair') },
+          ]}
+          meta={
+            <>
+              {copy.home.version} {formatBuildId(BUILD_ID)} · {variantLabel(APP_ENV.variant)} ·
+              chain {NETWORK.chainId}
+            </>
+          }
+        />
+      </footer>
     </div>
   );
 }
