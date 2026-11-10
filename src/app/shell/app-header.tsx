@@ -13,7 +13,7 @@ function canGoBack(): boolean {
 
 /**
  * Home wordmark = the current community's on-chain symbol(), with the protocol
- * name only while that metadata is unavailable (§1.3). The fallback is what
+ * label only while that metadata is unavailable (§1.3). The fallback is what
  * keeps first paint stable; long symbols truncate instead of moving the pill.
  */
 function HomeWordmark() {
@@ -22,7 +22,7 @@ function HomeWordmark() {
   const wordmark =
     community.address !== undefined && !community.isMetadataLoading
       ? community.symbol
-      : copy.brand.wordmark;
+      : copy.brand.protocolLabel;
 
   return (
     <Link

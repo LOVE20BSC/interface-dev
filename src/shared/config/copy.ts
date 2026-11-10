@@ -6,6 +6,8 @@
 export const copy = {
   brand: {
     wordmark: 'LOVE20',
+    /** Fallback label when no community is selected/known (GLOSSARY: protocol label). */
+    protocolLabel: 'LOVE20协议',
     fallbackName: 'LOVE20',
     fallbackSymbol: 'LOVE20',
     eyebrow: '身份优先的社区协作网络',

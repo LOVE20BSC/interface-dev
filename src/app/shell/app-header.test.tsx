@@ -47,11 +47,11 @@ beforeEach(() => {
 });
 
 describe('AppHeader wordmark', () => {
-  it('shows LOVE20 while community metadata loads, then the chain symbol', () => {
+  it('shows the protocol label while community metadata loads, then the chain symbol', () => {
     communityToken.mockReturnValue({ ...TOKEN, isMetadataLoading: true });
     const view = renderHeader();
 
-    expect(screen.getByRole('link', { name: 'LOVE20 首页' })).toHaveTextContent('LOVE20');
+    expect(screen.getByRole('link', { name: 'LOVE20协议 首页' })).toHaveTextContent('LOVE20协议');
 
     communityToken.mockReturnValue(TOKEN);
     view.rerender(
@@ -63,10 +63,10 @@ describe('AppHeader wordmark', () => {
     expect(screen.getByRole('link', { name: 'TestLOVE20 首页' })).toHaveTextContent('TestLOVE20');
   });
 
-  it('keeps the LOVE20 fallback when no community is resolved', () => {
+  it('keeps the protocol label when no community is resolved', () => {
     communityToken.mockReturnValue({ ...TOKEN, status: 'unknown', address: undefined });
     renderHeader();
 
-    expect(screen.getByRole('link', { name: 'LOVE20 首页' })).toHaveTextContent('LOVE20');
+    expect(screen.getByRole('link', { name: 'LOVE20协议 首页' })).toHaveTextContent('LOVE20协议');
   });
 });
