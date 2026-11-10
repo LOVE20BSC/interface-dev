@@ -1,0 +1,10 @@
+# pnpm 11 settings. Build scripts are deny-by-default; esbuild needs its
+# platform binary, while the optional native addons below are not required.
+allowBuilds:
+  bufferutil: false
+  esbuild: true
+  keccak: false
+  utf-8-validate: false
+
+minimumReleaseAgeExclude:
+  - lucide-react@1.71.0

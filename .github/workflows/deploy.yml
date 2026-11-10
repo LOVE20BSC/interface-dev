@@ -1,0 +1,80 @@
+name: deploy-pages
+
+# Static hosting only: build → upload-pages-artifact → deploy-pages.
+# No server, no secrets, no third-party API calls.
+#
+# Replace __GH_OWNER__ / __GH_REPO__ with the real owner/repo (or set the repo
+# variables VITE_ENV / VITE_BASE / VITE_SITE_ORIGIN in Settings → Variables).
+# One artifact serves one hosting shape (project path vs custom domain), so the
+# base must be provided at build time.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build (bundle budget + wallet SDK gate inside)
+        run: pnpm build
+        env:
+          VITE_ENV: ${{ vars.VITE_ENV || 'dev' }}
+          VITE_BASE: ${{ vars.VITE_BASE || '/__GH_REPO__/' }}
+          VITE_SITE_ORIGIN: ${{ vars.VITE_SITE_ORIGIN || 'https://__GH_OWNER__.github.io' }}
+
+      # The ABI drift gate (ADR-0002 §3.4) cannot run here: this checkout has no
+      # forge and no sibling contract repos. It belongs in the anvil/contracts
+      # job that can `forge build` and regenerate the ABI manifest.
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

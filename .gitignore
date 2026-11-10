@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+dist-*/
+out/
+cache/
+coverage/
+
+# environment / secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# generated at build/test time
+src/config/build-id.generated.ts
+.build-id
+build-id.json
+
+# research inputs are local-only and must never be committed
+.research/
+
+# tests
+playwright-report/
+test-results/
+blob-report/
+
+# editor / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.log

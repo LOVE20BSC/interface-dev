@@ -1,0 +1,60 @@
+{
+  "name": "love20-interface",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@11.5.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "node scripts/gen-build-id.mjs && vite",
+    "build": "node scripts/gen-build-id.mjs && pnpm typecheck && vite build && node scripts/postbuild.mjs && node scripts/check-bundle.mjs",
+    "preview": "vite preview",
+    "test": "node scripts/gen-build-id.mjs && vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint . --max-warnings=0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "node scripts/gen-build-id.mjs && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
+    "e2e": "playwright test",
+    "gen:errors": "node scripts/gen-errors.mjs"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.3.1",
+    "@radix-ui/react-popover": "^1.3.1",
+    "@tanstack/react-query": "^5.107.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.71.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-router-dom": "^7.18.5",
+    "tailwind-merge": "^3.7.0",
+    "viem": "^2.57.17",
+    "wagmi": "^2.19.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.65.0",
+    "@tailwindcss/vite": "^4.3.5",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "jsdom": "^31.0.0",
+    "prettier": "^3.9.10",
+    "tailwindcss": "^4.3.5",
+    "terser": "^5.51.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.2",
+    "vite": "^6.4.6",
+    "vitest": "^3.2.7"
+  }
+}
