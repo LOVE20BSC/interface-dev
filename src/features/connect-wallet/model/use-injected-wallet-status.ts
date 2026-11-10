@@ -2,59 +2,60 @@ import { useEffect, useState } from 'react';
 
 export type InjectedWalletStatus = 'checking' | 'available' | 'missing';
 
-const POLL_INTERVAL_MS = 250;
-const MAX_ATTEMPTS = 12; // 3 s, matching the UX spec's "don't show a dead button" rule
+/**
+ * The longest the connect surface says 「检测钱包中…」 when nothing has injected
+ * yet. The owner saw 1–3 s of it on the live site, so the window is short enough
+ * that the no-wallet path settles well under a second.
+ */
+export const DETECTION_WINDOW_MS = 600;
+
+/** Late injectors that never dispatch `ethereum#initialized` are still noticed. */
+export const LATE_PROVIDER_RECHECK_MS = 500;
+
+function hasInjectedProvider(): boolean {
+  return typeof window !== 'undefined' && window.ethereum !== undefined;
+}
 
 /**
  * Some wallets inject window.ethereum after the document loads, so "no provider
  * yet" is not the same as "no wallet". We wait briefly, then expose an explicit
  * `missing` state that opens the fallback sheet instead of a dead button.
+ *
+ * States only move forward: checking → available | missing, and a late provider
+ * upgrades missing → available. The surface never falls back to `checking`, so a
+ * slow injector cannot produce a 「连接钱包」 → 「检测钱包中…」 flicker.
  */
 export function useInjectedWalletStatus(): InjectedWalletStatus {
-  const [status, setStatus] = useState<InjectedWalletStatus>(() => {
-    if (typeof window === 'undefined') return 'checking';
-    return window.ethereum !== undefined ? 'available' : 'checking';
-  });
+  const [status, setStatus] = useState<InjectedWalletStatus>(() =>
+    hasInjectedProvider() ? 'available' : 'checking',
+  );
 
   useEffect(() => {
     if (status === 'available') return;
     if (typeof window === 'undefined') return;
 
-    let attempts = 0;
-    let settled = false;
-
-    const settle = (next: InjectedWalletStatus) => {
-      if (settled) return;
-      settled = true;
-      setStatus(next);
+    const upgrade = () => {
+      if (window.ethereum !== undefined) setStatus('available');
     };
 
-    const onInitialized = () => settle('available');
-    window.addEventListener('ethereum#initialized', onInitialized);
+    // Covers a provider injected between the initial render and this effect.
+    upgrade();
+    // The standardized event is the fast path; the recheck covers wallets that
+    // inject silently, including after we have already settled to `missing`.
+    window.addEventListener('ethereum#initialized', upgrade);
+    const recheck = window.setInterval(upgrade, LATE_PROVIDER_RECHECK_MS);
 
-    if (window.ethereum !== undefined) {
-      settle('available');
-      return () => {
-        window.removeEventListener('ethereum#initialized', onInitialized);
-      };
+    let deadline: number | undefined;
+    if (status === 'checking') {
+      deadline = window.setTimeout(() => {
+        setStatus(hasInjectedProvider() ? 'available' : 'missing');
+      }, DETECTION_WINDOW_MS);
     }
 
-    const timer = window.setInterval(() => {
-      if (window.ethereum !== undefined) {
-        window.clearInterval(timer);
-        settle('available');
-        return;
-      }
-      attempts += 1;
-      if (attempts >= MAX_ATTEMPTS) {
-        window.clearInterval(timer);
-        settle('missing');
-      }
-    }, POLL_INTERVAL_MS);
-
     return () => {
-      window.clearInterval(timer);
-      window.removeEventListener('ethereum#initialized', onInitialized);
+      window.clearTimeout(deadline);
+      window.clearInterval(recheck);
+      window.removeEventListener('ethereum#initialized', upgrade);
     };
   }, [status]);
 

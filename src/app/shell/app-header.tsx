@@ -2,11 +2,39 @@ import { ArrowLeft } from '@/shared/ui/icons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { copy } from '@/shared/config/copy';
 import { pageTitleFor } from '@/app/navigation/navigation';
+import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
+import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { ConnectPill } from '@/widgets/connect-pill/connect-pill';
 
 function canGoBack(): boolean {
   const state = window.history.state as { idx?: unknown } | null;
   return typeof state?.idx === 'number' && state.idx > 0;
+}
+
+/**
+ * Home wordmark = the current community's on-chain symbol(), with the protocol
+ * name only while that metadata is unavailable (§1.3). The fallback is what
+ * keeps first paint stable; long symbols truncate instead of moving the pill.
+ */
+function HomeWordmark() {
+  const { symbol } = useCommunityContext();
+  const community = useCommunityToken(symbol);
+  const wordmark =
+    community.address !== undefined && !community.isMetadataLoading
+      ? community.symbol
+      : copy.brand.wordmark;
+
+  return (
+    <Link
+      to="/"
+      aria-label={copy.header.brandAria(wordmark)}
+      className="flex min-w-0 shrink-0 items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 md:hidden"
+    >
+      <span className="max-w-[9rem] truncate text-base font-semibold tracking-tight">
+        {wordmark}
+      </span>
+    </Link>
+  );
 }
 
 /**
@@ -29,13 +57,7 @@ export function AppHeader() {
       <div className="mx-auto flex min-h-14 w-full max-w-2xl items-center gap-2 px-4 pt-[env(safe-area-inset-top)]">
         {isHome ? (
           <>
-            <Link
-              to="/"
-              aria-label={copy.header.brandAria}
-              className="flex shrink-0 items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 md:hidden"
-            >
-              <span className="text-base font-semibold tracking-tight">{copy.brand.wordmark}</span>
-            </Link>
+            <HomeWordmark />
             <span className="hidden text-sm font-medium text-muted md:inline">{copy.nav.home}</span>
           </>
         ) : (

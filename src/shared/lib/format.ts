@@ -27,7 +27,19 @@ export function formatUnits(value: bigint, decimals: number): string {
   return `${negative ? '-' : ''}${whole.toString()}${fractionText === '.' ? '' : fractionText}`;
 }
 
-/** Trims to `maxFractionDigits` without rounding up (never overstates a balance). */
+/** `99799100` → `99,799,100`. Pure string grouping, so huge balances are exact. */
+function groupInteger(whole: string): string {
+  return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/**
+ * Token amount for display: integer part grouped with thousands separators and
+ * at most `maxFractionDigits` decimals (truncated, never rounded up so a balance
+ * is never overstated). Trailing zeros are trimmed.
+ *
+ * `undefined` / `null` means "not loaded", which stays `—`: rendering 0 would
+ * read as "my money is gone" (ADR-0003 §4).
+ */
 export function formatAmount(
   value: bigint | undefined | null,
   decimals: number,
@@ -37,9 +49,10 @@ export function formatAmount(
   const raw = formatUnits(value, decimals);
   if (raw === UNKNOWN) return UNKNOWN;
   const [whole = '0', fraction] = raw.split('.');
-  if (fraction === undefined || maxFractionDigits <= 0) return whole;
+  const grouped = groupInteger(whole);
+  if (fraction === undefined || maxFractionDigits <= 0) return grouped;
   const trimmed = fraction.slice(0, maxFractionDigits).replace(/0+$/, '');
-  return trimmed.length > 0 ? `${whole}.${trimmed}` : whole;
+  return trimmed.length > 0 ? `${grouped}.${trimmed}` : grouped;
 }
 
 export function formatPhase(value: bigint | undefined | null): string {

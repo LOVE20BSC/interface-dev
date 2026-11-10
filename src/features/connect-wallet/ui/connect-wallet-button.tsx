@@ -21,7 +21,8 @@ export interface ConnectWalletButtonProps {
 
 /**
  * Disconnected state: one button, no fake disabled affordances.
- * If no provider is found within 3 s, clicking opens the fallback sheet.
+ * If no provider is found within the short detection window, clicking opens the
+ * fallback sheet instead of a dead button.
  */
 export function ConnectWalletButton({
   variant = 'primary',

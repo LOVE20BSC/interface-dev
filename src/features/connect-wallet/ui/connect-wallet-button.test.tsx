@@ -3,16 +3,19 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { http } from 'viem';
 import { createConfig, WagmiProvider } from 'wagmi';
 import { injected } from 'wagmi/connectors';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { targetChain } from '@/config/chain';
 import { NETWORK } from '@/config/networks';
+import { useInjectedWalletStatus } from '@/features/connect-wallet/model/use-injected-wallet-status';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
 
-// Simulate the "no provider after the 3s detection window" branch without
-// waiting for real timers. jsdom has no window.ethereum either.
+// Pin the detection status so each branch is exercised without real timers;
+// jsdom has no window.ethereum either.
 vi.mock('@/features/connect-wallet/model/use-injected-wallet-status', () => ({
-  useInjectedWalletStatus: () => 'missing' as const,
+  useInjectedWalletStatus: vi.fn(),
 }));
+
+const walletStatus = vi.mocked(useInjectedWalletStatus);
 
 const config = createConfig({
   chains: [targetChain],
@@ -38,10 +41,24 @@ function renderButton() {
 }
 
 describe('ConnectWalletButton', () => {
+  beforeEach(() => {
+    walletStatus.mockReturnValue('missing');
+  });
+
+  it('shows the detection label only while the provider check is in flight', () => {
+    walletStatus.mockReturnValue('checking');
+    renderButton();
+
+    const button = screen.getByRole('button', { name: '连接钱包' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent('检测钱包中…');
+  });
+
   it('offers a no-wallet sheet instead of a dead connect button', async () => {
     renderButton();
     const button = screen.getByRole('button', { name: '连接钱包' });
     expect(button).toBeEnabled();
+    expect(button).toHaveTextContent('连接钱包');
 
     fireEvent.click(button);
 

@@ -54,7 +54,7 @@ export const copy = {
     backAria: '返回上一页',
     collapseSidebar: '收起侧栏',
     expandSidebar: '展开侧栏',
-    brandAria: 'LOVE20 首页',
+    brandAria: (symbol: string) => `${symbol} 首页`,
   },
   wallet: {
     connect: '连接钱包',

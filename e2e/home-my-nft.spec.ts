@@ -156,6 +156,16 @@ async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: resolve(SHOTS, name), animations: 'disabled' });
 }
 
+/**
+ * UX spec §1.3: the home wordmark is the current community's on-chain symbol(),
+ * not the static protocol name. Waiting for it also keeps screenshots stable.
+ */
+async function expectCommunityWordmark(page: Page): Promise<void> {
+  await expect(page.getByRole('link', { name: 'TestLOVE20 首页' })).toBeVisible({
+    timeout: 15_000,
+  });
+}
+
 test.beforeAll(() => {
   mkdirSync(SHOTS, { recursive: true });
 });
@@ -169,6 +179,7 @@ test('home: disconnected shows connect and no identity yet', async ({ page }) =>
   await expect(page.getByText('你还没有身份')).toHaveCount(0);
   await expect(page.getByText('无需操作')).toHaveCount(0);
   expect(await countSolidButtons(page)).toBe(1);
+  await expectCommunityWordmark(page);
 
   await shot(page, 'home-disconnected.png');
 });
@@ -184,6 +195,7 @@ test('home: connected without identity offers 我的 NFT only', async ({ page })
   await expect(page.getByText('无需操作')).toHaveCount(0);
   await expect(page.getByText('你参与了销毁活动，获得空投铸造资格')).toHaveCount(0);
   expect(await countSolidButtons(page)).toBe(0);
+  await expectCommunityWordmark(page);
 
   await shot(page, 'home-connected-no-identity.png');
 });
@@ -199,6 +211,12 @@ test('home: identity greeting persists across reload', async ({ page }) => {
   await expect(page.getByRole('link', { name: '切换身份' })).toBeVisible();
   await expect(page.getByText('无需操作')).toHaveCount(0);
   expect(await countSolidButtons(page)).toBe(0);
+  await expectCommunityWordmark(page);
+
+  // 99,799,100 renders with thousands separators, never as a wall of digits.
+  const balanceRow = page.getByRole('region', { name: 'TestLOVE20 余额' });
+  await expect(balanceRow).toContainText(/\d{1,3}(,\d{3})+/);
+  await expect(balanceRow).not.toContainText('99799100');
 
   await shot(page, 'home-connected-with-identity.png');
 
@@ -218,6 +236,7 @@ test('home: eligible wallet sees the airdrop card', async ({ page }) => {
   // The card has a title and one CTA; no subtitle, no explanation sentence.
   await expect(card.locator('p')).toHaveCount(0);
   expect(await countSolidButtons(page)).toBe(1);
+  await expectCommunityWordmark(page);
   await shot(page, 'home-airdrop-eligible.png');
 });
 

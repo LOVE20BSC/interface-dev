@@ -37,7 +37,7 @@ export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
       >
         <Link
           to={{ pathname: '/', search: location.search }}
-          aria-label={copy.header.brandAria}
+          aria-label={copy.header.brandAria(copy.brand.wordmark)}
           className="flex min-w-0 items-center gap-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <span
