@@ -109,6 +109,8 @@ test.describe('首页提醒流', () => {
     // Mutually exclusive with the no-identity card; it owns the one filled button.
     await expect(page.getByRole('link', { name: '铸造身份' })).toHaveCount(0);
     expect(await countSolidButtons(page)).toBe(1);
+
+    await shot(page, 'home-needs-selection.png');
   });
 
   test('eligible: the airdrop reminder shows the claimable amount and one CTA', async ({

@@ -209,14 +209,17 @@ test('my-nft: card list and local selection without a transaction', async ({ pag
   await page.getByRole('button', { name: '使用此身份' }).click();
   // The row keeps its 当前 pill + tint; the disabled button carries the state
   // only as its accessible name (the visible duplicate is gone).
-  await expect(page.getByText('当前', { exact: true })).toBeVisible();
+  const identityList = page.getByRole('list', { name: '我的 NFT' });
+  await expect(identityList.getByText('当前', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '当前身份' })).toBeDisabled();
   // No wallet confirmation appeared: selection is a local cache write.
   await expect(page.getByRole('button', { name: '打开钱包与身份菜单' })).toBeVisible();
   await shot(page, 'my-nft-selected.png');
 
   await page.reload();
-  await expect(page.getByText('当前', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.getByRole('list', { name: '我的 NFT' }).getByText('当前', { exact: true }),
+  ).toBeVisible({ timeout: 15_000 });
 });
 
 test('identity cache is cleared when ownerOf belongs to someone else', async ({ page }) => {
