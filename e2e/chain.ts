@@ -1,29 +1,52 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { test } from '@playwright/test';
 
 /**
  * Chain-state isolation for the e2e suite.
  *
- * Every spec file mutates the shared anvil chain (claims, mints, swaps,
- * approvals, fixtures). Anvil 1.8.1 exposes `anvil_snapshot` / `anvil_revert`
- * (the `evm_*` aliases work too); a snapshot per test file plus a revert in
- * `afterAll` restores the exact pre-file chain state, so a second `pnpm e2e`
- * on the same chain starts where the first one did. See e2e/README.md.
+ * The suite owns a dedicated anvil chain: http://127.0.0.1:8555 by default, never the developer's
+ * personal chain on :8545. `pnpm e2e` (scripts/e2e-chain.mjs) bootstraps that chain on the first run
+ * and exports E2E_ANVIL_RPC for this process; playwright.config.ts forwards the same endpoint into
+ * the build as VITE_ANVIL_RPC, so the page and the specs use one chain. The address book is
+ * unchanged because a clean bootstrap from deployer nonce 0 reproduces the committed addresses.
  *
- * This is a per-file fixture on purpose: tests inside a file share fixtures
- * (e.g. the mint receipt is read by the following my-nft test), so reverting
- * per test would break them. Files must not overlap, which is why
- * playwright.config.ts runs the suite on one worker; two workers taking
- * snapshots at the same time would revert each other's writes.
+ * Every spec file mutates the suite chain (claims, mints, swaps, approvals, fixtures). Anvil 1.8.1
+ * exposes `anvil_snapshot` / `anvil_revert` (the `evm_*` aliases work too); a snapshot per test file
+ * plus a revert in `afterAll` restores the exact pre-file chain state, so a second `pnpm e2e` on the
+ * same chain starts where the first one did.
+ *
+ * This is a per-file fixture on purpose: tests inside a file share fixtures (e.g. the mint receipt is
+ * read by the following my-nft test), so reverting per test would break them. Files must not overlap,
+ * which is why playwright.config.ts runs the suite on one worker; two workers taking snapshots at
+ * the same time would revert each other's writes.
  */
 
-const deployment = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'src/config/deployments/anvil31337_dev.json'), 'utf8'),
-) as { rpcUrls: string[] };
+const DEFAULT_ANVIL_RPC = 'http://127.0.0.1:8555';
+const HUMAN_ANVIL_PORT = '8545';
 
-export const ANVIL_RPC =
-  process.env.E2E_ANVIL_RPC ?? deployment.rpcUrls[0] ?? 'http://127.0.0.1:8545';
+/** Hostnames that mean "this machine"; only these can be the developer's personal chain. */
+const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '0.0.0.0']);
+
+function resolveAnvilRpc(): string {
+  const raw = (process.env.E2E_ANVIL_RPC ?? '').trim();
+  const rpc = (raw === '' ? DEFAULT_ANVIL_RPC : raw).replace(/\/+$/, '');
+  let url: URL;
+  try {
+    url = new URL(rpc);
+  } catch {
+    throw new Error(`[chain] E2E_ANVIL_RPC is not a valid URL: ${JSON.stringify(raw)}`);
+  }
+  if (LOCAL_HOSTS.has(url.hostname) && url.port === HUMAN_ANVIL_PORT) {
+    // Defense in depth: scripts/e2e-chain.mjs already refuses before Playwright starts. Tests may
+    // never snapshot/revert/bootstrap the developer's chain - see e2e/README.md for the incident.
+    throw new Error(
+      `[chain] refusing to run against ${rpc}: that is the developer's personal chain. ` +
+        'Unset E2E_ANVIL_RPC to use the dedicated suite chain on :8555.',
+    );
+  }
+  return rpc;
+}
+
+export const ANVIL_RPC = resolveAnvilRpc();
 
 interface JsonRpcResponse {
   readonly result?: unknown;
