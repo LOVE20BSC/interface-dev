@@ -19,13 +19,14 @@ M0 范围共 6 项（[m0-scope](product/m0-scope.md)「范围内」）。✅ 完
 | 5 | 一条命令起全栈 | ✅ | [ADR-0004](adr/0004-anvil-local-chain.md)；clean bootstrap 两次导出同 sha256；本次 `cast chain-id`=31337，`merkleRoot` 与快照一致；前端地址簿由 `pnpm sync:anvil` 生成 |
 | 6 | 文案纪律落地 | ✅ | 所有中文进 `src/shared/config/copy.ts`（生成的错误文案除外），`src/architecture.test.ts` 强制；`7dc0949`；对照 [GLOSSARY](../GLOSSARY.md) |
 | — | M0 验收报告 | ✅ | [m0-acceptance](product/m0-acceptance.md)（14 步 + 证据；§3 的 O1–O4 已修复复核，见 §3.1） |
-| — | E2E 33 条 | ✅ | `e2e/*.spec.ts` 合计 33 个 `test()`；跑在独立 **8555** 链（`pnpm e2e` 自举/复用），按文件 `anvil_snapshot`/`anvil_revert` 隔离；两遍连跑均 33/33，8545 人工链前后不变（§6.1） |
+| — | E2E 50 条 | 🔄 | `e2e/*.spec.ts` 合计 50 个 `test()`；跑在独立 **8555** 链（`pnpm e2e` 自举/复用），按文件 `anvil_snapshot`/`anvil_revert` 隔离；**2026-11-12 本轮未跑成：`../anvil` 的 `DeployLocal.s.sol` 编译失败，8555 无法 bootstrap（§6.1）** |
+| — | 首页身份读取状态 | ✅ | `loading` / `error` / `unconfigured` 不再只剩问候：骨架卡、错误卡 +「重试」、未部署说明；无身份与未选择卡不变；[m0-ux-spec](product/m0-ux-spec.md) §3.1 · `home-identity-error.png` / `home-no-identity.png` |
 | — | 发布 interface-test | 🔄 | 线上 200，但 build id `mwb9werl-379de9b0`；远端 `main`=`a217ddb`，本仓 HEAD 未发布（领先 11 个） |
 | — | M1 治理 | ⏳ | 未开工；[CI-001](contract-issues/001-no-member-round-index.md) Blocker 未解 |
 
 **未完成清单（别误读为 done）**：三处真机体验、发布到 interface-test、test/prod 地址簿填充。e2e 已隔离到独立 8555 链（§6.1）；包体 prod 159.2–159.3 / dev 160.0–160.1 kB（build id 抖动；dev 有 1 kB 部署数据豁免，§6.2）；ABI manifest 与漂移门禁已补（§6.5）。
 
-截图共 19 张：home 5（含链不对药丸）/ airdrop 4 / mint 3 / my-nft 2 / swap 4 / live 1，见 [`product/screenshots/`](product/screenshots/)。本次核对用到的文件：`swap-form.png`、`mint-form.png`、`airdrop-eligible.png`、[`live/interface-test-live-2026-11-11.png`](product/screenshots/live/interface-test-live-2026-11-11.png)。
+截图共 31 张：home 7（含链不对药丸与身份读取错误卡）/ airdrop 5 / mint 5 / my-nft 2 / swap 4 / about 2 / apps 1 / me 1 / transfer 3 / tx-recovery 1 / live 1，见 [`product/screenshots/`](product/screenshots/)。本次核对用到的文件：`home-identity-error.png`、`home-no-identity.png`、`swap-form.png`、`mint-form.png`、`airdrop-eligible.png`、[`live/interface-test-live-2026-11-11.png`](product/screenshots/live/interface-test-live-2026-11-11.png)。
 
 ## 3. 仓库与环境事实
 
@@ -68,7 +69,7 @@ M0 范围共 6 项（[m0-scope](product/m0-scope.md)「范围内」）。✅ 完
 | 构建 | `pnpm build` | typecheck → vite → 404/.nojekyll/build-id → 包体门禁；默认 **prod** 变体 |
 | dev 变体构建 | `VITE_ENV=dev pnpm build` | 测包体/本地地址簿时必须显式指定 |
 | 预览产物 | `pnpm preview` | <http://127.0.0.1:4173> |
-| E2E | `pnpm e2e` | Playwright，**33 条**；在独立 **8555** 自动化链上自举/复用（`scripts/e2e-chain.mjs`），`playwright.config.ts` 强制 `VITE_ENV=dev` 并跑 `build && preview`，把解析出的 RPC 作为 `VITE_ANVIL_RPC` 烘进构建 |
+| E2E | `pnpm e2e` | Playwright，**50 条**；在独立 **8555** 自动化链上自举/复用（`scripts/e2e-chain.mjs`），`playwright.config.ts` 强制 `VITE_ENV=dev` 并跑 `build && preview`，把解析出的 RPC 作为 `VITE_ANVIL_RPC` 烘进构建 |
 | 只看 e2e 链 | `pnpm e2e:ensure-chain` | 打印 8555 端点与「自举/复用」结果，不跑测试；`pnpm e2e:reset-chain` 重建 |
 | 格式化 | `pnpm format` / `pnpm format:check` | Prettier |
 | 起人工链（8545） | `make stop && make clean && make bootstrap` | 只从全新链/nonce 0 部署；旧链会被拒绝 |
@@ -133,7 +134,7 @@ CI 环境规则（`.github/workflows/deploy.yml`）：取 `github.repository` �
 
 1. **读什么**：先 [ADR-0001](adr/0001-stack-and-static-hosting.md)→[0004](adr/0004-anvil-local-chain.md)（0002 环境/发布、0004 起链最关键），再本文件，再 [m0-ux-spec](product/m0-ux-spec.md)；改文案前读 [GLOSSARY](../GLOSSARY.md)。
 2. **起链**：`make -C ../anvil bootstrap`；`cast chain-id --rpc-url http://127.0.0.1:8545` 应为 31337；收链 `make -C ../anvil stop`。同一时刻只允许一条链。
-3. **跑测试**：`pnpm install` → `pnpm typecheck && pnpm lint && pnpm test`；`pnpm e2e` 跑 33 条，首次需干净链，之后可按文件快照/回滚重复跑（见 [e2e/README.md](../e2e/README.md)）。
+3. **跑测试**：`pnpm install` → `pnpm typecheck && pnpm lint && pnpm test`；`pnpm e2e` 跑 50 条，首次需干净链，之后可按文件快照/回滚重复跑（见 [e2e/README.md](../e2e/README.md)）。
 4. **改 UI 的纪律**：文案只进 `shared/config/copy.ts`；组件内禁止中文字面量；缓存只走 `shared/lib/cache.ts`；地址/chainId 只从环境包来；禁止硬编码费率；金额与倒计时必须标「约/预计」；不调 `tokenURI`、不读事件日志。
 5. **改 ABI/地址**：先 clean bootstrap，再 `pnpm sync:anvil` 生成并提交；不手改、不把 `out/`/`build/` 带进仓，不为了匹配旧地址簿调 nonce。漂移门禁 `pnpm abis:check`。
 6. **提交纪律**：显式 `git add <path>`（不要 `git add -A`）；已推送 commit 禁止 amend；不提交 `dist*/`、`.research/`、`.build-id`、`.env`。

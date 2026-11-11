@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { isolateChain } from './chain';
 import {
   ACCOUNTS,
+  RPC_URL,
   SEEDED_NAME,
   countSolidButtons,
   connect,
@@ -87,6 +88,37 @@ test.describe('首页提醒流', () => {
     await expect(page.getByText('现在没有需要你处理的事。')).toHaveCount(0);
     expect(await countSolidButtons(page)).toBe(1);
     await expectHomeWordmark(page, false);
+  });
+
+  test('unreachable RPC: honest error card, 重试 recovers instead of a bare greeting', async ({
+    page,
+  }) => {
+    await installWallet(page, ACCOUNTS.outsider);
+
+    // Simulate the owner's 2026-11-12 incident: every identity read fails while
+    // the wallet is connected. The page must explain the failure, not go blank.
+    const blockRpc = (url: URL) => url.href.startsWith(RPC_URL);
+    await page.route(blockRpc, (route) => route.abort('failed'));
+    await page.goto('/');
+    await connect(page);
+
+    const card = page.locator('[data-testid="home-identity-error"]');
+    await expect(card).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByRole('heading', { name: '身份 NFT 暂时读不到' })).toBeVisible();
+    await expect(card.getByRole('button', { name: '重试' })).toBeVisible();
+    // The greeting is still there; the error card is the explanation.
+    await expect(greeting(page)).toHaveText('你好');
+    await shot(page, 'home-identity-error.png');
+
+    // 重试 actually refetches: once the RPC works again the normal empty state
+    // replaces the error card.
+    await page.unroute(blockRpc);
+    await card.getByRole('button', { name: '重试' }).click();
+    await expect(page.getByText('你还没有身份 NFT')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('link', { name: '铸造身份 NFT' })).toHaveAttribute(
+      'href',
+      '/mint?symbol=TestLOVE20',
+    );
   });
 
   test('holds identities but none selected: asks to pick one, no empty sentence', async ({

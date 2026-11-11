@@ -111,6 +111,9 @@ export const copy = {
   identity: {
     memberId: (id: string) => `NFT #${id}`,
     disconnectedTitle: '先连接钱包',
+    /** Shared honest line for an environment whose address book has no MemberNFT. */
+    notDeployedTitle: '这个环境还没有部署身份 NFT 合约',
+    notDeployedBody: '这里暂时不能铸造身份 NFT。',
     unconfiguredBody: '地址簿里还没有 MemberNFT 或种子 core 合约。填充部署地址后会自动读取。',
     truncated: '这个钱包持有的身份 NFT 较多，这里只显示前 100 个。',
     emptyBody: '每个身份 NFT 都是一个独立的身份。铸造后可以参与社区治理与行动。',
@@ -127,6 +130,9 @@ export const copy = {
     identityIntro: '一个钱包可以拥有多个身份 NFT，身份 NFT 才是参与凭证。',
     greeting: (name: string) => `你好，${name}`,
     greetingNoName: '你好',
+    /** Identity read states that must never leave the page as a bare greeting. */
+    identityReading: '读取身份 NFT 中…',
+    identityErrorTitle: '身份 NFT 暂时读不到',
     noIdentity: '你还没有身份 NFT',
     goMyNft: '去我的 NFT',
     switchIdentity: '切换身份 NFT',

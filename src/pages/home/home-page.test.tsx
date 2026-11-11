@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { Link, MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomePage } from '@/pages/home/home-page';
@@ -225,6 +225,52 @@ describe('HomePage reminders', () => {
 
     expect(greeting()).toHaveTextContent('你好，Testdev-member-0');
     expect(screen.queryByText('现在没有需要你处理的事。')).toBeNull();
+  });
+});
+
+describe('HomePage identity read states', () => {
+  it('loading: keeps the reminder slot occupied with a compact skeleton card', () => {
+    memberIdentity.mockReturnValue(identity({ status: 'loading', selected: null }));
+    renderPage();
+
+    const card = screen.getByTestId('home-identity-loading');
+    expect(card).toBeVisible();
+    expect(card).toHaveAttribute('aria-busy', 'true');
+    expect(within(card).getByText('读取身份 NFT 中…')).toBeVisible();
+    expect(greeting()).toHaveTextContent('你好');
+    // Loading is not actionable: no mint CTA and no filled button.
+    expect(screen.queryByRole('link', { name: '铸造身份 NFT' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '重试' })).toBeNull();
+  });
+
+  it('error: explains the failed read and 重试 refetches identity', () => {
+    const state = identity({ status: 'error', selected: null });
+    memberIdentity.mockReturnValue(state);
+    renderPage();
+
+    const card = screen.getByTestId('home-identity-error');
+    expect(card).toBeVisible();
+    expect(within(card).getByRole('heading', { name: '身份 NFT 暂时读不到' })).toBeVisible();
+    expect(within(card).getByText('网络可能不稳，你的身份 NFT 没有变化。')).toBeVisible();
+    expect(screen.queryByRole('link', { name: '铸造身份 NFT' })).toBeNull();
+
+    fireEvent.click(within(card).getByRole('button', { name: '重试' }));
+    expect(state.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('unconfigured: states that this environment has no identity NFT contract, no CTA', () => {
+    memberIdentity.mockReturnValue(identity({ status: 'unconfigured', selected: null }));
+    renderPage();
+
+    const card = screen.getByTestId('home-identity-unconfigured');
+    expect(card).toBeVisible();
+    expect(
+      within(card).getByRole('heading', { name: '这个环境还没有部署身份 NFT 合约' }),
+    ).toBeVisible();
+    expect(within(card).getByText('这里暂时不能铸造身份 NFT。')).toBeVisible();
+    // No CTA that would fail and no 重试 (retrying cannot deploy a contract).
+    expect(screen.queryByRole('button', { name: '重试' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '铸造身份 NFT' })).toBeNull();
   });
 });
 
