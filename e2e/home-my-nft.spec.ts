@@ -201,6 +201,40 @@ test('home: a non-eligible account never sees the airdrop reminder', async ({ pa
   await expect(page.locator('section[aria-labelledby^="home-reminder"]')).toHaveCount(0);
 });
 
+test('wallet menu: identity row agrees with the pill when the chain is unreachable', async ({
+  page,
+}) => {
+  // Let the identity validate once, then cut the RPC and reload: the persisted
+  // tokenId is still cached, but it is not a fact until ownerOf() revalidates.
+  await installWallet(page, ACCOUNTS.withIdentity);
+  await seedIdentity(page, ACCOUNTS.withIdentity, '1');
+  await page.goto('/');
+  await connect(page);
+  await expect(greeting(page)).toHaveText(`你好，${SEEDED_NAME}`, { timeout: 15_000 });
+
+  await page.route(RPC_URL, (route) => route.abort());
+  await page.reload();
+  await connect(page);
+
+  const pill = page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' });
+  // The pill degrades to 「—」 because the identity is unvalidated.
+  await expect(pill).toContainText('—', { timeout: 30_000 });
+  await expect(pill).not.toContainText(SEEDED_NAME);
+  await pill.click();
+
+  const sheet = page.getByRole('dialog', { name: '钱包与身份 NFT' });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText('身份 NFT 暂时读不到')).toBeVisible({ timeout: 30_000 });
+  await expect(sheet.getByText('网络可能不稳，身份 NFT 没有变化。')).toBeVisible();
+  // No confident cached name/id and no entry to an NFT page that can only error.
+  await expect(sheet.getByText(SEEDED_NAME)).toHaveCount(0);
+  await expect(sheet.getByText(/^NFT #/)).toHaveCount(0);
+  await expect(sheet.getByText('查看NFT')).toHaveCount(0);
+  expect(await sheet.locator('a[href^="/my-nft"]').count()).toBe(0);
+
+  await shot(page, 'wallet-menu-identity-error.png');
+});
+
 test('my-nft: card list and local selection without a transaction', async ({ page }) => {
   await installWallet(page, ACCOUNTS.withIdentity);
   await page.goto('/my-nft?symbol=TestLOVE20');

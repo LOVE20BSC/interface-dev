@@ -25,6 +25,83 @@ export interface WalletMenuContentProps {
   readonly onNavigate: () => void;
 }
 
+interface IdentityRow {
+  readonly title: string;
+  readonly subtitle: string | null;
+  readonly action: string | null;
+  readonly href: string | null;
+  readonly isReady: boolean;
+}
+
+/**
+ * One row, derived only from the revalidated state (ADR-0003 §2). A cached
+ * selection (`identity.selected`) is never a fact on its own: while loading,
+ * error or unconfigured it must not leak a name, an id or a link to the NFT
+ * page.
+ */
+function identityRow(identity: MemberIdentityState): IdentityRow {
+  switch (identity.status) {
+    case 'ready':
+      if (identity.selected === null) {
+        return {
+          title: copy.wallet.noIdentitySelected,
+          subtitle: null,
+          action: copy.wallet.goSelect,
+          href: '/my-nft',
+          isReady: false,
+        };
+      }
+      return {
+        title: identity.selected.name ?? copy.common.unknown,
+        subtitle: copy.identity.memberId(identity.selected.tokenId.toString()),
+        action: copy.wallet.viewNft,
+        href: '/my-nft',
+        isReady: true,
+      };
+    case 'loading':
+      return {
+        title: copy.common.loading,
+        subtitle: null,
+        action: null,
+        href: null,
+        isReady: false,
+      };
+    case 'error':
+      return {
+        title: copy.wallet.identityUnavailable,
+        subtitle: copy.wallet.identityUnavailableBody,
+        action: null,
+        href: null,
+        isReady: false,
+      };
+    case 'unconfigured':
+      return {
+        title: copy.wallet.identityUnconfigured,
+        subtitle: null,
+        action: null,
+        href: null,
+        isReady: false,
+      };
+    case 'empty':
+      return {
+        title: copy.wallet.noIdentity,
+        subtitle: null,
+        action: copy.wallet.goMint,
+        href: '/mint',
+        isReady: false,
+      };
+    case 'disconnected':
+    case 'needs-selection':
+      return {
+        title: copy.wallet.noIdentitySelected,
+        subtitle: null,
+        action: identity.status === 'needs-selection' ? copy.wallet.goSelect : null,
+        href: identity.status === 'needs-selection' ? '/my-nft' : null,
+        isReady: false,
+      };
+  }
+}
+
 function BalanceValue({
   status,
   display,
@@ -60,29 +137,40 @@ export function WalletMenuContent({
     if (ok) window.setTimeout(() => setCopied(false), 2000);
   };
 
-  const identitySelected = identity.selected !== null;
-  const identityTitle = identitySelected
-    ? identity.selected.name
-    : identity.status === 'loading'
-      ? copy.wallet.identityReading
-      : identity.status === 'unconfigured'
-        ? copy.wallet.identityNotDeployed
-        : identity.status === 'empty'
-          ? copy.wallet.noIdentity
-          : copy.wallet.noIdentitySelected;
-
-  const identitySubtitle =
-    identitySelected && identity.selected !== null
-      ? copy.identity.memberId(identity.selected.tokenId.toString())
-      : null;
-
-  const identityAction = identitySelected
-    ? copy.wallet.viewNft
-    : identity.status === 'empty'
-      ? copy.wallet.goMint
-      : copy.wallet.goSelect;
-
-  const identityHref = identity.status === 'empty' && !identitySelected ? '/mint' : '/my-nft';
+  const row = identityRow(identity);
+  const rowClass = cn(
+    'flex items-center gap-3 rounded-xl px-2.5 py-2.5',
+    row.href !== null &&
+      'hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40',
+  );
+  const rowBody = (
+    <>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] text-muted">{copy.wallet.identityLabel}</p>
+        <p
+          className={cn(
+            'truncate text-sm font-medium',
+            row.isReady ? 'text-foreground' : 'text-muted',
+          )}
+        >
+          {row.title}
+        </p>
+        {row.subtitle !== null ? (
+          <p
+            className={cn(
+              'text-[11px] leading-4 text-muted',
+              row.isReady ? 'font-mono' : undefined,
+            )}
+          >
+            {row.subtitle}
+          </p>
+        ) : null}
+      </div>
+      {row.action !== null ? (
+        <Badge tone={row.isReady ? 'brand' : 'neutral'}>{row.action}</Badge>
+      ) : null}
+    </>
+  );
 
   return (
     <div>
@@ -111,31 +199,15 @@ export function WalletMenuContent({
 
       <Separator className="my-2" />
 
-      <Link
-        to={identityHref}
-        onClick={onNavigate}
-        className="flex items-center gap-3 rounded-xl px-2.5 py-2.5 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
-      >
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] text-muted">{copy.wallet.identityLabel}</p>
-          <p
-            className={cn(
-              'truncate text-sm font-medium',
-              identitySelected ? 'text-foreground' : 'text-muted',
-            )}
-          >
-            {identityTitle}
-          </p>
-          {identitySubtitle !== null ? (
-            <p className="font-mono text-[11px] text-muted">{identitySubtitle}</p>
-          ) : null}
+      {row.href !== null ? (
+        <Link to={row.href} onClick={onNavigate} className={rowClass}>
+          {rowBody}
+        </Link>
+      ) : (
+        <div className={rowClass} aria-busy={identity.status === 'loading'}>
+          {rowBody}
         </div>
-        {identity.status === 'loading' ? (
-          <Skeleton className="h-3 w-12" />
-        ) : (
-          <Badge tone={identitySelected ? 'brand' : 'neutral'}>{identityAction}</Badge>
-        )}
-      </Link>
+      )}
 
       <Separator className="my-2" />
 

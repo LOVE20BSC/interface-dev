@@ -82,6 +82,10 @@ export const copy = {
     noIdentitySelected: '未选择身份 NFT',
     identityReading: '读取身份 NFT 中…',
     identityNotDeployed: '身份 NFT 未部署',
+    /** Wallet-menu identity row: every state must agree with useMemberIdentity(). */
+    identityUnavailable: '身份 NFT 暂时读不到',
+    identityUnavailableBody: '网络可能不稳，身份 NFT 没有变化。',
+    identityUnconfigured: '这个环境还没有部署身份 NFT 合约',
     nativeFeeNote: `${NATIVE_SYMBOL} 用于支付网络手续费`,
     nativeBalanceLabel: (symbol: string) => `${symbol} 余额`,
     disconnect: '断开连接',

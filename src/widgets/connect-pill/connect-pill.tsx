@@ -52,13 +52,15 @@ export function ConnectPill() {
   const identityLabel =
     identity.status === 'loading'
       ? copy.wallet.identityReading
-      : identity.selected !== null
-        ? (identity.selected.name ?? copy.common.unknown)
+      : identity.status === 'error'
+        ? copy.common.unknown
         : identity.status === 'unconfigured'
           ? copy.wallet.identityNotDeployed
-          : identity.status === 'empty'
-            ? copy.wallet.noIdentity
-            : copy.wallet.noIdentitySelected;
+          : identity.selected !== null
+            ? (identity.selected.name ?? copy.common.unknown)
+            : identity.status === 'empty'
+              ? copy.wallet.noIdentity
+              : copy.wallet.noIdentitySelected;
 
   const closeMenu = () => {
     const activeTrigger = openMenu === 'wallet' ? walletAnchor : communityAnchor;
