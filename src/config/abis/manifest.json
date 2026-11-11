@@ -6,7 +6,7 @@
     "path": "../anvil/export",
     "chainId": 31337,
     "deployBlock": 32,
-    "exportedAt": "2026-11-11T12:01:56.167Z"
+    "exportedAt": "2026-11-11T14:46:33.290Z"
   },
   "sources": {
     "core": {
@@ -56,10 +56,10 @@
       }
     },
     "anvil": {
-      "head": "f38f78715b48dd73ed65496be821ba8fc13e56fc",
+      "head": "233790902f4711f5f64e58b4c49b0bc26464e85f",
       "path": "../anvil",
       "abis": {
-        "Airdrop": 28,
+        "Airdrop": 29,
         "WETH9": 16,
         "Multicall3": 16
       }
@@ -88,7 +88,7 @@
     },
     "Airdrop": {
       "file": "src/config/abis/airdrop.ts",
-      "entries": 28
+      "entries": 29
     },
     "UniswapV2Router02": {
       "file": "src/config/abis/uniswap-v2-router02.ts",

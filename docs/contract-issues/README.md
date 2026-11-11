@@ -4,7 +4,7 @@
 
 - 审计时间：2026-11-11
 - 审计基线：`core` @ `43d5344`、`action` @ `bceee40`、`group-chat` @ `62efe7f`、`libs` @ `65b1106`
-- 审计口径：**无后端、无索引器**的静态站，只有 RPC `eth_call` + 合约 view 函数 + Multicall3。`eth_getLogs` 不计为可用手段（BSC 公开 RPC 限 50 区块 / 拒绝，见 [`../product/m0-scope.md`](../product/m0-scope.md) 假设 1）。
+- 审计口径：**无后端、无索引器**的静态站，只有 RPC `eth_call` + 合约 view 函数 + Multicall3。`eth_getLogs` 不计为可用手段（BSC 公开 RPC 对 `fromBlock..toBlock` 范围有限制，无法扫全历史；这是本目录的审计口径，与 [`../product/m0-scope.md`](../product/m0-scope.md) 的假设清单无关，旧版本此处误引「假设 1」）。
 - 审计对象：M0 需要链上支撑的 6 个面（身份、铸造 MemberNFT、空投、代币兑换（任意代币 ↔ 任意代币，含原生币）、首页“下一步”、流水线/倒计时）。其中“首页下一步”“流水线”按 [`../product/m0-scope.md`](../product/m0-scope.md) 属于 M1+，因为项目负责人明确把它们列入了本次审计范围，所以仍然审。
 - 规范基准：[`matt-gov/CONTEXT.md`](../../../matt-gov/CONTEXT.md)、[`matt-gov/docs/dev-standards.md`](../../../matt-gov/docs/dev-standards.md)、[`matt-gov/docs/naming-standards.md`](../../../matt-gov/docs/naming-standards.md)。
 
@@ -25,8 +25,9 @@
 | [CI-011](011-silent-zero-ambiguity.md) | 静默 0 / 歧义 0：分不清“没有”与“未开始/不可铸造” | Medium | 激励铸造、质押、行动加入 | Open | `action/src/ActionTarget.sol`、`action/src/LpExecutor.sol`、`action/src/GroupActionExecutor.sol`、`action/src/GroupServiceExecutor.sol`、`core/src/Stake.sol` |
 | [CI-012](012-name-homoglyph-spoofing.md) | 名称同形可伪造身份（ASCII-only 折叠 + 宽松字符集） | Medium | 身份、提案、群聊 | Open | `core/src/MemberNFT.sol` |
 | [CI-013](013-member-nft-no-token-uri.md) | MemberNFT 没有 `tokenURI`/元数据，钱包里是空白 NFT | Low | 身份 | Open | `core/src/MemberNFT.sol` |
+| [CI-014](014-airdrop-claimed-amount-not-readable.md) | 空投没有「按账户查已铸造金额」的只读方法 | High | 空投铸造 | 已修复（burn@5f3b733，需重新部署生效） | `anvil/src/vendor/Airdrop.sol`、`src/config/abis/airdrop.ts`、`src/features/claim-airdrop/` |
 
-数量：13 条（**12 Open / 1 已修复**）；Open 条目按严重级别为 **1 Blocker / 4 High / 6 Medium / 1 Low**，已修复的 CI-004 为 High。
+数量：14 条（**12 Open / 2 已修复**）；Open 条目按严重级别为 **1 Blocker / 4 High / 6 Medium / 1 Low**，已修复的 CI-004（core@72a1604）与 CI-014（burn@5f3b733）均为 High。
 
 ## 严重级别定义
 
