@@ -319,7 +319,7 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     tokenAddress: HexAddress,
     nonce?: number,
   ): Promise<void> => {
-    if (router === undefined) return;
+    if (submittingRef.current || router === undefined) return;
     setError(null);
     setIsApproved(false);
     setWalletAction('approve');
@@ -364,7 +364,7 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
   };
 
   const submitExecution = async (execution: SwapExecution, nonce?: number): Promise<void> => {
-    if (submittingRef.current || pending !== null || activeReceipt !== null) return;
+    if (submittingRef.current) return;
     if (
       router === undefined ||
       account === undefined ||

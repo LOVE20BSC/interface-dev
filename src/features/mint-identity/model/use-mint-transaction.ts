@@ -288,7 +288,7 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
           : pending.name !== undefined
             ? { kind: 'mint', name: pending.name }
             : lastAttemptRef.current;
-    if (target === null) return;
+    if (target === null || walletAction !== null) return;
     void (async () => {
       const nonce = await readNextNonce();
       if (nonce === undefined) {

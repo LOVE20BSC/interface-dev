@@ -209,6 +209,7 @@ export function useAirdropClaimTransaction(
 
   /** One place for the claim write, so 「重新提交」 reuses the exact same call. */
   const submitClaim = async (nonce?: number): Promise<void> => {
+    if (submittingRef.current) return;
     if (airdropAddress === undefined || tokenAddress === undefined || account === undefined) return;
     if (entry === null) return;
     setError(null);
