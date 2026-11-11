@@ -178,6 +178,11 @@ export const copy = {
     goMyNft: '去我的 NFT',
     memberSinceUnknown: '—',
   },
+  /**
+   * 首页 = 提醒流 (UX spec §3.1, owner 2026-11-11). The page answers one
+   * question: 「有没有需要我处理的事」. Identity and balance live on 我的
+   * (§3.7); home keeps one thin line and conditional reminder cards.
+   */
   home: {
     identityIntro: '一个钱包可以拥有多个身份，身份才是参与凭证。',
     greeting: (name: string) => `你好，${name}`,
@@ -191,14 +196,18 @@ export const copy = {
     eligibilityTitle: '你参与了销毁活动，获得空投铸造资格',
     mintAirdrop: '空投铸造',
     eligibilityUnavailable: '空投资格暂时读不到',
-    balanceLabel: (symbol: string) => `${symbol} 余额`,
+    /** Thin line: no current identity (or none selected). */
+    thinLineNoIdentity: '还没有身份',
+    /** Reminder card 1: no identity yet. */
+    reminderNoIdentityTitle: '你还没有身份',
+    mintIdentity: '铸造身份',
+    /** Reminder card 2: eligible and unclaimed; drop the clause when unknown. */
+    reminderAirdrop: '你有空投资格',
+    reminderAirdropWithAmount: (amount: string, symbol: string) =>
+      `你有空投资格，可铸造 ${amount} ${symbol}`,
+    /** Empty state: exactly one muted sentence, nothing else. */
+    nothingToDo: '现在没有需要你处理的事。',
     swap: '兑换',
-    entriesLabel: '快捷入口',
-    entries: {
-      myNft: { title: '我的 NFT' },
-      airdrop: { title: '空投铸造' },
-      swap: { title: '兑换代币' },
-    },
     docs: '开源文档',
     technical: '技术详情',
     buildMeta: (buildId: string, environment: string, chainId: number) =>

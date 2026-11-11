@@ -2,6 +2,9 @@ import { ArrowLeft } from '@/shared/ui/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { copy } from '@/shared/config/copy';
 import { pageTitleFor } from '@/app/navigation/navigation';
+import { useCommunityDisplay } from '@/entities/community-token/model/use-community-display';
+import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
+import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { ConnectPill } from '@/widgets/connect-pill/connect-pill';
 
 function canGoBack(): boolean {
@@ -10,16 +13,22 @@ function canGoBack(): boolean {
 }
 
 /**
- * Sticky page header. Home carries no left wordmark on mobile: the community
- * symbol lives in the top-right pill, and desktop shows the home label (the
- * sidebar owns the desktop wordmark). Every other page shows a real back
- * control plus the title and the one connect pill.
+ * Sticky page header.
+ *
+ * Mobile home (<md) shows the community wordmark only while disconnected: once
+ * the wallet is connected (or on the wrong chain) the top-right pill is the
+ * only community-name position (owner decision 2026-11-11). Desktop home keeps
+ * the 「首页」 label — the sidebar owns the desktop wordmark — and secondary
+ * pages keep back + title + the one connect pill.
  */
 export function AppHeader() {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === '/';
   const title = pageTitleFor(location.pathname);
+  const wallet = useWalletConnection();
+  const { symbol } = useCommunityContext();
+  const wordmark = useCommunityDisplay(symbol).symbol;
 
   const goBack = () => {
     if (canGoBack()) navigate(-1);
@@ -30,7 +39,17 @@ export function AppHeader() {
     <header className="sticky top-0 z-30 border-b border-line/80 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <div className="mx-auto flex min-h-14 w-full max-w-2xl items-center gap-1.5 px-4 pt-[env(safe-area-inset-top)]">
         {isHome ? (
-          <span className="hidden text-sm font-medium text-muted md:inline">{copy.nav.home}</span>
+          <div className="flex min-w-0 flex-1 items-center">
+            <span className="hidden text-sm font-medium text-muted md:inline">{copy.nav.home}</span>
+            {!wallet.isConnected ? (
+              <span
+                data-testid="home-wordmark"
+                className="min-w-0 truncate text-sm font-semibold text-foreground md:hidden"
+              >
+                {wordmark}
+              </span>
+            ) : null}
+          </div>
         ) : (
           <div className="flex min-w-0 flex-1 items-center gap-1">
             <button

@@ -1,10 +1,38 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppHeader } from '@/app/shell/app-header';
 
 vi.mock('@/widgets/connect-pill/connect-pill', () => ({
   ConnectPill: () => <span data-testid="connect-pill" />,
+}));
+
+vi.mock('@/features/switch-community/model/use-community-context', () => ({
+  useCommunityContext: () => ({ symbol: 'TestLOVE20', fromUrl: true, switchSymbol: vi.fn() }),
+}));
+
+vi.mock('@/entities/community-token/model/use-community-display', () => ({
+  useCommunityDisplay: () => ({ symbol: 'TestLOVE20', resolved: true }),
+}));
+
+const wallet = vi.hoisted(() => ({
+  isConnected: false,
+  isWrongChain: false,
+}));
+
+vi.mock('@/features/connect-wallet/model/use-wallet-connection', () => ({
+  useWalletConnection: () => ({
+    address: wallet.isConnected ? '0x1234567890abcdef1234567890abcdef12345678' : undefined,
+    isConnected: wallet.isConnected,
+    isConnecting: false,
+    isSwitching: false,
+    chainId: 31337,
+    targetChainId: 31337,
+    isWrongChain: wallet.isWrongChain,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+    switchToTargetChain: vi.fn(),
+  }),
 }));
 
 function renderHeader(path: string) {
@@ -15,19 +43,42 @@ function renderHeader(path: string) {
   );
 }
 
+beforeEach(() => {
+  wallet.isConnected = false;
+  wallet.isWrongChain = false;
+});
+
 describe('AppHeader', () => {
-  it('home has no wordmark link, keeps the pill area and the landmark', () => {
+  it('home shows the community wordmark while disconnected, keeps the landmark and pill', () => {
     renderHeader('/');
 
-    // The mobile wordmark was removed by owner request (2026-11-11): the
-    // community symbol lives in the top-right pill, not a left home link.
+    // §1.3: disconnected mobile home is the only state with a left wordmark.
+    expect(screen.getByTestId('home-wordmark')).toHaveTextContent('TestLOVE20');
+    expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.getByTestId('connect-pill')).toBeVisible();
+    // The wordmark is a label, not a second home link.
     expect(screen.queryByRole('link')).toBeNull();
-    expect(screen.queryByRole('link', { name: /首页/ })).toBeNull();
+  });
+
+  it('home hides the wordmark once connected: the top-right chip is the only community name', () => {
+    wallet.isConnected = true;
+    renderHeader('/');
+
+    expect(screen.queryByTestId('home-wordmark')).toBeNull();
     expect(screen.getByRole('banner')).toBeInTheDocument();
     expect(screen.getByTestId('connect-pill')).toBeVisible();
   });
 
+  it('home hides the wordmark on the wrong chain too', () => {
+    wallet.isConnected = true;
+    wallet.isWrongChain = true;
+    renderHeader('/');
+
+    expect(screen.queryByTestId('home-wordmark')).toBeNull();
+  });
+
   it('desktop home keeps the page label as plain text, not a link', () => {
+    wallet.isConnected = true;
     renderHeader('/');
 
     expect(screen.getByText('首页')).toBeInTheDocument();
@@ -35,11 +86,13 @@ describe('AppHeader', () => {
   });
 
   it('secondary pages still render the back control, title and pill', () => {
+    wallet.isConnected = true;
     renderHeader('/my-nft');
 
     expect(screen.getByRole('button', { name: '返回上一页' })).toBeVisible();
     expect(screen.getByRole('heading', { name: '我的 NFT' })).toBeVisible();
     expect(screen.getByTestId('connect-pill')).toBeVisible();
     expect(screen.queryByText('首页')).toBeNull();
+    expect(screen.queryByTestId('home-wordmark')).toBeNull();
   });
 });

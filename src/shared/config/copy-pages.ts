@@ -459,6 +459,37 @@ export const copy = {
     description: '构建信息与合约地址。默认不展开。',
   },
   // ───────────────────────────────────────────────────────────────────────────
+  // 我的 (UX spec §3.7). Identity and balance moved here from the home page
+  // (owner 2026-11-11); the page is a settings-ish list, never a filled button.
+  // ───────────────────────────────────────────────────────────────────────────
+  me: {
+    identityTitle: '我的身份',
+    identityReading: '读取身份中…',
+    identityDisconnected: '连接钱包后显示当前身份。',
+    identityUnconfigured: '这个环境还没有配置身份合约。',
+    identityUnavailable: '身份暂时读不到',
+    identityEmpty: '你还没有身份',
+    identityNeedsSelection: '还没有选择当前身份',
+    identityInvalidated: '这个身份已不属于当前钱包，已为你清除选择。',
+    mintIdentity: '铸造身份',
+    switchIdentity: '切换身份',
+    transfer: '转让',
+    viewAll: '查看全部',
+    balanceTitle: '我的余额',
+    balanceUnavailable: '这个环境还没有配置社区代币，暂时看不到余额。',
+    balanceReading: '读取余额中…',
+    swap: '兑换',
+    accountTitle: '账户',
+    walletLabel: '钱包地址',
+    walletNotConnected: '未连接',
+    networkLabel: '网络',
+    networkValue: (name: string, chainId: number) => `${name} · chain ${chainId}`,
+    aboutTitle: '关于',
+    versionLabel: '版本',
+    versionValue: (buildId: string, variant: string) => `${buildId} · ${variant}`,
+    docs: '开源文档',
+  },
+  // ───────────────────────────────────────────────────────────────────────────
   // 应用目录 (UX spec §3.6). Appended as its own block: the lazy /apps page is
   // the only consumer, so these strings stay out of the first-screen chunk.
   // Keys are mirrored by src/domain/apps-catalog.ts (labelKey/descriptionKey).
