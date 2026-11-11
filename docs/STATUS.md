@@ -12,7 +12,7 @@ M0 范围共 6 项（[m0-scope](product/m0-scope.md)「范围内」）。✅ 完
 
 | # | M0 项 | 状态 | 证据（可复核） |
 | --- | --- | --- | --- |
-| 1 | 导航骨架 | ✅ | `src/app/navigation` + 5 条一级路由；占位页 `src/pages/{gov,act,group,me}`；`7e9b03b` |
+| 1 | 导航骨架 | ✅ | `src/app/navigation` + 5 个一级 tab（`/apps` 为功能页目录）；占位页 `src/pages/{gov,act,group,me}`；`7e9b03b` |
 | 2 | 右上角连接按钮 | ✅ | [ADR-0003](adr/0003-identity-and-connect-button.md) §1；`src/widgets/connect-pill`；`6db99a4`（品牌字标/余额格式） |
 | 3 | 新用户漏斗 | 🔄 | 首页/我的 NFT `ae607dd`；铸造身份 `484af93`+`49f63ce`；空投 `1a7074f`；通用兑换 `b3a2a7d`；**未做真机验收；e2e 已跑在独立 8555 自动化链（§6.1）** |
 | 4 | 工程底座 | 🔄 | 分层+架构测试 `7e9b03b`；CI `7f9794a`；路由拆分 `7dc0949`；`.github/workflows/deploy.yml`；ABI manifest + `pnpm abis:check` 漂移门禁已补（ADR-0002 §3）；**缺口：HEAD 未推送，CI 未验证** |
@@ -91,13 +91,15 @@ CI 环境规则（`.github/workflows/deploy.yml`）：取 `github.repository` �
 | 身份模型 | 身份 = `(chainId, MemberNFT 地址, tokenId)`；MemberNFT 由种子 core 的 `MEMBER_NFT_ADDRESS()` 解析；`balanceOf`+`tokenOfOwnerByIndex` 枚举；每次加载 `ownerOf` 重校验 | [ADR-0003](adr/0003-identity-and-connect-button.md) §2 |
 | 本地链 | `make bootstrap` 一条命令完成 preflight→fixture→build→anvil→fresh→部署→seed→导出→验证；`export/` 是唯一来源，前端只经 `pnpm sync:anvil` 消费 | [ADR-0004](adr/0004-anvil-local-chain.md) |
 | 品牌标签 | 社区名 = 链上 `symbol()`；无社区/未知回退「LOVE20协议」（协议名，不是代币社区）；`name()` = `<子币 symbol>@<父币 symbol>`，仅技术详情可见 | [m0-ux-spec](product/m0-ux-spec.md) §1.3/§2.1；[GLOSSARY](../GLOSSARY.md) 易混对 |
-| 空投页措辞 | 标题、按钮、状态统一「铸造空投份额」，不写「领取空投」；合约动作 `claim` 只留在代码/术语层 | [m0-ux-spec](product/m0-ux-spec.md) §3.4；[GLOSSARY](../GLOSSARY.md) |
+| 空投页措辞 | 标题、按钮、状态统一「空投铸造」（2026-11-11 由「铸造空投份额」改名），不写「领取空投」；被铸造的对象仍叫「空投份额」；合约动作 `claim` 只留在代码/术语层 | [m0-ux-spec](product/m0-ux-spec.md) §3.4；[GLOSSARY](../GLOSSARY.md) |
+| 已铸造量 | 已铸造态必须显示实际铸造数量，金额来自合约只读方法 `claimedAmount`，不依赖本机缓存；合约未加该方法前见 [CI-014](contract-issues/014-airdrop-claimed-amount-not-readable.md) | [m0-ux-spec](product/m0-ux-spec.md) §3.4 |
 | Test 前缀 | dev/test 变体前端强制名字以 `Test` 开头（大小写敏感），prod 无此规则；`core@72a1604` 起合约不再自动加/改前缀 | [m0-ux-spec](product/m0-ux-spec.md) §3.3/§6；[CI-004](contract-issues/004-member-nft-test-prefix-mismatch.md) |
 | 通用兑换页 | 任意代币 ↔ 任意代币（含原生币），路径 ≤3 跳；报价只调 `Router.getAmountsOut`；费率不写死，读不到就写「以链上费率为准」 | [m0-ux-spec](product/m0-ux-spec.md) §3.5；`b3a2a7d` |
 | 无第三方 / 零密钥 | 钱包 injected-only；无 WalletConnect/AppKit/第三方 API/Service Worker；所有 `VITE_*` 公开，环境包不放任何密钥 | [README](../README.md) §Stack；[ADR-0002](adr/0002-three-environment-injection.md) §1 |
 | i18n 纪律 | 所有用户可见文案进 `shared/config/copy.ts`；组件内禁止 CJK 字面量（架构测试强制）；暂不引入 i18n 库 | [README](../README.md)「i18n readiness」 |
 | 缓存与错误 | 唯一存储封装 `shared/lib/cache.ts`，键 `love20:v1:<chainId>:<contractAddress>:<wallet>:<businessKey>`；合约错误 selector → 中文人话 | [ADR-0003](adr/0003-identity-and-connect-button.md) §3；[README](../README.md) §Storage |
-| 底栏与占位页 | 5 个 tab 同权重，不做中央凸起；治理/行动/链群/我的只显示「即将上线」，不出现半成品表单 | [README](../README.md)「Decisions…」；[m0-ux-spec](product/m0-ux-spec.md) §1.2 |
+| 底栏与占位页 | 5 个 tab 同权重，不做中央凸起；治理/行动/我的只显示「即将上线」，不出现半成品表单 | [README](../README.md)「Decisions…」；[m0-ux-spec](product/m0-ux-spec.md) §1.2 |
+| 应用目录 | 底栏「链群」改为「应用」（`/apps?symbol=`）：功能型页面统一由 `src/domain/apps-catalog.ts` 的数据目录管理（今日：创世空投 / 身份 NFT / 代币兑换），≥2 个分类自动分组，未来页面只加目录条目；`/group` 深链保留、不再上底栏 | [m0-ux-spec](product/m0-ux-spec.md) §1.2/§3.6 |
 
 ## 6. 已知坑与注意事项
 

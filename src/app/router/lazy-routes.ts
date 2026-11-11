@@ -9,6 +9,7 @@ const loadMyNftPage = () => import('@/pages/my-nft/my-nft-page');
 const loadMintPage = () => import('@/pages/mint/mint-page');
 const loadAirdropPage = () => import('@/pages/airdrop/airdrop-page');
 const loadSwapPage = () => import('@/pages/swap/swap-page');
+const loadAppsPage = () => import('@/pages/apps/apps-page');
 const loadGovPage = () => import('@/pages/gov/gov-page');
 const loadActPage = () => import('@/pages/act/act-page');
 const loadGroupPage = () => import('@/pages/group/group-page');
@@ -30,6 +31,10 @@ export const AirdropPage = lazy(async () => {
 export const SwapPage = lazy(async () => {
   const module = await loadSwapPage();
   return { default: module.SwapPage };
+});
+export const AppsPage = lazy(async () => {
+  const module = await loadAppsPage();
+  return { default: module.AppsPage };
 });
 export const GovPage = lazy(async () => {
   const module = await loadGovPage();
@@ -58,6 +63,7 @@ const ROUTE_LOADERS: Readonly<Record<string, () => Promise<unknown>>> = Object.f
   '/mint': loadMintPage,
   '/airdrop': loadAirdropPage,
   '/swap': loadSwapPage,
+  '/apps': loadAppsPage,
   '/gov': loadGovPage,
   '/act': loadActPage,
   '/group': loadGroupPage,

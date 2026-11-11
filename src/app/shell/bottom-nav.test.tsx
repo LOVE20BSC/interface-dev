@@ -22,11 +22,14 @@ describe('BottomNav', () => {
       '首页',
       '治理',
       '行动',
-      '链群',
+      '应用',
       '我的',
     ]);
     // M0: the 行动 page is a placeholder, so this build has no raised center tab.
     expect(NAV_ITEMS.some((item) => 'raised' in item)).toBe(false);
+    expect(NAV_ITEMS.map((item) => item.key)).toEqual(['home', 'gov', 'act', 'apps', 'me']);
+    // Owner 2026-11-11: the 链群 tab is replaced by the 应用 feature directory.
+    expect(within(nav).queryByRole('link', { name: /链群/ })).toBeNull();
   });
 
   it('marks the active tab and preserves ?symbol= on every link', () => {
@@ -36,6 +39,13 @@ describe('BottomNav', () => {
     for (const link of within(nav).getAllByRole('link')) {
       expect(link.getAttribute('href')).toContain('symbol=LOVE20');
     }
+  });
+
+  it('marks 应用 active on /apps and keeps ?symbol= on the tab link', () => {
+    const nav = renderAt('/apps?symbol=LOVE20');
+    const apps = within(nav).getByRole('link', { name: '应用' });
+    expect(apps).toHaveAttribute('aria-current', 'page');
+    expect(apps.getAttribute('href')).toBe('/apps?symbol=LOVE20');
   });
 
   it('renders the center action tab as a normal tab, not a raised disc', () => {

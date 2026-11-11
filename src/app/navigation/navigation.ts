@@ -1,8 +1,8 @@
 import type { LucideIcon } from 'lucide-react';
-import { House, ListChecks, UserRound, UsersRound, Vote } from '@/shared/ui/icons';
+import { House, LayoutGrid, ListChecks, UserRound, Vote } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy';
 
-export type NavKey = 'home' | 'gov' | 'act' | 'group' | 'me';
+export type NavKey = 'home' | 'gov' | 'act' | 'apps' | 'me';
 
 export interface NavItem {
   readonly key: NavKey;
@@ -40,12 +40,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     placeholder: true,
   },
   {
-    key: 'group',
-    to: '/group',
-    label: copy.nav.group,
-    ariaLabel: copy.nav.groupAria,
-    icon: UsersRound,
-    placeholder: true,
+    key: 'apps',
+    to: '/apps',
+    label: copy.nav.apps,
+    ariaLabel: copy.nav.appsAria,
+    icon: LayoutGrid,
+    placeholder: false,
   },
   {
     key: 'me',
@@ -67,6 +67,7 @@ const PAGE_TITLES: Readonly<Record<string, string>> = Object.freeze({
   '/mint': copy.pageTitles.mint,
   '/airdrop': copy.pageTitles.airdrop,
   '/swap': copy.pageTitles.swap,
+  '/apps': copy.pageTitles.apps,
   '/gov': copy.placeholders.gov.title,
   '/act': copy.placeholders.act.title,
   '/group': copy.placeholders.group.title,

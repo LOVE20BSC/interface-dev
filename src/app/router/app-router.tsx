@@ -6,6 +6,7 @@ import { HomePage } from '@/pages/home/home-page';
 import {
   ActPage,
   AirdropPage,
+  AppsPage,
   GovPage,
   GroupPage,
   MePage,
@@ -50,6 +51,7 @@ export function AppRouter() {
           <Route path="mint" element={<MintPage />} />
           <Route path="airdrop" element={<AirdropPage />} />
           <Route path="swap" element={<SwapPage />} />
+          <Route path="apps" element={<AppsPage />} />
           <Route path="gov" element={<GovPage />} />
           <Route path="act" element={<ActPage />} />
           <Route path="group" element={<GroupPage />} />
