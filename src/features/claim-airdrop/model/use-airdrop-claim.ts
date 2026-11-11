@@ -52,7 +52,7 @@ function successBool(result: { status: string; result?: unknown } | undefined): 
 }
 
 /**
- * Read model for 铸造空投份额 (UX spec §3.4).
+ * Read model for 空投铸造 (UX spec §3.4).
  *
  * The snapshot is trusted only when its chain id and merkle root match the
  * deployed contract; a mismatch never becomes "no eligibility". Four claim

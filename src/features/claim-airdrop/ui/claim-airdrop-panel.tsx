@@ -3,15 +3,18 @@ import { Link } from 'react-router-dom';
 import { RefreshCw } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
-import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { NETWORK } from '@/config/networks';
+import { formatTokenAmount, shortenAddress, UNKNOWN } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { StickyAction } from '@/shared/ui/sticky-action';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import { airdropUnavailableCopy } from '@/features/claim-airdrop/lib/airdrop-unavailable-copy';
+import { claimedAmountView } from '@/features/claim-airdrop/lib/claimed-amount-view';
 import { useAirdropClaim } from '@/features/claim-airdrop/model/use-airdrop-claim';
 import { useAirdropClaimTransaction } from '@/features/claim-airdrop/model/use-airdrop-claim-transaction';
+import { useClaimedAmount } from '@/features/claim-airdrop/model/use-claimed-amount';
 import { AirdropReceipt } from '@/features/claim-airdrop/ui/airdrop-receipt';
 import { AirdropRules } from '@/features/claim-airdrop/ui/airdrop-rules';
 
@@ -75,7 +78,7 @@ function LoadingCard({ meta }: { readonly meta: string }) {
 }
 
 /**
- * 铸造空投份额 (UX spec §3.4).
+ * 空投铸造 (UX spec §3.4).
  *
  * Seven mutually exclusive states, one solid CTA in S5 only, and a receipt that
  * replaces the page after a claim. Every number comes from a chain read or the
@@ -109,6 +112,15 @@ export function ClaimAirdropPanel({
       ? claim.localReceipt
       : null;
   const receipt = tx.receipt ?? localReceipt;
+
+  // S6 only: the single injected adapter read (dev log scan today; CI-014 view
+  // later). A disabled/undefined result renders the honest fallback, never a
+  // fabricated or cached amount.
+  const claimedAmount = useClaimedAmount({
+    enabled: claim.status === 'claimed' && receipt === null,
+    airdropAddress: claim.airdropAddress,
+    tokenAddress: claim.tokenAddress,
+  });
 
   if (!isConnected) {
     return (
@@ -230,10 +242,45 @@ export function ClaimAirdropPanel({
   }
 
   if (claim.status === 'claimed') {
+    const view = claimedAmountView({
+      amount: claimedAmount.amount,
+      decimals: claim.tokenDecimals,
+      symbol: claim.tokenSymbol,
+      explorerAvailable: NETWORK.blockExplorerUrl !== null,
+    });
+    const localHash = claim.localReceipt?.hash;
+    const explorerUrl =
+      localHash !== undefined && NETWORK.blockExplorerUrl !== null
+        ? `${NETWORK.blockExplorerUrl}/tx/${localHash}`
+        : null;
     return (
       <StatusCard meta={meta}>
-        <CardTitle>{copy.airdrop.claimed.title}</CardTitle>
-        <CardDescription>{copy.airdrop.claimed.noRecordBody}</CardDescription>
+        <CardTitle data-testid="airdrop-claimed-title">{view.title}</CardTitle>
+        {claimedAmount.isLoading ? (
+          <Skeleton className="mt-2 h-4 w-52" />
+        ) : (
+          <CardDescription data-testid="airdrop-claimed-body">{view.body}</CardDescription>
+        )}
+        {localHash !== undefined ? (
+          <p className="mt-3 text-xs leading-5 text-muted">
+            <span
+              className="mr-2 font-mono text-[11px]"
+              aria-label={copy.airdrop.claimed.hashLabel}
+            >
+              {shortenAddress(localHash, 10, 8)}
+            </span>
+            {explorerUrl !== null ? (
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-brand-strong underline-offset-4 hover:underline"
+              >
+                {copy.airdrop.claimed.explorer}
+              </a>
+            ) : null}
+          </p>
+        ) : null}
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <Link to="/mint" className={buttonStyles('primary', 'md', 'w-full sm:w-auto')}>
             {copy.airdrop.claimed.goMint}
@@ -246,7 +293,7 @@ export function ClaimAirdropPanel({
     );
   }
 
-  // S5 可铸造: the only state with the 铸造空投份额 action.
+  // S5 可铸造: the only state with the 空投铸造 action.
   const amountText =
     claim.claimableAmount !== undefined && claim.tokenDecimals !== undefined
       ? formatTokenAmount(claim.claimableAmount, claim.tokenDecimals)

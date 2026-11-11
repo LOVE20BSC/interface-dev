@@ -70,7 +70,7 @@ export const copy = {
       haveIdentityNext: '去我的 NFT',
     },
     airdrop: {
-      title: '铸造空投份额',
+      title: '空投铸造',
     },
     swap: {
       title: '兑换代币',
@@ -116,7 +116,7 @@ export const copy = {
         amount === undefined
           ? '你还有空投份额可以铸造，铸造后就够了。'
           : `你还有空投份额可以铸造，预计 ${amount} ${symbol}，铸造后就够了。`,
-      airdropCta: '铸造空投份额',
+      airdropCta: '空投铸造',
       swap: (symbol: string) => `${symbol} 不够。可以用 ${NATIVE_SYMBOL} 换一些，再回来铸造。`,
       swapCta: `用 ${NATIVE_SYMBOL} 兑换`,
       unknown: '暂时确认不了你的空投资格。',
@@ -187,7 +187,7 @@ export const copy = {
     },
   },
   /**
-   * 铸造空投份额 (UX spec §3.4). The action is always called 铸造空投份额 and the
+   * 空投铸造 (UX spec §3.4). The action is always called 空投铸造 and the
    * result 已铸造; the contract's `claim` name never reaches user-facing copy.
    * No string here may contain 领取 (GLOSSARY 文案纪律).
    */
@@ -200,10 +200,10 @@ export const copy = {
       readErrorBody: '你的资产没有变化。',
       snapshotErrorTitle: '空投资格暂时读不到',
       snapshotErrorBody: '你的资产没有变化。可以重试，或稍后再来。',
-      notDeployedTitle: '铸造空投份额还没有接入',
+      notDeployedTitle: '空投铸造还没有接入',
       notDeployedBody: '地址簿里还没有 Airdrop 合约。接入后会先检查资格，再显示可铸造份额。',
       wrongChainTitle: '当前钱包连接的网络不对。',
-      wrongChainBody: '切换到这个应用使用的网络后再铸造空投份额。',
+      wrongChainBody: '切换到这个应用使用的网络后再进行空投铸造。',
       ineligibleTitle: '这个钱包不在空投名单里。',
       ineligibleBody: '空投只面向快照时的参与者，不影响你现在参与。',
       ineligibleSwap: (symbol: string) => `用 ${NATIVE_SYMBOL} 兑换 ${symbol}`,
@@ -218,7 +218,7 @@ export const copy = {
       expected: (amount: string, symbol: string) => `预计可得 ${amount} ${symbol}`,
       note: '按铸造时的池子余额与剩余份额计算，别人铸造后金额会变。',
       share: (percent: string) => `你的份额 ${percent}`,
-      cta: '铸造空投份额',
+      cta: '空投铸造',
     },
     unavailable: {
       poolEmptyTitle: '你有一份空投，但空投池还没有代币。',
@@ -232,7 +232,14 @@ export const copy = {
     },
     claimed: {
       title: '已铸造',
-      noRecordBody: '这次空投份额已经铸造过。这台设备没有留下这次的铸造记录，所以不显示金额。',
+      /** S6 with a real on-chain amount: 「已铸造 {X} LOVE20」 (spec §3.4). */
+      amountLine: (amount: string, symbol: string) => `已铸造 ${amount} ${symbol}`,
+      amountNote: '金额来自链上这笔交易的记录，不依赖本机缓存。',
+      /** S6 without a readable amount (no CI-014 view): never invent one. */
+      unknownBody: '这次空投已经铸造过，暂时读不到具体金额，以链上记录为准。',
+      unknownBodyExplorer: '这次空投已经铸造过。金额可以在区块链浏览器里查看。',
+      hashLabel: '交易哈希',
+      explorer: '在区块链浏览器里查看',
       goMint: '去铸造身份',
     },
     rules: {
@@ -450,5 +457,36 @@ export const copy = {
     close: '关闭',
     title: '高级信息',
     description: '构建信息与合约地址。默认不展开。',
+  },
+  // ───────────────────────────────────────────────────────────────────────────
+  // 应用目录 (UX spec §3.6). Appended as its own block: the lazy /apps page is
+  // the only consumer, so these strings stay out of the first-screen chunk.
+  // Keys are mirrored by src/domain/apps-catalog.ts (labelKey/descriptionKey).
+  // ───────────────────────────────────────────────────────────────────────────
+  apps: {
+    label: '功能页目录',
+    categories: {
+      token: '代币',
+      identity: '身份',
+    },
+    items: {
+      airdrop: {
+        label: '创世空投',
+        description: '按快照份额铸造创世代币',
+      },
+      myNft: {
+        label: '身份 NFT',
+        description: '查看、切换与转让你的身份',
+      },
+      swap: {
+        label: '代币兑换',
+        description: '在任意代币之间互换',
+      },
+    },
+    unavailable: {
+      airdropNotConfigured: '这个环境还没有配置空投铸造。',
+      memberNftNotConfigured: '这个环境还没有配置身份合约。',
+      routerNotConfigured: '这个环境还没有配置代币兑换。',
+    },
   },
 };
