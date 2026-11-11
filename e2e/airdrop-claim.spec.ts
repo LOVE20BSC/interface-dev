@@ -6,7 +6,7 @@ import { createPublicClient, http, parseAbiItem, parseEventLogs, formatUnits } f
 import { isolateChain } from './chain';
 
 /**
- * 铸造空投份额 (UX spec §3.4) against the local anvil chain.
+ * 空投铸造 (UX spec §3.4) against the local anvil chain.
  *
  * The wallet is the same injected EIP-1193 stub the other M0 specs use: reads go
  * through the app's HTTP transport, writes through eth_sendTransaction. Anvil
@@ -16,7 +16,8 @@ import { isolateChain } from './chain';
  *   - the eligible test claims the first unclaimed snapshot account among #6/#8/#9
  *     (never #5, which the home/mint specs read as their eligible wallet);
  *   - the already-claimed test pre-claims #7 outside the browser, then opens the
- *     page with no local record and expects 已铸造 without a fabricated amount.
+ *     page with no local record and expects the real chain-derived amount
+ *     (「已铸造 {X} TestLOVE20」), never a fabricated or cached-as-chain number.
  */
 
 const deployment = JSON.parse(
@@ -60,6 +61,8 @@ const CLAIM_EVENT = parseAbiItem(
 const publicClient = createPublicClient({ transport: http(RPC_URL) });
 
 let claimer: `0x${string}` = CANDIDATE_CLAIMERS[0];
+/** Set by beforeAll from the fixture claim's cast receipt (independent of the app). */
+let alreadyClaimedAmount: bigint | undefined;
 
 test.use({
   viewport: { width: 390, height: 844 },
@@ -142,6 +145,15 @@ function claimOutsideBrowser(account: `0x${string}`): void {
     ],
     { encoding: 'utf8' },
   );
+}
+
+/**
+ * Independent read of the already-minted amount: the CI-014 contract view via
+ * `cast call` (not the app's adapter, not a local record). This is the same
+ * value the page must show in S6.
+ */
+function castClaimedAmount(account: string): bigint {
+  return castUint('claimedAmount(address,address)(uint256)', TOKEN, account);
 }
 
 /** Mirrors formatTokenAmount's grouping for the 18-decimals genesis token (6 digits). */
@@ -241,6 +253,7 @@ test.beforeAll(() => {
   claimer = fresh;
 
   if (!isClaimed(ALREADY_CLAIMED)) claimOutsideBrowser(ALREADY_CLAIMED);
+  alreadyClaimedAmount = castClaimedAmount(ALREADY_CLAIMED);
 });
 
 test('airdrop: eligible wallet sees the estimate, claims, and gets a real receipt', async ({
@@ -255,7 +268,7 @@ test('airdrop: eligible wallet sees the estimate, claims, and gets a real receip
   await page.goto('/airdrop?symbol=NOT_A_REAL_COMMUNITY');
   await connect(page);
 
-  await expect(page.getByRole('heading', { name: '铸造空投份额' })).toBeVisible({
+  await expect(page.getByRole('heading', { name: '空投铸造' })).toBeVisible({
     timeout: 20_000,
   });
   await expect(page.getByText('本次空投：TestLOVE20')).toBeVisible({ timeout: 20_000 });
@@ -269,7 +282,7 @@ test('airdrop: eligible wallet sees the estimate, claims, and gets a real receip
 
   await shot(page, 'airdrop-eligible.png');
 
-  await page.getByRole('button', { name: '铸造空投份额' }).click();
+  await page.getByRole('button', { name: '空投铸造' }).click();
   await expect(page.getByRole('heading', { name: '铸造成功' })).toBeVisible({
     timeout: 30_000,
   });
@@ -324,23 +337,40 @@ test('airdrop: eligible wallet sees the estimate, claims, and gets a real receip
   );
 });
 
-test('airdrop: already claimed on-chain shows 已铸造 without inventing an amount', async ({
+test('airdrop: already claimed on-chain shows the real minted amount, not a local cache', async ({
   page,
 }) => {
   expect(isClaimed(ALREADY_CLAIMED)).toBe(true);
+  expect(alreadyClaimedAmount).toBeDefined();
+  if (alreadyClaimedAmount === undefined) return;
 
   await installWallet(page, ALREADY_CLAIMED);
   await page.goto('/airdrop');
   await connect(page);
 
-  await expect(page.getByText('已铸造', { exact: true })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText('这台设备没有留下这次的铸造记录', { exact: false })).toBeVisible();
-  // No local record means no amount and no hash to show; the receipt is not fabricated.
+  // No local record in this context: the adapter reads the chain (CI-014 view on
+  // a redeployed chain, dev AirdropClaimed logs on the current one), so S6 must
+  // equal the amount cast read independently in beforeAll.
+  const expectedTitle = `已铸造 ${displayAmount(alreadyClaimedAmount)} TestLOVE20`;
+  const title = page.getByTestId('airdrop-claimed-title');
+  await expect(title).toBeVisible({ timeout: 20_000 });
+  await expect(title).toHaveText(expectedTitle);
+  await expect(page.getByTestId('airdrop-claimed-body')).toHaveText(
+    '金额来自链上这笔交易的记录，不依赖本机缓存。',
+  );
+  // The old 「这台设备没有留下这次的铸造记录」 dead end must be gone.
+  await expect(page.getByText('这台设备没有留下这次的铸造记录', { exact: false })).toHaveCount(0);
   await expect(page.getByTestId('airdrop-receipt-amount')).toHaveCount(0);
   await expect(page.getByTestId('airdrop-receipt-hash')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '铸造空投份额' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '空投铸造' })).toHaveCount(0);
 
-  await shot(page, 'airdrop-already-claimed.png');
+  await shot(page, 'airdrop-already-claimed-amount.png');
+
+  // Reload keeps the same chain-derived amount (still no local receipt).
+  await page.reload();
+  await expect(page.getByTestId('airdrop-claimed-title')).toHaveText(expectedTitle, {
+    timeout: 20_000,
+  });
 });
 
 test('airdrop: a wallet outside the snapshot gets the reason and a way out', async ({ page }) => {
@@ -353,7 +383,7 @@ test('airdrop: a wallet outside the snapshot gets the reason and a way out', asy
   const swap = page.getByRole('link', { name: '用 ETH 兑换 TestLOVE20' });
   await expect(swap).toBeVisible();
   await expect(swap).toHaveAttribute('href', '/swap?symbol=TestLOVE20');
-  await expect(page.getByRole('button', { name: '铸造空投份额' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '空投铸造' })).toHaveCount(0);
 
   await shot(page, 'airdrop-no-eligibility.png');
 });

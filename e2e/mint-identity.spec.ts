@@ -237,7 +237,7 @@ test('mint: insufficient balance with airdrop eligibility goes to 铸造空投�
     timeout: 20_000,
   });
 
-  const airdropCta = page.getByRole('link', { name: '铸造空投份额' });
+  const airdropCta = page.getByRole('link', { name: '空投铸造' });
   await expect(airdropCta).toBeVisible();
   await expect(airdropCta).toHaveAttribute('href', /\/airdrop\?symbol=TestLOVE20$/);
   // The mint ladder is replaced by the branch CTA: no second solid action.
