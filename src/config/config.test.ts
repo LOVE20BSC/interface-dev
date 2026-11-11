@@ -3,7 +3,7 @@ import devJson from './deployments/anvil31337_dev.json';
 import testJson from './deployments/bscTestnet_test.json';
 import prodJson from './deployments/bscMainnet_prod.json';
 import { parseDeployment, isHexAddress } from './deployments/types';
-import { DEPLOYMENT_FILES, resolveVariant, variantLabel } from './variant';
+import { DEPLOYMENT_FILES, resolveVariant } from './variant';
 import {
   ADDRESSES,
   DEFAULT_SYMBOL,
@@ -32,9 +32,6 @@ describe('variant resolution', () => {
     expect(DEPLOYMENT_FILES.dev).toBe('anvil31337_dev.json');
     expect(DEPLOYMENT_FILES.test).toBe('bscTestnet_test.json');
     expect(DEPLOYMENT_FILES.prod).toBe('bscMainnet_prod.json');
-    expect(variantLabel('dev')).toBe('本地开发');
-    expect(variantLabel('test')).toBe('测试网');
-    expect(variantLabel('prod')).toBe('主网');
   });
 });
 

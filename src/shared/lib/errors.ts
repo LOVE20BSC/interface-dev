@@ -12,10 +12,10 @@ type HexData = `0x${string}`;
  * from matt-gov/registry/errors.json whenever the protocol adds errors.
  */
 const FALLBACK_MESSAGES: Readonly<Record<string, string>> = Object.freeze({
-  '0xea74f32b': '这一轮还没有开始，请稍后再来。',
-  '0x33393244': '这个身份不属于当前钱包，请切换到正确的钱包或身份。',
-  '0x08c379a0': '操作没有完成，请检查输入后重试。',
-  '0x4e487b71': '数据校验没有通过，请检查输入后重试。',
+  '0xea74f32b': copy.errors.revertPhaseNotStarted,
+  '0x33393244': copy.errors.revertIdentityNotOwner,
+  '0x08c379a0': copy.errors.revertCallFailed,
+  '0x4e487b71': copy.errors.revertInvalidData,
 });
 
 const MESSAGES: Readonly<Record<string, string>> = Object.freeze({

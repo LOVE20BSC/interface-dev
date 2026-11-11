@@ -17,5 +17,17 @@ test.describe('M0 shell', () => {
     await page.goto('/my-nft');
     await expect(page.getByRole('heading', { name: '我的 NFT' })).toBeVisible();
     await expect(page.getByRole('button', { name: '返回上一页' })).toBeVisible();
+    // lazy route chunk + community resolution share the §1.3 tab-title rule.
+    await expect(page).toHaveTitle('我的 NFT · TestLOVE20', { timeout: 15_000 });
+  });
+
+  test('unknown community falls back to the protocol label in tab title and wordmark', async ({
+    page,
+  }) => {
+    await page.goto('/?symbol=NOT_A_REAL_COMMUNITY');
+    await expect(page.getByRole('link', { name: 'LOVE20协议 首页' })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page).toHaveTitle('LOVE20协议');
   });
 });

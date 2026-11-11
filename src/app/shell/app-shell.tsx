@@ -4,7 +4,8 @@ import { DEPLOYMENT } from '@/config/networks';
 import { copy } from '@/shared/config/copy';
 import { cn } from '@/shared/lib/cn';
 import { AppErrorBoundary } from '@/app/shell/error-boundary';
-import { Skeleton } from '@/shared/ui/skeleton';
+import { RouteFallback } from '@/app/shell/route-fallback';
+import { RoutePrefetcher } from '@/app/router/route-prefetcher';
 import { AppHeader } from '@/app/shell/app-header';
 import { BottomNav } from '@/app/shell/bottom-nav';
 import { DesktopSidebar } from '@/app/shell/desktop-sidebar';
@@ -32,6 +33,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
+      <RoutePrefetcher />
       <DesktopSidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
       <div
         className={cn(
@@ -43,14 +45,7 @@ export function AppShell() {
         <TestnetBanner />
         <main className="mx-auto w-full max-w-[32rem] flex-1 px-4 pb-[calc(var(--nav-h)+16px)] pt-4 md:max-w-2xl md:pb-10">
           <AppErrorBoundary key={location.pathname}>
-            <Suspense
-              fallback={
-                <div className="space-y-3" aria-busy="true">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-40 w-full rounded-3xl" />
-                </div>
-              }
-            >
+            <Suspense fallback={<RouteFallback />}>
               <Outlet />
             </Suspense>
           </AppErrorBoundary>

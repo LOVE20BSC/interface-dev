@@ -1,17 +1,20 @@
+import { BRAND_NAME } from '@/config/networks';
+
 /**
  * All user-facing Chinese copy lives here (i18n framework deliberately deferred).
  * Review against GLOSSARY.md before adding a new word: 激励/预留/销毁, 身份, 链群,
  * 代币社区, 时间片/轮次. Never write gas/approve/allowance/nonce/revert on the happy path.
+ *
+ * The site-level brand name is NOT duplicated here: it comes from the environment
+ * package (`BRAND_NAME`), so deployments/*.json stays the single source of truth.
  */
 export const copy = {
   brand: {
-    wordmark: 'LOVE20',
-    /** Fallback label when no community is selected/known (GLOSSARY: protocol label). */
-    protocolLabel: 'LOVE20协议',
-    fallbackName: 'LOVE20',
-    fallbackSymbol: 'LOVE20',
+    /** Protocol label when no community is selected/known (GLOSSARY). */
+    protocolLabel: `${BRAND_NAME}协议`,
+    /** Browser tab title for a resolved community: `<page> · <symbol>`. */
+    pageTitle: (page: string, symbol: string) => `${page} · ${symbol}`,
     eyebrow: '身份优先的社区协作网络',
-    tagline: '身份、社区与行动',
   },
   common: {
     back: '返回',
@@ -31,6 +34,7 @@ export const copy = {
     next: '下一步',
     learnMore: '了解',
     copyFailed: '复制失败，请长按选择内容',
+    parenthesized: (text: string) => `（${text}）`,
     cancel: '取消',
     notSelected: '未选择',
     confirm: '确认',
@@ -184,7 +188,8 @@ export const copy = {
     },
     docs: '开源文档',
     technical: '技术详情',
-    version: '版本',
+    buildMeta: (buildId: string, environment: string, chainId: number) =>
+      `版本 ${buildId} · ${environment} · chain ${chainId}`,
     errorTitle: '暂时读不到身份',
     errorBody: '网络可能不稳，你的身份没有变化。',
     balanceError: '余额暂时读不到',
@@ -350,6 +355,7 @@ export const copy = {
       revertedBody: '交易已经上链，但合约没有接受这次铸造。名字和余额都没有变化。',
       missingTitle: '读不到身份编号',
       missingBody: '交易已经上链，但回执里没有身份编号。可以去「我的 NFT」确认。',
+      missingMessage: '交易已经上链，但没有读到身份编号，请去「我的 NFT」确认。',
     },
     states: {
       notDeployedTitle: '铸造还没有接入',
@@ -432,6 +438,12 @@ export const copy = {
     wrongChain: '当前钱包连接的网络不对。',
     noAccess: '当前钱包没有执行这个操作的权限。',
     copy: '复制失败，请手动选择内容。',
+    // Hand-written safety net for the three M0-critical selectors; the
+    // generated registry remains authoritative.
+    revertPhaseNotStarted: '这一轮还没有开始，请稍后再来。',
+    revertIdentityNotOwner: '这个身份不属于当前钱包，请切换到正确的钱包或身份。',
+    revertCallFailed: '操作没有完成，请检查输入后重试。',
+    revertInvalidData: '数据校验没有通过，请检查输入后重试。',
   },
   notFound: {
     title: '页面不存在',
@@ -441,6 +453,11 @@ export const copy = {
   build: {
     development: '开发构建',
     version: (buildId: string) => `版本 ${buildId}`,
+    variant: {
+      dev: '本地开发',
+      test: '测试网',
+      prod: '主网',
+    },
   },
   dev: {
     statusTitle: '开发状态',

@@ -5,7 +5,7 @@ import { useAccount } from 'wagmi';
 import { BUILD_ID } from '@/config/build-id.generated';
 import { APP_ENV } from '@/config/env';
 import { BRAND_DOCS_URL, DEFAULT_SYMBOL, NETWORK, configuredAddress } from '@/config/networks';
-import { variantLabel } from '@/config/variant';
+import { variantLabel } from '@/shared/lib/variant-label';
 import { copy } from '@/shared/config/copy';
 import { formatAmount, formatBuildId, UNKNOWN } from '@/shared/lib/format';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -147,12 +147,11 @@ export function HomePage() {
             { label: 'Router', address: configuredAddress('router') },
             { label: 'Pair', address: configuredAddress('pair') },
           ]}
-          meta={
-            <>
-              {copy.home.version} {formatBuildId(BUILD_ID)} · {variantLabel(APP_ENV.variant)} ·
-              chain {NETWORK.chainId}
-            </>
-          }
+          meta={copy.home.buildMeta(
+            formatBuildId(BUILD_ID),
+            variantLabel(APP_ENV.variant),
+            NETWORK.chainId,
+          )}
         />
       </footer>
     </div>

@@ -12,13 +12,6 @@ export type { AddressBook, DeploymentConfig, HexAddress } from './deployments/ty
 
 export const ZERO_ADDRESS: HexAddress = '0x0000000000000000000000000000000000000000';
 
-/**
- * Built-in fallbacks. They are *data* fallbacks, never chain facts:
- * every address-dependent surface checks isConfiguredAddress() and renders
- * 「未配置」 instead of guessing.
- */
-const FALLBACK_SYMBOL = 'LOVE20';
-
 export const DEPLOYMENT: DeploymentConfig = parseDeployment(deploymentJson, APP_ENV.variant);
 
 export const ADDRESSES: AddressBook = DEPLOYMENT.addresses;
@@ -46,13 +39,14 @@ export const NETWORK = Object.freeze({
   variant: DEPLOYMENT.variant,
 });
 
-export const DEFAULT_SYMBOL: string = DEPLOYMENT.defaultSymbol || FALLBACK_SYMBOL;
+export const DEFAULT_SYMBOL: string = DEPLOYMENT.defaultSymbol;
 
-export const BRAND_FALLBACK = Object.freeze({
-  name: DEPLOYMENT.brand.name || 'LOVE20',
-  symbol: FALLBACK_SYMBOL,
-  tagline: DEPLOYMENT.brand.tagline,
-});
+/**
+ * Site-level brand name from the environment package. This is the *only* source
+ * of the "LOVE20" string; copy.ts derives the protocol label from it. It is not
+ * a community display name — the wordmark always follows the on-chain symbol().
+ */
+export const BRAND_NAME: string = DEPLOYMENT.brand.name;
 
 /** Footer docs link comes from the environment package, never a hardcoded page constant. */
 export const BRAND_DOCS_URL: string = DEPLOYMENT.brand.docsUrl;

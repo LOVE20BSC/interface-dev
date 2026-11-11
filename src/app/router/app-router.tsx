@@ -1,40 +1,22 @@
-import { lazy, useEffect } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { BASENAME } from '@/app/router/base-path';
 import { AppShell } from '@/app/shell/app-shell';
 import { HomePage } from '@/pages/home/home-page';
-import { MyNftPage } from '@/pages/my-nft/my-nft-page';
-import { MintPage } from '@/pages/mint/mint-page';
-import { NotFoundPage } from '@/pages/not-found/not-found-page';
-
-// ADR-0001 §3: identity and mint stay in the first-screen bundle; secondary
-// routes (including the M0 placeholders) are split out.
-const AirdropPage = lazy(async () => {
-  const module = await import('@/pages/airdrop/airdrop-page');
-  return { default: module.AirdropPage };
-});
-const SwapPage = lazy(async () => {
-  const module = await import('@/pages/swap/swap-page');
-  return { default: module.SwapPage };
-});
-const GovPage = lazy(async () => {
-  const module = await import('@/pages/gov/gov-page');
-  return { default: module.GovPage };
-});
-const ActPage = lazy(async () => {
-  const module = await import('@/pages/act/act-page');
-  return { default: module.ActPage };
-});
-const GroupPage = lazy(async () => {
-  const module = await import('@/pages/group/group-page');
-  return { default: module.GroupPage };
-});
-const MePage = lazy(async () => {
-  const module = await import('@/pages/me/me-page');
-  return { default: module.MePage };
-});
-import { pageTitleFor } from '@/app/navigation/navigation';
-import { copy } from '@/shared/config/copy';
+import {
+  ActPage,
+  AirdropPage,
+  GovPage,
+  GroupPage,
+  MePage,
+  MintPage,
+  MyNftPage,
+  NotFoundPage,
+  SwapPage,
+} from '@/app/router/lazy-routes';
+import { documentTitleFor } from '@/app/navigation/document-title';
+import { useCommunityDisplay } from '@/entities/community-token/model/use-community-display';
+import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -46,10 +28,13 @@ function ScrollToTop() {
 
 function DocumentTitle() {
   const { pathname } = useLocation();
+  const { symbol } = useCommunityContext();
+  const community = useCommunityDisplay(symbol);
+
   useEffect(() => {
-    const page = pageTitleFor(pathname);
-    document.title = page !== null ? `${page} · ${copy.brand.wordmark}` : copy.brand.wordmark;
-  }, [pathname]);
+    document.title = documentTitleFor(pathname, community);
+  }, [community, pathname]);
+
   return null;
 }
 

@@ -36,9 +36,12 @@ pnpm gen:errors     # regenerate src/config/errors.generated.ts
 - fails above **200 kB** and warns above **160 kB**;
 - fails if any shipped chunk contains WalletConnect / AppKit / MetaMask SDK bytes.
 
-Current entry: **~152 kB gzip** (React 19.1 + viem is most of it). Overlay code and secondary
-routes are split so the first paint stays inside the budget; this is under ADR-0001's 160 kB
-warning line, with the 200 kB hard gate as the actual failure.
+Current entry: **~157 kB gzip** by `scripts/check-bundle.mjs` (Vite reports ~161 kB with its own
+gzip setting; React 19.1 + viem is most of it). Overlay code, all secondary routes (including
+mint / my-nft / airdrop / swap / placeholders / 404) and the build-version banner are split so
+the first paint stays inside the budget; this is under ADR-0001's 160 kB warning line, with the
+200 kB hard gate as the actual failure. Intent prefetch (hover/focus/touch) keeps lazy
+navigation instant.
 
 ## Layout
 
@@ -153,6 +156,16 @@ and a separate `awaiting-phase-end` state models the current round’s mint. Bou
   never reach the user. Wallet-layer errors live in `features/connect-wallet/lib/wallet-errors.ts`
   so the large contract map is not in the entry chunk.
 - All UI copy is in `shared/config/copy.ts` (Chinese only; i18n deferred). Follow GLOSSARY terms.
+
+## i18n readiness (discipline now, library later)
+
+所有用户可见文案在 `copy.ts`；组件内禁止中文字面量，由测试/ESLint 门禁强制；句子用参数化模板；格式化走 `format.*` 并显式传 locale。
+Concretely: `src/architecture.test.ts` («keeps every CJK string literal inside copy.ts or the generated
+error copy») fails the build if a Chinese string literal appears in `src/**` outside
+`shared/config/copy.ts` and the generated error registry (test files are exempt). Reusable
+sentences are parameterised copy functions rather than `+`/template-literal glue, and every
+locale-sensitive formatter in `shared/lib/format.ts` takes a `locale` argument (default
+`zh-CN`) so no call site hard-codes browser locale.
 
 ## Static hosting
 

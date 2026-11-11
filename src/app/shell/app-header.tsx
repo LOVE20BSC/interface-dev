@@ -2,7 +2,7 @@ import { ArrowLeft } from '@/shared/ui/icons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { copy } from '@/shared/config/copy';
 import { pageTitleFor } from '@/app/navigation/navigation';
-import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
+import { useCommunityDisplay } from '@/entities/community-token/model/use-community-display';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { ConnectPill } from '@/widgets/connect-pill/connect-pill';
 
@@ -18,11 +18,7 @@ function canGoBack(): boolean {
  */
 function HomeWordmark() {
   const { symbol } = useCommunityContext();
-  const community = useCommunityToken(symbol);
-  const wordmark =
-    community.address !== undefined && !community.isMetadataLoading
-      ? community.symbol
-      : copy.brand.protocolLabel;
+  const wordmark = useCommunityDisplay(symbol).symbol;
 
   return (
     <Link
@@ -70,7 +66,7 @@ export function AppHeader() {
             >
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </button>
-            <h1 className="truncate text-base font-semibold">{title ?? copy.brand.wordmark}</h1>
+            <h1 className="truncate text-base font-semibold">{title ?? copy.brand.protocolLabel}</h1>
           </div>
         )}
         <div className="ml-auto flex min-w-0 shrink-0 items-center justify-end">

@@ -164,6 +164,7 @@ async function expectCommunityWordmark(page: Page): Promise<void> {
   await expect(page.getByRole('link', { name: 'TestLOVE20 首页' })).toBeVisible({
     timeout: 15_000,
   });
+  await expect(page).toHaveTitle('TestLOVE20');
 }
 
 test.beforeAll(() => {

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatAmount, formatUnits, UNKNOWN } from '@/shared/lib/format';
+import {
+  DEFAULT_LOCALE,
+  formatAmount,
+  formatDateTime,
+  formatUnits,
+  UNKNOWN,
+} from '@/shared/lib/format';
 
 const E18 = 10n ** 18n;
 
@@ -60,5 +66,31 @@ describe('formatAmount', () => {
 
   it('groups negative values consistently', () => {
     expect(formatAmount(-12345n, 1)).toBe('-1,234.5');
+  });
+
+  it('uses the explicit locale for grouping and decimal separators', () => {
+    expect(DEFAULT_LOCALE).toBe('zh-CN');
+    // The default stays byte-identical to the previous hard-coded output.
+    expect(formatAmount(1234567n, 2, 2)).toBe('12,345.67');
+    expect(formatAmount(1234567n, 2, 2, 'zh-CN')).toBe('12,345.67');
+    // A non-default locale actually reaches grouping and the decimal point.
+    expect(formatAmount(1234567n, 2, 2, 'de-DE')).toBe('12.345,67');
+    expect(formatAmount(12345n, 1, 2, 'de-DE')).toBe('1.234,5');
+    // Huge BigInts stay exact after locale grouping.
+    expect(formatAmount(123456789012345678901234567890n, 0, 0, 'de-DE')).toBe(
+      '123.456.789.012.345.678.901.234.567.890',
+    );
+  });
+});
+
+describe('formatDateTime', () => {
+  it('formats dates through the explicit locale', () => {
+    const instant = Date.UTC(2026, 0, 2, 12, 30);
+    const en = formatDateTime(instant, 'en-US');
+    const zh = formatDateTime(instant, 'zh-CN');
+    expect(en).not.toBe(zh);
+    expect(en).toMatch(/2026/);
+    expect(zh).toMatch(/2026/);
+    expect(formatDateTime(instant)).toBe(zh);
   });
 });

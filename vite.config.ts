@@ -62,7 +62,7 @@ function htmlMetaPlugin(options: HtmlMetaOptions): Plugin {
           },
           {
             tag: 'meta',
-            attrs: { property: 'og:image:alt', content: 'LOVE20 身份优先的社区协作网络' },
+            attrs: { property: 'og:image:alt', content: 'LOVE20协议 身份优先的社区协作网络' },
             injectTo: 'head',
           },
         );

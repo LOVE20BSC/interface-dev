@@ -39,18 +39,3 @@ export function resolveVariant(explicit: string | undefined, mode: string): EnvV
       `${Object.keys(MODE_TO_VARIANT).join(', ')}.`,
   );
 }
-
-export function variantLabel(variant: EnvVariant): string {
-  switch (variant) {
-    case 'dev':
-      return '本地开发';
-    case 'test':
-      return '测试网';
-    case 'prod':
-      return '主网';
-    default: {
-      const exhaustive: never = variant;
-      return exhaustive;
-    }
-  }
-}

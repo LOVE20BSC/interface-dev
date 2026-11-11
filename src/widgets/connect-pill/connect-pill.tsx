@@ -8,6 +8,7 @@ import { useMemberIdentity } from '@/entities/member-identity/model/use-member-i
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
 import { WrongNetworkButton } from '@/features/connect-wallet/ui/wrong-network-button';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
+import { useCommunityDisplay } from '@/entities/community-token/model/use-community-display';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import type { ConnectPillMenu } from '@/widgets/connect-pill/connect-pill-menus';
 
@@ -35,6 +36,7 @@ export function ConnectPill() {
   const compactChip = location.pathname !== '/' && isCompactViewport;
   const wallet = useWalletConnection();
   const { symbol, switchSymbol } = useCommunityContext();
+  const chipSymbol = useCommunityDisplay(symbol).symbol;
   const identity = useMemberIdentity();
   const [openMenu, setOpenMenu] = useState<ConnectPillMenu | null>(null);
   const [communityAnchor, setCommunityAnchor] = useState<HTMLButtonElement | null>(null);
@@ -77,7 +79,7 @@ export function ConnectPill() {
         onClick={() => toggleMenu('community')}
         onPointerEnter={preloadMenus}
         onFocus={preloadMenus}
-        aria-label={copy.community.chipAria(symbol)}
+        aria-label={copy.community.chipAria(chipSymbol)}
         aria-expanded={openMenu === 'community'}
         aria-haspopup="dialog"
         title={copy.community.menuTitle}
@@ -88,11 +90,11 @@ export function ConnectPill() {
             aria-hidden="true"
             className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-soft font-mono text-xs font-semibold text-brand-strong"
           >
-            {symbol.slice(0, 1)}
+            {chipSymbol.slice(0, 1)}
           </span>
         ) : (
           <span className="max-w-[96px] truncate font-mono text-[13px] font-semibold text-foreground">
-            {symbol}
+            {chipSymbol}
           </span>
         )}
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />

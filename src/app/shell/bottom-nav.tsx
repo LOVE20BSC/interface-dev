@@ -43,7 +43,7 @@ export function BottomNav() {
                 />
                 <span>{item.label}</span>
                 {item.placeholder ? (
-                  <span className="sr-only">（{copy.common.comingSoon}）</span>
+                  <span className="sr-only">{copy.common.parenthesized(copy.common.comingSoon)}</span>
                 ) : null}
               </Link>
             </li>

@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const SRC = resolve(process.cwd(), 'src');
@@ -146,5 +147,57 @@ describe('storage boundary', () => {
 
   it('the only cache module is actually present', () => {
     expect(FILES.some((file) => file.relative === 'shared/lib/cache.ts')).toBe(true);
+  });
+});
+
+/**
+ * i18n door rail. No i18n library yet, so the cheap invariant is that every
+ * Chinese user-facing string lives in one of two reviewed files. Tests are
+ * excluded by sourceFiles(); comments and identifiers are not literals.
+ */
+const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
+const CJK_ALLOWED = new Set(['shared/config/copy.ts', 'config/errors.generated.ts']);
+
+interface CjkLiteral {
+  readonly line: number;
+  readonly text: string;
+}
+
+function cjkLiterals(content: string, filename: string): CjkLiteral[] {
+  const source = ts.createSourceFile(
+    filename,
+    content,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const hits: CjkLiteral[] = [];
+  const record = (node: ts.Node, text: string): void => {
+    if (!CJK.test(text)) return;
+    const position = source.getLineAndCharacterOfPosition(node.getStart(source));
+    hits.push({ line: position.line + 1, text: text.trim().slice(0, 80) });
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+      record(node, node.text);
+    } else if (ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+      record(node, node.text);
+    } else if (ts.isJsxText(node)) {
+      record(node, node.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return hits;
+}
+
+describe('i18n discipline', () => {
+  it('keeps every CJK string literal inside copy.ts or the generated error copy', () => {
+    const violations = FILES.filter((file) => !CJK_ALLOWED.has(file.relative)).flatMap((file) =>
+      cjkLiterals(file.content, file.relative).map(
+        (hit) => `${file.relative}:${hit.line}: ${hit.text}`,
+      ),
+    );
+    expect(violations).toEqual([]);
   });
 });

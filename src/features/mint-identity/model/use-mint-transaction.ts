@@ -160,7 +160,7 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
       if (scope !== null) cache.remove(scope, MINT_TASK_KEY);
       setError({
         action: 'mint',
-        message: `${copy.mintIdentity.receipt.missingTitle}：${copy.mintIdentity.receipt.missingBody}`,
+        message: copy.mintIdentity.receipt.missingMessage,
       });
       setPending(null);
       return;

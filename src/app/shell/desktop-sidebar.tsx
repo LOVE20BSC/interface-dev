@@ -2,11 +2,13 @@ import { PanelLeftClose, PanelLeftOpen } from '@/shared/ui/icons';
 import { Link, useLocation } from 'react-router-dom';
 import { BUILD_ID } from '@/config/build-id.generated';
 import { APP_ENV } from '@/config/env';
-import { variantLabel } from '@/config/variant';
+import { variantLabel } from '@/shared/lib/variant-label';
 import { copy } from '@/shared/config/copy';
 import { cn } from '@/shared/lib/cn';
 import { formatBuildId } from '@/shared/lib/format';
 import { Badge } from '@/shared/ui/badge';
+import { useCommunityDisplay } from '@/entities/community-token/model/use-community-display';
+import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { isNavActive, NAV_ITEMS, type NavItem } from '@/app/navigation/navigation';
 
 function navTo(item: NavItem, search: string) {
@@ -21,6 +23,8 @@ export interface DesktopSidebarProps {
 /** Desktop navigation: collapsible left rail, same NAV_ITEMS as the mobile bar. */
 export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
   const location = useLocation();
+  const { symbol } = useCommunityContext();
+  const wordmark = useCommunityDisplay(symbol).symbol;
   return (
     <aside
       aria-label={copy.nav.desktopLabel}
@@ -37,7 +41,7 @@ export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
       >
         <Link
           to={{ pathname: '/', search: location.search }}
-          aria-label={copy.header.brandAria(copy.brand.wordmark)}
+          aria-label={copy.header.brandAria(wordmark)}
           className="flex min-w-0 items-center gap-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <span
@@ -47,9 +51,7 @@ export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
             L20
           </span>
           {!collapsed ? (
-            <span className="truncate text-base font-semibold tracking-tight">
-              {copy.brand.wordmark}
-            </span>
+            <span className="truncate text-base font-semibold tracking-tight">{wordmark}</span>
           ) : null}
         </Link>
       </div>

@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { useReadContract, useReadContracts } from 'wagmi';
 import { launchAbi, love20TokenAbi } from '@/config/abis';
 import {
-  BRAND_FALLBACK,
   DEFAULT_SYMBOL,
   configuredAddress,
   isConfiguredAddress,
@@ -27,9 +26,11 @@ export interface CommunityToken {
  * Resolve the current community token:
  *   1. the address book's default token when ?symbol= names the genesis symbol;
  *   2. otherwise Launch.tokenAddressBySymbol(?symbol=);
- *   3. brand falls back to LOVE20 only when the chain cannot be read.
+ *   3. the URL symbol / default symbol is only a fallback until chain data lands.
  *
- * A zero address from Launch means "unknown community", not "no data".
+ * A zero address from Launch means "unknown community", not "no data". This read
+ * model never invents a brand name: display fallbacks belong to
+ * useCommunityDisplay (`LOVE20协议`), not to the token entity.
  */
 export function useCommunityToken(symbol: string): CommunityToken {
   const defaultAddress = configuredAddress('tokenAddress');
@@ -110,14 +111,14 @@ export function useCommunityToken(symbol: string): CommunityToken {
     status = defaultAddress === undefined ? 'unconfigured' : 'unknown';
   }
 
-  const name = readName !== undefined && readName.length > 0 ? readName : BRAND_FALLBACK.name;
+  const name = readName !== undefined && readName.length > 0 ? readName : DEFAULT_SYMBOL;
   const chainSymbol = readSymbol !== undefined && readSymbol.length > 0 ? readSymbol : undefined;
 
   return {
     status,
     address: tokenAddress,
     name,
-    symbol: chainSymbol ?? (symbol.length > 0 ? symbol : BRAND_FALLBACK.symbol),
+    symbol: chainSymbol ?? (symbol.length > 0 ? symbol : DEFAULT_SYMBOL),
     decimals: readDecimals,
     isMetadataLoading,
     metadataError,

@@ -29,7 +29,7 @@ const html = `<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex, nofollow" />
-    <title>LOVE20</title>
+    <title>LOVE20协议</title>
     <script>
       (function () {
         var segmentsToKeep = ${segments};
@@ -53,7 +53,7 @@ const html = `<!doctype html>
   </head>
   <body>
     <p style="font-family: system-ui, sans-serif; padding: 24px">
-      正在打开 LOVE20… 如果没有自动跳转，请回到首页。
+      正在打开 LOVE20协议… 如果没有自动跳转，请回到首页。
     </p>
     <a href="${normalizedBase}" style="font-family: system-ui, sans-serif; padding: 0 24px">返回首页</a>
   </body>
