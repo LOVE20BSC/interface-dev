@@ -437,8 +437,12 @@ export function MintIdentityPanel({
         ) : (
           <>
             {needsApproval ? (
-              <>
-                <StickyAction>
+              // Reading order is the owner-approved grammar: `1 授权` must come
+              // before `2 铸造`. Step 2 is therefore rendered *below* step 1 in
+              // the same dock (never above it in the content flow while step 1
+              // is a fixed bottom action).
+              <StickyAction>
+                <div className="space-y-2">
                   <Button
                     variant="primary"
                     size="lg"
@@ -449,13 +453,11 @@ export function MintIdentityPanel({
                   >
                     {approveLabel}
                   </Button>
-                </StickyAction>
-                <div className="space-y-2">
                   <Button variant="secondary" size="md" className="w-full" disabled>
                     {copy.mintIdentity.ladder.mintStep}
                   </Button>
                 </div>
-              </>
+              </StickyAction>
             ) : (
               <>
                 {tx.isApproved ? (
@@ -527,6 +529,12 @@ export function MintIdentityPanel({
             {copy.mintIdentity.states.backHome}
           </Link>
         </div>
+
+        {/* The approve ladder dock is one subdued row taller than the reserved
+            --sticky-action-height; this keeps the last content reachable. */}
+        {needsApproval && !isInsufficient ? (
+          <div className="h-[3.25rem] md:hidden" aria-hidden="true" />
+        ) : null}
       </section>
     </div>
   );
