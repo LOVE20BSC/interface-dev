@@ -1,0 +1,7 @@
+# preview probe — 2026-11-11 21:02 CST
+$ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:4400/
+200
+$ curl -s http://127.0.0.1:4400/build-id.json
+{"buildId":"mwc4gwou-4aec4147","base":"/"}
+
+# note: the 14-step walkthrough ran before 'pnpm e2e' rebuilt dist; the server now serves the e2e rebuild (same HEAD).

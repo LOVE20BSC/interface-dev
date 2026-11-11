@@ -1,0 +1,2 @@
+$ node scripts/check-abis.mjs
+[abis:check] ABIs, manifest, address book and airdrop snapshot match ../anvil/export.

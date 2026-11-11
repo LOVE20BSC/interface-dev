@@ -1,0 +1,45 @@
+$ node scripts/gen-build-id.mjs && vitest run
+[build-id] mwc3sdkt-72dfb5b8
+
+ RUN  v3.2.7 /Users/BigPolarBear/Documents/github/LOVE20BSC/interface-dev-dsh
+
+ ✓ src/features/connect-wallet/model/use-injected-wallet-status.test.ts (5 tests) 15ms
+ ✓ src/features/mint-identity/lib/name-rule.test.ts (8 tests) 2ms
+ ✓ src/shared/lib/format.test.ts (20 tests) 30ms
+ ✓ src/app/shell/app-header.test.tsx (2 tests) 36ms
+ ✓ src/app/shell/desktop-sidebar.test.tsx (2 tests) 89ms
+ ✓ src/app/shell/bottom-nav.test.tsx (3 tests) 141ms
+ ✓ src/widgets/connect-pill/connect-pill.test.tsx (2 tests) 103ms
+ ✓ src/architecture.test.ts (5 tests) 391ms
+   ✓ i18n discipline > keeps every CJK string literal inside copy.ts or the generated error copy  384ms
+ ✓ src/shared/lib/errors.test.ts (10 tests) 22ms
+ ✓ src/entities/community-token/model/use-community-display.test.ts (3 tests) 7ms
+ ✓ src/features/swap-token/lib/swap-state.test.ts (7 tests) 13ms
+ ✓ src/domain/identity-order.test.ts (4 tests) 3ms
+ ✓ src/domain/airdrop-claim.test.ts (8 tests) 26ms
+ ✓ src/domain/round-axis.test.ts (28 tests) 10ms
+ ✓ src/features/swap-token/lib/swap-route.test.ts (7 tests) 3ms
+ ✓ src/features/connect-wallet/ui/connect-wallet-button.test.tsx (2 tests) 546ms
+   ✓ ConnectWalletButton > offers a no-wallet sheet instead of a dead connect button  405ms
+ ✓ src/shared/lib/cache.test.ts (10 tests) 10ms
+ ✓ src/config/config.test.ts (11 tests) 4ms
+ ✓ src/features/swap-token/lib/swap-events.test.ts (5 tests) 5ms
+ ✓ src/features/mint-identity/lib/mint-errors.test.ts (4 tests) 10ms
+ ✓ src/features/swap-token/lib/swap-receipt-record.test.ts (5 tests) 2ms
+ ✓ src/domain/airdrop-snapshot.test.ts (9 tests) 3ms
+ ✓ src/features/connect-wallet/lib/wallet-errors.test.ts (4 tests) 1ms
+ ✓ src/features/swap-token/lib/swap-amount.test.ts (6 tests) 3ms
+ ✓ src/features/claim-airdrop/lib/airdrop-claim-record.test.ts (4 tests) 5ms
+ ✓ src/app/router/restore-deep-link.test.ts (5 tests) 5ms
+ ✓ src/domain/member-name.test.ts (7 tests) 2ms
+ ✓ src/domain/airdrop-share.test.ts (4 tests) 1ms
+ ✓ src/features/mint-identity/lib/approve-amount.test.ts (3 tests) 1ms
+ ✓ src/features/claim-airdrop/lib/airdrop-unavailable-copy.test.ts (3 tests) 1ms
+ ✓ src/shared/lib/variant-label.test.ts (1 test) 1ms
+ ✓ src/app/navigation/document-title.test.ts (4 tests) 1ms
+
+ Test Files  32 passed (32)
+      Tests  201 passed (201)
+   Start at  20:36:42
+   Duration  5.46s (transform 1.32s, setup 7.59s, collect 6.18s, tests 1.50s, environment 23.32s, prepare 2.16s)
+

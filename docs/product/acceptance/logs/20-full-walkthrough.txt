@@ -1,0 +1,125 @@
+[2026-11-11T12:53:04.825Z] acceptance run against http://127.0.0.1:4400 (chain 31337, run ifdrtq)
+[2026-11-11T12:53:04.825Z] deployment: MemberNFT=0x610178dA211FEF7D417bC0e6FeD39F05609AD788 firstToken=0x8aCd85898458400f7Db866d53FCFF6f0D49741FF airdrop=0xa513E6E4b8f2a923D98304ec87F64353C4D5C853
+[2026-11-11T12:53:04.975Z] chain: {"chainId":"31337","block":"1080"}
+[2026-11-11T12:53:05.262Z] mint wallet 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf: 5000 TestLOVE20, 9.999656673997596718 ETH, NFT=1
+[2026-11-11T12:53:06.055Z] STEP 1 PASS — 未连接首页显示「先连接钱包」，整屏仅 1 个实心按钮
+[2026-11-11T12:53:06.055Z]   evidence: docs/product/acceptance/01-home-disconnected.png
+[2026-11-11T12:53:06.055Z]   evidence: identity card: 「先连接钱包」 + 「一个钱包可以拥有多个身份，身份才是参与凭证。」
+[2026-11-11T12:53:06.056Z]   evidence: solid brand-coloured controls: 1
+[2026-11-11T12:53:06.056Z]   evidence: connect-labelled buttons: 2 (header pill is secondary, card CTA is primary)
+[2026-11-11T12:53:06.056Z]   evidence: balance section (disconnected): TestLOVE20 余额 |  | — |  | 兑换
+[2026-11-11T12:53:06.352Z] STEP 2 PASS — 已连接、无身份：显示「你还没有身份」+「去我的 NFT」，首页无铸造 CTA、无资格卡
+[2026-11-11T12:53:06.352Z]   evidence: docs/product/acceptance/02-home-connected-no-identity.png
+[2026-11-11T12:53:06.352Z]   evidence: identity card: 「你还没有身份」+「去我的 NFT」
+[2026-11-11T12:53:06.352Z]   evidence: home mint CTA count: 0
+[2026-11-11T12:53:06.352Z]   evidence: eligibility card count: 0 (wallet is not in the snapshot)
+[2026-11-11T12:53:06.352Z]   evidence: header pill: 0x2B5A…D6cF | 未关联 NFT
+[2026-11-11T12:53:06.352Z]   evidence: on-chain wallet assets: 0 wei ETH, 0 TestLOVE20, 0 NFT
+[2026-11-11T12:53:07.539Z] STEP 3 PASS — 空态引导到铸造页：「你还没有身份。」+「铸造身份」→ /mint
+[2026-11-11T12:53:07.539Z]   evidence: docs/product/acceptance/03-my-nft-empty.png
+[2026-11-11T12:53:07.539Z]   evidence: docs/product/acceptance/03-mint-from-empty.png
+[2026-11-11T12:53:07.539Z]   evidence: empty state copy: 「你还没有身份。」+「铸造需要一个名字和少量 LOVE20。」+ CTA「铸造身份」
+[2026-11-11T12:53:07.539Z]   evidence: navigation target: /mint?symbol=TestLOVE20
+[2026-11-11T12:53:09.479Z] STEP 4 PASS — dev 变体规则可见；非 Test 名字被阻断，Test 名字通过校验
+[2026-11-11T12:53:09.479Z]   evidence: docs/product/acceptance/04-mint-name-blocked.png
+[2026-11-11T12:53:09.479Z]   evidence: docs/product/acceptance/04-mint-name-valid.png
+[2026-11-11T12:53:09.479Z]   evidence: rule copy visible: 「名称必须以 Test 开头」+「中文 3 字节、英文与数字 1 字节；名字越短，价格越高」
+[2026-11-11T12:53:09.479Z]   evidence: name「nottest-ifdrtq」→ 「✗ 名称必须以 Test 开头」+「为了让测试身份和真实身份一眼能分开。」，铸造按钮 1 个且全部 disabled
+[2026-11-11T12:53:09.479Z]   evidence: name「Testacc-ifdrtq」→ 「✓ 可以用」，prefix 错误计数 0
+[2026-11-11T12:53:13.815Z] STEP 5 PASS — 余额不足分流正确：无资格→兑换、有资格→铸造空投份额
+[2026-11-11T12:53:13.816Z]   evidence: docs/product/acceptance/05-mint-branch-swap.png
+[2026-11-11T12:53:13.816Z]   evidence: ineligible wallet #0x2B5A…: branch copy + CTA「用 ETH 兑换」，href=/swap?symbol=TestLOVE20
+[2026-11-11T12:53:13.816Z]   evidence: landed URL: /swap?symbol=TestLOVE20&from=ETH&to=TestLOVE20
+[2026-11-11T12:53:13.816Z]   evidence: the swap page wrote the effective pair back into the URL (from=ETH&to=TestLOVE20)
+[2026-11-11T12:53:13.816Z]   evidence: docs/product/acceptance/05-mint-branch-airdrop.png
+[2026-11-11T12:53:13.816Z]   evidence: eligible wallet 0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f: branch copy contains 你还有空投份额可以铸造，CTA「铸造空投份额」，href=/airdrop?symbol=TestLOVE20
+[2026-11-11T12:53:13.816Z]   evidence: branch context: 给身份起个名字 | 14/32 字节 | 中文 3 字节、英文与数字 1 字节；名字越短，价格越高 |  | 名称必须以 Test 开头 |  | ✓ 可以用 |  | 铸造价格 | 预计 900.00054 TestLOVE20 | 我的 TestLOVE20 | 0 | 去兑换代币 |  | 余额不足，还需要 900.00054 TestLOVE20 |  | 费用以创世代币 TestLOVE20 计价，与当前社区无关；价格随已铸造数量变化，提交时以链上为准。 |  | 你还有空投份额可以铸造，预计 100,0
+[2026-11-11T12:53:15.664Z]   mint: clicking 1. 授权
+[2026-11-11T12:53:16.916Z]   mint: clicking 铸造身份
+[2026-11-11T12:53:18.357Z] STEP 6 PASS — 铸造成功收据含 #7 与真实哈希；身份没有被自动选中
+[2026-11-11T12:53:18.358Z]   evidence: docs/product/acceptance/06-mint-receipt.png
+[2026-11-11T12:53:18.358Z]   evidence: receipt: 身份 #7 / 名称 Testaccept-ifdrtq / 已销毁 900.00054 TestLOVE20 / hash 0xef7c9b5a8647d7dc71c61379fed57ed2e825232ce2ff9805b67765ae586b50e9
+[2026-11-11T12:53:18.358Z]   evidence: MemberMinted.memberId=7, cost=900000540000135000018, name=Testaccept-ifdrtq
+[2026-11-11T12:53:18.358Z]   evidence: on-chain ownerOf(7)=0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf, memberName=Testaccept-ifdrtq
+[2026-11-11T12:53:18.358Z]   evidence: identity cache key for 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf: null (not auto-selected)
+[2026-11-11T12:53:18.358Z]   evidence: next-step link href=/my-nft
+[2026-11-11T12:53:18.358Z]   evidence: form before mint: 给身份起个名字 | 17/32 字节 | 中文 3 字节、英文与数字 1 字节；名字越短，价格越高 |  | 名称必须以 Test 开头 |  | ✓ 可以用 |  | 铸造价格 | 预计 900.00054 TestLOVE20 | 我的 TestLOVE20 | 5,000 | 去兑换代币 |  | 费用以创世代币 TestLOVE20 计价，与当前社区无关；价格随已铸造数量变化，提交时以链上为准。 |  | 1. 授权 | 2. 铸造身份 | 为什么要两次确认？ | 回首页
+[2026-11-11T12:53:19.767Z] STEP 7 threw: Error: identity cache not written: {"tokenId":"6"}
+    at check (file:///Users/BigPolarBear/Documents/github/LOVE20BSC/interface-dev-dsh/docs/product/acceptance/run.mjs:122:25)
+    at step7 (file:///Users/BigPolarBear/Documents/github/LOVE20BSC/interface-dev-dsh/docs/product/acceptance/run.mjs:858:5)
+    at async main (file:///Users/BigPolarBear/Documents/github/LOVE20BSC/interface-dev-dsh/docs/product/acceptance/run.mjs:1532:25)
+    at async file:///Users/BigPolarBear/Documents/github/LOVE20BSC/interface-dev-dsh/docs/product/acceptance/run.mjs:1551:1
+[2026-11-11T12:53:19.767Z] STEP 7 FAIL — 执行中断：identity cache not written: {"tokenId":"6"}
+[2026-11-11T12:53:22.579Z] STEP 8 PASS — 空投资格卡→预计金额→铸造成功；回执金额与 AirdropClaimed 一致，isClaimed=true
+[2026-11-11T12:53:22.580Z]   evidence: docs/product/acceptance/08-home-airdrop-eligible.png
+[2026-11-11T12:53:22.580Z]   evidence: docs/product/acceptance/08-airdrop-eligible.png
+[2026-11-11T12:53:22.580Z]   evidence: docs/product/acceptance/08-airdrop-receipt.png
+[2026-11-11T12:53:22.580Z]   evidence: home card: 你参与了销毁活动，获得空投铸造资格 | 铸造空投份额
+[2026-11-11T12:53:22.580Z]   evidence: airdrop page expected amount: 预计可得 100,000,000 TestLOVE20
+[2026-11-11T12:53:22.580Z]   evidence: amount label carries 预计 + note「按铸造时的池子余额与剩余份额计算，别人铸造后金额会变。」
+[2026-11-11T12:53:22.580Z]   evidence: claimableAmount before claim: 100000000000000000000000000
+[2026-11-11T12:53:22.580Z]   evidence: AirdropClaimed.amount: 100000000000000000000000000; receipt text: 100,000,000 TestLOVE20; hash: 0xe1e936fe19903c05b33395050e38ceeebf5248d40a117fa304e984224a5aad51
+[2026-11-11T12:53:22.580Z]   evidence: isClaimed(0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f): true; wallet TestLOVE20 after: 100000000000000000000000000
+[2026-11-11T12:53:22.581Z]   evidence: 「领取」 occurrences on the airdrop page: 0
+[2026-11-11T12:53:25.613Z] STEP 9 PASS — 深链预选 ETH→TestLOVE20；回执到账 = Swap 事件 = 钱包余额增量（19.934031354124216886）
+[2026-11-11T12:53:25.613Z]   evidence: docs/product/acceptance/09-swap-deep-link.png
+[2026-11-11T12:53:25.613Z]   evidence: docs/product/acceptance/09-swap-receipt.png
+[2026-11-11T12:53:25.614Z]   evidence: deep link: /swap?symbol=TestLOVE20&from=ETH&to=TestLOVE20; from="ETH", to="TestLOVE20"
+[2026-11-11T12:53:25.614Z]   evidence: quote shown: 19.934031 TestLOVE20; info block: 从 | ETH | 余额 ETH 9,999.946751 | 全部 | 到 | TestLOVE20 | 预计可得 | 19.934031 TestLOVE20 | 1 ETH ≈ 1,993.4 TestLOVE20 | 路径 | ETH → TestLOVE20 | 最少到账 | 19.834361 TestLOVE20 | 最多可接受的价格变化 | 0.1% | 0.5% | 1.0% | 自定义 | 手续费率 | 以链上费率为准 | 更新于 0 秒前 | 30s 后更新 | 兑换 | 报价随池子变化；提交前会再读一次链上价格。 | 回首页 | 技术详情 | ＋
+[2026-11-11T12:53:25.614Z]   evidence: receipt: 到账 19.934031 TestLOVE20 | 路径 ETH → TestLOVE20 | 最少到账 19.834361 TestLOVE20 | hash 0x5c6d3bf049e4eb823149b27d85eea5949b5745e805e1fab8dd6f27c9ac754c76
+[2026-11-11T12:53:25.614Z]   evidence: pair Swap: amountIn=10000000000000000 wei (WETH), amountOut=19934031354124216886 wei (TestLOVE20)
+[2026-11-11T12:53:25.614Z]   evidence: wallet TestLOVE20: before=99999119937652180131635489, after=99999139871683534255852375, delta=19934031354124216886
+[2026-11-11T12:53:25.614Z]   evidence: asserted: UI == Swap.amountOut == balance delta
+[2026-11-11T12:53:25.636Z] empty-pool token already exists: TestEMPTY2=0xe082b26cEf079a095147F35c9647eC97c2401B83
+[2026-11-11T12:53:26.782Z] STEP 10 PASS — 零流动性交易对显示专门说明与两条出路，没有 revert/失败文案
+[2026-11-11T12:53:26.783Z]   evidence: docs/product/acceptance/10-swap-empty-pool.png
+[2026-11-11T12:53:26.783Z]   evidence: fixture: TestEMPTY2=0xe082b26cEf079a095147F35c9647eC97c2401B83, pair=0x84666F814329dD5565328920176FAfB330aB2E84, reserves=0
+0
+0
+[2026-11-11T12:53:26.783Z]   evidence: copy: 「这个兑换对还没有可兑换的流动性。」+「发射代币时只创建了交易对，没有注入资金，所以现在换不了。」
+[2026-11-11T12:53:26.783Z]   evidence: next steps: 「换个代币」+「回首页」; 卡在… 行可见
+[2026-11-11T12:53:26.783Z]   evidence: 页面无 revert / 失败 文案
+[2026-11-11T12:53:29.844Z] STEP 11 PASS — 未连接 / 链不对 / 无钱包三种状态都给出了明确下一步
+[2026-11-11T12:53:29.844Z]   evidence: docs/product/acceptance/11-swap-disconnected.png
+[2026-11-11T12:53:29.844Z]   evidence: swap 未连接：「连接钱包后兑换。」+ 可用主按钮「连接钱包」
+[2026-11-11T12:53:29.844Z]   evidence: docs/product/acceptance/11-swap-wrong-network.png
+[2026-11-11T12:53:29.844Z]   evidence: swap 链不对：「当前钱包连接的网络不对。」+ 2 个「网络不对，点此切换」按钮（header pill 与页内各一）
+[2026-11-11T12:53:29.844Z]   evidence: docs/product/acceptance/11-home-no-wallet.png
+[2026-11-11T12:53:29.844Z]   evidence: home 无注入钱包：点「连接钱包」打开兜底抽屉「没有检测到钱包」+ 三条出路 +「复制本页链接」
+[2026-11-11T12:53:29.845Z]   evidence: drawer text: 没有检测到钱包 |  | 当前浏览器没有可用的钱包。你可以换一个入口打开本页。 |  | 在手机钱包 App 的内置浏览器中打开本页。 | 或在电脑浏览器安装钱包扩展后刷新。 | 如果已经在钱包里，仍然看不到，请关闭应用内浏览器再试。 | 复制本页链接 | 知道了
+[2026-11-11T12:53:34.399Z] STEP 12 PASS — 三页主 CTA 均在首屏完整可见、贴着底栏上方，浮层不透明且无内容透底
+[2026-11-11T12:53:34.399Z]   evidence: docs/product/acceptance/12-swap-sticky.png
+[2026-11-11T12:53:34.400Z]   evidence: docs/product/acceptance/12-mint-sticky.png
+[2026-11-11T12:53:34.400Z]   evidence: docs/product/acceptance/12-airdrop-sticky.png
+[2026-11-11T12:53:34.400Z]   evidence: swap: CTA rect y=721..769, viewport 390x844, nav top=779, dock position=fixed, z=30, background=rgb(255, 255, 255), hit-inside-dock=true
+[2026-11-11T12:53:34.400Z]   evidence: mint: CTA rect y=721..769, viewport 390x844, nav top=779, dock position=fixed, z=30, background=rgb(255, 255, 255), hit-inside-dock=true
+[2026-11-11T12:53:34.400Z]   evidence: airdrop: CTA rect y=721..769, viewport 390x844, nav top=779, dock position=fixed, z=30, background=rgb(255, 255, 255), hit-inside-dock=true
+[2026-11-11T12:53:37.959Z] STEP 13 PASS — 五页标题在 390×844 与 360×640 均完整显示，无横向溢出
+[2026-11-11T12:53:37.959Z]   evidence: 390x844 home: title「TestLOVE20」 scroll=89/89 truncated=false doc.scrollWidth=390/390 overflow=true right=105
+[2026-11-11T12:53:37.959Z]   evidence: docs/product/acceptance/13-390-home.png
+[2026-11-11T12:53:37.959Z]   evidence: 390x844 my-nft: title「我的 NFT」 scroll=67/67 truncated=false doc.scrollWidth=390/390 overflow=true right=131
+[2026-11-11T12:53:37.959Z]   evidence: docs/product/acceptance/13-390-my-nft.png
+[2026-11-11T12:53:37.960Z]   evidence: 390x844 mint: title「铸造身份」 scroll=64/64 truncated=false doc.scrollWidth=390/390 overflow=true right=128
+[2026-11-11T12:53:37.960Z]   evidence: docs/product/acceptance/13-390-mint.png
+[2026-11-11T12:53:37.960Z]   evidence: 390x844 airdrop: title「铸造空投份额」 scroll=96/96 truncated=false doc.scrollWidth=390/390 overflow=true right=160
+[2026-11-11T12:53:37.960Z]   evidence: docs/product/acceptance/13-390-airdrop.png
+[2026-11-11T12:53:37.960Z]   evidence: 390x844 swap: title「兑换代币」 scroll=64/64 truncated=false doc.scrollWidth=390/390 overflow=true right=128
+[2026-11-11T12:53:37.961Z]   evidence: docs/product/acceptance/13-390-swap.png
+[2026-11-11T12:53:37.961Z]   evidence: 360x640 home: title「TestLOVE20」 scroll=89/89 truncated=false doc.scrollWidth=360/360 overflow=true right=105
+[2026-11-11T12:53:37.961Z]   evidence: docs/product/acceptance/13-360-home.png
+[2026-11-11T12:53:37.961Z]   evidence: 360x640 my-nft: title「我的 NFT」 scroll=67/67 truncated=false doc.scrollWidth=360/360 overflow=true right=131
+[2026-11-11T12:53:37.961Z]   evidence: docs/product/acceptance/13-360-my-nft.png
+[2026-11-11T12:53:37.961Z]   evidence: 360x640 mint: title「铸造身份」 scroll=64/64 truncated=false doc.scrollWidth=360/360 overflow=true right=128
+[2026-11-11T12:53:37.962Z]   evidence: docs/product/acceptance/13-360-mint.png
+[2026-11-11T12:53:37.962Z]   evidence: 360x640 airdrop: title「铸造空投份额」 scroll=96/96 truncated=false doc.scrollWidth=360/360 overflow=true right=160
+[2026-11-11T12:53:37.962Z]   evidence: docs/product/acceptance/13-360-airdrop.png
+[2026-11-11T12:53:37.962Z]   evidence: 360x640 swap: title「兑换代币」 scroll=64/64 truncated=false doc.scrollWidth=360/360 overflow=true right=128
+[2026-11-11T12:53:37.962Z]   evidence: docs/product/acceptance/13-360-swap.png
+[2026-11-11T12:53:41.550Z] STEP 14 PASS — 1100×900 使用左侧栏；兑换/铸造主 CTA 回到文档流，不再吸底
+[2026-11-11T12:53:41.551Z]   evidence: docs/product/acceptance/14-desktop-home.png
+[2026-11-11T12:53:41.551Z]   evidence: 1100x900 home: aside visible=true, bottom nav visible=false, aside width=232, main left=330
+[2026-11-11T12:53:41.551Z]   evidence: docs/product/acceptance/14-desktop-swap.png
+[2026-11-11T12:53:41.551Z]   evidence: 1100x900 swap: fixed ancestors of CTA=0, CTA top=709
+[2026-11-11T12:53:41.552Z]   evidence: docs/product/acceptance/14-desktop-mint.png
+[2026-11-11T12:53:41.552Z]   evidence: 1100x900 mint: fixed ancestors of CTA=0
+[2026-11-11T12:53:41.577Z] tally: {"PASS":13,"FAIL":1}

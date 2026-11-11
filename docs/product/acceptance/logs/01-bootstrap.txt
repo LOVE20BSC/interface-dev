@@ -1,0 +1,114 @@
+[0;34m==>[0m preflight (anvil31337_dev, chain 31337, rpc http://127.0.0.1:8545)
+[0;32m  ok[0m sibling checkouts present (core action group-chat libs dex)
+[0;32m  ok[0m dex creation bytecode artifacts present (hash-asserted during deploy)
+[0;32m  ok[0m Multicall3 signed transaction matches its pinned sha256
+[0;32m  ok[0m Multicall3 deployer/nonce produce the canonical address 0xcA11bde05977b3631167028862bE2a173976CA11
+[0;34m==>[0m airdrop snapshot
+snapshot  : /Users/BigPolarBear/Documents/github/LOVE20BSC/anvil/fixtures/airdrop/anvil31337_dev.json
+accounts  : 10 (mnemonic index 0..9)
+share/each: 100000000000000000  totalShare: 1000000000000000000
+merkleRoot: 0x046a5d5357fd4da6986a88fb1e2baf3603375d2099ce9f46b9d6fbe333c6c404
+[0;34m==>[0m build (siblings are compiled read-only)
+Compiling 140 files with Solc 0.8.37
+Solc 0.8.37 finished in 7.84s
+Compiler run successful!
+[0;32m  ok[0m forge build
+[0;34m==>[0m anvil 127.0.0.1:8545 (chain 31337)
+[0;32m  ok[0m anvil up (pid 87001, automine, log .anvil/anvil.log)
+[0;34m==>[0m fresh-chain guard
+[0;32m  ok[0m fresh enough (0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 nonce 0, Multicall3 absent, block 0)
+[0;34m==>[0m Multicall3 at 0xcA11bde05977b3631167028862bE2a173976CA11
+[0;32m  ok[0m funded deployer 0x05f32b3cc3888453ff71b01135b34ff8e41263f2 with 100000000000000000 wei
+[0;32m  ok[0m published upstream signed transaction (CREATE from 0x05f32b3cc3888453ff71b01135b34ff8e41263f2, nonce 0)
+[0;32m  ok[0m code present (3808 bytes), getBlockNumber() = 1
+[0;32m  ok[0m recorded deployment block 1
+[0;34m==>[0m action linked libraries
+[0;32m  ok[0m GroupActionJoin 0x5FbDB2315678afecb367f032d93F642f64180aa3
+[0;32m  ok[0m GroupActionManager 0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
+[0;32m  ok[0m GroupActionVerify 0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+[0;32m  ok[0m GroupRecipients 0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9
+[0;34m==>[0m deploy (WETH -> UniswapV2 -> Airdrop -> core -> action -> group-chat)
+[0;32m  ok[0m deployed; address book written to /Users/BigPolarBear/Documents/github/LOVE20BSC/anvil/export/deployments/anvil31337_dev.addresses.json
+[0;34m==>[0m seed (airdrop claims, MemberNFTs, liquidity, ETH balances)
+[0;32m  ok[0m seeded
+[0;34m==>[0m export
+deployment nonces: libraries 0..3, deploy 4..30 (fresh chain)
+wrote export/deployments/anvil31337_dev.json
+  chainId 31337, deploy block 32, 34 contracts
+wrote 19 ABIs to export/abis/
+wrote export/airdrop/anvil31337_dev.json
+[0;32m  ok[0m export/deployments/anvil31337_dev.json + export/abis/*.json
+[0;34m==>[0m verify
+
+==> verify (anvil31337_dev @ http://127.0.0.1:8545)
+  [0;32mPASS[0m chain id = 31337
+  -- code at every exported address --
+  [0;32mPASS[0m code present at all 34 exported addresses
+  [0;32mPASS[0m UniswapV2Router02.factory() = 0x5FC8d32690cc91D4c39d9d3abcBD16989F875707
+  [0;32mPASS[0m UniswapV2Router02.WETH() = 0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9
+  [0;32mPASS[0m UniswapV2Factory.feeTo() = 0x0000000000000000000000000000000000000000
+  [0;32mPASS[0m UniswapV2Factory.feeToSetter() = 0x0000000000000000000000000000000000000000
+  [0;32mPASS[0m UniswapV2Pair has WETH as token1 = 0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9
+  [0;32mPASS[0m LOVE20Token.MINTER() = 0x9A676e781A523b5d0C0e43731313A708CB607508
+  [0;32mPASS[0m LOVE20Token.PARENT_TOKEN_ADDRESS() = 0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9
+  [0;32mPASS[0m LOVE20Token.symbol() = TestLOVE20
+  [0;32mPASS[0m LOVE20Token.name() = TestLOVE20@TestWETH
+  [0;32mPASS[0m LOVE20Token.MAX_SUPPLY() = 10000000000000000000000000000
+  [0;32mPASS[0m Launch.FIRST_TOKEN_ADDRESS() = 0x8aCd85898458400f7Db866d53FCFF6f0D49741FF
+  [0;32mPASS[0m Launch.MINT_ADDRESS() = 0x9A676e781A523b5d0C0e43731313A708CB607508
+  [0;32mPASS[0m Launch.MEMBER_NFT_ADDRESS() = 0x610178dA211FEF7D417bC0e6FeD39F05609AD788
+  [0;32mPASS[0m Launch.ROOT_PARENT_TOKEN_ADDRESS() = 0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9
+  [0;32mPASS[0m Launch.PAIR_FACTORY_ADDRESS() = 0x5FC8d32690cc91D4c39d9d3abcBD16989F875707
+  [0;32mPASS[0m Stake.VOTE_ADDRESS() = 0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82
+  [0;32mPASS[0m Stake.LAUNCH_ADDRESS() = 0x8A791620dd6260079BF849Dc5567aDC3F2FdC318
+  [0;32mPASS[0m Stake.ROUTER_ADDRESS() = 0x0165878A594ca255338adfa4d48449f69242Eb8F
+  [0;32mPASS[0m Stake.PAIR_FACTORY_ADDRESS() = 0x5FC8d32690cc91D4c39d9d3abcBD16989F875707
+  [0;32mPASS[0m Vote.SUBMIT_ADDRESS() = 0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0
+  [0;32mPASS[0m Vote.STAKE_ADDRESS() = 0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e
+  [0;32mPASS[0m Submit.STAKE_ADDRESS() = 0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e
+  [0;32mPASS[0m Mint.MEMBER_NFT_ADDRESS() = 0x610178dA211FEF7D417bC0e6FeD39F05609AD788
+  [0;32mPASS[0m ActionTarget.MINT_ADDRESS() = 0x9A676e781A523b5d0C0e43731313A708CB607508
+  [0;32mPASS[0m LpExecutor.STAKE_ADDRESS() = 0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e
+  [0;32mPASS[0m GroupActionExecutor.ACTION_TARGET_ADDRESS() = 0x0B306BF915C4d645ff596e518fAf3F9669b97016
+  [0;32mPASS[0m GroupServiceExecutor.GROUP_ACTION_EXECUTOR_ADDRESS() = 0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE
+  [0;32mPASS[0m GroupChat.GROUP_ADDRESS() = 0x610178dA211FEF7D417bC0e6FeD39F05609AD788
+  [0;32mPASS[0m GroupChat.GROUP_ADMIN_ADDRESS() = 0x3Aa5ebB10DC797CAC828524e59A333d0A371443c
+  [0;32mPASS[0m Phase.currentPhase() = 1 (> 0)
+  [0;32mPASS[0m Phase.ORIGIN_PHASE_BLOCKS() = 120
+  [0;32mPASS[0m Phase.TARGET_SECONDS() = 120
+  [0;32mPASS[0m GroupChat.currentRound() = 1
+  [0;32mPASS[0m export.deployer == params deploy account = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+  [0;32mPASS[0m exported deployer ETH balance = 9892634671510787948684 (> 0)
+  [0;32mPASS[0m export.params.tokenName = TestLOVE20@TestWETH
+  [0;32mPASS[0m export.params.tokenSymbol = TestLOVE20
+  [0;32mPASS[0m export.params.phaseOriginBlocks = 1
+  [0;32mPASS[0m export.params.phaseOriginPhaseBlocks = 120
+  [0;32mPASS[0m export.params.phaseTargetSeconds = 120
+  [0;32mPASS[0m export.params.seedAccountCount = 10
+  [0;32mPASS[0m export.params.seedMemberCount = 5
+  [0;32mPASS[0m export.params.groupActionSplits = ["100000000000000000", "400000000000000000", "700000000000000000"]
+  [0;32mPASS[0m export.uniswapV2.factory = 0x5FC8d32690cc91D4c39d9d3abcBD16989F875707
+  [0;32mPASS[0m export.uniswapV2.feeTo = 0x0000000000000000000000000000000000000000
+  [0;32mPASS[0m MemberNFT.balanceOf(seed[0]) = 1 (> 0)
+  [0;32mPASS[0m MemberNFT.totalSupply() = 5 (> 1)
+  [0;32mPASS[0m LOVE20Token.balanceOf(seed[0]) = 99799100000000000000000000 (> 0)
+  [0;32mPASS[0m LOVE20Token.balanceOf(Airdrop) = 500000000000000000000000000 (> 0)
+  [0;32mPASS[0m UniswapV2Pair reserve0 = 200000000000000000000000 (> 0)
+  [0;32mPASS[0m UniswapV2Pair reserve1 = 100000000000000000000 (> 0)
+  [0;32mPASS[0m UniswapV2Pair LP held by Stake = 4472135954999579391818 (> 0)
+  [0;32mPASS[0m Stake.totalLiquidityShares = 4472135954999579391818 (> 0)
+  [0;32mPASS[0m Airdrop.merkleRoot() == fixture root = 0x046a5d5357fd4da6986a88fb1e2baf3603375d2099ce9f46b9d6fbe333c6c404
+  [0;32mPASS[0m Airdrop.totalShare() == fixture totalShare = 1000000000000000000
+  [0;32mPASS[0m Airdrop.claimableAmount(unclaimed fixture entry) = 100000000000000000000000000 (> 0)
+  [0;32mPASS[0m Airdrop.isClaimed(seed[0]) = true
+  [0;32mPASS[0m ETH balances of 5 seeded accounts >= 100000000000000000000 wei
+  [0;32mPASS[0m Multicall3.getBlockNumber() > 0 = true
+  [0;32mPASS[0m library GroupActionJoin code size = 18654 (> 0)
+  [0;32mPASS[0m library GroupActionManager code size = 14141 (> 0)
+  [0;32mPASS[0m library GroupActionVerify code size = 18302 (> 0)
+  [0;32mPASS[0m library GroupRecipients code size = 9726 (> 0)
+
+  ALL CHECKS PASSED — report written to export/VERIFIED.md
+[0;32m  ok[0m interval mining enabled (1s per block)
+
+[0;32mbootstrap complete[0m - chain 31337 at http://127.0.0.1:8545, address book export/deployments/anvil31337_dev.json

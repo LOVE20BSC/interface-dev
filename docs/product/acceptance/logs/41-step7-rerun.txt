@@ -1,0 +1,13 @@
+[2026-11-11T12:54:05.503Z] acceptance run against http://127.0.0.1:4400 (chain 31337, run u15mgp)
+[2026-11-11T12:54:05.503Z] deployment: MemberNFT=0x610178dA211FEF7D417bC0e6FeD39F05609AD788 firstToken=0x8aCd85898458400f7Db866d53FCFF6f0D49741FF airdrop=0xa513E6E4b8f2a923D98304ec87F64353C4D5C853
+[2026-11-11T12:54:05.679Z] chain: {"chainId":"31337","block":"1141"}
+[2026-11-11T12:54:06.839Z] funded 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf with 900.000540000135000018 TestLOVE20 from #2
+[2026-11-11T12:54:07.094Z] mint wallet 0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf: 5000 TestLOVE20, 9.999376934995638545 ETH, NFT=2
+[2026-11-11T12:54:09.348Z] STEP 7 PASS — 选择身份后首页问候「你好，Testaccept-ifdrtq」+ #7，刷新保持
+[2026-11-11T12:54:09.349Z]   evidence: docs/product/acceptance/07-my-nft-selected.png
+[2026-11-11T12:54:09.349Z]   evidence: docs/product/acceptance/07-home-greeting.png
+[2026-11-11T12:54:09.349Z]   evidence: selected tokenId=7, name=Testaccept-ifdrtq
+[2026-11-11T12:54:09.349Z]   evidence: cache after click: {"tokenId":"7"}
+[2026-11-11T12:54:09.349Z]   evidence: cache after reload: {"tokenId":"7"}
+[2026-11-11T12:54:09.349Z]   evidence: home heading: 你好，Testaccept-ifdrtq / 身份 #7
+[2026-11-11T12:54:11.062Z] tally: {"PASS":14}

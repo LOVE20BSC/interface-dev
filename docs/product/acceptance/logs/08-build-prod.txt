@@ -1,0 +1,94 @@
+$ node scripts/gen-build-id.mjs && pnpm typecheck && vite build && node scripts/postbuild.mjs && node scripts/check-bundle.mjs
+[build-id] mwc3slwx-5945301e
+$ node scripts/gen-build-id.mjs && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json
+[build-id] mwc3sm5f-2109f180
+vite v6.4.6 building for production...
+transforming...
+node_modules/.pnpm/ox@0.6.9_typescript@5.9.3_zod@3.25.76/node_modules/ox/_esm/core/Address.js (6:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/.pnpm/ox@0.6.9_typescript@5.9.3_zod@3.25.76/node_modules/ox/_esm/core/Address.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/.pnpm/ox@0.6.9_typescript@5.9.3_zod@3.25.76/node_modules/ox/_esm/core/Base64.js (6:27): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/.pnpm/ox@0.6.9_typescript@5.9.3_zod@3.25.76/node_modules/ox/_esm/core/Base64.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/.pnpm/ox@0.9.17_typescript@5.9.3_zod@4.6.7/node_modules/ox/_esm/core/Base64.js (6:27): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/.pnpm/ox@0.9.17_typescript@5.9.3_zod@4.6.7/node_modules/ox/_esm/core/Base64.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/.pnpm/ox@0.6.9_typescript@5.9.3_zod@3.25.76/node_modules/ox/_esm/core/internal/cursor.js (2:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/.pnpm/ox@0.6.9_typescript@5.9.3_zod@3.25.76/node_modules/ox/_esm/core/internal/cursor.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/regexes.js (74:0): A comment
+
+"/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+ * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+ * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+
+in "node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/util.js (400:0): A comment
+
+"// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle."
+
+in "node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/core/util.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/.pnpm/ox@0.6.7_typescript@5.9.3_zod@3.25.76/node_modules/ox/_esm/core/Address.js (6:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/.pnpm/ox@0.6.7_typescript@5.9.3_zod@3.25.76/node_modules/ox/_esm/core/Address.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/.pnpm/ox@0.6.7_typescript@5.9.3_zod@3.25.76/node_modules/ox/_esm/core/internal/cursor.js (2:21): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/.pnpm/ox@0.6.7_typescript@5.9.3_zod@3.25.76/node_modules/ox/_esm/core/internal/cursor.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 4773 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                        1.48 kB │ gzip:   0.76 kB
+dist/assets/index-ssbsJ8AY.css                        41.36 kB │ gzip:   8.10 kB
+dist/assets/check-CBs3Vu9Q.js                          0.14 kB │ gzip:   0.15 kB
+dist/assets/gov-page-C2M1ltNU.js                       0.16 kB │ gzip:   0.15 kB
+dist/assets/act-page-CR69BoED.js                       0.16 kB │ gzip:   0.15 kB
+dist/assets/group-page-CyO5ASsy.js                     0.16 kB │ gzip:   0.15 kB
+dist/assets/me-page-CmMskbEe.js                        0.22 kB │ gzip:   0.18 kB
+dist/assets/not-found-page-CV6rsxg9.js                 0.30 kB │ gzip:   0.23 kB
+dist/assets/wallet-error-dialog-B-IItwJz.js            0.51 kB │ gzip:   0.33 kB
+dist/assets/build-version-banner-CCiJvPky.js           0.66 kB │ gzip:   0.43 kB
+dist/assets/clipboard-D_A0bPha.js                      0.71 kB │ gzip:   0.46 kB
+dist/assets/simulateContract-ukPWZbQk.js               0.73 kB │ gzip:   0.41 kB
+dist/assets/empty-state-C0eS7quY.js                    0.73 kB │ gzip:   0.43 kB
+dist/assets/placeholder-page-CJ-njPy-.js               0.85 kB │ gzip:   0.44 kB
+dist/assets/airdrop-eligibility-section-B5ambbZU.js    1.26 kB │ gzip:   0.67 kB
+dist/assets/no-wallet-dialog-CB-KCF6H.js               1.33 kB │ gzip:   0.67 kB
+dist/assets/use-airdrop-eligibility-CJvNscYy.js        1.44 kB │ gzip:   0.71 kB
+dist/assets/localBatchGatewayRequest-C70RSMG-.js       2.31 kB │ gzip:   1.12 kB
+dist/assets/ccip-BotBHOtN.js                           4.35 kB │ gzip:   1.94 kB
+dist/assets/transfer-identity-layer-Btsv5fLa.js        5.75 kB │ gzip:   2.40 kB
+dist/assets/use-airdrop-snapshot-C0jipewr.js           6.29 kB │ gzip:   1.59 kB
+dist/assets/waitForTransactionReceipt-DzsYQQuO.js      7.12 kB │ gzip:   2.66 kB
+dist/assets/my-nft-page-CyUWMOmR.js                    7.55 kB │ gzip:   2.36 kB
+dist/assets/connect-pill-menus-DA4YCN0p.js             7.83 kB │ gzip:   2.56 kB
+dist/assets/copy-pages-Sk-pWTcO.js                    15.38 kB │ gzip:   5.78 kB
+dist/assets/airdrop-page-DWeK4iST.js                  19.28 kB │ gzip:   5.59 kB
+dist/assets/errors-eDSnLgB3.js                        24.28 kB │ gzip:   9.37 kB
+dist/assets/mint-page-WxJUne3A.js                     24.62 kB │ gzip:   7.28 kB
+dist/assets/secp256k1-Bvv8fyFH.js                     26.50 kB │ gzip:  10.21 kB
+dist/assets/useWriteContract-SddT3iu4.js              30.55 kB │ gzip:  10.37 kB
+dist/assets/popover-B9Khxipo.js                       34.71 kB │ gzip:  12.77 kB
+dist/assets/sheet-C1c0rP00.js                         40.49 kB │ gzip:  13.58 kB
+dist/assets/swap-page-DYzqmHpx.js                    158.19 kB │ gzip:  41.53 kB
+dist/assets/index-BI35zDhg.js                        547.22 kB │ gzip: 163.30 kB
+✓ built in 8.93s
+[postbuild] 404.html (0 path segment(s) kept), .nojekyll, build-id.json
+
+[bundle] first-screen JavaScript (gzip):
+    159.2 kB  /assets/index-BI35zDhg.js
+    159.2 kB  TOTAL (534.4 kB raw, 1 file(s))
+[bundle] budget: target ≤ 160 kB, hard limit 200 kB gzip
+
+[bundle] wallet SDK check: injected-only (no WalletConnect/AppKit/MetaMask SDK).

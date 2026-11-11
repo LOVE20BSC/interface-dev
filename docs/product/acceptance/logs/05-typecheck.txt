@@ -1,0 +1,2 @@
+$ node scripts/gen-build-id.mjs && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json
+[build-id] mwc3rztd-662f604a

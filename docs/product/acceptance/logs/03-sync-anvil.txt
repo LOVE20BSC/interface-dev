@@ -1,0 +1,20 @@
+$ node scripts/sync-anvil.mjs
+[sync-anvil] anvil31337_dev chain 31337, deploy block 32
+[sync-anvil] merkle root copied: 0x046a5d5357fd4da6986a88fb1e2baf3603375d2099ce9f46b9d6fbe333c6c404
+[sync-anvil] airdrop: 10 entries, totalShare 1000000000000000000
+  unchanged                src/config/deployments/anvil31337_dev.json
+  unchanged                src/config/abis/member-nft.ts
+  unchanged                src/config/abis/love20-token.ts
+  unchanged                src/config/abis/launch.ts
+  unchanged                src/config/abis/stake.ts
+  unchanged                src/config/abis/phase.ts
+  unchanged                src/config/abis/airdrop.ts
+  unchanged                src/config/abis/uniswap-v2-router02.ts
+  unchanged                src/config/abis/uniswap-v2-pair.ts
+  unchanged                src/config/abis/uniswap-v2-factory.ts
+  unchanged                src/config/abis/weth9.ts
+  unchanged                src/config/abis/multicall3.ts
+  unchanged                src/config/abis/index.ts
+  updated (115 -> 115 lines) src/config/abis/manifest.json
+  unchanged                public/airdrop/anvil31337_dev.json
+[sync-anvil] 1 file(s) written; src/config/abis + src/config/abis/manifest.json + public/airdrop/anvil31337_dev.json
