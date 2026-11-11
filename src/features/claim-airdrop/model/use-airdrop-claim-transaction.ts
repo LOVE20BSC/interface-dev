@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseEventLogs } from 'viem';
-import { useAccount, useChainId, useTransactionReceipt, useWriteContract } from 'wagmi';
+import { useAccount, useChainId, useWriteContract } from 'wagmi';
 import { airdropAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 import type { AirdropSnapshotEntry } from '@/domain/airdrop-snapshot';
 import { copy } from '@/shared/config/copy-pages';
+import { useNextNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
 import { describeAirdropClaimError } from '@/features/claim-airdrop/lib/airdrop-errors';
 import {
   clearAirdropClaimRecord,
@@ -25,6 +26,10 @@ export interface AirdropClaimTransactionState {
   readonly error: string | null;
   /** False until the local pending/receipt record has been read. */
   readonly isHydrating: boolean;
+  /** Bounded wait for the submitted hash; `isStuck` frees the CTA + shows recovery. */
+  readonly watch: TxWatch;
+  /** Re-sends the claim with an explicitly correct nonce (recovery card). */
+  readonly resubmit: () => void;
   readonly claim: () => void;
   readonly clearError: () => void;
 }
@@ -51,6 +56,10 @@ interface PendingClaim {
  * The hash is persisted before waiting, so a refresh resumes the receipt. The
  * confirmed record stores AirdropClaimed.amount — the estimate is never used as
  * the final number. Local storage is wallet/chain/contract scoped by cache.ts.
+ *
+ * The receipt wait is the shared bounded watcher (`useTxWatch`): a dropped,
+ * replaced or nonce-gapped claim becomes an actionable recovery card instead of
+ * an endless 确认中.
  */
 export function useAirdropClaimTransaction(
   options: AirdropClaimTransactionOptions,
@@ -67,6 +76,7 @@ export function useAirdropClaimTransaction(
   const { address: account } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
+  const readNextNonce = useNextNonce(account);
 
   const [pending, setPending] = useState<PendingClaim | null>(null);
   const [receipt, setReceipt] = useState<AirdropClaimReceipt | null>(null);
@@ -111,15 +121,17 @@ export function useAirdropClaimTransaction(
   }, [scope]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const receiptQuery = useTransactionReceipt({
-    ...(pending !== null ? { hash: pending.hash } : {}),
-    query: { enabled: pending !== null },
+  const watch = useTxWatch({
+    hash: pending?.hash ?? null,
+    wallet: account,
+    walletAction,
+    enabled: pending !== null,
   });
-  const onChainReceipt = receiptQuery.data;
+  const onChainReceipt = watch.receipt;
 
   /* eslint-disable react-hooks/set-state-in-effect -- a mined receipt is an external chain fact */
   useEffect(() => {
-    if (pending === null || onChainReceipt === undefined) return;
+    if (pending === null || onChainReceipt === null) return;
 
     if (onChainReceipt.status === 'reverted') {
       if (scope !== null) clearAirdropClaimRecord(scope);
@@ -190,57 +202,61 @@ export function useAirdropClaimTransaction(
   ]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // A hash from a previous chain that no longer exists would otherwise leave the
-  // page stuck in 确认中 forever. This is a one-shot read, not a polling loop.
-  /* eslint-disable react-hooks/set-state-in-effect -- the receipt query is an external system */
-  useEffect(() => {
-    if (pending === null || !receiptQuery.isError) return;
-    if (scope !== null) clearAirdropClaimRecord(scope);
-    setPending(null);
-    setError(copy.airdrop.errors.pendingUnknown);
-    onConfirmedRef.current?.();
-  }, [pending, receiptQuery.isError, scope]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const claim = (): void => {
-    if (submittingRef.current || receipt !== null || pending !== null) return;
-    if (
-      airdropAddress === undefined ||
-      tokenAddress === undefined ||
-      account === undefined ||
-      entry === null
-    ) {
-      return;
-    }
+  /** One place for the claim write, so 「重新提交」 reuses the exact same call. */
+  const submitClaim = async (nonce?: number): Promise<void> => {
+    if (airdropAddress === undefined || tokenAddress === undefined || account === undefined) return;
+    if (entry === null) return;
     setError(null);
     setWalletAction(true);
     submittingRef.current = true;
+    try {
+      const hash = await writeContractAsync({
+        address: airdropAddress,
+        abi: airdropAbi,
+        functionName: 'claim',
+        args: [tokenAddress, account, entry.share, entry.proof],
+        ...(nonce !== undefined ? { nonce } : {}),
+      });
+      // Persist before waiting: a refresh while pending must recover this hash.
+      if (scope !== null) writeAirdropClaimPending(scope, hash);
+      setPending({ hash });
+    } catch (cause) {
+      setError(describeAirdropClaimError(cause));
+      // Another device may have claimed first (AlreadyClaimed), or the pool
+      // may have changed: resync so the page does not keep offering the CTA.
+      onConfirmedRef.current?.();
+    } finally {
+      setWalletAction(false);
+      submittingRef.current = false;
+    }
+  };
+
+  const claim = (): void => {
+    if (submittingRef.current || receipt !== null) return;
+    if (pending !== null && !watch.isStuck) return;
+    void submitClaim();
+  };
+
+  /**
+   * Recovery action for a stuck hash: re-send the same claim with the on-chain
+   * nonce, so a wallet that cached a stale nonce heals the gap itself.
+   */
+  const resubmit = (): void => {
+    if (pending === null) return;
     void (async () => {
-      try {
-        const hash = await writeContractAsync({
-          address: airdropAddress,
-          abi: airdropAbi,
-          functionName: 'claim',
-          args: [tokenAddress, account, entry.share, entry.proof],
-        });
-        // Persist before waiting: a refresh while pending must recover this hash.
-        if (scope !== null) writeAirdropClaimPending(scope, hash);
-        setPending({ hash });
-      } catch (cause) {
-        setError(describeAirdropClaimError(cause));
-        // Another device may have claimed first (AlreadyClaimed), or the pool
-        // may have changed: resync so the page does not keep offering the CTA.
-        onConfirmedRef.current?.();
-      } finally {
-        setWalletAction(false);
-        submittingRef.current = false;
+      const nonce = await readNextNonce();
+      if (nonce === undefined) {
+        setError(copy.txWatch.nonceUnavailable);
+        return;
       }
+      await submitClaim(nonce);
     })();
   };
 
+  // A stuck hash frees the CTA; the recovery card owns the manual actions.
   const stage: AirdropClaimTxStage = walletAction
     ? 'wallet'
-    : pending !== null
+    : pending !== null && !watch.isStuck
       ? 'pending'
       : 'idle';
 
@@ -250,6 +266,8 @@ export function useAirdropClaimTransaction(
     pendingHash: pending?.hash ?? null,
     error,
     isHydrating,
+    watch,
+    resubmit,
     claim,
     clearError: () => {
       setError(null);

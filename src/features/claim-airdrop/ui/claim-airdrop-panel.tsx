@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom';
 import { RefreshCw } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
-import { formatTokenAmount, shortenAddress, UNKNOWN } from '@/shared/lib/format';
+import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { StickyAction } from '@/shared/ui/sticky-action';
+import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import { airdropUnavailableCopy } from '@/features/claim-airdrop/lib/airdrop-unavailable-copy';
 import { useAirdropClaim } from '@/features/claim-airdrop/model/use-airdrop-claim';
 import { useAirdropClaimTransaction } from '@/features/claim-airdrop/model/use-airdrop-claim-transaction';
@@ -293,14 +294,7 @@ export function ClaimAirdropPanel({
           </Button>
         </StickyAction>
 
-        {tx.stage === 'pending' || tx.pendingHash !== null ? (
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-5 text-muted">
-            <span>{copy.airdrop.pending.submitted}</span>
-            {tx.pendingHash !== null ? (
-              <span className="font-mono text-[11px]">{shortenAddress(tx.pendingHash, 10, 8)}</span>
-            ) : null}
-          </p>
-        ) : null}
+        {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
 
         {tx.error !== null ? (
           <div
