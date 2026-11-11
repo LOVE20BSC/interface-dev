@@ -14,14 +14,14 @@
  * link.
  */
 
-export type AppId = 'airdrop' | 'myNft' | 'swap';
+export type AppId = 'airdrop' | 'myNft' | 'swap' | 'about';
 
-export type AppCategoryKey = 'token' | 'identity';
+export type AppCategoryKey = 'token' | 'identity' | 'about';
 
 /** Icon keys are stable data; the page maps them to lucide components. */
-export type AppIconKey = 'gift' | 'identity' | 'swap';
+export type AppIconKey = 'gift' | 'identity' | 'swap' | 'book';
 
-export type AppRoute = '/airdrop' | '/my-nft' | '/swap';
+export type AppRoute = '/airdrop' | '/my-nft' | '/swap' | '/about';
 
 export type AppAvailability = 'available' | 'unavailable';
 
@@ -39,7 +39,11 @@ export interface AppCatalogEntry {
   readonly route: AppRoute;
   readonly icon: AppIconKey;
   readonly category: AppCategoryKey;
-  readonly requires: AppAddressRequirement;
+  /**
+   * Address slot this page needs. `null` means no contract dependency, so the row
+   * is always available (the 关于 page is documentation + read-only data).
+   */
+  readonly requires: AppAddressRequirement | null;
 }
 
 /** A catalog row plus this build's availability decision. */
@@ -64,8 +68,9 @@ const UNAVAILABLE_REASONS: Readonly<Record<AppAddressRequirement, AppUnavailable
   });
 
 /**
- * Owner order (2026-11-11): 创世空投, 身份 NFT, 代币兑换. Category is declared per
- * row; the page groups automatically once two or more categories exist.
+ * Owner order (2026-11-11): 创世空投, 身份 NFT, 代币兑换; 开源文档 appended last
+ * (2026-11-12, documents + debugging data). Category is declared per row; the
+ * page groups automatically once two or more categories exist.
  */
 export const APP_CATALOG: readonly AppCatalogEntry[] = Object.freeze([
   {
@@ -95,6 +100,16 @@ export const APP_CATALOG: readonly AppCatalogEntry[] = Object.freeze([
     category: 'token',
     requires: 'router',
   },
+  {
+    id: 'about',
+    labelKey: 'about',
+    descriptionKey: 'about',
+    route: '/about',
+    icon: 'book',
+    category: 'about',
+    // Documentation + read-only chain data: no contract address can disable it.
+    requires: null,
+  },
 ]);
 
 /**
@@ -103,7 +118,7 @@ export const APP_CATALOG: readonly AppCatalogEntry[] = Object.freeze([
  */
 export function resolveAppsCatalog(configuration: AppAddressConfiguration): readonly AppEntry[] {
   return APP_CATALOG.map(({ requires, ...entry }) => {
-    if (configuration[requires]) {
+    if (requires === null || configuration[requires]) {
       return { ...entry, availability: 'available' as const };
     }
     return {

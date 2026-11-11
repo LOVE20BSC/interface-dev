@@ -8,6 +8,7 @@ export { default as ArrowDownUp } from 'lucide-react/icons/arrow-down-up';
 export { default as ArrowLeft } from 'lucide-react/icons/arrow-left';
 export { default as ArrowRight } from 'lucide-react/icons/arrow-right';
 export { default as ArrowUpLeft } from 'lucide-react/icons/arrow-up-left';
+export { default as BookOpen } from 'lucide-react/icons/book-open';
 export { default as Check } from 'lucide-react/icons/check';
 export { default as ChevronDown } from 'lucide-react/icons/chevron-down';
 export { default as ChevronRight } from 'lucide-react/icons/chevron-right';
