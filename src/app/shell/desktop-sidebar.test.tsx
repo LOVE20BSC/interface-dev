@@ -42,6 +42,16 @@ beforeEach(() => {
   token.mockReturnValue(FIXTURE);
 });
 
+describe('DesktopSidebar navigation', () => {
+  it('keeps 即将上线 only on the 治理 / 行动 placeholders', () => {
+    renderSidebar();
+    expect(screen.getByRole('link', { name: /治理/ })).toHaveTextContent('即将上线');
+    expect(screen.getByRole('link', { name: /行动/ })).toHaveTextContent('即将上线');
+    expect(screen.getByRole('link', { name: '我的' })).not.toHaveTextContent('即将上线');
+    expect(screen.getByRole('link', { name: '应用' })).not.toHaveTextContent('即将上线');
+  });
+});
+
 describe('DesktopSidebar wordmark', () => {
   it('follows the current community on-chain symbol()', () => {
     renderSidebar();

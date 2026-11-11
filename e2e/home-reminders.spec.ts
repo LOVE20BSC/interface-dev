@@ -91,6 +91,26 @@ test.describe('首页提醒流', () => {
     await expectHomeWordmark(page, false);
   });
 
+  test('holds identities but none selected: asks to pick one, no empty sentence', async ({
+    page,
+  }) => {
+    await installWallet(page, ACCOUNTS.withIdentity);
+    await page.goto('/');
+    await connect(page);
+
+    const reminder = page.locator('section[aria-labelledby="home-reminder-choose-identity"]');
+    await expect(reminder).toBeVisible({ timeout: 15_000 });
+    await expect(reminder.getByRole('heading', { name: '你还没有选择身份' })).toBeVisible();
+    await expect(reminder.getByRole('link', { name: '选择身份' })).toHaveAttribute(
+      'href',
+      '/my-nft?symbol=TestLOVE20',
+    );
+    await expect(page.getByText('现在没有需要你处理的事。')).toHaveCount(0);
+    // Mutually exclusive with the no-identity card; it owns the one filled button.
+    await expect(page.getByRole('link', { name: '铸造身份' })).toHaveCount(0);
+    expect(await countSolidButtons(page)).toBe(1);
+  });
+
   test('eligible: the airdrop reminder shows the claimable amount and one CTA', async ({
     page,
   }) => {

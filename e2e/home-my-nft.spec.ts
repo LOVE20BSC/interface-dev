@@ -184,6 +184,7 @@ test('home: eligible wallet sees the airdrop reminder', async ({ page }) => {
 
 test('home: a non-eligible account never sees the airdrop reminder', async ({ page }) => {
   await installWallet(page, ACCOUNTS.withIdentity); // claimed its share during seeding
+  await seedIdentity(page, ACCOUNTS.withIdentity, '1');
   const snapshotLoaded = page.waitForResponse(
     (response) => response.url().includes('/airdrop/anvil31337_dev.json'),
     { timeout: 20_000 },

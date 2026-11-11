@@ -10,7 +10,7 @@ export interface NavItem {
   readonly label: string;
   readonly ariaLabel: string;
   readonly icon: LucideIcon;
-  /** M0: only 首页 has real content; the rest are labelled placeholders. */
+  /** M0 placeholders: only 治理 and 行动 are still labelled 即将上线. */
   readonly placeholder: boolean;
 }
 
@@ -53,7 +53,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: copy.nav.me,
     ariaLabel: copy.nav.meAria,
     icon: UserRound,
-    placeholder: true,
+    placeholder: false,
   },
 ];
 

@@ -51,14 +51,12 @@ export function HomePage() {
       : UNKNOWN);
 
   const amountText =
-    balance.status === 'ready'
-      ? formatTokenAmount(balance.value, balance.decimals)
-      : UNKNOWN;
-  const balanceText =
-    amountText === UNKNOWN ? UNKNOWN : `${amountText} ${token.symbol}`;
+    balance.status === 'ready' ? formatTokenAmount(balance.value, balance.decimals) : UNKNOWN;
+  const balanceText = amountText === UNKNOWN ? UNKNOWN : `${amountText} ${token.symbol}`;
 
   const connected = account !== undefined;
   const needsIdentityCard = connected && identity.status === 'empty';
+  const needsSelectionCard = connected && identity.status === 'needs-selection';
   const identitySettled =
     identity.status === 'empty' ||
     identity.status === 'ready' ||
@@ -98,10 +96,7 @@ export function HomePage() {
           aria-labelledby="home-reminder-identity"
           className="rounded-2xl border border-line bg-surface p-4"
         >
-          <h2
-            id="home-reminder-identity"
-            className="text-base font-semibold text-foreground"
-          >
+          <h2 id="home-reminder-identity" className="text-base font-semibold text-foreground">
             {copy.home.reminderNoIdentityTitle}
           </h2>
           <Link
@@ -113,17 +108,41 @@ export function HomePage() {
         </section>
       ) : null}
 
+      {needsSelectionCard ? (
+        <section
+          aria-labelledby="home-reminder-choose-identity"
+          className="rounded-2xl border border-line bg-surface p-4"
+        >
+          <h2
+            id="home-reminder-choose-identity"
+            className="text-base font-semibold text-foreground"
+          >
+            {copy.home.reminderNeedsSelectionTitle}
+          </h2>
+          <Link
+            to={{ pathname: '/my-nft', search }}
+            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-brand px-4 text-sm font-medium text-white shadow-soft transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2"
+          >
+            {copy.home.chooseIdentity}
+          </Link>
+        </section>
+      ) : null}
+
       {connected ? (
         <Suspense fallback={null}>
           <AirdropReminder
-            primary={!needsIdentityCard}
+            primary={!needsIdentityCard && !needsSelectionCard}
             onStatusChange={setAirdropStatus}
             search={search}
           />
         </Suspense>
       ) : null}
 
-      {connected && identitySettled && !needsIdentityCard && airdropStatus === 'other' ? (
+      {connected &&
+      identitySettled &&
+      !needsIdentityCard &&
+      !needsSelectionCard &&
+      airdropStatus === 'other' ? (
         <p className="text-sm leading-6 text-muted">{copy.home.nothingToDo}</p>
       ) : null}
 

@@ -196,7 +196,6 @@ describe('HomePage reminders', () => {
   });
 
   it('shows exactly one muted sentence when nothing is applicable', async () => {
-    memberIdentity.mockReturnValue(identity({ status: 'needs-selection', selected: null }));
     renderPage();
 
     const sentence = await screen.findByText('现在没有需要你处理的事。');
@@ -204,6 +203,34 @@ describe('HomePage reminders', () => {
     expect(screen.getAllByText('现在没有需要你处理的事。')).toHaveLength(1);
     expect(screen.queryByRole('link', { name: '铸造身份' })).toBeNull();
     expect(screen.queryByRole('link', { name: '空投铸造' })).toBeNull();
+  });
+
+  it('asks a wallet holding identities to pick one, and never shows the empty sentence', () => {
+    memberIdentity.mockReturnValue(identity({ status: 'needs-selection', selected: null }));
+    renderPage();
+
+    expect(screen.getByText('你还没有选择身份')).toBeVisible();
+    expect(screen.getByRole('link', { name: '选择身份' })).toHaveAttribute(
+      'href',
+      '/my-nft?symbol=TestLOVE20',
+    );
+    expect(screen.queryByText('现在没有需要你处理的事。')).toBeNull();
+    // Mutually exclusive with the no-identity card.
+    expect(screen.queryByRole('link', { name: '铸造身份' })).toBeNull();
+  });
+
+  it('gives the needs-selection card the only filled button', async () => {
+    memberIdentity.mockReturnValue(identity({ status: 'needs-selection', selected: null }));
+    airdrop.status = 'eligible';
+    renderPage();
+
+    const choose = screen.getByRole('link', { name: '选择身份' });
+    const airdropLink = screen.getByRole('link', { name: '空投铸造' });
+    expect(choose.className).toContain('bg-brand');
+    expect(airdropLink.className).not.toContain('bg-brand');
+    expect(choose.compareDocumentPosition(airdropLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 
   it('hides the empty sentence while the lazy airdrop chunk is still pending', () => {

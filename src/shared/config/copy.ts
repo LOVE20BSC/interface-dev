@@ -53,7 +53,7 @@ export const copy = {
     govAria: '治理（即将上线）',
     actAria: '行动（即将上线）',
     appsAria: '应用',
-    meAria: '我的（即将上线）',
+    meAria: '我的',
     mobileLabel: '主导航',
     desktopLabel: '主导航',
   },
@@ -141,6 +141,9 @@ export const copy = {
     /** Reminder card 1: no identity yet. */
     reminderNoIdentityTitle: '你还没有身份',
     mintIdentity: '铸造身份',
+    /** Reminder card 2: holds identities but none selected (vs card 1, mutually exclusive). */
+    reminderNeedsSelectionTitle: '你还没有选择身份',
+    chooseIdentity: '选择身份',
     /** Reminder card 2: eligible and unclaimed; drop the clause when unknown. */
     reminderAirdrop: '你有空投资格',
     reminderAirdropWithAmount: (amount: string, symbol: string) =>

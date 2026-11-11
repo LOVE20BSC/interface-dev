@@ -30,6 +30,10 @@ describe('BottomNav', () => {
     expect(NAV_ITEMS.map((item) => item.key)).toEqual(['home', 'gov', 'act', 'apps', 'me']);
     // Owner 2026-11-11: the 链群 tab is replaced by the 应用 feature directory.
     expect(within(nav).queryByRole('link', { name: /链群/ })).toBeNull();
+    // 我的 is a real page now: no 即将上线 suffix/badge. 治理 / 行动 keep it.
+    expect(within(nav).getByRole('link', { name: '我的' })).not.toHaveTextContent('即将上线');
+    expect(within(nav).getByRole('link', { name: /治理/ })).toHaveTextContent('即将上线');
+    expect(within(nav).getByRole('link', { name: /行动/ })).toHaveTextContent('即将上线');
   });
 
   it('marks the active tab and preserves ?symbol= on every link', () => {
