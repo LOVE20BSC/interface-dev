@@ -167,6 +167,19 @@ describe('useTxWatch', () => {
     expect(result.current.receipt).toBe(receipt);
   });
 
+  it('stops polling once a nonce gap is terminal', async () => {
+    const fake = makeClient({
+      tx: () => Promise.resolve({ nonce: 68, from: WALLET }),
+      nonce: () => Promise.resolve(3),
+    });
+    const { result } = renderWatch(fake);
+    await flush();
+    expect(result.current.status).toBe('nonceGap');
+    const callsAfterSettle = fake.calls.tx.mock.calls.length;
+    await flush(5_000);
+    expect(fake.calls.tx.mock.calls.length).toBe(callsAfterSettle);
+  });
+
   it('detects a replacement mined with the same wallet+nonce', async () => {
     const fake = makeClient({
       tx: () => Promise.resolve({ nonce: 3, from: WALLET }),
@@ -187,6 +200,10 @@ describe('useTxWatch', () => {
     await flush();
     expect(result.current.status).toBe('replaced');
     expect(result.current.isStuck).toBe(true);
+
+    const callsAfterSettle = fake.calls.tx.mock.calls.length;
+    await flush(5_000);
+    expect(fake.calls.tx.mock.calls.length).toBe(callsAfterSettle);
   });
 
   it('stops polling on unmount', async () => {
