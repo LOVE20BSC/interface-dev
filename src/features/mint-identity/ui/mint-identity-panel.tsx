@@ -6,11 +6,12 @@ import { memberNftAbi } from '@/config/abis';
 import { DEFAULT_SYMBOL, NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { formatTokenAmount, shortenAddress, UNKNOWN } from '@/shared/lib/format';
+import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { StickyAction } from '@/shared/ui/sticky-action';
+import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import { useAirdropEligibility } from '@/entities/airdrop/model/use-airdrop-eligibility';
 import { approveAmountFor } from '@/features/mint-identity/lib/approve-amount';
 import { describeMintError } from '@/features/mint-identity/lib/mint-errors';
@@ -482,14 +483,7 @@ export function MintIdentityPanel({
           </>
         )}
 
-        {tx.mintStage === 'pending' || (tx.pendingHash !== null && tx.receipt === null) ? (
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-5 text-muted">
-            <span>{copy.mintIdentity.ladder.pendingNote}</span>
-            {tx.pendingHash !== null ? (
-              <span className="font-mono text-[11px]">{shortenAddress(tx.pendingHash, 10, 8)}</span>
-            ) : null}
-          </p>
-        ) : null}
+        {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
 
         {errorMessage !== null ? (
           <div

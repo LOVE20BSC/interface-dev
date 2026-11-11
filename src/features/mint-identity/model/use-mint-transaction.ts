@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAccount, useChainId, useTransactionReceipt, useWriteContract } from 'wagmi';
+import { useAccount, useChainId, useWriteContract } from 'wagmi';
 import { parseEventLogs } from 'viem';
 import { love20TokenAbi, memberNftAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cache } from '@/shared/lib/cache';
 import { describeMintError } from '@/features/mint-identity/lib/mint-errors';
+import { useNextNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
 
 type HexHash = `0x${string}`;
 type PendingKind = 'approve' | 'mint';
@@ -15,6 +16,8 @@ interface PendingTx {
   readonly hash: HexHash;
   /** For an approval, the amount just approved (drives the optimistic allowance). */
   readonly amount?: bigint;
+  /** For a mint, the submitted name so 「重新提交」 can resend without the form. */
+  readonly name?: string;
 }
 
 export interface MintedIdentity {
@@ -43,6 +46,10 @@ export interface MintTransactionState {
   /** Amount approved in this session, so stage 2 appears without waiting for a refetch. */
   readonly approvedAmount: bigint | null;
   readonly pendingHash: HexHash | null;
+  /** Bounded wait for the submitted hash; `isStuck` frees the CTA + shows recovery. */
+  readonly watch: TxWatch;
+  /** Re-sends the pending step with an explicitly correct nonce (recovery card). */
+  readonly resubmit: () => void;
   readonly approve: (amount: bigint) => void;
   readonly mint: (name: string) => void;
   readonly clearReceipt: () => void;
@@ -61,11 +68,20 @@ const MINT_TASK_KEY = 'mintTask';
 
 interface StoredMintTask {
   readonly hash?: unknown;
+  readonly name?: unknown;
 }
 
-function readStoredHash(raw: StoredMintTask | null): HexHash | undefined {
-  if (raw === null || typeof raw.hash !== 'string') return undefined;
-  return /^0x[0-9a-fA-F]{64}$/.test(raw.hash) ? (raw.hash as HexHash) : undefined;
+const HASH_RE = /^0x[0-9a-fA-F]{64}$/;
+
+function readStoredPending(
+  raw: StoredMintTask | null,
+): { readonly hash: HexHash; readonly name?: string } | null {
+  if (raw === null || typeof raw.hash !== 'string' || !HASH_RE.test(raw.hash)) return null;
+  const name =
+    typeof raw.name === 'string' && raw.name.length > 0 && raw.name.length <= 256
+      ? raw.name
+      : undefined;
+  return name === undefined ? { hash: raw.hash as HexHash } : { hash: raw.hash as HexHash, name };
 }
 
 /**
@@ -81,6 +97,7 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
   const { address: account } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
+  const readNextNonce = useNextNonce(account);
 
   const [walletAction, setWalletAction] = useState<PendingKind | null>(null);
   const [pending, setPending] = useState<PendingTx | null>(null);
@@ -113,20 +130,30 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
     setWalletAction(null);
     if (scope === null) return;
     const stored = cache.get<StoredMintTask>(scope, MINT_TASK_KEY);
-    const hash = readStoredHash(stored);
-    if (hash !== undefined) setPending({ kind: 'mint', hash });
+    const storedPending = readStoredPending(stored);
+    if (storedPending !== null) {
+      setPending(
+        storedPending.name === undefined
+          ? { kind: 'mint', hash: storedPending.hash }
+          : { kind: 'mint', hash: storedPending.hash, name: storedPending.name },
+      );
+    }
   }, [scope]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const receiptQuery = useTransactionReceipt({
-    ...(pending !== null ? { hash: pending.hash } : {}),
-    query: { enabled: pending !== null },
+  // A bounded wait for the submitted hash. It replaces a bare receipt poll so a
+  // nonce-gapped/dropped/underpriced transaction cannot trap the page in 确认中.
+  const watch = useTxWatch({
+    hash: pending?.hash ?? null,
+    wallet: account,
+    walletAction: walletAction !== null,
+    enabled: pending !== null,
   });
-  const onChainReceipt = receiptQuery.data;
+  const onChainReceipt = watch.receipt;
 
   /* eslint-disable react-hooks/set-state-in-effect -- a mined receipt is an external chain fact */
   useEffect(() => {
-    if (pending === null || onChainReceipt === undefined) return;
+    if (pending === null || onChainReceipt === null) return;
 
     if (onChainReceipt.status === 'reverted') {
       if (pending.kind === 'mint' && scope !== null) cache.remove(scope, MINT_TASK_KEY);
@@ -177,7 +204,7 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
   }, [onChainReceipt, pending, scope]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const approve = (amount: bigint): void => {
+  const approve = (amount: bigint, nonce?: number): void => {
     if (memberNftAddress === undefined || paymentTokenAddress === undefined || amount <= 0n) {
       return;
     }
@@ -191,6 +218,9 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
           abi: love20TokenAbi,
           functionName: 'approve',
           args: [memberNftAddress, amount],
+          // 重新提交 passes the on-chain nonce so a wallet stuck on a stale
+          // queued nonce heals itself instead of signing into a gap forever.
+          ...(nonce !== undefined ? { nonce } : {}),
         });
         setPending({ kind: 'approve', hash, amount });
       } catch (cause) {
@@ -204,7 +234,7 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
     })();
   };
 
-  const mint = (name: string): void => {
+  const mint = (name: string, nonce?: number): void => {
     if (memberNftAddress === undefined || name.length === 0) return;
     setError(null);
     setWalletAction('mint');
@@ -215,10 +245,11 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
           abi: memberNftAbi,
           functionName: 'mint',
           args: [name],
+          ...(nonce !== undefined ? { nonce } : {}),
         });
         // Persist before waiting: a refresh while pending must recover this hash.
         if (scope !== null) cache.set(scope, MINT_TASK_KEY, { hash, name });
-        setPending({ kind: 'mint', hash });
+        setPending({ kind: 'mint', hash, name });
       } catch (cause) {
         setError({
           action: 'mint',
@@ -227,6 +258,20 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
       } finally {
         setWalletAction(null);
       }
+    })();
+  };
+
+  const resubmit = (): void => {
+    if (pending === null) return;
+    const target = pending;
+    void (async () => {
+      const nonce = await readNextNonce();
+      if (nonce === undefined) {
+        setError({ action: target.kind, message: copy.txWatch.nonceUnavailable });
+        return;
+      }
+      if (target.kind === 'approve') approve(target.amount ?? 0n, nonce);
+      else mint(target.name ?? '', nonce);
     })();
   };
 
@@ -239,10 +284,20 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
     if (scope !== null) cache.remove(scope, MINT_TASK_KEY);
   };
 
+  // A stuck hash frees the primary action so 授权/铸造 can be retried; the
+  // recovery card keeps the hash and its manual actions visible until then.
   const approveStage: MintTxStage =
-    walletAction === 'approve' ? 'wallet' : pending?.kind === 'approve' ? 'pending' : 'idle';
+    walletAction === 'approve'
+      ? 'wallet'
+      : pending?.kind === 'approve' && !watch.isStuck
+        ? 'pending'
+        : 'idle';
   const mintStage: MintTxStage =
-    walletAction === 'mint' ? 'wallet' : pending?.kind === 'mint' ? 'pending' : 'idle';
+    walletAction === 'mint'
+      ? 'wallet'
+      : pending?.kind === 'mint' && !watch.isStuck
+        ? 'pending'
+        : 'idle';
 
   return {
     approveStage,
@@ -252,6 +307,8 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
     error,
     approvedAmount: isApproved ? approvedAmount : null,
     pendingHash: pending?.hash ?? null,
+    watch,
+    resubmit,
     approve,
     mint,
     clearReceipt,
