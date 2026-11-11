@@ -169,13 +169,21 @@ async function shot(page: Page, name: string): Promise<void> {
 }
 
 /**
- * UX spec §1.3: the home wordmark is the current community's on-chain symbol(),
- * not the static protocol name. Waiting for it also keeps screenshots stable.
+ * UX spec §1.3 (owner request 2026-11-11): the mobile home header has no left
+ * wordmark link any more. While connected, the community symbol is still on
+ * screen in the top-right pill's community trigger; while disconnected the
+ * header shows only 「连接钱包」 (the accepted trade-off in §1.3). Waiting for
+ * the tab title also keeps screenshots stable.
  */
-async function expectCommunityWordmark(page: Page): Promise<void> {
-  await expect(page.getByRole('link', { name: 'TestLOVE20 首页' })).toBeVisible({
-    timeout: 15_000,
-  });
+async function expectCommunityHeader(page: Page, connected: boolean): Promise<void> {
+  await expect(page.getByRole('banner').getByRole('link')).toHaveCount(0);
+  if (connected) {
+    await expect(
+      page.getByRole('button', { name: '当前代币社区 TestLOVE20，打开社区菜单' }),
+    ).toContainText('TestLOVE20');
+  } else {
+    await expect(page.getByRole('banner').getByRole('button', { name: '连接钱包' })).toBeVisible();
+  }
   await expect(page).toHaveTitle('TestLOVE20');
 }
 
@@ -195,7 +203,7 @@ test('home: disconnected shows connect and no identity yet', async ({ page }) =>
   await expect(page.getByText('你还没有身份')).toHaveCount(0);
   await expect(page.getByText('无需操作')).toHaveCount(0);
   expect(await countSolidButtons(page)).toBe(1);
-  await expectCommunityWordmark(page);
+  await expectCommunityHeader(page, false);
 
   await shot(page, 'home-disconnected.png');
 });
@@ -251,7 +259,7 @@ test('home: connected without identity offers 我的 NFT only', async ({ page })
   await expect(page.getByText('无需操作')).toHaveCount(0);
   await expect(page.getByText('你参与了销毁活动，获得空投铸造资格')).toHaveCount(0);
   expect(await countSolidButtons(page)).toBe(0);
-  await expectCommunityWordmark(page);
+  await expectCommunityHeader(page, true);
 
   await shot(page, 'home-connected-no-identity.png');
 });
@@ -267,7 +275,7 @@ test('home: identity greeting persists across reload', async ({ page }) => {
   await expect(page.getByRole('link', { name: '切换身份' })).toBeVisible();
   await expect(page.getByText('无需操作')).toHaveCount(0);
   expect(await countSolidButtons(page)).toBe(0);
-  await expectCommunityWordmark(page);
+  await expectCommunityHeader(page, true);
 
   // 99,799,100 renders with thousands separators, never as a wall of digits.
   const balanceRow = page.getByRole('region', { name: 'TestLOVE20 余额' });
@@ -288,11 +296,11 @@ test('home: eligible wallet sees the airdrop card', async ({ page }) => {
   const title = page.getByText('你参与了销毁活动，获得空投铸造资格');
   await expect(title).toBeVisible({ timeout: 20_000 });
   const card = page.locator('section[aria-labelledby="airdrop-eligibility-title"]');
-  await expect(card.getByRole('link', { name: '铸造空投份额' })).toBeVisible();
+  await expect(card.getByRole('link', { name: '空投铸造' })).toBeVisible();
   // The card has a title and one CTA; no subtitle, no explanation sentence.
   await expect(card.locator('p')).toHaveCount(0);
   expect(await countSolidButtons(page)).toBe(1);
-  await expectCommunityWordmark(page);
+  await expectCommunityHeader(page, true);
   await shot(page, 'home-airdrop-eligible.png');
 });
 

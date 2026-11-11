@@ -1,9 +1,7 @@
 import { ArrowLeft } from '@/shared/ui/icons';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { copy } from '@/shared/config/copy';
 import { pageTitleFor } from '@/app/navigation/navigation';
-import { useCommunityDisplay } from '@/entities/community-token/model/use-community-display';
-import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { ConnectPill } from '@/widgets/connect-pill/connect-pill';
 
 function canGoBack(): boolean {
@@ -12,30 +10,10 @@ function canGoBack(): boolean {
 }
 
 /**
- * Home wordmark = the current community's on-chain symbol(), with the protocol
- * label only while that metadata is unavailable (§1.3). The fallback is what
- * keeps first paint stable; long symbols truncate instead of moving the pill.
- */
-function HomeWordmark() {
-  const { symbol } = useCommunityContext();
-  const wordmark = useCommunityDisplay(symbol).symbol;
-
-  return (
-    <Link
-      to="/"
-      aria-label={copy.header.brandAria(wordmark)}
-      className="flex min-w-0 shrink-0 items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 md:hidden"
-    >
-      <span className="max-w-[9rem] truncate text-base font-semibold tracking-tight">
-        {wordmark}
-      </span>
-    </Link>
-  );
-}
-
-/**
- * Sticky page header. Home shows the wordmark; every other page shows a real
- * back control (deep links included) plus the title and the one connect pill.
+ * Sticky page header. Home carries no left wordmark on mobile: the community
+ * symbol lives in the top-right pill, and desktop shows the home label (the
+ * sidebar owns the desktop wordmark). Every other page shows a real back
+ * control plus the title and the one connect pill.
  */
 export function AppHeader() {
   const location = useLocation();
@@ -52,10 +30,7 @@ export function AppHeader() {
     <header className="sticky top-0 z-30 border-b border-line/80 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <div className="mx-auto flex min-h-14 w-full max-w-2xl items-center gap-1.5 px-4 pt-[env(safe-area-inset-top)]">
         {isHome ? (
-          <>
-            <HomeWordmark />
-            <span className="hidden text-sm font-medium text-muted md:inline">{copy.nav.home}</span>
-          </>
+          <span className="hidden text-sm font-medium text-muted md:inline">{copy.nav.home}</span>
         ) : (
           <div className="flex min-w-0 flex-1 items-center gap-1">
             <button

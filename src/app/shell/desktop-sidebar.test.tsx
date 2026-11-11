@@ -43,7 +43,7 @@ beforeEach(() => {
 });
 
 describe('DesktopSidebar wordmark', () => {
-  it('follows the current community symbol() like the mobile header', () => {
+  it('follows the current community on-chain symbol()', () => {
     renderSidebar();
     expect(screen.getByRole('link', { name: 'TestLOVE20 首页' })).toHaveTextContent('TestLOVE20');
   });
