@@ -102,6 +102,9 @@ export function useAboutChainData(symbol: string): AboutChainData {
     memberNftSupply = { status: 'unconfigured', value: undefined };
   } else if (memberNft.status === 'error') {
     memberNftSupply = { status: 'error', value: undefined };
+  } else if (memberNft.status === 'resolving') {
+    // Seed core is being asked for MEMBER_NFT_ADDRESS(): unknown, not 未配置.
+    memberNftSupply = { status: 'loading', value: undefined };
   } else {
     memberNftSupply = readState(
       memberNft.address !== undefined,
