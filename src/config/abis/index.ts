@@ -12,4 +12,5 @@ export { airdropAbi } from './airdrop';
 export { uniswapV2Router02Abi } from './uniswap-v2-router02';
 export { uniswapV2PairAbi } from './uniswap-v2-pair';
 export { uniswapV2FactoryAbi } from './uniswap-v2-factory';
+export { weth9Abi } from './weth9';
 export { multicall3Abi } from './multicall3';
