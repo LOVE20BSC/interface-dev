@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AirdropReminder } from '@/pages/home/airdrop-reminder';
@@ -36,18 +36,12 @@ const ELIGIBLE: AirdropEligibility = {
   refetch: () => {},
 };
 
-function renderReminder(props: { primary?: boolean; onStatusChange?: () => void } = {}) {
-  const onStatusChange = vi.fn();
-  const view = render(
+function renderReminder(props: { primary?: boolean } = {}) {
+  return render(
     <MemoryRouter initialEntries={['/?symbol=TestLOVE20']}>
-      <AirdropReminder
-        primary={props.primary ?? true}
-        onStatusChange={onStatusChange}
-        search="?symbol=TestLOVE20"
-      />
+      <AirdropReminder primary={props.primary ?? true} search="?symbol=TestLOVE20" />
     </MemoryRouter>,
   );
-  return { ...view, onStatusChange };
 }
 
 beforeEach(() => {
@@ -59,8 +53,9 @@ describe('AirdropReminder', () => {
   it('shows the claimable amount and links to /airdrop with the current search', () => {
     renderReminder();
 
-    expect(screen.getByRole('heading', { name: '你有空投资格，可铸造 100,000,000 TestLOVE20' }))
-      .toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: '你有空投资格，可铸造 100,000,000 TestLOVE20' }),
+    ).toBeVisible();
     const cta = screen.getByRole('link', { name: '空投铸造' });
     expect(cta).toHaveAttribute('href', '/airdrop?symbol=TestLOVE20');
     expect(cta.className).toContain('bg-brand');
@@ -87,19 +82,19 @@ describe('AirdropReminder', () => {
     expect(screen.getByRole('link', { name: '空投铸造' }).className).not.toContain('bg-brand');
   });
 
-  it('renders nothing and reports other when the wallet is not eligible', async () => {
+  it('renders nothing when the wallet is not eligible', () => {
     eligibility.mockReturnValue({ ...ELIGIBLE, status: 'ineligible', isEligible: false });
-    const { onStatusChange } = renderReminder();
+    renderReminder();
 
     expect(screen.queryByRole('heading')).toBeNull();
-    await waitFor(() => expect(onStatusChange).toHaveBeenCalledWith('other'));
+    expect(screen.queryByRole('link')).toBeNull();
   });
 
-  it('reports pending while the snapshot is still loading', async () => {
+  it('renders nothing while the snapshot is still loading', () => {
     eligibility.mockReturnValue({ ...ELIGIBLE, status: 'loading', isEligible: false });
-    const { onStatusChange } = renderReminder();
+    renderReminder();
 
     expect(screen.queryByRole('heading')).toBeNull();
-    await waitFor(() => expect(onStatusChange).toHaveBeenCalledWith('pending'));
+    expect(screen.queryByRole('link')).toBeNull();
   });
 });

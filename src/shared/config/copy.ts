@@ -11,7 +11,7 @@ const NATIVE_SYMBOL = NETWORK.nativeCurrency.symbol;
  *
  * All user-facing Chinese copy lives in the copy module(s) (i18n framework
  * deliberately deferred). Review against GLOSSARY.md before adding a new word:
- * 激励/预留/销毁, 身份, 链群, 代币社区, 时间片/轮次. Never write
+ * 激励/预留/销毁, 身份 NFT, 链群, 代币社区, 时间片/轮次. Never write
  * gas/approve/allowance/nonce/revert on the happy path.
  *
  * Copy that only lazily loaded pages render (mint, airdrop, swap, my NFT,
@@ -72,21 +72,21 @@ export const copy = {
     addressLabel: '钱包地址',
     copyAddressAria: '复制钱包地址',
     copiedAddressAria: '钱包地址已复制',
-    identityLabel: '身份',
-    walletMenuAria: '打开钱包与身份菜单',
+    identityLabel: '身份 NFT',
+    walletMenuAria: '打开钱包与身份 NFT 菜单',
     tokenBalanceLabel: (symbol: string) => `${symbol} 余额`,
     viewNft: '查看NFT',
     goSelect: '去选择',
     goMint: '去铸造',
     noIdentity: '未关联 NFT',
-    noIdentitySelected: '未选择身份',
-    identityReading: '读取身份中…',
-    identityNotDeployed: '身份未部署',
+    noIdentitySelected: '未选择身份 NFT',
+    identityReading: '读取身份 NFT 中…',
+    identityNotDeployed: '身份 NFT 未部署',
     nativeFeeNote: `${NATIVE_SYMBOL} 用于支付网络手续费`,
     nativeBalanceLabel: (symbol: string) => `${symbol} 余额`,
     disconnect: '断开连接',
-    footer: '身份保存在这台设备；换浏览器需要重新选择。',
-    menuTitle: '钱包与身份',
+    footer: '当前身份 NFT 保存在这台设备；换浏览器需要重新选择。',
+    menuTitle: '钱包与身份 NFT',
     noWalletTitle: '没有检测到钱包',
     noWalletBody: '你可以换一个入口打开本页。',
     noWalletStepInApp: '在手机钱包 App 的内置浏览器中打开本页；已经在内置浏览器里，关掉再打开。',
@@ -109,12 +109,12 @@ export const copy = {
     chipAria: (symbol: string) => `当前代币社区 ${symbol}，打开社区菜单`,
   },
   identity: {
-    memberId: (id: string) => `身份 #${id}`,
+    memberId: (id: string) => `NFT #${id}`,
     disconnectedTitle: '先连接钱包',
     unconfiguredBody: '地址簿里还没有 MemberNFT 或种子 core 合约。填充部署地址后会自动读取。',
-    truncated: '这个钱包持有的身份较多，这里只显示前 100 个。',
-    emptyBody: '一个 NFT 就是一个成员身份。铸造后可以参与社区治理与行动。',
-    selectedLabel: '当前身份',
+    truncated: '这个钱包持有的身份 NFT 较多，这里只显示前 100 个。',
+    emptyBody: '每个身份 NFT 都是一个独立的身份。铸造后可以参与社区治理与行动。',
+    selectedLabel: '当前身份 NFT',
     myNftTitle: '我的 NFT',
     selectedBadge: '当前',
   },
@@ -124,52 +124,49 @@ export const copy = {
    * (§3.7); home keeps one thin line and conditional reminder cards.
    */
   home: {
-    identityIntro: '一个钱包可以拥有多个身份，身份才是参与凭证。',
+    identityIntro: '一个钱包可以拥有多个身份 NFT，身份 NFT 才是参与凭证。',
     greeting: (name: string) => `你好，${name}`,
     greetingNoName: '你好',
-    noIdentity: '你还没有身份',
+    noIdentity: '你还没有身份 NFT',
     goMyNft: '去我的 NFT',
-    switchIdentity: '切换身份',
-    identityInvalidated: '这个身份已不属于当前钱包',
-    chooseIdentityTitle: '还没有选择当前身份',
-    chooseIdentityBody: '这个钱包持有身份。去「我的 NFT」选一个作为当前身份。',
+    switchIdentity: '切换身份 NFT',
+    identityInvalidated: '这个身份 NFT 已不属于当前钱包',
+    chooseIdentityTitle: '还没有选择当前身份 NFT',
+    chooseIdentityBody: '这个钱包持有身份 NFT。去「我的 NFT」选一个作为当前身份 NFT。',
     eligibilityTitle: '你参与了销毁活动，获得空投铸造资格',
     mintAirdrop: '空投铸造',
     eligibilityUnavailable: '空投资格暂时读不到',
-    /** Thin line: no current identity (or none selected). */
-    thinLineNoIdentity: '还没有身份',
     /** Reminder card 1: no identity yet. */
-    reminderNoIdentityTitle: '你还没有身份',
-    mintIdentity: '铸造身份',
+    reminderNoIdentityTitle: '你还没有身份 NFT',
+    mintIdentity: '铸造身份 NFT',
     /** Reminder card 2: holds identities but none selected (vs card 1, mutually exclusive). */
-    reminderNeedsSelectionTitle: '你还没有选择身份',
-    chooseIdentity: '选择身份',
+    reminderNeedsSelectionTitle: '你还没有选择身份 NFT',
+    chooseIdentity: '选择身份 NFT',
     /** Reminder card 2: eligible and unclaimed; drop the clause when unknown. */
     reminderAirdrop: '你有空投资格',
     reminderAirdropWithAmount: (amount: string, symbol: string) =>
       `你有空投资格，可铸造 ${amount} ${symbol}`,
-    /** Empty state: exactly one muted sentence, nothing else. */
-    nothingToDo: '现在没有需要你处理的事。',
     docs: '开源文档',
     technical: '技术详情',
     buildMeta: (buildId: string, environment: string, chainId: number) =>
       `版本 ${buildId} · ${environment} · chain ${chainId}`,
-    errorTitle: '暂时读不到身份',
-    errorBody: '网络可能不稳，你的身份没有变化。',
+    errorTitle: '暂时读不到身份 NFT',
+    errorBody: '网络可能不稳，你的身份 NFT 没有变化。',
     balanceError: '余额暂时读不到',
   },
   /** Page titles the eager router/header needs; bodies live in ./copy-pages. */
   pageTitles: {
     myNft: '我的 NFT',
-    mint: '铸造身份',
+    mint: '铸造身份 NFT',
     airdrop: '空投铸造',
     swap: '兑换代币',
     apps: '应用',
+    about: '关于',
   },
   placeholders: {
     gov: {
       title: '治理',
-      body: '用身份对提案投票，按治理轮结算。M0 只做身份与兑换。',
+      body: '用身份 NFT 对提案投票，按治理轮结算。M0 只做身份 NFT 与兑换。',
     },
     act: {
       title: '行动',
@@ -177,7 +174,7 @@ export const copy = {
     },
     group: {
       title: '链群',
-      body: '链群是成员身份组成的协作单位。',
+      body: '链群是身份 NFT 组成的协作单位。',
     },
     me: {
       title: '我的',
@@ -189,6 +186,11 @@ export const copy = {
   },
   banners: {
     testnet: '测试网 · 没有真实价值',
+    /** HTTPS Pages build talking to a loopback RPC: the browser blocks it. */
+    rpcBlockedTitle: '线上页面不能访问本地链',
+    rpcBlockedBody:
+      '浏览器会拦截 HTTPS 页面对本地链（127.0.0.1）的请求。请用本地开发服务打开（pnpm dev，如 http://localhost:5180），或换成可访问的链。',
+    rpcBlockedDismiss: '知道了',
     buildMismatchTitle: '有新版本，请刷新',
     buildMismatchBody: '当前输入会丢失。',
     buildMismatchAction: '刷新页面',
@@ -206,7 +208,7 @@ export const copy = {
     // Hand-written safety net for the three M0-critical selectors; the
     // generated registry remains authoritative.
     revertPhaseNotStarted: '这一轮还没有开始，请稍后再来。',
-    revertIdentityNotOwner: '这个身份不属于当前钱包，请切换到正确的钱包或身份。',
+    revertIdentityNotOwner: '这个身份 NFT 不属于当前钱包，请切换到正确的钱包或身份 NFT。',
     revertCallFailed: '操作没有完成，请检查输入后重试。',
     revertInvalidData: '数据校验没有通过，请检查输入后重试。',
   },

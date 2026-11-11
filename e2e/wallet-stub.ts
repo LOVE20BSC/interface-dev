@@ -134,7 +134,7 @@ export async function connect(page: Page): Promise<void> {
   const button = page.getByRole('button', { name: '连接钱包' }).first();
   await expect(button).toBeEnabled({ timeout: 5_000 });
   await button.click();
-  await expect(page.getByRole('button', { name: '打开钱包与身份菜单' })).toBeVisible({
+  await expect(page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' })).toBeVisible({
     timeout: 15_000,
   });
 }

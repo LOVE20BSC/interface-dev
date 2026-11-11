@@ -4,6 +4,7 @@ import { BASENAME } from '@/app/router/base-path';
 import { AppShell } from '@/app/shell/app-shell';
 import { HomePage } from '@/pages/home/home-page';
 import {
+  AboutPage,
   ActPage,
   AirdropPage,
   AppsPage,
@@ -52,6 +53,7 @@ export function AppRouter() {
           <Route path="airdrop" element={<AirdropPage />} />
           <Route path="swap" element={<SwapPage />} />
           <Route path="apps" element={<AppsPage />} />
+          <Route path="about" element={<AboutPage />} />
           <Route path="gov" element={<GovPage />} />
           <Route path="act" element={<ActPage />} />
           <Route path="group" element={<GroupPage />} />

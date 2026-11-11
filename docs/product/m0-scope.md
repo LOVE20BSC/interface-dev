@@ -55,5 +55,6 @@ M0 结束时的可演示路径（新用户漏斗，顺序固定）：打开页�
 - **一条产物只能服务一种托管形态**：项目路径与自定义域名必须分别构建（`--base` 烘进产物）。
 - **陈旧外壳无法根治**：Pages 固定 `max-age=600` 且不可改头，只能靠 build id 比对 + `vite:preloadError` → 刷新。
 - **本地链不方便手机**：钱包按规范须拒绝 `http:` RPC，且同一 chainId 只能添加一次；移动端联调走测试网或 HTTPS 隧道。
+- **线上 HTTPS 页面不能访问本地链**：GitHub Pages 上的 dev 构建能打开，但浏览器会拦截对回环地址 RPC 的请求。2026-11-12 复现的 Chromium 报错：`Access to fetch at 'http://127.0.0.1:8545/' from origin 'https://love20bsc.github.io' has been blocked by CORS policy: Permission was denied for this request to access the 'loopback' address space.` 因此 **Pages 上的 dev 构建只能做 UI/文案预览**；交互测试必须用 `localhost` 本地服务（`pnpm dev`，如 `http://localhost:5180`），或换成可访问的链。命中「HTTPS 页面 + 回环 RPC」时，界面显示一次可关闭的说明，不再用「网络可能不稳」解释。
 - **地址可复现，但只限全新链**：`make stop && make clean && make bootstrap` 从 deployer nonce 0 开始，地址（以及 bootstrap 期间的导出块高）确定；在已经用过的链上重跑会得到另一组地址。因此前端不手写地址，只在每次 bootstrap 后跑 `pnpm sync:anvil`，并在有兄弟仓时用 `pnpm abis:check` 拦截漂移；ADR-0004 §6 记录了两次 bootstrap 同 hash 的证明命令。
 - **应用内浏览器打不开钱包**（Android 微信/Telegram 等）：平台级限制，只能在连接**之前**给出“用浏览器打开/复制链接/扫码”的横幅。

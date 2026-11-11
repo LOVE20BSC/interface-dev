@@ -98,10 +98,10 @@ describe('MePage', () => {
   it('carries the current identity with name, memberId and the three links', () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { name: '我的身份' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: '我的身份 NFT' })).toBeVisible();
     expect(screen.getByText('Testdev-member-0')).toBeVisible();
-    expect(screen.getByText('身份 #1')).toBeVisible();
-    for (const name of ['切换身份', '转让', '查看全部']) {
+    expect(screen.getByText('NFT #1')).toBeVisible();
+    for (const name of ['切换身份 NFT', '转让', '查看全部']) {
       expect(screen.getByRole('link', { name })).toHaveAttribute(
         'href',
         '/my-nft?symbol=TestLOVE20',
@@ -120,12 +120,12 @@ describe('MePage', () => {
     );
   });
 
-  it('offers 铸造身份 when the wallet has no identity', () => {
+  it('offers 铸造身份 NFT when the wallet has no identity NFT', () => {
     memberIdentity.mockReturnValue(identity({ status: 'empty', identities: [], selected: null }));
     renderPage();
 
-    expect(screen.getByText('你还没有身份')).toBeVisible();
-    expect(screen.getByRole('link', { name: '铸造身份' })).toHaveAttribute(
+    expect(screen.getByText('你还没有身份 NFT')).toBeVisible();
+    expect(screen.getByRole('link', { name: '铸造身份 NFT' })).toHaveAttribute(
       'href',
       '/mint?symbol=TestLOVE20',
     );
@@ -138,7 +138,11 @@ describe('MePage', () => {
       address: undefined,
       symbol: 'TestLOVE20',
     });
-    communityBalance.mockReturnValue({ status: 'unconfigured', value: undefined, decimals: undefined });
+    communityBalance.mockReturnValue({
+      status: 'unconfigured',
+      value: undefined,
+      decimals: undefined,
+    });
     renderPage();
 
     expect(screen.getByText('这个环境还没有配置社区代币，暂时看不到余额。')).toBeVisible();

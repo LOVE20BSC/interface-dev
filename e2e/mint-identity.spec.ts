@@ -137,7 +137,7 @@ async function connect(page: Page): Promise<void> {
   const button = page.getByRole('button', { name: '连接钱包' }).first();
   await expect(button).toBeEnabled({ timeout: 5_000 });
   await button.click();
-  await expect(page.getByRole('button', { name: '打开钱包与身份菜单' })).toBeVisible({
+  await expect(page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' })).toBeVisible({
     timeout: 15_000,
   });
 }
@@ -183,18 +183,18 @@ test('mint: dev blocks a name that does not start with Test', async ({ page }) =
   await page.goto('/mint');
   await connect(page);
 
-  const input = page.getByRole('textbox', { name: '给身份起个名字' });
+  const input = page.getByRole('textbox', { name: '给身份 NFT 起个名字' });
   await expect(input).toBeVisible({ timeout: 15_000 });
   await input.fill(NON_TEST_NAME);
 
   await expect(page.getByText('✗ 还没加 Test 前缀')).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText('为了让测试身份和真实身份一眼能分开。')).toBeVisible();
+  await expect(page.getByText('为了让测试身份 NFT 和真实身份 NFT 一眼能分开。')).toBeVisible();
   // The rule line is dev/test copy, and the old "contract adds Test" note is gone.
   await expect(page.getByText('名称必须以 Test 开头', { exact: true })).toBeVisible();
   await expect(page.getByText(/测试环境会在链上名字前加 Test/)).toHaveCount(0);
   // The byte budget is the full MAX_NAME_LENGTH (32), not 28.
   await expect(page.locator('#mint-name-bytes')).toContainText('/32 字节');
-  await expect(page.getByRole('button', { name: /^(2\. )?铸造身份$/ })).toBeDisabled();
+  await expect(page.getByRole('button', { name: /^(2\. )?铸造身份 NFT$/ })).toBeDisabled();
   await expect(page.getByText('✓ 可以用')).toHaveCount(0);
 
   // Once the name satisfies the rule the local error disappears and the quote runs.
@@ -208,14 +208,14 @@ test('mint: a taken name blocks the CTA and shows the existing #id', async ({ pa
   await page.goto('/mint');
   await connect(page);
 
-  const input = page.getByRole('textbox', { name: '给身份起个名字' });
+  const input = page.getByRole('textbox', { name: '给身份 NFT 起个名字' });
   await expect(input).toBeVisible({ timeout: 15_000 });
   await input.fill(SEEDED_NAME);
 
   // The quote sends the raw name, and the seed minted exactly this string.
   await expect(page.getByText('这个名字已经被用了（#1）')).toBeVisible({ timeout: 10_000 });
 
-  const mintButton = page.getByRole('button', { name: /^(2\. )?铸造身份$/ });
+  const mintButton = page.getByRole('button', { name: /^(2\. )?铸造身份 NFT$/ });
   await expect(mintButton).toBeDisabled();
   await expect(page.getByText('✓ 可以用')).toHaveCount(0);
 });
@@ -227,7 +227,7 @@ test('mint: insufficient balance with airdrop eligibility goes to 铸造空投�
   await page.goto('/mint');
   await connect(page);
 
-  const input = page.getByRole('textbox', { name: '给身份起个名字' });
+  const input = page.getByRole('textbox', { name: '给身份 NFT 起个名字' });
   await expect(input).toBeVisible({ timeout: 15_000 });
   await input.fill(BRANCH_NAME);
 
@@ -241,7 +241,7 @@ test('mint: insufficient balance with airdrop eligibility goes to 铸造空投�
   await expect(airdropCta).toBeVisible();
   await expect(airdropCta).toHaveAttribute('href', /\/airdrop\?symbol=TestLOVE20$/);
   // The mint ladder is replaced by the branch CTA: no second solid action.
-  await expect(page.getByRole('button', { name: /^(2\. )?铸造身份$/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^(2\. )?铸造身份 NFT$/ })).toHaveCount(0);
 
   await shot(page, 'mint-insufficient.png');
 });
@@ -253,7 +253,7 @@ test('mint: insufficient balance without airdrop eligibility goes to 用 ETH 兑
   await page.goto('/mint');
   await connect(page);
 
-  const input = page.getByRole('textbox', { name: '给身份起个名字' });
+  const input = page.getByRole('textbox', { name: '给身份 NFT 起个名字' });
   await expect(input).toBeVisible({ timeout: 15_000 });
   await input.fill(BRANCH_NAME);
 
@@ -278,7 +278,7 @@ test('mint: approve → mint produces a real receipt with MemberMinted data', as
   await page.goto('/mint');
   await connect(page);
 
-  const input = page.getByRole('textbox', { name: '给身份起个名字' });
+  const input = page.getByRole('textbox', { name: '给身份 NFT 起个名字' });
   await expect(input).toBeVisible({ timeout: 15_000 });
   await input.fill(NEW_NAME);
   await expect(page.getByText('✓ 可以用')).toBeVisible({ timeout: 10_000 });
@@ -294,7 +294,7 @@ test('mint: approve → mint produces a real receipt with MemberMinted data', as
   await expect(page.getByText('已授权')).toBeVisible({ timeout: 30_000 });
   await expect(page).toHaveURL(/\/mint/);
 
-  const mintButton = page.getByRole('button', { name: '铸造身份' });
+  const mintButton = page.getByRole('button', { name: '铸造身份 NFT' });
   await expect(mintButton).toBeEnabled({ timeout: 30_000 });
   await mintButton.click();
 
@@ -338,9 +338,24 @@ test('mint: approve → mint produces a real receipt with MemberMinted data', as
 
   await shot(page, 'mint-receipt.png');
 
+  // 留在此页: backdrop / Esc / the explicit button dismiss the receipt without
+  // changing the route. The page lands on a compact success strip with the form
+  // reset, so the just-minted name cannot be submitted twice.
+  await page.getByRole('button', { name: '留在此页' }).click();
+  await expect(page).toHaveURL(/\/mint/);
+  await expect(page.getByRole('heading', { name: '铸造成功' })).toHaveCount(0);
+  const strip = page.getByTestId('mint-success-strip');
+  await expect(strip).toBeVisible();
+  await expect(strip).toContainText(`#${mintedMemberId}`);
+  await expect(strip).toContainText(mintedName);
+  await expect(page.getByRole('textbox', { name: /起个名字/ })).toHaveValue('');
+  await expect(page.getByRole('button', { name: /铸造身份/ })).toBeDisabled();
+  await expect(page.getByRole('link', { name: '查看我的 NFT' })).toHaveAttribute('href', '/my-nft');
+  await shot(page, 'mint-receipt-dismissed.png');
+
   console.log(`mint receipt: #${mintedMemberId} ${mintedName} tx=${mintedHash} burned=${burned}`);
 
-  await page.getByRole('link', { name: '去我的 NFT 使用这个身份' }).click();
+  await page.getByRole('link', { name: '查看我的 NFT' }).click();
   await expect(page).toHaveURL(/\/my-nft/);
 });
 

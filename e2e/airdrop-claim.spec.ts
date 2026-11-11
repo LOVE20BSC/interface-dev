@@ -231,7 +231,7 @@ async function connect(page: Page): Promise<void> {
   const button = page.getByRole('button', { name: '连接钱包' }).first();
   await expect(button).toBeEnabled({ timeout: 5_000 });
   await button.click();
-  await expect(page.getByRole('button', { name: '打开钱包与身份菜单' })).toBeVisible({
+  await expect(page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' })).toBeVisible({
     timeout: 15_000,
   });
 }
@@ -324,13 +324,23 @@ test('airdrop: eligible wallet sees the estimate, claims, and gets a real receip
     receiptAmountText,
   );
   expect((await page.getByTestId('airdrop-receipt-hash').innerText()).trim()).toBe(hash);
-  await expect(page.getByRole('link', { name: '用这些代币铸造身份' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: '用这些代币铸造身份 NFT' })).toHaveAttribute(
     'href',
     '/mint',
   );
   await expect(page.getByRole('link', { name: '回首页' })).toBeVisible();
 
   await shot(page, 'airdrop-receipt.png');
+
+  // 留在此页 must land on the page's S6 已铸造 state with the real amount,
+  // never back on the claim CTA.
+  await page.getByRole('button', { name: '留在此页' }).click();
+  await expect(page).toHaveURL(/\/airdrop/);
+  await expect(page.getByTestId('airdrop-claimed-title')).toHaveText(
+    `已铸造 ${receiptAmountText}`,
+    { timeout: 20_000 },
+  );
+  await expect(page.getByRole('button', { name: '空投铸造' })).toHaveCount(0);
 
   console.log(
     `airdrop claim: account=${claimer} tx=${hash} amount=${receiptAmountText} isClaimed=${isClaimed(claimer)}`,

@@ -166,6 +166,18 @@ export function markSessionFlag(name: string): void {
   }
 }
 
+/** Reads a session flag without consuming it (render-time visibility checks). */
+export function hasSessionFlag(name: string): boolean {
+  if (!BUSINESS_KEY_RE.test(name)) throw new Error(`cache: invalid session flag "${name}"`);
+  const store = sessionStorageOrNull();
+  if (store === null) return false;
+  try {
+    return store.getItem(`${SESSION_PREFIX}${name}`) !== null;
+  } catch {
+    return false;
+  }
+}
+
 /** Returns true the first time it is called in this tab, then clears the flag. */
 export function consumeSessionFlag(name: string): boolean {
   if (!BUSINESS_KEY_RE.test(name)) throw new Error(`cache: invalid session flag "${name}"`);

@@ -148,7 +148,7 @@ async function connect(page: Page): Promise<void> {
   const button = page.getByRole('button', { name: '连接钱包' }).first();
   await expect(button).toBeEnabled({ timeout: 10_000 });
   await button.click();
-  await expect(page.getByRole('button', { name: '打开钱包与身份菜单' })).toBeVisible({
+  await expect(page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' })).toBeVisible({
     timeout: 20_000,
   });
 }
@@ -169,7 +169,7 @@ test(
     await page.goto('/mint');
     await connect(page);
 
-    const nameInput = page.getByLabel('给身份起个名字');
+    const nameInput = page.getByLabel('给身份 NFT 起个名字');
     await expect(nameInput).toBeVisible({ timeout: 20_000 });
     await nameInput.fill(NAME);
     // The name check is debounced + on-chain; the approve CTA enables after 可以用.

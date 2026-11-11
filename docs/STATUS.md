@@ -99,7 +99,7 @@ CI 环境规则（`.github/workflows/deploy.yml`）：取 `github.repository` �
 | i18n 纪律 | 所有用户可见文案进 `shared/config/copy.ts`；组件内禁止 CJK 字面量（架构测试强制）；暂不引入 i18n 库 | [README](../README.md)「i18n readiness」 |
 | 缓存与错误 | 唯一存储封装 `shared/lib/cache.ts`，键 `love20:v1:<chainId>:<contractAddress>:<wallet>:<businessKey>`；合约错误 selector → 中文人话 | [ADR-0003](adr/0003-identity-and-connect-button.md) §3；[README](../README.md) §Storage |
 | 底栏与占位页 | 5 个 tab 同权重，不做中央凸起；治理/行动/我的只显示「即将上线」，不出现半成品表单 | [README](../README.md)「Decisions…」；[m0-ux-spec](product/m0-ux-spec.md) §1.2 |
-| 应用目录 | 底栏「链群」改为「应用」（`/apps?symbol=`）：功能型页面统一由 `src/domain/apps-catalog.ts` 的数据目录管理（今日：创世空投 / 身份 NFT / 代币兑换），≥2 个分类自动分组，未来页面只加目录条目；`/group` 深链保留、不再上底栏 | [m0-ux-spec](product/m0-ux-spec.md) §1.2/§3.6 |
+| 应用目录 | 底栏「链群」改为「应用」（`/apps?symbol=`）：功能型页面统一由 `src/domain/apps-catalog.ts` 的数据目录管理（今日：创世空投 / 身份 NFT / 代币兑换 / 开源文档；`/about` 是文档、合约地址与只读链上数据页，无合约地址依赖），≥2 个分类自动分组，未来页面只加目录条目；`/group` 深链保留、不再上底栏 | [m0-ux-spec](product/m0-ux-spec.md) §1.2/§3.6/§3.8 |
 
 ## 6. 已知坑与注意事项
 
@@ -116,6 +116,7 @@ CI 环境规则（`.github/workflows/deploy.yml`）：取 `github.repository` �
 8. **test/prod 地址簿为空**：两份 JSON 各 22 个零地址，现在发布会得到「未配置」界面；地址只能来自合约仓 `script/network/`，不得把 anvil 地址抄过去。
 9. **Pages 缓存**：`index.html` 最多陈旧 600 s、旧哈希 chunk 会 404；只能靠 build id 比对 + `vite:preloadError` 兜底；不启用 PWA。
 10. **构建运行时**：不要用 DSH 自带 Node 跑 `pnpm install/build`（rollup 原生二进制 code-signature 失败，见 §3.3）。
+11. **Pages 上的 dev 构建只能做 UI/文案预览**：HTTPS 页面不能访问回环 RPC（2026-11-12 复现的 Chromium 报错：`Permission was denied for this request to access the 'loopback' address space`，目标 `http://127.0.0.1:8545/`，来源 `https://love20bsc.github.io`）；交互测试必须用 localhost 本地服务（`pnpm dev`，如 <http://localhost:5180>），或换成可访问的链。界面已对该组合显示一次性可关闭说明（`src/app/shell/rpc-blocked-notice.tsx`），不再误报「网络可能不稳」。
 
 ## 7. 下一步（按顺序）
 

@@ -37,7 +37,7 @@ test.describe('应用目录', () => {
     await expect(page.locator('header h1')).toHaveText('应用');
     // Two categories today, so the grouped layout (and its headings) is visible.
     await expect(page.getByRole('heading', { name: '代币' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '身份' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '身份 NFT' })).toBeVisible();
   });
 
   test('each catalog row opens its feature page with ?symbol= and back returns to /apps', async ({

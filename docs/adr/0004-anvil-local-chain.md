@@ -87,4 +87,5 @@ dev profile 以 **120 块/phase** 为准（`PHASE_ORIGIN_PHASE_BLOCKS=120`，`ma
 - `dex/build` 必须先存在；`make bootstrap` 约 45–50 秒；`deploy` + `seed` 每个部署只能跑一次，重跑会得到新地址。
 - 地址只在**全新链**上确定；重跑前必须 `make stop && make clean`，bootstrap 会拒绝复用旧链（见 §2、§5）。规范端口 8545 可能被别的 anvil 占用，先停掉占用者再 `make bootstrap`。
 - 本地链无法可靠给手机钱包用（钱包拒绝 `http:` RPC），移动端验收仍走测试网或 HTTPS 隧道（ADR-0001）。
+- **Pages 上的 dev 构建只能做 UI/文案预览**：HTTPS 页面里的浏览器会拦截对回环 RPC 的请求（2026-11-12 复现：`Permission was denied for this request to access the 'loopback' address space`，目标 `http://127.0.0.1:8545/`，来源 `https://love20bsc.github.io`）。交互测试必须用 `localhost` 本地服务（`pnpm dev`，如 `http://localhost:5180`），或换成可访问的链；界面在命中「HTTPS 页面 + 回环 RPC」时显示一次可关闭的说明（`src/app/shell/rpc-blocked-notice.tsx`），不要把浏览器拦截误报成「网络可能不稳」。
 - 前端生成物（地址簿、ABI、manifest、快照）必须与 anvil 导出同一个 commit 一起提交；`pnpm abis:check` 是本地/有兄弟仓 job 的漂移门禁，CI 前端 job 无兄弟仓时只能跳过。

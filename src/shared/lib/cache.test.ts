@@ -3,6 +3,7 @@ import {
   cache,
   clearSessionFlag,
   consumeSessionFlag,
+  hasSessionFlag,
   listCacheKeys,
   markSessionFlag,
 } from '@/shared/lib/cache';
@@ -100,5 +101,14 @@ describe('session flags', () => {
     markSessionFlag('preloadReloaded');
     expect(consumeSessionFlag('preloadReloaded')).toBe(true);
     expect(consumeSessionFlag('preloadReloaded')).toBe(false);
+  });
+
+  it('hasSessionFlag reads without consuming', () => {
+    expect(hasSessionFlag('preloadReloaded')).toBe(false);
+    markSessionFlag('preloadReloaded');
+    expect(hasSessionFlag('preloadReloaded')).toBe(true);
+    expect(hasSessionFlag('preloadReloaded')).toBe(true);
+    clearSessionFlag('preloadReloaded');
+    expect(hasSessionFlag('preloadReloaded')).toBe(false);
   });
 });

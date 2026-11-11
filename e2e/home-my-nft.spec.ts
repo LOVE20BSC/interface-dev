@@ -18,9 +18,10 @@ import {
 /**
  * M0 identity-first pages against the dedicated anvil chain.
  *
- * Home is a reminder feed (UX spec §3.1, owner 2026-11-11): a thin line into
- * 我的 plus conditional reminder cards; the old identity/balance cards and the
- * three navigation rows are gone (they live on /apps and /me now).
+ * Home is greeting + reminder feed (UX spec §3.1, owners 2026-11-11/12): the
+ * page h1 greets the current identity NFT, followed by conditional reminder
+ * cards; identity and balance details live in 我的. With nothing to do the page
+ * is just greeting + footer (no filler sentence).
  */
 
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
@@ -37,10 +38,9 @@ async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: resolve(SHOTS, name), animations: 'disabled' });
 }
 
-/** The home thin line into 我的 (the bottom nav/sidebar also link there). */
-function thinLine(page: Page) {
-  // Scoped by test id: the bottom nav and desktop sidebar also link to /me.
-  return page.getByTestId('home-thin-line');
+/** The page h1 greeting (never a link). */
+function greeting(page: Page) {
+  return page.getByRole('heading', { level: 1 });
 }
 
 // Snapshot before any test touches the chain; afterAll restores it.
@@ -50,23 +50,24 @@ test.beforeAll(() => {
   mkdirSync(SHOTS, { recursive: true });
 });
 
-test('home: disconnected shows the connect entry, the wordmark and the thin line', async ({
-  page,
-}) => {
+test('home: disconnected shows the greeting, connect entry and wordmark', async ({ page }) => {
   await installWallet(page, ACCOUNTS.withIdentity);
   await page.goto('/');
 
   await expect(page.getByRole('button', { name: '连接钱包' })).toHaveCount(2);
-  await expect(page.getByText('一个钱包可以拥有多个身份，身份才是参与凭证。')).toBeVisible();
-  await expect(page.getByText('你还没有身份')).toHaveCount(0);
+  await expect(
+    page.getByText('一个钱包可以拥有多个身份 NFT，身份 NFT 才是参与凭证。'),
+  ).toBeVisible();
+  // Not connected still greets, and never names an identity.
+  await expect(greeting(page)).toHaveText('你好');
+  expect(await greeting(page).locator('a').count()).toBe(0);
+  await expect(page.getByText('你还没有身份 NFT')).toHaveCount(0);
   await expect(page.getByText('现在没有需要你处理的事。')).toHaveCount(0);
   expect(await countSolidButtons(page)).toBe(1);
   await expectHomeWordmark(page, true);
 
-  // Thin line is always visible, even disconnected: name —, balance —.
-  await expect(thinLine(page)).toBeVisible();
-  await expect(thinLine(page)).toContainText('—');
-  // The old navigation rows are gone.
+  // The old navigation rows and thin line are gone.
+  await expect(page.getByTestId('home-thin-line')).toHaveCount(0);
   await expect(page.getByRole('link', { name: '我的 NFT' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: '兑换代币' })).toHaveCount(0);
   await expect(page).toHaveTitle('TestLOVE20');
@@ -116,13 +117,13 @@ test('home: wrong chain shows the red outlined switch pill, not a solid fill', a
   await shot(page, 'home-wrong-network.png');
 });
 
-test('home: connected without identity shows the 铸造身份 reminder only', async ({ page }) => {
+test('home: connected without identity shows the 铸造身份 NFT reminder only', async ({ page }) => {
   await installWallet(page, ACCOUNTS.outsider);
   await page.goto('/');
   await connect(page);
 
-  await expect(page.getByText('你还没有身份')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('link', { name: '铸造身份' })).toHaveAttribute(
+  await expect(page.getByText('你还没有身份 NFT')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('link', { name: '铸造身份 NFT' })).toHaveAttribute(
     'href',
     '/mint?symbol=TestLOVE20',
   );
@@ -131,36 +132,37 @@ test('home: connected without identity shows the 铸造身份 reminder only', as
   await expect(page.getByText('现在没有需要你处理的事。')).toHaveCount(0);
   expect(await countSolidButtons(page)).toBe(1);
   await expectHomeWordmark(page, false);
-  await expect(thinLine(page)).toContainText('还没有身份');
+  // Connected without an identity: plain 你好, no name and no balance.
+  await expect(greeting(page)).toHaveText('你好');
+  await expect(page.getByText(/99,799,100/)).toHaveCount(0);
+  await expect(page.getByTestId('home-thin-line')).toHaveCount(0);
   await expect(page).toHaveTitle('TestLOVE20');
 
   await shot(page, 'home-no-identity.png');
 });
 
-test('home: identity and balance stay in the thin line across reload', async ({ page }) => {
+test('home: the greeting names the identity NFT and survives reload', async ({ page }) => {
   await installWallet(page, ACCOUNTS.withIdentity);
   await seedIdentity(page, ACCOUNTS.withIdentity, '1');
   await page.goto('/');
   await connect(page);
 
-  const line = thinLine(page);
-  await expect(line).toContainText(SEEDED_NAME, { timeout: 15_000 });
-  // 99,799,100 renders with thousands separators, never as a wall of digits.
-  await expect(line).toContainText('99,799,100 TestLOVE20');
-  await expect(line).not.toContainText('99799100');
-  // No greeting card, no identity pill, no 切换身份 button on home.
-  await expect(page.getByText(`你好，${SEEDED_NAME}`)).toHaveCount(0);
-  await expect(page.getByText('身份 #1')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: '切换身份' })).toHaveCount(0);
+  const heading = greeting(page);
+  await expect(heading).toHaveText(`你好，${SEEDED_NAME}`, { timeout: 15_000 });
+  // The greeting is not a link and does not carry the balance: that is 我的.
+  expect(await heading.locator('a').count()).toBe(0);
+  await expect(page.getByText(/99,799,100/)).toHaveCount(0);
+  await expect(page.getByText('NFT #1')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '切换身份 NFT' })).toHaveCount(0);
   await expectHomeWordmark(page, false);
-  // The thin line is one row: it must not wrap at 390 px.
-  const box = await line.boundingBox();
-  expect(box?.height ?? 0).toBeLessThan(32);
+  // Single line at 390 px: the h1 must not wrap.
+  const box = await heading.boundingBox();
+  expect(box?.height ?? 0).toBeLessThan(40);
 
   await shot(page, 'home-connected-with-identity.png');
 
   await page.reload();
-  await expect(thinLine(page)).toContainText(SEEDED_NAME, { timeout: 15_000 });
+  await expect(greeting(page)).toHaveText(`你好，${SEEDED_NAME}`, { timeout: 15_000 });
 });
 
 test('home: eligible wallet sees the airdrop reminder', async ({ page }) => {
@@ -176,7 +178,7 @@ test('home: eligible wallet sees the airdrop reminder', async ({ page }) => {
     '/airdrop?symbol=TestLOVE20',
   );
   // No-identity reminder comes first and owns the one filled button.
-  await expect(page.getByText('你还没有身份')).toBeVisible();
+  await expect(page.getByText('你还没有身份 NFT')).toBeVisible();
   expect(await countSolidButtons(page)).toBe(1);
   await expectHomeWordmark(page, false);
   await shot(page, 'home-airdrop-eligible.png');
@@ -193,7 +195,10 @@ test('home: a non-eligible account never sees the airdrop reminder', async ({ pa
   await connect(page);
   await snapshotLoaded;
   await expect(page.getByText('你有空投资格')).toHaveCount(0);
-  await expect(page.getByText('现在没有需要你处理的事。')).toBeVisible();
+  // Nothing to do: greeting + footer only, no filler sentence.
+  await expect(greeting(page)).toHaveText(`你好，${SEEDED_NAME}`);
+  await expect(page.getByText('现在没有需要你处理的事。')).toHaveCount(0);
+  await expect(page.locator('section[aria-labelledby^="home-reminder"]')).toHaveCount(0);
 });
 
 test('my-nft: card list and local selection without a transaction', async ({ page }) => {
@@ -201,19 +206,19 @@ test('my-nft: card list and local selection without a transaction', async ({ pag
   await page.goto('/my-nft?symbol=TestLOVE20');
   await connect(page);
 
-  await expect(page.getByText('持有 1 个身份')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('button', { name: '当前身份' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '使用此身份' })).toBeVisible();
+  await expect(page.getByText('持有 1 个身份 NFT')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: '当前身份 NFT' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '使用此身份 NFT' })).toBeVisible();
   await shot(page, 'my-nft-list.png');
 
-  await page.getByRole('button', { name: '使用此身份' }).click();
+  await page.getByRole('button', { name: '使用此身份 NFT' }).click();
   // The row keeps its 当前 pill + tint; the disabled button carries the state
   // only as its accessible name (the visible duplicate is gone).
   const identityList = page.getByRole('list', { name: '我的 NFT' });
   await expect(identityList.getByText('当前', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '当前身份' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '当前身份 NFT' })).toBeDisabled();
   // No wallet confirmation appeared: selection is a local cache write.
-  await expect(page.getByRole('button', { name: '打开钱包与身份菜单' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' })).toBeVisible();
   await shot(page, 'my-nft-selected.png');
 
   await page.reload();
@@ -230,9 +235,9 @@ test('identity cache is cleared when ownerOf belongs to someone else', async ({ 
   await connect(page);
 
   // Home no longer renders the neutral invalidation notice; it falls back to
-  // the no-identity reminder and the thin line. The cache is the proof.
-  await expect(page.getByText('你还没有身份')).toBeVisible({ timeout: 15_000 });
-  await expect(thinLine(page)).toContainText('还没有身份');
+  // the no-identity reminder and a plain greeting. The cache is the proof.
+  await expect(page.getByText('你还没有身份 NFT')).toBeVisible({ timeout: 15_000 });
+  await expect(greeting(page)).toHaveText('你好');
   await expect(page.getByText(`你好，${SEEDED_NAME}`)).toHaveCount(0);
   const stored = await page.evaluate(
     (key) => window.localStorage.getItem(key),
@@ -246,11 +251,11 @@ test('my-nft: empty wallet gets the mint identity next step', async ({ page }) =
   await page.goto('/my-nft');
   await connect(page);
 
-  // Empty state: no summary bar above the card (「持有 0 个身份」 was the same
-  // fact as 「你还没有身份。」).
-  await expect(page.getByText('你还没有身份。')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('持有 0 个身份')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: '铸造身份' })).toHaveAttribute('href', '/mint');
+  // Empty state: no summary bar above the card (「持有 0 个身份 NFT」 was the same
+  // fact as 「你还没有身份 NFT。」).
+  await expect(page.getByText('你还没有身份 NFT。')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('持有 0 个身份 NFT')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '铸造身份 NFT' })).toHaveAttribute('href', '/mint');
 });
 
 test('my-nft: md+ renders the 编号/名称/操作 table', async ({ page }) => {
@@ -260,7 +265,7 @@ test('my-nft: md+ renders the 编号/名称/操作 table', async ({ page }) => {
   await page.goto('/my-nft');
   await connect(page);
 
-  await expect(page.getByRole('columnheader', { name: '编号' })).toBeVisible({
+  await expect(page.getByRole('columnheader', { name: 'NFT 编号' })).toBeVisible({
     timeout: 15_000,
   });
   await expect(page.getByRole('columnheader', { name: '名称' })).toBeVisible();
@@ -276,14 +281,62 @@ test('my-nft: transfer drawer warns and rejects the current wallet', async ({ pa
 
   await page.getByRole('button', { name: '转让' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(
-    page.getByText(
-      '转让会改变这个身份的控制者。身份的历史与质押仍留在身份上，不随钱包转走；转让不可撤销。',
-    ),
-  ).toBeVisible();
+  // The terminology pass may word this as 身份 NFT; the two owner-approved
+  // promises (irreversible, history/stake move with the NFT) must stay.
+  await expect(page.getByText(/转让会改变这个身份/)).toBeVisible();
+  await expect(page.getByText(/历史与质押/)).toBeVisible();
+  await expect(page.getByText(/转让不可撤销/)).toBeVisible();
   await page.getByPlaceholder('0x 开头的 40 位地址').fill(ACCOUNTS.withIdentity);
   await expect(page.getByText('不能转让给自己。')).toBeVisible();
   await expect(page.getByRole('button', { name: '确认转让' })).toBeDisabled();
+  await page.getByRole('button', { name: '取消' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('my-nft: transfer recipient can be an address or an identity NFT', async ({ page }) => {
+  await installWallet(page, ACCOUNTS.withIdentity);
+  await seedIdentity(page, ACCOUNTS.withIdentity, '1');
+  await page.goto('/my-nft');
+  await connect(page);
+
+  await page.getByRole('button', { name: '转让' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('收款人', { exact: true })).toBeVisible();
+
+  // Default is 按地址: same 0x input as before, with the mode selector on the left.
+  const modeTrigger = page.getByTestId('transfer-mode-trigger');
+  await expect(modeTrigger).toContainText('按地址');
+  await expect(page.getByPlaceholder('0x 开头的 40 位地址')).toBeVisible();
+  await shot(page, 'transfer-drawer-address-mode.png');
+
+  // Switch to 按身份 NFT with the compact menu (not a second full-screen sheet).
+  await modeTrigger.click();
+  await page.getByTestId('transfer-mode-member').click();
+  await expect(modeTrigger).toContainText('按身份 NFT');
+  const input = page.getByTestId('transfer-recipient-input');
+  await expect(input).toHaveAttribute('placeholder', '#身份 NFT 编号');
+
+  // Invalid id: specific copy, CTA disabled.
+  await input.fill('abc');
+  await expect(page.getByText('请输入身份 NFT 编号，例如 #12。')).toBeVisible();
+  await expect(page.getByRole('button', { name: '确认转让' })).toBeDisabled();
+
+  // Own identity NFT: reading ownerOf() returns the connected wallet.
+  await input.fill('#1');
+  await expect(page.getByText('这是你自己的身份 NFT。')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: '确认转让' })).toBeDisabled();
+
+  // A seeded identity NFT owned by another wallet resolves to its owner; the
+  // confirmation line shows the short address and the transfer becomes possible.
+  await input.fill('#2');
+  const resolved = page.getByTestId('transfer-recipient-resolved');
+  await expect(resolved).toBeVisible({ timeout: 15_000 });
+  await expect(resolved).toContainText('收款人：0x7099');
+  await expect(page.getByRole('button', { name: '确认转让' })).toBeEnabled();
+  await shot(page, 'transfer-drawer-member-mode.png');
+
+  // No transfer is sent: cancel leaves the drawer and the list untouched.
   await page.getByRole('button', { name: '取消' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
@@ -299,7 +352,7 @@ test('reads are batched through Multicall3, never one RPC per list item', async 
   await installWallet(page, ACCOUNTS.withIdentity);
   await page.goto('/my-nft');
   await connect(page);
-  await expect(page.getByText('持有 1 个身份')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('持有 1 个身份 NFT')).toBeVisible({ timeout: 15_000 });
 
   // aggregate3((address,bool,bytes)[]) selector 0x82ad56cb, sent to the
   // Multicall3 address from the address book.

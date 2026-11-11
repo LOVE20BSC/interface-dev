@@ -18,18 +18,19 @@ export const copy = {
   ...firstScreenCopy,
   pages: {
     myNft: {
-      intro: '一个 NFT 就是一个身份，可以在多个社区使用。换钱包不会改身份，只有转让才换控制者。',
-      summary: (count: string) => `持有 ${count} 个身份`,
-      tableNumber: '编号',
+      intro:
+        '每个身份 NFT 都是一个独立的身份，可以在多个社区使用。换钱包不会改身份 NFT，只有转让才换控制者。',
+      summary: (count: string) => `持有 ${count} 个身份 NFT`,
+      tableNumber: 'NFT 编号',
       tableName: '名称',
       tableActions: '操作',
       currentBadge: '当前',
-      useAction: '使用此身份',
-      currentAction: '当前身份',
+      useAction: '使用此身份 NFT',
+      currentAction: '当前身份 NFT',
       transferAction: '转让',
-      transferTitle: '转让身份',
+      transferTitle: '转让身份 NFT',
       transferWarning:
-        '转让会改变这个身份的控制者。身份的历史与质押仍留在身份上，不随钱包转走；转让不可撤销。',
+        '转让会改变这个身份 NFT 的控制者。身份 NFT 的历史与质押仍留在身份 NFT 上，不随钱包转走；转让不可撤销。',
       recipientLabel: '收款地址',
       recipientPlaceholder: '0x 开头的 40 位地址',
       invalidRecipient: '收款地址格式不对，需要 0x 开头的 40 位地址。',
@@ -39,34 +40,34 @@ export const copy = {
       transferring: '转让中…',
       transferSuccess: (address: string) => `已转让给 ${address}`,
       busyReason: '有一个操作正在进行',
-      disconnectedTitle: '连接钱包后查看你的身份。',
-      disconnectedBody: '没有身份也能先看看这里能做什么。',
-      emptyTitle: '你还没有身份。',
+      disconnectedTitle: '连接钱包后查看你的身份 NFT。',
+      disconnectedBody: '没有身份 NFT 也能先看看这里能做什么。',
+      emptyTitle: '你还没有身份 NFT。',
       emptyBody: '铸造需要一个名字和少量 LOVE20。',
-      emptyMint: '铸造身份',
-      errorTitle: '身份列表暂时读不到。',
-      mintAnother: '铸造新身份',
+      emptyMint: '铸造身份 NFT',
+      errorTitle: '身份 NFT 列表暂时读不到。',
+      mintAnother: '铸造新身份 NFT',
       backHome: '回首页',
       advancedMemberNft: 'MemberNFT 合约地址',
     },
     mint: {
-      title: '铸造身份',
+      title: '铸造身份 NFT',
     },
     swap: {
       title: '兑换代币',
     },
   },
   /**
-   * 铸造身份 (UX spec §3.3). Kept in its own namespace so the page has a single
+   * 铸造身份 NFT (UX spec §3.3). Kept in its own namespace so the page has a single
    * source of copy and the shared 我的 NFT / wallet strings stay untouched.
    */
   mintIdentity: {
     name: {
-      label: '给身份起个名字',
+      label: '给身份 NFT 起个名字',
       bytes: (used: string, max: string) => `${used}/${max} 字节`,
       rule: '中文 3 字节、英文与数字 1 字节；名字越短，价格越高',
       testRule: '名称必须以 Test 开头',
-      testReason: '为了让测试身份和真实身份一眼能分开。',
+      testReason: '为了让测试身份 NFT 和真实身份 NFT 一眼能分开。',
       check: {
         checking: '检查中…',
         available: '✓ 可以用',
@@ -106,8 +107,8 @@ export const copy = {
       approving: '授权中…',
       approvePending: '确认中…',
       approved: '已授权',
-      mintStep: '2. 铸造身份',
-      mint: '铸造身份',
+      mintStep: '2. 铸造身份 NFT',
+      mint: '铸造身份 NFT',
       minting: '铸造中…',
       mintPending: '确认中…',
       approvalShort: '授权额度不够这次使用，需要再授权一次。',
@@ -116,22 +117,22 @@ export const copy = {
     },
     receipt: {
       title: '铸造成功',
-      memberId: (id: string) => `身份 #${id}`,
+      memberId: (id: string) => `NFT #${id}`,
       burnedLabel: '已销毁',
       value: (amount: string, symbol: string) => `${amount} ${symbol}`,
       hashLabel: '交易哈希',
       explorerLink: '在区块浏览器里查看',
       copyHash: '复制交易哈希',
-      notSelected: '还没有设为当前身份。',
-      goMyNft: '去我的 NFT 使用这个身份',
+      notSelected: '还没有设为当前身份 NFT。',
+      goMyNft: '去我的 NFT 使用这个身份 NFT',
       backHome: '回首页',
-      mintAnother: '再铸造一个身份',
-      missingMessage: '交易已经上链，但没有读到身份编号，请去「我的 NFT」确认。',
+      mintAnother: '再铸造一个身份 NFT',
+      missingMessage: '交易已经上链，但没有读到身份 NFT 编号，请去「我的 NFT」确认。',
     },
     states: {
       notDeployedTitle: '铸造还没有接入',
-      notDeployedBody: '地址簿里还没有 MemberNFT 合约。填充部署地址后才能铸造身份。',
-      connectTitle: '连接钱包后铸造身份。',
+      notDeployedBody: '地址簿里还没有 MemberNFT 合约。填充部署地址后才能铸造身份 NFT。',
+      connectTitle: '连接钱包后铸造身份 NFT。',
       connectBody: '铸造需要一个名字和少量 LOVE20。连接后可以先看到价格和余额。',
       wrongChainBody: '切换到这个应用使用的网络后再铸造。',
       errorTitle: '铸造配置暂时读不到。',
@@ -205,7 +206,7 @@ export const copy = {
       unknownBodyExplorer: '这次空投已经铸造过。金额可以在区块链浏览器里查看。',
       hashLabel: '交易哈希',
       explorer: '在区块链浏览器里查看',
-      goMint: '去铸造身份',
+      goMint: '去铸造身份 NFT',
     },
     rules: {
       summary: '规则',
@@ -228,7 +229,7 @@ export const copy = {
       hashLabel: '交易哈希',
       copyHash: '复制交易哈希',
       explorer: '在区块浏览器里查看',
-      goMint: '用这些代币铸造身份',
+      goMint: '用这些代币铸造身份 NFT',
       backHome: '回首页',
       missingBody: '交易已经上链，但回执里没有读到铸造金额。刷新后会以链上状态为准。',
     },
@@ -405,16 +406,16 @@ export const copy = {
   // (owner 2026-11-11); the page is a settings-ish list, never a filled button.
   // ───────────────────────────────────────────────────────────────────────────
   me: {
-    identityTitle: '我的身份',
-    identityReading: '读取身份中…',
-    identityDisconnected: '连接钱包后显示当前身份。',
-    identityUnconfigured: '这个环境还没有配置身份合约。',
-    identityUnavailable: '身份暂时读不到',
-    identityEmpty: '你还没有身份',
-    identityNeedsSelection: '还没有选择当前身份',
-    identityInvalidated: '这个身份已不属于当前钱包，已为你清除选择。',
-    mintIdentity: '铸造身份',
-    switchIdentity: '切换身份',
+    identityTitle: '我的身份 NFT',
+    identityReading: '读取身份 NFT 中…',
+    identityDisconnected: '连接钱包后显示当前身份 NFT。',
+    identityUnconfigured: '这个环境还没有配置身份 NFT 合约。',
+    identityUnavailable: '身份 NFT 暂时读不到',
+    identityEmpty: '你还没有身份 NFT',
+    identityNeedsSelection: '还没有选择当前身份 NFT',
+    identityInvalidated: '这个身份 NFT 已不属于当前钱包，已为你清除选择。',
+    mintIdentity: '铸造身份 NFT',
+    switchIdentity: '切换身份 NFT',
     transfer: '转让',
     viewAll: '查看全部',
     balanceTitle: '我的余额',
@@ -439,7 +440,8 @@ export const copy = {
     label: '功能页目录',
     categories: {
       token: '代币',
-      identity: '身份',
+      identity: '身份 NFT',
+      about: '资料',
     },
     items: {
       airdrop: {
@@ -448,17 +450,122 @@ export const copy = {
       },
       myNft: {
         label: '身份 NFT',
-        description: '查看、切换与转让你的身份',
+        description: '查看、切换与转让你的身份 NFT',
       },
       swap: {
         label: '代币兑换',
         description: '在任意代币之间互换',
       },
+      about: {
+        label: '开源文档',
+        description: '文档、合约地址与链上数据',
+      },
     },
     unavailable: {
       airdropNotConfigured: '这个环境还没有配置空投铸造。',
-      memberNftNotConfigured: '这个环境还没有配置身份合约。',
+      memberNftNotConfigured: '这个环境还没有配置身份 NFT 合约。',
       routerNotConfigured: '这个环境还没有配置代币兑换。',
     },
   },
+  // ───────────────────────────────────────────────────────────────────────────
+  // BEGIN UX-child block: 转让身份 NFT 收款人模式 + 交易回执收起 (keep verbatim;
+  // append new keys above this block only if another agent needs the same names).
+  // ───────────────────────────────────────────────────────────────────────────
+  transferIdentity: {
+    recipientLabel: '收款人',
+    modeLabel: '收款人类型',
+    modeAddress: '按地址',
+    modeMember: '按身份 NFT',
+    memberPlaceholder: '#身份 NFT 编号',
+    memberInvalid: '请输入身份 NFT 编号，例如 #12。',
+    memberNotFound: '这个身份 NFT 不存在。',
+    memberSelf: '这是你自己的身份 NFT。',
+    memberReading: '读取中…',
+    memberFailed: '暂时读不到这个身份 NFT 的持有人。',
+    memberRetry: '重试',
+    resolvedRecipient: (address: string) => `收款人：${address}`,
+  },
+  receiptDismiss: {
+    stayHere: '留在此页',
+    mintStripTitle: (id: string, name: string) => `已铸造 #${id} ${name}`,
+    mintStripGoMyNft: '查看我的 NFT',
+    swapStripTitle: '兑换完成',
+    swapStripAmount: (amount: string) => `已到账 ${amount}`,
+    swapStripAgain: '再兑换一次',
+  },
+  // ───────────────────────────────────────────────────────────────────────────
+  // END UX-child block
+  // ───────────────────────────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────────────────
+  // BEGIN about-page block (owner 2026-11-12): 关于 / 开源文档. Unique anchor:
+  // ABOUT_PAGE_COPY_BLOCK. The lazy /about chunk is the only consumer, so these
+  // strings never enter the first-screen bundle. 未配置 is the honest state for a
+  // deployment slot that is still the zero address.
+  // ───────────────────────────────────────────────────────────────────────────
+  about: {
+    intro: '开源文档、合约地址和链上数据都集中在这里，方便核对与排查。',
+    docsLink: '打开开源文档',
+    docsNote: '文档托管在 GitHub Pages，会在新标签页打开。',
+    tabsLabel: '关于内容',
+    tabs: {
+      contracts: '合约地址',
+      data: '数据',
+    },
+    addresses: {
+      chainInfoLabel: '网络信息',
+      chainId: '链 ID',
+      rpc: 'RPC',
+      notConfigured: '未配置',
+      copyAddress: (label: string) => `复制地址：${label}`,
+      copied: '已复制',
+      explorer: (label: string) => `在区块浏览器查看${label}`,
+      groups: {
+        core: '核心',
+        tokenIdentity: '代币与身份',
+        trade: '交易',
+        groupChat: '群聊',
+        other: '其他',
+      },
+      labels: {
+        tokenAddress: '社区代币',
+        firstTokenAddress: '首币',
+        memberNFT: '身份 NFT',
+        stake: '质押',
+        submit: '提交',
+        vote: '投票',
+        mint: '铸造',
+        phase: '阶段',
+        launch: '发射',
+        actionTarget: '行动目标',
+        groupActionExecutor: '链群行动执行器',
+        groupServiceExecutor: '链群服务执行器',
+        lpExecutor: 'LP 执行器',
+        groupChat: '链群聊天',
+        groupChatMember: '链群成员',
+        groupChatAdmin: '链群管理',
+        weth: '包装原生币',
+        factory: '交易对工厂',
+        router: '兑换路由',
+        multicall3: '批量读取',
+        airdrop: '空投',
+        pair: '交易对',
+      },
+    },
+    data: {
+      chainId: '链 ID',
+      rpc: 'RPC',
+      deploymentBlock: '部署区块',
+      communityToken: '当前社区代币',
+      communitySupply: '当前社区代币总量',
+      memberNftSupply: '身份 NFT 总供应量',
+      airdropPool: '空投池余额',
+      phase: '当前阶段',
+      appVersion: '应用版本',
+      buildNumber: '构建号',
+      notConfigured: '未配置',
+    },
+  },
+  // ───────────────────────────────────────────────────────────────────────────
+  // END about-page block
+  // ───────────────────────────────────────────────────────────────────────────
 };

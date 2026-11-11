@@ -1,5 +1,5 @@
 import { ArrowUpLeft } from '@/shared/ui/icons';
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { BUILD_ID } from '@/config/build-id.generated';
@@ -7,8 +7,7 @@ import { APP_ENV } from '@/config/env';
 import { BRAND_DOCS_URL, NETWORK, configuredAddress } from '@/config/networks';
 import { variantLabel } from '@/shared/lib/variant-label';
 import { copy } from '@/shared/config/copy';
-import { formatBuildId, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
-import { useCommunityBalance } from '@/entities/community-token/model/use-community-balance';
+import { formatBuildId } from '@/shared/lib/format';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
@@ -16,51 +15,37 @@ import { useCommunityContext } from '@/features/switch-community/model/use-commu
 import { TechnicalDetails } from '@/widgets/contract-addresses/technical-details';
 
 /**
- * 首页 = 提醒流 (UX spec §3.1, owner 2026-11-11): only what needs the user's
- * attention is on the page. Navigation lives in /apps; identity and balance
- * details live in 我的 (§3.7); home keeps a single thin line into 我的.
+ * 首页 = 问候 + 提醒流 (UX spec §3.1, owner 2026-11-12): the page opens with a
+ * greeting that names the current identity NFT, then only what needs the user's
+ * attention. Navigation lives in /apps; identity and balance details live in 我的
+ * (§3.7). With nothing to do the page is greeting + footer, with no filler line.
  */
 
 // The snapshot + Airdrop ABI live in a separate chunk: they must never block
-// the thin line or the no-identity reminder (UX spec §3.1 "快照加载与资格卡显隐").
+// the greeting or the no-identity reminder (UX spec §3.1 "快照加载与资格卡显隐").
 const AirdropReminder = lazy(async () => {
   const module = await import('@/pages/home/airdrop-reminder');
   return { default: module.AirdropReminder };
 });
-
-/** Whether the lazy airdrop chunk found a reminder card. */
-export type AirdropReminderStatus = 'pending' | 'eligible' | 'other';
 
 export function HomePage() {
   const { address: account } = useAccount();
   const identity = useMemberIdentity();
   const { symbol } = useCommunityContext();
   const token = useCommunityToken(symbol);
-  const balance = useCommunityBalance(token.address, token.decimals);
   const { search } = useLocation();
-  const [airdropStatus, setAirdropStatus] = useState<AirdropReminderStatus>('pending');
 
-  const toMe = { pathname: '/me', search } as const;
-
-  // Thin line left: current identity name, 还没有身份 when settled without a
-  // current identity, — while unknown (never invent a name).
-  const identityName =
-    identity.selected?.name ??
-    (identity.status === 'empty' || identity.status === 'needs-selection'
-      ? copy.home.thinLineNoIdentity
-      : UNKNOWN);
-
-  const amountText =
-    balance.status === 'ready' ? formatTokenAmount(balance.value, balance.decimals) : UNKNOWN;
-  const balanceText = amountText === UNKNOWN ? UNKNOWN : `${amountText} ${token.symbol}`;
+  const selectedName = identity.selected?.name;
+  // Greeting states: connected + identity → 你好，{memberName}; otherwise 你好
+  // (connected without an identity, still loading, or not connected at all).
+  const greeting =
+    selectedName !== null && selectedName !== undefined
+      ? copy.home.greeting(selectedName)
+      : copy.home.greetingNoName;
 
   const connected = account !== undefined;
   const needsIdentityCard = connected && identity.status === 'empty';
   const needsSelectionCard = connected && identity.status === 'needs-selection';
-  const identitySettled =
-    identity.status === 'empty' ||
-    identity.status === 'ready' ||
-    identity.status === 'needs-selection';
 
   // TODO(owner 2026-11-11, 未确认交易提醒): there is no shared pending-tx read
   // model today — mintTask / airdropClaim / swapReceipt each persist their own
@@ -81,15 +66,13 @@ export function HomePage() {
         </section>
       ) : null}
 
-      {/* Thin line: always visible, one row, whole row → /me, no card chrome. */}
-      <Link
-        to={toMe}
-        data-testid="home-thin-line"
-        className="flex w-full min-w-0 items-center justify-between gap-3 py-1 text-sm text-muted underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+      {/* The page h1: a greeting, never a link. One line, truncating. */}
+      <h1
+        data-testid="home-greeting"
+        className="truncate text-2xl font-semibold tracking-tight text-foreground"
       >
-        <span className="min-w-0 flex-1 truncate">{identityName}</span>
-        <span className="shrink-0 whitespace-nowrap font-mono text-xs">{balanceText}</span>
-      </Link>
+        {greeting}
+      </h1>
 
       {needsIdentityCard ? (
         <section
@@ -130,20 +113,8 @@ export function HomePage() {
 
       {connected ? (
         <Suspense fallback={null}>
-          <AirdropReminder
-            primary={!needsIdentityCard && !needsSelectionCard}
-            onStatusChange={setAirdropStatus}
-            search={search}
-          />
+          <AirdropReminder primary={!needsIdentityCard && !needsSelectionCard} search={search} />
         </Suspense>
-      ) : null}
-
-      {connected &&
-      identitySettled &&
-      !needsIdentityCard &&
-      !needsSelectionCard &&
-      airdropStatus === 'other' ? (
-        <p className="text-sm leading-6 text-muted">{copy.home.nothingToDo}</p>
       ) : null}
 
       <footer className="space-y-3 border-t border-line pt-4">

@@ -10,6 +10,7 @@ const loadMintPage = () => import('@/pages/mint/mint-page');
 const loadAirdropPage = () => import('@/pages/airdrop/airdrop-page');
 const loadSwapPage = () => import('@/pages/swap/swap-page');
 const loadAppsPage = () => import('@/pages/apps/apps-page');
+const loadAboutPage = () => import('@/pages/about/about-page');
 const loadGovPage = () => import('@/pages/gov/gov-page');
 const loadActPage = () => import('@/pages/act/act-page');
 const loadGroupPage = () => import('@/pages/group/group-page');
@@ -35,6 +36,10 @@ export const SwapPage = lazy(async () => {
 export const AppsPage = lazy(async () => {
   const module = await loadAppsPage();
   return { default: module.AppsPage };
+});
+export const AboutPage = lazy(async () => {
+  const module = await loadAboutPage();
+  return { default: module.AboutPage };
 });
 export const GovPage = lazy(async () => {
   const module = await loadGovPage();
@@ -64,6 +69,7 @@ const ROUTE_LOADERS: Readonly<Record<string, () => Promise<unknown>>> = Object.f
   '/airdrop': loadAirdropPage,
   '/swap': loadSwapPage,
   '/apps': loadAppsPage,
+  '/about': loadAboutPage,
   '/gov': loadGovPage,
   '/act': loadActPage,
   '/group': loadGroupPage,

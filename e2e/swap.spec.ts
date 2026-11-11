@@ -264,7 +264,7 @@ async function installWallet(page: Page, account: string): Promise<void> {
 }
 
 async function connect(page: Page): Promise<void> {
-  const menu = page.getByRole('button', { name: '打开钱包与身份菜单' });
+  const menu = page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' });
   if (await menu.isVisible().catch(() => false)) return;
   const button = page.getByRole('button', { name: '连接钱包' }).first();
   await expect(button).toBeEnabled({ timeout: 5_000 });
@@ -367,6 +367,16 @@ test('swap: ETH → TestLOVE20 shows path/min-out and a receipt from the pair Sw
   await expect(page.getByRole('heading', { name: '兑换完成' })).toBeVisible({ timeout: 30_000 });
   expect((await page.getByTestId('swap-receipt-amount').innerText()).trim()).toBe(actualText);
   expect((await page.getByTestId('swap-receipt-hash').innerText()).trim()).toBe(hash);
+
+  // 留在此页: the receipt collapses into a success strip, the route stays /swap
+  // and the form resets to empty so the same swap cannot be submitted again.
+  await page.getByRole('button', { name: '留在此页' }).click();
+  await expect(page).toHaveURL(/\/swap/);
+  const strip = page.getByTestId('swap-success-strip');
+  await expect(strip).toBeVisible();
+  await expect(strip).toContainText(actualText);
+  await expect(page.getByTestId('swap-from-amount')).toHaveValue('');
+  await expect(page.getByRole('button', { name: '再兑换一次' })).toBeVisible();
 
   console.log(
     `swap ETH→token: tx=${hash} quote=${quotedText} minOut=${minOutText} actual=${actualText} ` +

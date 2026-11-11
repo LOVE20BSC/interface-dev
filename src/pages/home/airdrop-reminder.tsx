@@ -1,16 +1,13 @@
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy';
 import { buttonStyles } from '@/shared/ui/button';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { useAirdropEligibility } from '@/entities/airdrop/model/use-airdrop-eligibility';
 import { useFirstToken } from '@/entities/community-token/model/use-first-token';
-import type { AirdropReminderStatus } from '@/pages/home/home-page';
 
 export interface AirdropReminderProps {
   /** False when the no-identity card already owns the screen's one filled button. */
   readonly primary: boolean;
-  readonly onStatusChange: (status: AirdropReminderStatus) => void;
   readonly search: string;
 }
 
@@ -23,22 +20,11 @@ export interface AirdropReminderProps {
  * This module is a lazy chunk: the snapshot document and Airdrop ABI must never
  * enter the first-screen bundle.
  */
-export function AirdropReminder({ primary, onStatusChange, search }: AirdropReminderProps) {
+export function AirdropReminder({ primary, search }: AirdropReminderProps) {
   const eligibility = useAirdropEligibility();
   const firstToken = useFirstToken();
 
-  const isEligible = eligibility.status === 'eligible';
-  const status: AirdropReminderStatus = isEligible
-    ? 'eligible'
-    : eligibility.status === 'loading'
-      ? 'pending'
-      : 'other';
-
-  useEffect(() => {
-    onStatusChange(status);
-  }, [onStatusChange, status]);
-
-  if (!isEligible) return null;
+  if (eligibility.status !== 'eligible') return null;
 
   const amount =
     eligibility.claimableAmount !== undefined &&
