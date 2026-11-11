@@ -125,6 +125,19 @@ describe('HomePage greeting', () => {
     expect(greeting()).toHaveTextContent('你好');
   });
 
+  it.each(['loading', 'error'] as const)(
+    'does not name a cached identity while status is %s',
+    (status) => {
+      // ownerOf() has not validated the cached selection, so the greeting must
+      // agree with the pill's 「—」 and the error card, not assert a name.
+      memberIdentity.mockReturnValue(identity({ status }));
+      renderPage();
+
+      expect(greeting()).toHaveTextContent(/^你好$/);
+      expect(greeting()).not.toHaveTextContent('Testdev-member-0');
+    },
+  );
+
   it('greets with 你好 when the wallet is not connected', () => {
     account.mockReturnValue({ address: undefined, isConnected: false } as ReturnType<
       typeof useAccount

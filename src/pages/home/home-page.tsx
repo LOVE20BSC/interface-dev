@@ -26,9 +26,12 @@ export function HomePage() {
   const identity = useMemberIdentity();
   const { search } = useLocation();
 
-  const selectedName = identity.selected?.name;
-  // Greeting states: connected + identity → 你好，{memberName}; otherwise 你好
-  // (connected without an identity, still loading, or not connected at all).
+  // Only a validated (`ready`) identity may be named: a cached selection is not
+  // a fact while ownerOf() is loading, failed, or has not run (UX spec §3.1,
+  // same rule as the pill / wallet menu).
+  const selectedName = identity.status === 'ready' ? identity.selected?.name : undefined;
+  // Greeting states: validated identity → 你好，{memberName}; otherwise 你好
+  // (loading / error / unconfigured / empty / needs-selection / disconnected).
   const greeting =
     selectedName !== null && selectedName !== undefined
       ? copy.home.greeting(selectedName)

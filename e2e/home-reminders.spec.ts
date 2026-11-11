@@ -93,10 +93,13 @@ test.describe('首页提醒流', () => {
   test('unreachable RPC: honest error card, 重试 recovers instead of a bare greeting', async ({
     page,
   }) => {
-    await installWallet(page, ACCOUNTS.outsider);
+    // The owner's 2026-11-12 incident: a cached identity selection exists, but
+    // every identity read fails while the wallet is connected. The greeting must
+    // not name the cached identity (the pill shows 「—」); the page explains the
+    // failure instead of going blank.
+    await installWallet(page, ACCOUNTS.withIdentity);
+    await seedIdentity(page, ACCOUNTS.withIdentity, '1');
 
-    // Simulate the owner's 2026-11-12 incident: every identity read fails while
-    // the wallet is connected. The page must explain the failure, not go blank.
     const blockRpc = (url: URL) => url.href.startsWith(RPC_URL);
     await page.route(blockRpc, (route) => route.abort('failed'));
     await page.goto('/');
@@ -106,19 +109,16 @@ test.describe('首页提醒流', () => {
     await expect(card).toBeVisible({ timeout: 20_000 });
     await expect(card.getByRole('heading', { name: '身份 NFT 暂时读不到' })).toBeVisible();
     await expect(card.getByRole('button', { name: '重试' })).toBeVisible();
-    // The greeting is still there; the error card is the explanation.
+    // Cached name is not a fact until ownerOf() revalidates it.
     await expect(greeting(page)).toHaveText('你好');
     await shot(page, 'home-identity-error.png');
 
-    // 重试 actually refetches: once the RPC works again the normal empty state
-    // replaces the error card.
+    // 重试 actually refetches: once the RPC works again the validated identity
+    // replaces the error card and the greeting names it.
     await page.unroute(blockRpc);
     await card.getByRole('button', { name: '重试' }).click();
-    await expect(page.getByText('你还没有身份 NFT')).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole('link', { name: '铸造身份 NFT' })).toHaveAttribute(
-      'href',
-      '/mint?symbol=TestLOVE20',
-    );
+    await expect(greeting(page)).toHaveText(`你好，${SEEDED_NAME}`, { timeout: 20_000 });
+    await expect(card).toHaveCount(0);
   });
 
   test('holds identities but none selected: asks to pick one, no empty sentence', async ({
