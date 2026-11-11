@@ -37,6 +37,13 @@ const ACCOUNTS = {
 
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
 
+/**
+ * The seed mints `Testdev-member-0` verbatim (anvil
+ * params/anvil31337_dev/seed.params SEED_MEMBER_NAME_PREFIX=Testdev-member-).
+ * core@72a1604 no longer adds `Test` on chain, so this is the fixture string.
+ */
+const SEEDED_NAME = 'Testdev-member-0';
+
 test.use({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 1,
@@ -207,7 +214,7 @@ test('home: identity greeting persists across reload', async ({ page }) => {
   await page.goto('/');
   await connect(page);
 
-  await expect(page.getByText('你好，Testdev-member-0')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(`你好，${SEEDED_NAME}`)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('身份 #1').first()).toBeVisible();
   await expect(page.getByRole('link', { name: '切换身份' })).toBeVisible();
   await expect(page.getByText('无需操作')).toHaveCount(0);
@@ -222,7 +229,7 @@ test('home: identity greeting persists across reload', async ({ page }) => {
   await shot(page, 'home-connected-with-identity.png');
 
   await page.reload();
-  await expect(page.getByText('你好，Testdev-member-0')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(`你好，${SEEDED_NAME}`)).toBeVisible({ timeout: 15_000 });
 });
 
 test('home: eligible wallet sees the airdrop card', async ({ page }) => {
@@ -270,14 +277,14 @@ test('my-nft: card list and local selection without a transaction', async ({ pag
   await shot(page, 'my-nft-list.png');
 
   await page.getByRole('button', { name: '使用此身份' }).click();
-  await expect(page.getByText('当前：Testdev-member-0')).toBeVisible();
+  await expect(page.getByText(`当前：${SEEDED_NAME}`)).toBeVisible();
   await expect(page.getByRole('button', { name: '当前身份' })).toBeDisabled();
   // No wallet confirmation appeared: selection is a local cache write.
   await expect(page.getByRole('button', { name: '打开钱包与身份菜单' })).toBeVisible();
   await shot(page, 'my-nft-selected.png');
 
   await page.reload();
-  await expect(page.getByText('当前：Testdev-member-0')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(`当前：${SEEDED_NAME}`)).toBeVisible({ timeout: 15_000 });
 });
 
 test('identity cache is cleared when ownerOf belongs to someone else', async ({ page }) => {
@@ -289,7 +296,7 @@ test('identity cache is cleared when ownerOf belongs to someone else', async ({ 
 
   await expect(page.getByText('这个身份已不属于当前钱包')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('你还没有身份')).toBeVisible();
-  await expect(page.getByText('你好，Testdev-member-0')).toHaveCount(0);
+  await expect(page.getByText(`你好，${SEEDED_NAME}`)).toHaveCount(0);
   const stored = await page.evaluate(
     (key) => window.localStorage.getItem(key),
     identityCacheKey(ACCOUNTS.eligible),
@@ -319,7 +326,7 @@ test('my-nft: md+ renders the 编号/名称/操作 table', async ({ page }) => {
   });
   await expect(page.getByRole('columnheader', { name: '名称' })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: '操作' })).toBeVisible();
-  await expect(page.getByRole('cell', { name: 'Testdev-member-0' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: SEEDED_NAME })).toBeVisible();
 });
 
 test('my-nft: transfer drawer warns and rejects the current wallet', async ({ page }) => {

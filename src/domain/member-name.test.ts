@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { isMemberNameCharacterValid, utf8ByteLength } from './member-name';
+import { isMemberNameCharacterValid, isTestPrefixedName, utf8ByteLength } from './member-name';
+
+describe('isTestPrefixedName', () => {
+  it('accepts the exact, case-sensitive Test prefix', () => {
+    expect(isTestPrefixedName('Test')).toBe(true);
+    expect(isTestPrefixedName('Testdev-member-0')).toBe(true);
+    expect(isTestPrefixedName('Teste2e-member')).toBe(true);
+  });
+
+  it('rejects names that do not start with a capital Test', () => {
+    expect(isTestPrefixedName('testdev-member-0')).toBe(false);
+    expect(isTestPrefixedName('TEST-member')).toBe(false);
+    expect(isTestPrefixedName('dev-member-0')).toBe(false);
+    expect(isTestPrefixedName('Tes')).toBe(false);
+    expect(isTestPrefixedName('')).toBe(false);
+  });
+});
 
 describe('utf8ByteLength', () => {
   it('counts ASCII as one byte and Chinese as three', () => {

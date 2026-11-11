@@ -41,10 +41,12 @@ const ACCOUNTS = {
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
 
 const RUN_ID = Math.random().toString(36).slice(2, 8);
-const BRANCH_NAME = `e2e-branch-${RUN_ID}`;
-const NEW_NAME = `e2e-mint-${RUN_ID}`;
-/** CI-004: mint() prefixes `Test` when the payment symbol starts with Test. */
-const CHAIN_NAME = `Test${NEW_NAME}`;
+/** Dev builds block names without `Test`; the chain then stores them verbatim. */
+const BRANCH_NAME = `Teste2e-branch-${RUN_ID}`;
+const NEW_NAME = `Teste2e-mint-${RUN_ID}`;
+const NON_TEST_NAME = `e2e-noprefix-${RUN_ID}`;
+/** anvil seed: params/anvil31337_dev/seed.params SEED_MEMBER_NAME_PREFIX=Testdev-member- */
+const SEEDED_NAME = 'Testdev-member-0';
 
 let mintedMemberId = '';
 let mintedName = '';
@@ -165,6 +167,34 @@ function castCall(signature: string, ...args: string[]): string {
 
 test.beforeAll(() => {
   mkdirSync(SHOTS, { recursive: true });
+  // The seed fixture must be live: core@72a1604 stores this name verbatim, so a
+  // chain that still auto-prefixes (or still seeds `dev-member-0`) fails loudly.
+  expect(castCall('memberName(uint256)(string)', '1')).toBe(`"${SEEDED_NAME}"`);
+});
+
+test('mint: dev blocks a name that does not start with Test', async ({ page }) => {
+  await installWallet(page, ACCOUNTS.funded);
+  await page.goto('/mint');
+  await connect(page);
+
+  const input = page.getByRole('textbox', { name: '给身份起个名字' });
+  await expect(input).toBeVisible({ timeout: 15_000 });
+  await input.fill(NON_TEST_NAME);
+
+  await expect(page.getByText('✗ 名称必须以 Test 开头')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('为了让测试身份和真实身份一眼能分开。')).toBeVisible();
+  // The rule line is dev/test copy, and the old "contract adds Test" note is gone.
+  await expect(page.getByText('名称必须以 Test 开头', { exact: true })).toBeVisible();
+  await expect(page.getByText(/测试环境会在链上名字前加 Test/)).toHaveCount(0);
+  // The byte budget is the full MAX_NAME_LENGTH (32), not 28.
+  await expect(page.locator('#mint-name-bytes')).toContainText('/32 字节');
+  await expect(page.getByRole('button', { name: /^(2\. )?铸造身份$/ })).toBeDisabled();
+  await expect(page.getByText('✓ 可以用')).toHaveCount(0);
+
+  // Once the name satisfies the rule the local error disappears and the quote runs.
+  await input.fill(`Test${NON_TEST_NAME}`);
+  await expect(page.getByText('✗ 名称必须以 Test 开头')).toHaveCount(0);
+  await expect(page.getByText('✓ 可以用')).toBeVisible({ timeout: 10_000 });
 });
 
 test('mint: a taken name blocks the CTA and shows the existing #id', async ({ page }) => {
@@ -174,9 +204,9 @@ test('mint: a taken name blocks the CTA and shows the existing #id', async ({ pa
 
   const input = page.getByRole('textbox', { name: '给身份起个名字' });
   await expect(input).toBeVisible({ timeout: 15_000 });
-  await input.fill('dev-member-0');
+  await input.fill(SEEDED_NAME);
 
-  // The dev/test deployment prefixes Test before checking uniqueness (CI-004).
+  // The quote sends the raw name, and the seed minted exactly this string.
   await expect(page.getByText('这个名字已经被用了（#1）')).toBeVisible({ timeout: 10_000 });
 
   const mintButton = page.getByRole('button', { name: /^(2\. )?铸造身份$/ });
@@ -210,7 +240,7 @@ test('mint: insufficient balance with airdrop eligibility goes to 铸造空投�
   await shot(page, 'mint-insufficient.png');
 });
 
-test('mint: insufficient balance without airdrop eligibility goes to 用 BNB 兑换', async ({
+test('mint: insufficient balance without airdrop eligibility goes to 用 ETH 兑换', async ({
   page,
 }) => {
   await installWallet(page, ACCOUNTS.outsider);
@@ -222,11 +252,11 @@ test('mint: insufficient balance without airdrop eligibility goes to 用 BNB 兑
   await input.fill(BRANCH_NAME);
 
   await expect(page.getByText('✓ 可以用')).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText('TestLOVE20 不够。可以用 BNB 换一些，再回来铸造。')).toBeVisible({
+  await expect(page.getByText('TestLOVE20 不够。可以用 ETH 换一些，再回来铸造。')).toBeVisible({
     timeout: 20_000,
   });
 
-  const swapCta = page.getByRole('link', { name: '用 BNB 兑换' });
+  const swapCta = page.getByRole('link', { name: '用 ETH 兑换' });
   await expect(swapCta).toBeVisible();
   await expect(swapCta).toHaveAttribute('href', /\/swap\?symbol=TestLOVE20$/);
 });
@@ -269,7 +299,7 @@ test('mint: approve → mint produces a real receipt with MemberMinted data', as
   const burned = (await page.getByTestId('mint-receipt-burned').innerText()).trim();
 
   expect(mintedMemberId).toMatch(/^[0-9]+$/);
-  expect(mintedName).toBe(CHAIN_NAME);
+  expect(mintedName).toBe(NEW_NAME);
   expect(mintedHash).toMatch(/^0x[0-9a-f]{64}$/i);
   expect(burned).toMatch(/TestLOVE20$/);
   expect(burned).toMatch(/[1-9]/);
@@ -283,7 +313,8 @@ test('mint: approve → mint produces a real receipt with MemberMinted data', as
   ).toBeNull();
 
   // The receipt's #id is a real on-chain token that cast agrees exists.
-  expect(castCall('memberName(uint256)(string)', mintedMemberId)).toBe(`"${CHAIN_NAME}"`);
+  // core@72a1604 stores the raw input; the chain did not add or strip a prefix.
+  expect(castCall('memberName(uint256)(string)', mintedMemberId)).toBe(`"${NEW_NAME}"`);
   expect(castCall('ownerOf(uint256)(address)', mintedMemberId).toLowerCase()).toBe(
     ACCOUNTS.funded.toLowerCase(),
   );

@@ -1,11 +1,21 @@
 /**
  * MemberNFT name rules that the browser can decide without a chain read.
- * The contract remains authoritative: mint() re-validates the (possibly
- * dev-prefixed) name, and a rejected transaction is still handled by the page.
+ * The contract remains authoritative: mint() re-validates the raw name, and a
+ * rejected transaction is still handled by the page.
  *
  * UX spec §3.3: length is UTF-8 bytes, never `maxLength` characters — a Chinese
- * character is 3 bytes and must not be cut in half.
+ * character is 3 bytes and must not be cut in half. Dev/test builds additionally
+ * require the name to start with `Test`; that is a frontend rule, not chain
+ * behaviour (core@72a1604 stopped auto-prefixing names).
  */
+
+/** Dev/test builds require identity names to start with this exact prefix. */
+export const TEST_NAME_PREFIX = 'Test';
+
+/** Case-sensitive: `test…` does not satisfy the dev/test naming rule. */
+export function isTestPrefixedName(value: string): boolean {
+  return value.startsWith(TEST_NAME_PREFIX);
+}
 
 /** UTF-8 byte length, the unit MAX_NAME_LENGTH and calculateMintCost use. */
 export function utf8ByteLength(value: string): number {

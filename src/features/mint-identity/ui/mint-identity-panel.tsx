@@ -33,6 +33,7 @@ const NAME_CHECK_TONE: Record<MintNameStatus, string> = {
   empty: 'text-muted',
   'too-long': 'text-danger',
   invalid: 'text-danger',
+  'prefix-required': 'text-danger',
   checking: 'text-muted',
   taken: 'text-danger',
   available: 'text-success',
@@ -239,7 +240,8 @@ export function MintIdentityPanel({
     );
   }
 
-  const maxBytesText = quote.maxBytes !== undefined ? quote.maxBytes.toString() : UNKNOWN;
+  const maxBytesText =
+    config.maxNameLength !== undefined ? config.maxNameLength.toString() : UNKNOWN;
   const checkText = (() => {
     switch (quote.nameStatus) {
       case 'checking':
@@ -252,6 +254,8 @@ export function MintIdentityPanel({
         return copy.mintIdentity.name.check.tooLong(maxBytesText);
       case 'invalid':
         return copy.mintIdentity.name.check.invalid;
+      case 'prefix-required':
+        return copy.mintIdentity.name.check.prefix;
       case 'error':
         return copy.mintIdentity.name.check.error;
       case 'empty':
@@ -313,7 +317,7 @@ export function MintIdentityPanel({
           autoCapitalize="off"
           spellCheck={false}
           className="mt-2 h-12 w-full rounded-2xl border border-line bg-surface px-3 text-base text-foreground shadow-soft outline-none placeholder:text-muted/70 focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
-          aria-describedby="mint-name-bytes mint-name-check"
+          aria-describedby={`mint-name-bytes${quote.requiresTestPrefix ? ' mint-name-rule' : ''} mint-name-check`}
         />
         <div
           id="mint-name-bytes"
@@ -324,10 +328,13 @@ export function MintIdentityPanel({
           </span>
           <span>{copy.mintIdentity.name.rule}</span>
         </div>
-        {quote.isPrefixed && name.length > 0 ? (
-          <p className="mt-1 text-xs leading-5 text-warning">
-            {copy.mintIdentity.name.devPrefix(quote.effectiveName)}
-          </p>
+        {quote.requiresTestPrefix ? (
+          <div id="mint-name-rule" className="mt-1 space-y-0.5">
+            <p className="text-xs leading-5 text-muted">{copy.mintIdentity.name.testRule}</p>
+            {quote.nameStatus === 'prefix-required' ? (
+              <p className="text-xs leading-5 text-danger">{copy.mintIdentity.name.testReason}</p>
+            ) : null}
+          </div>
         ) : null}
         <p
           id="mint-name-check"

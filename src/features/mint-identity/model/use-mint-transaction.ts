@@ -19,7 +19,7 @@ interface PendingTx {
 
 export interface MintedIdentity {
   readonly memberId: bigint;
-  /** On-chain memberName (MemberMinted.name), i.e. the dev-prefixed string when applicable. */
+  /** On-chain memberName (MemberMinted.name); the chain stores the raw input verbatim. */
   readonly name: string;
   /** MemberMinted.cost — exactly what the contract pulled and burned. */
   readonly cost: bigint;

@@ -1,24 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useReadContracts } from 'wagmi';
 import { memberNftAbi } from '@/config/abis';
-import { isMemberNameCharacterValid, utf8ByteLength } from '@/domain/member-name';
-import {
-  applyDevNamePrefixIfNeeded,
-  DEV_NAME_PREFIX_BYTES,
-} from '@/features/mint-identity/lib/dev-name-prefix';
+import { APP_ENV } from '@/config/env';
+import { utf8ByteLength } from '@/domain/member-name';
+import { localNameStatus, requiresTestNamePrefix } from '@/features/mint-identity/lib/name-rule';
 import type { MintConfigState } from '@/features/mint-identity/model/use-mint-config';
 
 export type MintNameStatus =
-  'empty' | 'too-long' | 'invalid' | 'checking' | 'taken' | 'available' | 'error';
+  | 'empty'
+  | 'too-long'
+  | 'invalid'
+  | 'prefix-required'
+  | 'checking'
+  | 'taken'
+  | 'available'
+  | 'error';
 
 export interface MintQuoteState {
   readonly nameStatus: MintNameStatus;
-  /** Name after the CI-004 dev/test prefix; what the chain will actually store. */
-  readonly effectiveName: string;
-  readonly isPrefixed: boolean;
+  /** True on dev/test builds: the name must start with `Test` (UX spec §3.3). */
+  readonly requiresTestPrefix: boolean;
   readonly byteLength: number;
-  /** Maximum bytes the user may type, already reduced by the dev prefix. */
-  readonly maxBytes: number | undefined;
   /** Quoted cost in payment-token units; undefined until a valid name is checked. */
   readonly cost: bigint | undefined;
   /** Existing token id when the name is taken; undefined means unknown. */
@@ -28,26 +30,15 @@ export interface MintQuoteState {
 
 const NAME_DEBOUNCE_MS = 400;
 
-function localNameStatus(
-  rawName: string,
-  effectiveName: string,
-  maxNameLength: number | undefined,
-  isConfigReady: boolean,
-): 'empty' | 'too-long' | 'invalid' | 'waiting' | 'ok' {
-  if (rawName.length === 0) return 'empty';
-  if (!isConfigReady || maxNameLength === undefined) return 'waiting';
-  if (!isMemberNameCharacterValid(rawName)) return 'invalid';
-  if (utf8ByteLength(effectiveName) > maxNameLength) return 'too-long';
-  return 'ok';
-}
-
 /**
  * Debounced name → price/uniqueness quote (UX spec §3.3).
  *
  * The debounce is the cancellation mechanism: until it settles the contracts
  * array is empty, so a stale request for the previous name cannot overwrite the
- * answer for the new one. Names are sent to the contract exactly as mint() will
- * see them (including the CI-004 dev prefix), never folded to lower case here.
+ * answer for the new one. Names are sent to the contract exactly as the user
+ * typed them — core@72a1604 stopped prefixing names, so calculateMintCost(),
+ * isNameUsed() and memberId() all take the raw string. The dev/test `Test`
+ * requirement is a local blocking rule, never a transformation.
  */
 export function useMintQuote(rawName: string, config: MintConfigState): MintQuoteState {
   const [debouncedName, setDebouncedName] = useState('');
@@ -58,28 +49,16 @@ export function useMintQuote(rawName: string, config: MintConfigState): MintQuot
     return () => window.clearTimeout(timer);
   }, [debouncedName, rawName]);
 
-  const preview = applyDevNamePrefixIfNeeded(rawName, config.paymentTokenSymbol);
-  const status = localNameStatus(
-    rawName,
-    preview.effectiveName,
-    config.maxNameLength,
-    config.status === 'ready',
-  );
-
-  const maxBytes =
-    config.maxNameLength !== undefined
-      ? config.maxNameLength - (preview.isPrefixed ? DEV_NAME_PREFIX_BYTES : 0)
-      : undefined;
+  const rule = {
+    variant: APP_ENV.variant,
+    maxNameLength: config.maxNameLength,
+    isConfigReady: config.status === 'ready',
+  } as const;
+  const status = localNameStatus({ name: rawName, ...rule });
   const byteLength = utf8ByteLength(rawName);
 
-  const debounced = applyDevNamePrefixIfNeeded(debouncedName, config.paymentTokenSymbol);
-  const debouncedIsValid =
-    debouncedName.length > 0 &&
-    rawName === debouncedName &&
-    config.status === 'ready' &&
-    config.maxNameLength !== undefined &&
-    isMemberNameCharacterValid(debouncedName) &&
-    utf8ByteLength(debounced.effectiveName) <= config.maxNameLength;
+  const debouncedStatus = localNameStatus({ name: debouncedName, ...rule });
+  const debouncedIsValid = rawName === debouncedName && debouncedStatus === 'ok';
 
   const nft = config.memberNftAddress;
   const contracts = useMemo(() => {
@@ -89,22 +68,22 @@ export function useMintQuote(rawName: string, config: MintConfigState): MintQuot
         address: nft,
         abi: memberNftAbi,
         functionName: 'calculateMintCost' as const,
-        args: [debounced.effectiveName] as const,
+        args: [debouncedName] as const,
       },
       {
         address: nft,
         abi: memberNftAbi,
         functionName: 'isNameUsed' as const,
-        args: [debounced.effectiveName] as const,
+        args: [debouncedName] as const,
       },
       {
         address: nft,
         abi: memberNftAbi,
         functionName: 'memberId' as const,
-        args: [debounced.effectiveName] as const,
+        args: [debouncedName] as const,
       },
     ];
-  }, [debounced.effectiveName, debouncedIsValid, nft]);
+  }, [debouncedIsValid, debouncedName, nft]);
 
   const reads = useReadContracts({
     contracts,
@@ -136,6 +115,8 @@ export function useMintQuote(rawName: string, config: MintConfigState): MintQuot
     nameStatus = 'invalid';
   } else if (status === 'too-long') {
     nameStatus = 'too-long';
+  } else if (status === 'prefix-required') {
+    nameStatus = 'prefix-required';
   } else if (status === 'waiting' || rawName !== debouncedName) {
     nameStatus = 'checking';
   } else if (reads.isError || quoteFailed) {
@@ -152,10 +133,8 @@ export function useMintQuote(rawName: string, config: MintConfigState): MintQuot
 
   return {
     nameStatus,
-    effectiveName: preview.effectiveName,
-    isPrefixed: preview.isPrefixed,
+    requiresTestPrefix: requiresTestNamePrefix(APP_ENV.variant),
     byteLength,
-    maxBytes,
     cost: nameStatus === 'available' ? cost : undefined,
     existingMemberId: nameStatus === 'taken' ? existingMemberId : undefined,
     refetch: () => {

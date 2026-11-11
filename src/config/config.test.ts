@@ -44,7 +44,8 @@ describe('deployment documents', () => {
     const parsed = parseDeployment(json, variant);
     expect(parsed.chainId).toBe(chainId);
     expect(parsed.rpcUrls.length).toBeGreaterThan(0);
-    expect(parsed.nativeCurrency.symbol).toBe('BNB');
+    // anvil's native coin is ETH; only the BSC deployments use BNB.
+    expect(parsed.nativeCurrency.symbol).toBe(variant === 'dev' ? 'ETH' : 'BNB');
     expect(parsed.defaultSymbol.length).toBeGreaterThan(0);
     expect(parsed.brand.docsUrl).toMatch(/^https?:\/\//);
     const addresses = Object.values(parsed.addresses);
@@ -83,6 +84,7 @@ describe('active environment package (vitest pins VITE_ENV=dev)', () => {
   it('loads the real anvil address book through the build alias', () => {
     expect(DEPLOYMENT.variant).toBe('dev');
     expect(DEFAULT_SYMBOL).toBe('TestLOVE20');
+    expect(DEPLOYMENT.nativeCurrency.symbol).toBe('ETH');
     expect(isConfiguredAddress(ADDRESSES.tokenAddress)).toBe(true);
     expect(seedCoreAddress()).toBe(ADDRESSES.launch);
   });

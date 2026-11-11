@@ -1,4 +1,10 @@
-import { BRAND_NAME } from '@/config/networks';
+import { BRAND_NAME, NETWORK } from '@/config/networks';
+
+/**
+ * The chain's native coin (ETH on the local anvil, BNB on BSC). Every string
+ * that names it renders this, never a hardcoded ticker (UX spec §1.3/§3.3).
+ */
+const NATIVE_SYMBOL = NETWORK.nativeCurrency.symbol;
 
 /**
  * All user-facing Chinese copy lives here (i18n framework deliberately deferred).
@@ -82,7 +88,7 @@ export const copy = {
     identityReading: '读取身份中…',
     identityNotDeployed: '身份未部署',
     balanceUnavailable: '未部署',
-    nativeFeeNote: 'BNB 用于支付网络手续费',
+    nativeFeeNote: `${NATIVE_SYMBOL} 用于支付网络手续费`,
     nativeBalanceLabel: (symbol: string) => `${symbol} 余额`,
     identityMismatch: '这个身份已不属于当前钱包，请重新选择。',
     disconnect: '断开连接',
@@ -235,7 +241,7 @@ export const copy = {
     },
     mint: {
       title: '铸造身份',
-      description: '铸造需要 LOVE20 与一点 BNB 支付网络手续费。',
+      description: `铸造需要 LOVE20 与一点 ${NATIVE_SYMBOL} 支付网络手续费。`,
       notDeployedTitle: '铸造还没有接入',
       notDeployedBody: '地址簿里还缺少 MemberNFT 或铸造合约。价格预览与余额预判会在接入后出现。',
       notDeployedNext: '回首页',
@@ -252,7 +258,7 @@ export const copy = {
     },
     swap: {
       title: '兑换代币',
-      description: '仅支持用 BNB 买入当前社区代币。',
+      description: `仅支持用 ${NATIVE_SYMBOL} 买入当前社区代币。`,
       notDeployedTitle: '兑换还没有接入',
       notDeployedBody: '地址簿里还没有 Router 或交易对地址。接入后会先给报价，再让你确认。',
       notDeployedNext: '回首页',
@@ -275,9 +281,8 @@ export const copy = {
       placeholder: '给身份起个名字',
       bytes: (used: string, max: string) => `${used}/${max} 字节`,
       rule: '中文 3 字节、英文与数字 1 字节；名字越短，价格越高',
-      // CI-004 only: remove together with lib/dev-name-prefix.ts once fixed.
-      devPrefix: (effectiveName: string) =>
-        `测试环境会在链上名字前加 Test，实际名称为「${effectiveName}」。`,
+      testRule: '名称必须以 Test 开头',
+      testReason: '为了让测试身份和真实身份一眼能分开。',
       check: {
         checking: '检查中…',
         available: '✓ 可以用',
@@ -285,6 +290,7 @@ export const copy = {
           memberId === undefined ? '✗ 这个名字已经被用了' : `✗ 这个名字已经被用了（#${memberId}）`,
         tooLong: (maxBytes: string) => `✗ 太长了（最多 ${maxBytes} 字节）`,
         invalid: '✗ 含有不可用的字符',
+        prefix: '✗ 名称必须以 Test 开头',
         error: '暂时检查不了这个名字',
         retry: '重新检查',
       },
@@ -306,8 +312,8 @@ export const copy = {
           ? '你还有空投份额可以铸造，铸造后就够了。'
           : `你还有空投份额可以铸造，预计 ${amount} ${symbol}，铸造后就够了。`,
       airdropCta: '铸造空投份额',
-      swap: (symbol: string) => `${symbol} 不够。可以用 BNB 换一些，再回来铸造。`,
-      swapCta: '用 BNB 兑换',
+      swap: (symbol: string) => `${symbol} 不够。可以用 ${NATIVE_SYMBOL} 换一些，再回来铸造。`,
+      swapCta: `用 ${NATIVE_SYMBOL} 兑换`,
       unknown: '暂时确认不了你的空投资格。',
       retry: '重试',
       swapFirst: '先兑换',
@@ -394,8 +400,8 @@ export const copy = {
       wrongChainBody: '切换到这个应用使用的网络后再铸造空投份额。',
       ineligibleTitle: '这个钱包不在空投名单里。',
       ineligibleBody: '空投只面向快照时的参与者，不影响你现在参与。',
-      ineligibleSwap: (symbol: string) => `用 BNB 兑换 ${symbol}`,
-      unavailableSwap: (symbol: string) => `先用 BNB 兑换 ${symbol}`,
+      ineligibleSwap: (symbol: string) => `用 ${NATIVE_SYMBOL} 兑换 ${symbol}`,
+      unavailableSwap: (symbol: string) => `先用 ${NATIVE_SYMBOL} 兑换 ${symbol}`,
       copyLink: '复制本页链接',
       copied: '已复制',
       backHome: '回首页',
@@ -412,7 +418,7 @@ export const copy = {
       poolEmptyTitle: '你有一份空投，但空投池还没有代币。',
       poolEmptyBody: '等池子补充后再来；你的份额没有变化。',
       shareZeroTitle: '你的份额为 0。',
-      shareZeroBody: '这份快照里没有可分到的份额；你可以先用 BNB 兑换一些。',
+      shareZeroBody: `这份快照里没有可分到的份额；你可以先用 ${NATIVE_SYMBOL} 兑换一些。`,
       shareExceedsTitle: '你的份额超过了空投池剩余份额。',
       shareExceedsBody: '等剩余份额恢复后才能铸造；你的份额没有变化。',
       zeroAmountTitle: '可铸造金额暂时为 0。',

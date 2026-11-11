@@ -346,7 +346,7 @@ test('airdrop: a wallet outside the snapshot gets the reason and a way out', asy
 
   await expect(page.getByText('这个钱包不在空投名单里。')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('空投只面向快照时的参与者，不影响你现在参与。')).toBeVisible();
-  const swap = page.getByRole('link', { name: '用 BNB 兑换 TestLOVE20' });
+  const swap = page.getByRole('link', { name: '用 ETH 兑换 TestLOVE20' });
   await expect(swap).toBeVisible();
   await expect(swap).toHaveAttribute('href', '/swap?symbol=TestLOVE20');
   await expect(page.getByRole('button', { name: '铸造空投份额' })).toHaveCount(0);
