@@ -338,6 +338,11 @@ export const stakeAbi = [
         type: 'uint256',
         internalType: 'uint256',
       },
+      {
+        name: 'firstGovVoteRound',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
     stateMutability: 'view',
   },
@@ -560,6 +565,11 @@ export const stakeAbi = [
       },
       {
         name: 'parentTokenAmountForLiquidity',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'firstGovVoteRound',
         type: 'uint256',
         internalType: 'uint256',
       },
