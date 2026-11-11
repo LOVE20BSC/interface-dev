@@ -1,4 +1,5 @@
 import { getContractErrorMessage, extractRevertData, isUserRejection } from '@/shared/lib/errors';
+import { isTxSendNonceError, isTxStaleBlockError } from '@/shared/lib/tx-send-errors';
 import { copy } from '@/shared/config/copy-pages';
 
 /**
@@ -30,6 +31,9 @@ const AIRDROP_ERRORS: Readonly<Record<string, string>> = Object.freeze({
 /** Writes the result and the next step, never revert data or contract internals. */
 export function describeAirdropClaimError(error: unknown): string {
   if (isUserRejection(error)) return copy.airdrop.errors.rejected;
+  // A stale wallet nonce must never fall through to the generic retry copy.
+  if (isTxSendNonceError(error)) return copy.txWatch.bodies.nonceGap;
+  if (isTxStaleBlockError(error)) return copy.txWatch.staleBlock;
 
   const data = extractRevertData(error);
   if (data !== null) {

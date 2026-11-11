@@ -6,6 +6,7 @@ import type { HexAddress } from '@/config/networks';
 import type { AirdropSnapshotEntry } from '@/domain/airdrop-snapshot';
 import { copy } from '@/shared/config/copy-pages';
 import { useNextNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
+import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 import { describeAirdropClaimError } from '@/features/claim-airdrop/lib/airdrop-errors';
 import {
   clearAirdropClaimRecord,
@@ -24,6 +25,8 @@ export interface AirdropClaimTransactionState {
   readonly receipt: AirdropClaimReceipt | null;
   readonly pendingHash: HexHash | null;
   readonly error: string | null;
+  /** Send-time recovery family: nonce mismatch / stale wallet block view. */
+  readonly errorKind: 'nonce' | 'staleBlock' | null;
   /** False until the local pending/receipt record has been read. */
   readonly isHydrating: boolean;
   /** Bounded wait for the submitted hash; `isStuck` frees the CTA + shows recovery. */
@@ -82,6 +85,7 @@ export function useAirdropClaimTransaction(
   const [receipt, setReceipt] = useState<AirdropClaimReceipt | null>(null);
   const [walletAction, setWalletAction] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<'nonce' | 'staleBlock' | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
   const submittingRef = useRef(false);
 
@@ -105,6 +109,7 @@ export function useAirdropClaimTransaction(
     setPending(null);
     setReceipt(null);
     setError(null);
+    setErrorKind(null);
     setWalletAction(false);
     setIsHydrating(true);
     submittingRef.current = false;
@@ -207,6 +212,7 @@ export function useAirdropClaimTransaction(
     if (airdropAddress === undefined || tokenAddress === undefined || account === undefined) return;
     if (entry === null) return;
     setError(null);
+    setErrorKind(null);
     setWalletAction(true);
     submittingRef.current = true;
     try {
@@ -222,6 +228,7 @@ export function useAirdropClaimTransaction(
       setPending({ hash });
     } catch (cause) {
       setError(describeAirdropClaimError(cause));
+      setErrorKind(txSendRecoveryKind(cause) ?? null);
       // Another device may have claimed first (AlreadyClaimed), or the pool
       // may have changed: resync so the page does not keep offering the CTA.
       onConfirmedRef.current?.();
@@ -242,11 +249,11 @@ export function useAirdropClaimTransaction(
    * nonce, so a wallet that cached a stale nonce heals the gap itself.
    */
   const resubmit = (): void => {
-    if (pending === null) return;
     void (async () => {
       const nonce = await readNextNonce();
       if (nonce === undefined) {
         setError(copy.txWatch.nonceUnavailable);
+        setErrorKind(null);
         return;
       }
       await submitClaim(nonce);
@@ -265,12 +272,14 @@ export function useAirdropClaimTransaction(
     receipt,
     pendingHash: pending?.hash ?? null,
     error,
+    errorKind,
     isHydrating,
     watch,
     resubmit,
     claim,
     clearError: () => {
       setError(null);
+      setErrorKind(null);
     },
   };
 }

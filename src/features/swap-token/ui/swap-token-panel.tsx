@@ -753,6 +753,12 @@ export function SwapTokenPanel({
 
   const errorMessage = submitError ?? tx.error?.message ?? null;
   const showQuoteError = quote.isError;
+  const recoveryAction =
+    tx.error?.kind === 'nonce'
+      ? { run: tx.resubmit, label: copy.txWatch.actions.resubmit }
+      : tx.error?.kind === 'staleBlock'
+        ? { run: () => window.location.reload(), label: copy.txWatch.actions.reload }
+        : null;
 
   const maxAmount = () => {
     if (availableBalance === undefined) return;
@@ -959,16 +965,19 @@ export function SwapTokenPanel({
           {tx.error?.action === 'swap' ? (
             <p className="mt-1 text-xs leading-5 text-muted">{copy.swap.errors.failedNote}</p>
           ) : null}
-          {submitError !== null ||
+          {recoveryAction !== null ||
+          submitError !== null ||
           (tx.error?.action === 'approve' ? canApprove : tx.error !== null && canSwap) ? (
             <Button
               variant="secondary"
               size="sm"
               className="mt-2"
-              onClick={handleRetry}
+              onClick={recoveryAction !== null ? recoveryAction.run : handleRetry}
               leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
             >
-              {tx.error?.retryLabel ?? copy.swap.states.retry}
+              {recoveryAction !== null
+                ? recoveryAction.label
+                : (tx.error?.retryLabel ?? copy.swap.states.retry)}
             </Button>
           ) : null}
         </div>

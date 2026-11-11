@@ -258,6 +258,12 @@ export function ClaimAirdropPanel({
         ? copy.airdrop.pending.chain
         : copy.airdrop.eligible.cta;
   const isBusy = tx.stage !== 'idle';
+  const recoveryAction =
+    tx.errorKind === 'nonce'
+      ? { run: tx.resubmit, label: copy.txWatch.actions.resubmit }
+      : tx.errorKind === 'staleBlock'
+        ? { run: () => window.location.reload(), label: copy.txWatch.actions.reload }
+        : null;
 
   return (
     <div className="space-y-4">
@@ -306,10 +312,10 @@ export function ClaimAirdropPanel({
               variant="secondary"
               size="sm"
               className="mt-2"
-              onClick={tx.claim}
+              onClick={recoveryAction !== null ? recoveryAction.run : tx.claim}
               leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
             >
-              {copy.airdrop.states.retry}
+              {recoveryAction !== null ? recoveryAction.label : copy.airdrop.states.retry}
             </Button>
           </div>
         ) : null}

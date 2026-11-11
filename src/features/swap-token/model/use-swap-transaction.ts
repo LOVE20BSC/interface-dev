@@ -4,6 +4,7 @@ import { love20TokenAbi, uniswapV2Router02Abi, weth9Abi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { useNextNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
+import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 import { describeSwapError, swapRetryLabel } from '@/features/swap-token/lib/swap-errors';
 import { parseSwapReceipt } from '@/features/swap-token/lib/swap-events';
 import {
@@ -27,6 +28,8 @@ export interface SwapTxError {
   readonly action: SwapTxAction;
   readonly message: string;
   readonly retryLabel: string | undefined;
+  /** Send-time recovery family: nonce mismatch / stale wallet block view. */
+  readonly kind?: 'nonce' | 'staleBlock';
 }
 
 export interface SwapTransactionInput {
@@ -64,6 +67,10 @@ export interface SwapTransactionState {
   readonly clearReceipt: () => void;
   readonly clearError: () => void;
 }
+
+type ResendTarget =
+  | { readonly kind: 'approve'; readonly amount: bigint; readonly tokenAddress: HexAddress }
+  | { readonly kind: 'swap'; readonly execution: SwapExecution };
 
 type PendingTx =
   | {
@@ -132,6 +139,7 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
   const [error, setError] = useState<SwapTxError | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
   const submittingRef = useRef(false);
+  const lastAttemptRef = useRef<ResendTarget | null>(null);
 
   const fromKey = from !== undefined ? swapTokenKey(from) : '';
   // An approval belongs to one token; switching the input must not reuse it.
@@ -327,7 +335,13 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
       setPending({ kind: 'approve', hash, amount, tokenAddress });
     } catch (cause) {
       const message = describeSwapError(cause, { nativeSymbol, fromSymbol: from?.symbol ?? '' });
-      setError({ action: 'approve', message, retryLabel: swapRetryLabel(message) });
+      const recovery = txSendRecoveryKind(cause);
+      setError({
+        action: 'approve',
+        message,
+        retryLabel: swapRetryLabel(message),
+        ...(recovery !== undefined ? { kind: recovery } : {}),
+      });
     } finally {
       setWalletAction(null);
       submittingRef.current = false;
@@ -345,10 +359,11 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     ) {
       return;
     }
+    lastAttemptRef.current = { kind: 'approve', amount, tokenAddress: from.address };
     void submitApprove(amount, from.address);
   };
 
-  const execute = async (execution: SwapExecution): Promise<void> => {
+  const submitExecution = async (execution: SwapExecution, nonce?: number): Promise<void> => {
     if (submittingRef.current || pending !== null || activeReceipt !== null) return;
     if (
       router === undefined ||
@@ -373,7 +388,7 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
       path: route.kind === 'swap' ? [...route.pathAddresses] : [],
     };
     try {
-      const hash = await writeSwapRequest(request);
+      const hash = await writeSwapRequest(request, nonce);
       const record: SwapRecord = {
         hash,
         kind: route.kind,
@@ -401,62 +416,88 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
       setPending({ kind: 'swap', hash, record });
     } catch (cause) {
       const message = describeSwapError(cause, { nativeSymbol, fromSymbol: from.symbol });
-      setError({ action: 'swap', message, retryLabel: swapRetryLabel(message) });
+      const recovery = txSendRecoveryKind(cause);
+      setError({
+        action: 'swap',
+        message,
+        retryLabel: swapRetryLabel(message),
+        ...(recovery !== undefined ? { kind: recovery } : {}),
+      });
     } finally {
       setWalletAction(null);
       submittingRef.current = false;
     }
   };
 
+  const execute = async (execution: SwapExecution): Promise<void> => {
+    if (submittingRef.current || pending !== null || activeReceipt !== null) return;
+    lastAttemptRef.current = { kind: 'swap', execution };
+    await submitExecution(execution);
+  };
+
   /**
-   * Recovery action for a stuck hash: rebuild the same call from the persisted
+   * Recovery action for a stuck hash or a rejected send: rebuild the same call
+   * from the persisted record (or the last attempt) and re-send it with the
+   * on-chain nonce, so a nonce gap heals itself.
    * record and re-send it with the on-chain nonce, so a nonce gap heals itself.
    */
   const resubmit = (): void => {
-    if (pending === null) return;
-    const target = pending;
     void (async () => {
       const nonce = await readNextNonce();
       if (nonce === undefined) {
-        setError({
-          action: target.kind,
-          message: copy.txWatch.nonceUnavailable,
-          retryLabel: undefined,
-        });
+        const action: SwapTxAction = pending?.kind ?? lastAttemptRef.current?.kind ?? 'swap';
+        setError({ action, message: copy.txWatch.nonceUnavailable, retryLabel: undefined });
         return;
       }
-      if (target.kind === 'approve') {
-        await submitApprove(target.amount, target.tokenAddress, nonce);
+      if (pending !== null) {
+        const target = pending;
+        if (target.kind === 'approve') {
+          await submitApprove(target.amount, target.tokenAddress, nonce);
+          return;
+        }
+        const request = requestFromRecord(target.record);
+        if (request === null) {
+          setError({ action: 'swap', message: copy.swap.errors.failedNote, retryLabel: undefined });
+          return;
+        }
+        setError(null);
+        setWalletAction('swap');
+        submittingRef.current = true;
+        try {
+          const hash = await writeSwapRequest(request, nonce);
+          const record: SwapRecord = {
+            ...target.record,
+            hash,
+            confirmed: false,
+            recordedAt: Date.now(),
+          };
+          if (scope !== null) writeSwapRecord(scope, record);
+          setPending({ kind: 'swap', hash, record });
+        } catch (cause) {
+          const message = describeSwapError(cause, {
+            nativeSymbol,
+            fromSymbol: target.record.fromSymbol,
+          });
+          const recovery = txSendRecoveryKind(cause);
+          setError({
+            action: 'swap',
+            message,
+            retryLabel: swapRetryLabel(message),
+            ...(recovery !== undefined ? { kind: recovery } : {}),
+          });
+        } finally {
+          setWalletAction(null);
+          submittingRef.current = false;
+        }
         return;
       }
-      const request = requestFromRecord(target.record);
-      if (request === null) {
-        setError({ action: 'swap', message: copy.swap.errors.failedNote, retryLabel: undefined });
+      const last = lastAttemptRef.current;
+      if (last === null) return;
+      if (last.kind === 'approve') {
+        await submitApprove(last.amount, last.tokenAddress, nonce);
         return;
       }
-      setError(null);
-      setWalletAction('swap');
-      submittingRef.current = true;
-      try {
-        const hash = await writeSwapRequest(request, nonce);
-        const record: SwapRecord = {
-          ...target.record,
-          hash,
-          confirmed: false,
-          recordedAt: Date.now(),
-        };
-        if (scope !== null) writeSwapRecord(scope, record);
-        setPending({ kind: 'swap', hash, record });
-      } catch (cause) {
-        const message = describeSwapError(cause, {
-          nativeSymbol,
-          fromSymbol: target.record.fromSymbol,
-        });
-        setError({ action: 'swap', message, retryLabel: swapRetryLabel(message) });
-      } finally {
-        setWalletAction(null);
-        submittingRef.current = false;
-      }
+      await submitExecution(last.execution, nonce);
     })();
   };
 
