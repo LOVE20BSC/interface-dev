@@ -1,7 +1,6 @@
 import { useAccount } from 'wagmi';
 import { copy } from '@/shared/config/copy-pages';
 import { EmptyState } from '@/widgets/empty-state/empty-state';
-import { TechnicalDetails } from '@/widgets/contract-addresses/technical-details';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
 import { IdentityList } from '@/features/select-identity/ui/identity-list';
@@ -9,7 +8,8 @@ import { IdentityList } from '@/features/select-identity/ui/identity-list';
 /**
  * 我的 NFT: summary, responsive identity list, local selection and transfer.
  * The list itself owns loading/error/empty/list states so the page has exactly
- * one next step in each one (UX spec §3.2).
+ * one next step in each one (UX spec §3.2). Contract addresses live in /about
+ * (§3.8), so the page no longer ends with an advanced fold.
  */
 export function MyNftPage() {
   const { isConnected } = useAccount();
@@ -26,12 +26,6 @@ export function MyNftPage() {
       ) : (
         <IdentityList identity={identity} onRetry={identity.refetch} />
       )}
-
-      <TechnicalDetails
-        entries={[
-          { label: copy.pages.myNft.advancedMemberNft, address: identity.memberNftAddress },
-        ]}
-      />
     </div>
   );
 }

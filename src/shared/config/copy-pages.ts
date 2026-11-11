@@ -48,7 +48,6 @@ export const copy = {
       errorTitle: '身份 NFT 列表暂时读不到。',
       mintAnother: '铸造新身份 NFT',
       backHome: '回首页',
-      advancedMemberNft: 'MemberNFT 合约地址',
     },
     mint: {
       title: '铸造身份 NFT',
@@ -212,7 +211,6 @@ export const copy = {
       summary: '规则',
       genesis: (symbol: string) => `这次空投发的是首币 ${symbol}，和当前选择的社区无关。`,
       snapshot: '份额来自销毁活动快照，地址和份额在部署时固定。',
-      contract: '空投合约地址',
     },
     pending: {
       wallet: '铸造中…',
@@ -344,11 +342,6 @@ export const copy = {
       explorer: '在区块浏览器里查看',
       goHome: '回首页',
       swapAgain: '再兑换一次',
-    },
-    advanced: {
-      summary: '技术详情',
-      router: 'Router 合约地址',
-      pair: (a: string, b: string) => `${a} / ${b} 交易对`,
     },
     errors: {
       rejected: '你在钱包里点了取消，没有扣款。',

@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react';
 import { Link, MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HomePage } from '@/pages/home/home-page';
-import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import type { MemberIdentityState } from '@/entities/member-identity/model/use-member-identity';
 import type { CommunityToken } from '@/entities/community-token/model/use-community-token';
@@ -24,10 +23,6 @@ vi.mock('@/features/switch-community/model/use-community-context', () => ({
 
 vi.mock('@/entities/member-identity/model/use-member-identity', () => ({
   useMemberIdentity: vi.fn(),
-}));
-
-vi.mock('@/entities/community-token/model/use-community-token', () => ({
-  useCommunityToken: vi.fn(),
 }));
 
 const airdrop = vi.hoisted(() => ({
@@ -53,7 +48,6 @@ vi.mock('@/pages/home/airdrop-reminder', () => ({
 
 const account = vi.mocked(useAccount);
 const memberIdentity = vi.mocked(useMemberIdentity);
-const communityToken = vi.mocked(useCommunityToken);
 
 const TOKEN: CommunityToken = {
   status: 'ready',
@@ -100,7 +94,6 @@ beforeEach(() => {
     typeof useAccount
   >);
   memberIdentity.mockReturnValue(identity());
-  communityToken.mockReturnValue(TOKEN);
 });
 
 describe('HomePage greeting', () => {
@@ -184,7 +177,7 @@ describe('HomePage reminders', () => {
     expect(screen.queryByText('现在没有需要你处理的事。')).toBeNull();
   });
 
-  it('shows only the greeting and footer when nothing is applicable', () => {
+  it('shows only the greeting when nothing is applicable (no footer)', () => {
     renderPage();
 
     expect(greeting()).toHaveTextContent('你好，Testdev-member-0');
@@ -192,6 +185,10 @@ describe('HomePage reminders', () => {
     expect(screen.queryByRole('link', { name: '铸造身份 NFT' })).toBeNull();
     expect(screen.queryByRole('link', { name: '空投铸造' })).toBeNull();
     expect(document.querySelectorAll('section[aria-labelledby^="home-reminder"]')).toHaveLength(0);
+    // Footer/docs/technical details now live on /about (§3.8).
+    expect(document.querySelector('footer')).toBeNull();
+    expect(screen.queryByText('开源文档')).toBeNull();
+    expect(screen.queryByText('技术详情')).toBeNull();
   });
 
   it('asks a wallet holding identity NFTs to pick one, and never shows the empty sentence', () => {

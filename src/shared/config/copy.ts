@@ -146,10 +146,9 @@ export const copy = {
     reminderAirdrop: '你有空投资格',
     reminderAirdropWithAmount: (amount: string, symbol: string) =>
       `你有空投资格，可铸造 ${amount} ${symbol}`,
+    /** Still rendered by 我的 (§3.7) and the shared technical-details widget. */
     docs: '开源文档',
     technical: '技术详情',
-    buildMeta: (buildId: string, environment: string, chainId: number) =>
-      `版本 ${buildId} · ${environment} · chain ${chainId}`,
     errorTitle: '暂时读不到身份 NFT',
     errorBody: '网络可能不稳，你的身份 NFT 没有变化。',
     balanceError: '余额暂时读不到',

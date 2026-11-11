@@ -519,8 +519,9 @@ test('swap: zero-liquidity child pair shows the dedicated empty-pool state', asy
   await expect(page.getByRole('link', { name: '回首页' })).toBeVisible();
   await expect(page.getByTestId('swap-submit')).toHaveCount(0);
 
-  await page.getByText('技术详情').click();
-  await expect(page.getByText(new RegExp(emptyPoolPair, 'i'))).toBeVisible();
+  // The advanced fold was removed: contract addresses live on /about only.
+  await expect(page.getByText('技术详情')).toHaveCount(0);
+  await expect(page.getByText(new RegExp(emptyPoolPair, 'i'))).toHaveCount(0);
   await shot(page, 'swap-empty-pool.png');
 });
 

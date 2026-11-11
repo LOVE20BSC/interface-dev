@@ -1,24 +1,16 @@
-import { ArrowUpLeft } from '@/shared/ui/icons';
 import { lazy, Suspense } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAccount } from 'wagmi';
-import { BUILD_ID } from '@/config/build-id.generated';
-import { APP_ENV } from '@/config/env';
-import { BRAND_DOCS_URL, NETWORK, configuredAddress } from '@/config/networks';
-import { variantLabel } from '@/shared/lib/variant-label';
 import { copy } from '@/shared/config/copy';
-import { formatBuildId } from '@/shared/lib/format';
-import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
-import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
-import { TechnicalDetails } from '@/widgets/contract-addresses/technical-details';
 
 /**
  * 首页 = 问候 + 提醒流 (UX spec §3.1, owner 2026-11-12): the page opens with a
  * greeting that names the current identity NFT, then only what needs the user's
  * attention. Navigation lives in /apps; identity and balance details live in 我的
- * (§3.7). With nothing to do the page is greeting + footer, with no filler line.
+ * (§3.7); docs and every contract address live in /about (§3.8). With nothing to
+ * do the page is just the greeting, with no footer and no filler line.
  */
 
 // The snapshot + Airdrop ABI live in a separate chunk: they must never block
@@ -31,8 +23,6 @@ const AirdropReminder = lazy(async () => {
 export function HomePage() {
   const { address: account } = useAccount();
   const identity = useMemberIdentity();
-  const { symbol } = useCommunityContext();
-  const token = useCommunityToken(symbol);
   const { search } = useLocation();
 
   const selectedName = identity.selected?.name;
@@ -116,33 +106,6 @@ export function HomePage() {
           <AirdropReminder primary={!needsIdentityCard && !needsSelectionCard} search={search} />
         </Suspense>
       ) : null}
-
-      <footer className="space-y-3 border-t border-line pt-4">
-        <a
-          href={BRAND_DOCS_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline"
-        >
-          {copy.home.docs}
-          <ArrowUpLeft className="h-3.5 w-3.5" aria-hidden="true" />
-        </a>
-
-        <TechnicalDetails
-          entries={[
-            { label: token.symbol, address: token.address },
-            { label: 'MemberNFT', address: configuredAddress('memberNFT') },
-            { label: 'Airdrop', address: configuredAddress('airdrop') },
-            { label: 'Router', address: configuredAddress('router') },
-            { label: 'Pair', address: configuredAddress('pair') },
-          ]}
-          meta={copy.home.buildMeta(
-            formatBuildId(BUILD_ID),
-            variantLabel(APP_ENV.variant),
-            NETWORK.chainId,
-          )}
-        />
-      </footer>
     </div>
   );
 }

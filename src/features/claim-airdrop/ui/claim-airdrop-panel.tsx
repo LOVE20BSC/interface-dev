@@ -229,7 +229,7 @@ export function ClaimAirdropPanel({
             </Link>
           </div>
         </StatusCard>
-        <AirdropRules symbol={symbol} airdropAddress={claim.airdropAddress} />
+        <AirdropRules symbol={symbol} />
       </div>
     );
   }
@@ -248,7 +248,7 @@ export function ClaimAirdropPanel({
             <CopyLinkButton />
           </div>
         </StatusCard>
-        <AirdropRules symbol={symbol} airdropAddress={claim.airdropAddress} />
+        <AirdropRules symbol={symbol} />
         <Link to="/" className={TEXT_LINK}>
           {copy.airdrop.states.backHome}
         </Link>
@@ -383,7 +383,7 @@ export function ClaimAirdropPanel({
         ) : null}
       </div>
 
-      <AirdropRules symbol={symbol} airdropAddress={claim.airdropAddress} />
+      <AirdropRules symbol={symbol} />
 
       <Link to="/" className={TEXT_LINK}>
         {copy.airdrop.states.backHome}

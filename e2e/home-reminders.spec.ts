@@ -17,7 +17,7 @@ import {
  *
  * The home page opens with a greeting naming the current identity NFT, then only
  * answers 「有没有需要我处理的事」 with conditional reminder cards. With nothing
- * to do it is greeting + footer only — no muted "nothing to do" sentence.
+ * to do it is just the greeting — no footer, no muted "nothing to do" sentence.
  * Identity and balance details live on 我的.
  */
 
@@ -55,7 +55,7 @@ test.describe('首页提醒流', () => {
     await expect(page.getByText('你有空投资格')).toHaveCount(0);
   });
 
-  test('connected with identity and nothing to do: greeting + footer only', async ({ page }) => {
+  test('connected with identity and nothing to do: greeting only', async ({ page }) => {
     await installWallet(page, ACCOUNTS.withIdentity);
     await seedIdentity(page, ACCOUNTS.withIdentity, '1');
     await page.goto('/');
@@ -66,7 +66,7 @@ test.describe('首页提醒流', () => {
     await expect(page.getByText(/99,799,100/)).toHaveCount(0);
     await expectHomeWordmark(page, false);
 
-    // No filler sentence and no reminder cards: just the greeting plus footer.
+    // No filler sentence, no reminder cards and no footer.
     await expect(page.getByText('现在没有需要你处理的事。')).toHaveCount(0);
     await expect(page.locator('section[aria-labelledby^="home-reminder"]')).toHaveCount(0);
     expect(await countSolidButtons(page)).toBe(0);

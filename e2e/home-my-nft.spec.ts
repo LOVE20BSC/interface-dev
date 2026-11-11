@@ -21,7 +21,7 @@ import {
  * Home is greeting + reminder feed (UX spec §3.1, owners 2026-11-11/12): the
  * page h1 greets the current identity NFT, followed by conditional reminder
  * cards; identity and balance details live in 我的. With nothing to do the page
- * is just greeting + footer (no filler sentence).
+ * is just the greeting (no footer, no filler sentence).
  */
 
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
@@ -195,7 +195,7 @@ test('home: a non-eligible account never sees the airdrop reminder', async ({ pa
   await connect(page);
   await snapshotLoaded;
   await expect(page.getByText('你有空投资格')).toHaveCount(0);
-  // Nothing to do: greeting + footer only, no filler sentence.
+  // Nothing to do: greeting only, no footer and no filler sentence.
   await expect(greeting(page)).toHaveText(`你好，${SEEDED_NAME}`);
   await expect(page.getByText('现在没有需要你处理的事。')).toHaveCount(0);
   await expect(page.locator('section[aria-labelledby^="home-reminder"]')).toHaveCount(0);
