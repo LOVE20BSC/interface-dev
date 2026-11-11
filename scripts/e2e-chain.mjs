@@ -35,6 +35,7 @@ import {
   writeSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
+import { connect as netConnect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,6 +59,9 @@ const LOCK_STALE_MS = 30 * 60_000;
  * it here keeps `e2e/tx-recovery.spec.ts` from silently skipping on a clean shell.
  */
 const DEFAULT_E2E_TX_DEADLINE_MS = '4000';
+/** Short probe for "is something alive on :8555?", so a wedged port fails in seconds, not minutes. */
+const LIVENESS_PROBE_TIMEOUT_MS = 3_000;
+const MAKE_TIMEOUT_MS = 10 * 60_000;
 const DEPLOYMENT_FILE = resolve(ROOT, 'src/config/deployments/anvil31337_dev.json');
 
 /** Hostnames that mean "this machine"; only these can be the developer's personal chain. */
@@ -268,12 +272,12 @@ function resolveRpc() {
 // ------------------------------------------------------------------------------------------------
 let requestId = 0;
 
-async function rpc(rpcUrl, method, params = []) {
+async function rpc(rpcUrl, method, params = [], timeoutMs = 10_000) {
   const response = await fetch(rpcUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: ++requestId, method, params }),
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok) throw new Error(`${method}: HTTP ${response.status}`);
   const body = await response.json();
@@ -281,14 +285,67 @@ async function rpc(rpcUrl, method, params = []) {
   return body.result;
 }
 
-/** A down port is expected (first run); a foreign chain is not. */
-async function probeChain(rpcUrl) {
+/** A down port is expected (first run); a foreign chain or a wedged listener is not. */
+async function probeChain(rpcUrl, timeoutMs = 10_000) {
   try {
-    const chainId = Number(await rpc(rpcUrl, 'eth_chainId'));
+    const chainId = Number(await rpc(rpcUrl, 'eth_chainId', [], timeoutMs));
     return { chainId };
   } catch (error) {
     return { error };
   }
+}
+
+/** TCP liveness: distinguishes "nothing is listening" from "a process holds :8555 but won't talk". */
+function isPortListening(port, timeoutMs = 1_500) {
+  return new Promise((resolvePromise) => {
+    const socket = netConnect({ host: '127.0.0.1', port });
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolvePromise(value);
+    };
+    socket.setTimeout(timeoutMs, () => finish(false));
+    socket.once('connect', () => finish(true));
+    socket.once('error', () => finish(false));
+  });
+}
+
+function lsofDiagnostics(port) {
+  const result = spawnSync('lsof', ['-nP', `-iTCP:${port}`], { encoding: 'utf8' });
+  if (result.error !== undefined) return [`(could not run lsof: ${result.error.message})`];
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trimEnd();
+  return output.length > 0 ? output.split('\n') : ['(lsof reported no process)'];
+}
+
+/**
+ * A bound port that cannot answer `eth_chainId` is wedged, not absent. Bootstrapping over it used to
+ * start a losing anvil (`Address already in use`), leave the pidfile pointing at the failed pid and
+ * hang until the 15-minute lock bound. Fail immediately with evidence instead.
+ */
+function fatalPortBoundWithoutRpc(error) {
+  fatal(
+    `${DEFAULT_SUITE_RPC} has a listener on :${SUITE_PORT} but no JSON-RPC answer (${error.message}).`,
+    `lsof -nP -iTCP:${SUITE_PORT}:`,
+    ...lsofDiagnostics(SUITE_PORT).map((line) => `  ${line}`),
+    'Refusing to bootstrap over a process that cannot be proven to be our anvil.',
+    `If it is a wedged suite anvil, stop it and rebuild with \`pnpm e2e:reset-chain\`;`,
+    'otherwise stop the foreign listener yourself or point E2E_ANVIL_RPC at another endpoint.',
+  );
+}
+
+function processCommand(pid) {
+  const result = spawnSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' });
+  if (result.error !== undefined || result.status !== 0) return null;
+  return result.stdout.trim();
+}
+
+/** Proof for kill/stop decisions: the cmdline itself must name anvil and the suite port. */
+function isOurAnvil(pid) {
+  const command = processCommand(pid);
+  if (command === null) return false;
+  return /\banvil\b/i.test(command) && command.includes(String(SUITE_PORT));
 }
 
 function expectedAddresses() {
@@ -305,6 +362,35 @@ function expectedAddresses() {
   });
   if (entries.length === 0) fatal(`${DEPLOYMENT_FILE} has no usable addresses`);
   return entries;
+}
+
+/** `cast code` on the MemberNFT address: the explicit on-chain proof that the suite deployment exists. */
+function assertMemberNftCodeWithCast(rpcUrl) {
+  const memberNft = expectedAddresses().find(([key]) => key === 'memberNFT')?.[1];
+  if (memberNft === undefined) fatal(`${DEPLOYMENT_FILE} has no memberNFT address`);
+  const result = spawnSync('cast', ['code', memberNft, '--rpc-url', rpcUrl], {
+    encoding: 'utf8',
+    timeout: 20_000,
+  });
+  if (result.error !== undefined) {
+    if (result.error.code === 'ENOENT') {
+      console.warn(
+        '[e2e-chain] cast not found on PATH; falling back to the JSON-RPC deployment check',
+      );
+      return;
+    }
+    fatal(`cast code ${memberNft} failed: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    fatal(`cast code ${memberNft} on ${rpcUrl} failed: ${(result.stderr ?? '').trim()}`);
+  }
+  const code = (result.stdout ?? '').trim();
+  if (code === '' || code === '0x') {
+    fatal(
+      `${rpcUrl} answers but memberNFT ${memberNft} has no code.`,
+      'The suite deployment is missing; refusing to run against it.',
+    );
+  }
 }
 
 /** @returns {Promise<string[]>} human-readable list of expected contracts with no code. */
@@ -338,6 +424,8 @@ function readSuiteChainOwner() {
   } catch {
     return null;
   }
+  // The pidfile alone is not proof: pids are recycled. The cmdline must still be our anvil on :8555.
+  if (!isOurAnvil(pid)) return null;
   return { pid, host, pidFile };
 }
 
@@ -350,8 +438,21 @@ function runMake(args) {
     );
   }
   console.log(`[e2e-chain] $ make -C ${ANVIL_REPO} ${args.join(' ')}`);
-  const result = spawnSync('make', ['-C', ANVIL_REPO, ...args], { cwd: ROOT, stdio: 'inherit' });
-  if (result.error !== undefined) fatal(`could not run make: ${result.error.message}`);
+  const result = spawnSync('make', ['-C', ANVIL_REPO, ...args], {
+    cwd: ROOT,
+    stdio: 'inherit',
+    timeout: MAKE_TIMEOUT_MS,
+  });
+  if (result.error !== undefined) {
+    if (result.error.code === 'ETIMEDOUT') {
+      fatal(
+        `make ${args.join(' ')} did not finish within ${MAKE_TIMEOUT_MS / 60_000} minutes.`,
+        'It may be wedged on a bound :8555. Inspect `lsof -nP -iTCP:8555`, then run',
+        '`pnpm e2e:reset-chain` before retrying.',
+      );
+    }
+    fatal(`could not run make: ${result.error.message}`);
+  }
   return result.status === 0;
 }
 
@@ -384,18 +485,22 @@ async function ensureDedicatedChain({ reset }) {
     if (owner !== null) {
       if (!runMake(['stop', `PORT=${SUITE_PORT}`])) fatal('could not stop the suite chain');
     } else {
-      const probe = await probeChain(DEFAULT_SUITE_RPC);
+      const probe = await probeChain(DEFAULT_SUITE_RPC, LIVENESS_PROBE_TIMEOUT_MS);
       if (probe.error === undefined) {
         fatal(
           `--reset-chain: ${DEFAULT_SUITE_RPC} answers but was not started by ../anvil`,
           `(no live .anvil/${SUITE_PORT}/anvil.pid). Refusing to kill a foreign process; stop it yourself.`,
         );
       }
+      if (await isPortListening(SUITE_PORT)) fatalPortBoundWithoutRpc(probe.error);
     }
   }
 
-  const probe = await probeChain(DEFAULT_SUITE_RPC);
+  // Probe first, bootstrap only when the port is genuinely free. A bound port with no JSON-RPC is
+  // the wedged case (orphan anvil / foreign listener): fail fast, never start a losing bootstrap.
+  const probe = await probeChain(DEFAULT_SUITE_RPC, LIVENESS_PROBE_TIMEOUT_MS);
   if (probe.error !== undefined) {
+    if (await isPortListening(SUITE_PORT)) fatalPortBoundWithoutRpc(probe.error);
     await bootstrapSuiteChain();
     return;
   }
@@ -407,11 +512,13 @@ async function ensureDedicatedChain({ reset }) {
     );
   }
 
+  // It answers and the chain id is right: validate the committed deployment instead of bootstrapping.
+  assertMemberNftCodeWithCast(DEFAULT_SUITE_RPC);
   const missing = await missingDeploymentCode(DEFAULT_SUITE_RPC);
   if (missing.length === 0) {
     console.log(
       `[e2e-chain] reusing the bootstrapped suite chain on ${DEFAULT_SUITE_RPC} ` +
-        `(chain ${probe.chainId})`,
+        `(chain ${probe.chainId}, memberNFT code present)`,
     );
     return;
   }

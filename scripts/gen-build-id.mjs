@@ -8,7 +8,13 @@ import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const id = `${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
+// `pnpm e2e` sets E2E_BUILD_ID to a fingerprint of the sources + build environment so the preview
+// guard can tell a current bundle from a stale one (see playwright.config.ts). Every other build
+// keeps the timestamp-random id.
+const override = (process.env.E2E_BUILD_ID ?? '').trim();
+const id = /^[a-z0-9][a-z0-9-]{0,63}$/.test(override)
+  ? override
+  : `${Date.now().toString(36)}-${randomBytes(4).toString('hex')}`;
 const target = resolve(root, 'src/config/build-id.generated.ts');
 
 mkdirSync(dirname(target), { recursive: true });

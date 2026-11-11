@@ -148,9 +148,20 @@ async function connect(page: Page): Promise<void> {
   const button = page.getByRole('button', { name: '连接钱包' }).first();
   await expect(button).toBeEnabled({ timeout: 10_000 });
   await button.click();
+  // Wait for the pill's steady state: the connected wallet trigger, never the wrong-network pill.
   await expect(page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' })).toBeVisible({
     timeout: 20_000,
   });
+  await expect(page.getByRole('button', { name: '网络不对，点此切换' })).toHaveCount(0);
+  const walletChainId = await page.evaluate(async () => {
+    const provider = (
+      window as unknown as {
+        ethereum?: { request: (args: { method: string }) => Promise<unknown> };
+      }
+    ).ethereum;
+    return await provider?.request({ method: 'eth_chainId' });
+  });
+  expect(String(walletChainId).toLowerCase()).toBe(CHAIN_HEX.toLowerCase());
 }
 
 test(

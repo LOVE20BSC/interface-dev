@@ -29,7 +29,13 @@ pnpm e2e:reset-chain
 `src/config/deployments/anvil31337_dev.json` 相同——clean bootstrap 从 deployer nonce 0 开始，
 端口不影响地址）。之后每次 `pnpm e2e` 检测到 8555 已有完整部署就直接复用。
 
-`playwright.config.ts` 的 `webServer` 会先跑 `pnpm build`（`VITE_ENV=dev`）再起 preview；它会把本次解析出的 RPC 作为 `VITE_ANVIL_RPC` 烘进构建，页面里的 viem 和 spec 的直连 RPC 因此永远指向同一条链。`reuseExistingServer` 默认关闭（`E2E_REUSE_PREVIEW=1` 才复用已有 preview），避免复用一份用别的 RPC 构建的旧产物。其它可选环境变量：`E2E_PORT`（默认 4173）、`E2E_BASE_PATH`（默认 `/`）。
+`playwright.config.ts` 的 `webServer` 会先跑 `pnpm build`（`VITE_ENV=dev`）再起 preview；它会把本次解析出的 RPC 作为 `VITE_ANVIL_RPC` 烘进构建，页面里的 viem 和 spec 的直连 RPC 因此永远指向同一条链。本地默认允许复用已有 preview，但复用前会先校验 build id（见下节「Harness guards」）；CI 总是重新构建，`E2E_REUSE_PREVIEW=0` 可强制重启本地 preview。其它可选环境变量：`E2E_PORT`（默认 4173）、`E2E_BASE_PATH`（默认 `/`）。
+
+### Harness guards（2026-11-12）
+
+- **Stale-build guard（`playwright.config.ts`）**：启动测试前请求已有 preview 的 `/build-id.json`，与本次即将构建的 `E2E_BUILD_ID`（源码 + 构建环境/端点指纹，`scripts/gen-build-id.mjs` 接受该值）比较。一致才 `reuseExistingServer`；不一致时只有 `lsof` + `ps` 证明监听者确实是该端口的 `vite preview` 才重启它，否则立即失败并打印 `:4173 上是旧构建（A ≠ B），拒绝复用`。绝不静默测试旧 bundle。
+- **Wedged-chain guard（`scripts/e2e-chain.mjs`）**：bootstrap 前先用 3 s 超时发 `eth_chainId`。有应答视为链存活，继续校验 chain id、`cast code <memberNFT>` 与完整地址簿部署，而不是重新 bootstrap；端口被占用但不应答则立即 fatal，打印 `lsof -nP -iTCP:8555` 结果并提示 `pnpm e2e:reset-chain`。只在 pidfile + `ps` cmdline 同时证明是本套件的 anvil 时才停止它。`make` 另有 10 分钟上限，避免卡死到 15 分钟锁超时。
+- **Known flake fix（`e2e/tx-recovery.spec.ts`）**：连接后等待 pill 进入稳定态（`打开钱包与身份 NFT 菜单` 触发按钮可见、`网络不对，点此切换` 不存在），并在提交前断言注入钱包的 `eth_chainId` 等于 app chain（31337），避免偶发落到 wrong-network pill 后恢复卡断言超时。
 
 ### 覆盖端点 / 使用别人的链
 
