@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LOCALE,
   formatAmount,
+  formatBpsPercent,
   formatDateTime,
+  formatPercent,
+  formatRate,
+  formatTokenAmount,
   formatUnits,
   UNKNOWN,
 } from '@/shared/lib/format';
@@ -92,5 +96,70 @@ describe('formatDateTime', () => {
     expect(en).toMatch(/2026/);
     expect(zh).toMatch(/2026/);
     expect(formatDateTime(instant)).toBe(zh);
+  });
+});
+
+describe('formatTokenAmount', () => {
+  it('is the single token rule: max 6 decimals, trailing zeros trimmed', () => {
+    expect(formatTokenAmount(1_234_500_000_000_000_000n, 18)).toBe('1.2345');
+    expect(formatTokenAmount(9_999_885_749_000_000_000_000n, 18)).toBe('9,999.885749');
+    expect(formatTokenAmount(99_998_199_990_000_000_000_000_000n, 18)).toBe('99,998,199.99');
+    expect(formatTokenAmount(1n, 18)).toBe('0');
+    expect(formatTokenAmount(1n, 6)).toBe('0.000001');
+  });
+
+  it('keeps a known zero but never turns an unknown value into zero', () => {
+    expect(formatTokenAmount(0n, 18)).toBe('0');
+    expect(formatTokenAmount(undefined, 18)).toBe(UNKNOWN);
+    expect(formatTokenAmount(null, 18)).toBe(UNKNOWN);
+    expect(formatTokenAmount(1n, undefined)).toBe(UNKNOWN);
+  });
+
+  it('allows an explicit cap only for fee/percentage surfaces', () => {
+    expect(formatTokenAmount(1_999n, 3)).toBe('1.999');
+    expect(formatTokenAmount(1_999n, 3, { maxFractionDigits: 2 })).toBe('1.99');
+    expect(formatTokenAmount(1_999n, 3, { maxFractionDigits: 2, locale: 'de-DE' })).toBe('1,99');
+  });
+});
+
+describe('formatPercent', () => {
+  it('caps percentages at two fraction digits without rounding up', () => {
+    expect(formatPercent(1.239)).toBe('1.23');
+    expect(formatPercent(1.2)).toBe('1.2');
+    expect(formatPercent(50)).toBe('50');
+    expect(formatPercent(0.05)).toBe('0.05');
+  });
+
+  it('can keep a fixed number of digits for preset labels', () => {
+    expect(formatPercent(0.1, { minimumFractionDigits: 1 })).toBe('0.1');
+    expect(formatPercent(1, { minimumFractionDigits: 1 })).toBe('1.0');
+  });
+
+  it('returns the unknown marker for a non-finite percentage', () => {
+    expect(formatPercent(Number.NaN)).toBe(UNKNOWN);
+    expect(formatPercent(Number.POSITIVE_INFINITY)).toBe(UNKNOWN);
+  });
+});
+
+describe('formatBpsPercent', () => {
+  it('renders basis points as a two-digit percentage', () => {
+    expect(formatBpsPercent(0)).toBe('0');
+    expect(formatBpsPercent(50)).toBe('0.5');
+    expect(formatBpsPercent(123)).toBe('1.23');
+    expect(formatBpsPercent(1234)).toBe('12.34');
+    expect(formatBpsPercent(Number.NaN)).toBe(UNKNOWN);
+  });
+});
+
+describe('formatRate', () => {
+  it('groups the integer part and caps rates at two decimals', () => {
+    expect(formatRate(2_000n * E18, E18, 18, 18)).toBe('2,000');
+    expect(formatRate(1_993_801_200_000_000_000_000n, E18, 18, 18)).toBe('1,993.8');
+    expect(formatRate(5n * 10n ** 14n, E18, 18, 18)).toBe('0');
+  });
+
+  it('returns the unknown marker for unusable inputs', () => {
+    expect(formatRate(1n, 0n, 18, 18)).toBe(UNKNOWN);
+    expect(formatRate(1n, E18, -1, 18)).toBe(UNKNOWN);
   });
 });

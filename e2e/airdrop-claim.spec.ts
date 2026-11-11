@@ -140,12 +140,12 @@ function claimOutsideBrowser(account: `0x${string}`): void {
   );
 }
 
-/** Mirrors formatAmount's grouping for the 18-decimals genesis token. */
+/** Mirrors formatTokenAmount's grouping for the 18-decimals genesis token (6 digits). */
 function displayAmount(value: bigint): string {
   const raw = formatUnits(value, 18);
   const [whole = '0', fraction] = raw.split('.');
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const trimmed = (fraction ?? '').slice(0, 2).replace(/0+$/, '');
+  const trimmed = (fraction ?? '').slice(0, 6).replace(/0+$/, '');
   return trimmed.length > 0 ? `${grouped}.${trimmed}` : grouped;
 }
 

@@ -5,15 +5,19 @@ import { ArrowDownUp, Check, RefreshCw } from '@/shared/ui/icons';
 import { NETWORK, configuredAddress, explorerAddressUrl, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { shortenAddress, formatUnits } from '@/shared/lib/format';
+import {
+  formatBpsPercent,
+  formatTokenAmount,
+  formatUnits,
+  shortenAddress,
+} from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
+import { StickyAction } from '@/shared/ui/sticky-action';
 import {
   applySlippage,
   DEFAULT_SLIPPAGE_PERCENT,
-  formatBpsPercent,
-  formatTokenAmount,
   isSlippagePercentValid,
   NATIVE_GAS_RESERVE_WEI,
   parseSwapAmount,
@@ -976,51 +980,57 @@ export function SwapTokenPanel({
 
       <section aria-label={copy.pages.swap.title} className="space-y-2">
         {needsApproval ? (
-          <div className="space-y-2">
-            <Button
-              variant="primary"
-              size="lg"
-              className="w-full"
-              data-testid="swap-approve"
-              onClick={() => {
-                if (amountIn !== undefined) tx.approve(amountIn);
-              }}
-              disabled={!canApprove || tx.approveStage !== 'idle'}
-              loading={tx.approveStage === 'wallet'}
-            >
-              {approveLabel}
-            </Button>
-            <Button variant="secondary" size="md" className="w-full" disabled>
-              {copy.swap.ladder.swapStep}
-            </Button>
-            {tx.isApproved ? (
-              <p className="text-xs leading-5 text-warning">{copy.swap.ladder.approvalShort}</p>
-            ) : (
-              <p className="text-xs leading-5 text-muted">{copy.swap.ladder.approvalNote}</p>
-            )}
-          </div>
+          <>
+            <StickyAction>
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full"
+                data-testid="swap-approve"
+                onClick={() => {
+                  if (amountIn !== undefined) tx.approve(amountIn);
+                }}
+                disabled={!canApprove || tx.approveStage !== 'idle'}
+                loading={tx.approveStage === 'wallet'}
+              >
+                {approveLabel}
+              </Button>
+            </StickyAction>
+            <div className="space-y-2">
+              <Button variant="secondary" size="md" className="w-full" disabled>
+                {copy.swap.ladder.swapStep}
+              </Button>
+              {tx.isApproved ? (
+                <p className="text-xs leading-5 text-warning">{copy.swap.ladder.approvalShort}</p>
+              ) : (
+                <p className="text-xs leading-5 text-muted">{copy.swap.ladder.approvalNote}</p>
+              )}
+            </div>
+          </>
         ) : (
-          <div className="space-y-2">
+          <>
             {tx.isApproved ? (
               <p className="flex items-center gap-1.5 text-sm font-medium text-success">
                 <Check className="h-4 w-4" aria-hidden="true" />
                 {copy.swap.ladder.approved}
               </p>
             ) : null}
-            <Button
-              variant="primary"
-              size="lg"
-              className="w-full"
-              data-testid="swap-submit"
-              onClick={() => {
-                void handlePrimary();
-              }}
-              disabled={!canSwap || isPreparing || tx.swapStage !== 'idle'}
-              loading={tx.swapStage === 'wallet' || isPreparing}
-            >
-              {isPreparing ? copy.swap.quoteRefreshing : swapLabel}
-            </Button>
-          </div>
+            <StickyAction>
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full"
+                data-testid="swap-submit"
+                onClick={() => {
+                  void handlePrimary();
+                }}
+                disabled={!canSwap || isPreparing || tx.swapStage !== 'idle'}
+                loading={tx.swapStage === 'wallet' || isPreparing}
+              >
+                {isPreparing ? copy.swap.quoteRefreshing : swapLabel}
+              </Button>
+            </StickyAction>
+          </>
         )}
 
         {tx.pendingHash !== null ? (

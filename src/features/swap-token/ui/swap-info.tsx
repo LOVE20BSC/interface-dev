@@ -3,10 +3,11 @@ import { cn } from '@/shared/lib/cn';
 import { copy } from '@/shared/config/copy-pages';
 import {
   formatBpsPercent,
+  formatPercent,
   formatRate,
   formatTokenAmount,
-  SLIPPAGE_PRESETS,
-} from '@/features/swap-token/lib/swap-amount';
+} from '@/shared/lib/format';
+import { SLIPPAGE_PRESETS } from '@/features/swap-token/lib/swap-amount';
 import type { SwapRoute, SwapToken } from '@/features/swap-token/lib/swap-types';
 import { Skeleton } from '@/shared/ui/skeleton';
 
@@ -158,7 +159,7 @@ export function SwapInfo(props: SwapInfoProps) {
                       active ? ACTIVE_PILL : IDLE_PILL,
                     )}
                   >
-                    {preset.toFixed(1)}%
+                    {formatPercent(preset, { minimumFractionDigits: 1 })}%
                   </button>
                 );
               })}

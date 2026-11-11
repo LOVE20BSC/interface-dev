@@ -7,7 +7,7 @@ import { APP_ENV } from '@/config/env';
 import { BRAND_DOCS_URL, DEFAULT_SYMBOL, NETWORK, configuredAddress } from '@/config/networks';
 import { variantLabel } from '@/shared/lib/variant-label';
 import { copy } from '@/shared/config/copy';
-import { formatAmount, formatBuildId, UNKNOWN } from '@/shared/lib/format';
+import { formatBuildId, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { useFirstToken } from '@/entities/community-token/model/use-first-token';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
@@ -51,7 +51,7 @@ export function HomePage() {
       : firstToken.status === 'ready' &&
           firstToken.balance !== undefined &&
           firstToken.decimals !== undefined
-        ? formatAmount(firstToken.balance, firstToken.decimals, 2)
+        ? formatTokenAmount(firstToken.balance, firstToken.decimals)
         : UNKNOWN;
 
   return (

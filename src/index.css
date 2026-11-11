@@ -30,13 +30,19 @@
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --nav-content-h: 64px;
-  --nav-h: calc(var(--nav-content-h) + var(--safe-bottom));
+  --bottom-navigation-content-height: 64px;
+  /* The tab bar's 1px top border is part of its fixed height. */
+  --bottom-navigation-height: calc(
+    var(--bottom-navigation-content-height) + 1px + var(--safe-bottom)
+  );
+  /* Action dock: 48px button + 2 × 10px padding + 1px border. */
+  --sticky-action-height: 69px;
 }
 
 @media (min-width: 768px) {
   :root {
-    --nav-h: 0px;
+    --bottom-navigation-height: 0px;
+    --sticky-action-height: 0px;
   }
 }
 

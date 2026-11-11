@@ -5,7 +5,7 @@ import { NETWORK } from '@/config/networks';
 import { formatSharePercent } from '@/domain/airdrop-share';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
-import { formatAmount, formatDateTime, UNKNOWN } from '@/shared/lib/format';
+import { formatDateTime, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
@@ -24,7 +24,9 @@ function ReceiptBody({ receipt, totalShare }: AirdropReceiptProps) {
     receipt.amount !== undefined &&
     receipt.tokenDecimals !== undefined &&
     receipt.tokenDecimals >= 0;
-  const amountText = amountKnown ? formatAmount(receipt.amount, receipt.tokenDecimals, 2) : UNKNOWN;
+  const amountText = amountKnown
+    ? formatTokenAmount(receipt.amount, receipt.tokenDecimals)
+    : UNKNOWN;
   const symbolText = receipt.tokenSymbol;
   const amountLine =
     amountKnown && symbolText !== undefined ? `${amountText} ${symbolText}` : amountText;

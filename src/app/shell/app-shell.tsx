@@ -43,7 +43,7 @@ export function AppShell() {
       >
         <AppHeader />
         <TestnetBanner />
-        <main className="mx-auto w-full max-w-[32rem] flex-1 px-4 pb-[calc(var(--nav-h)+16px)] pt-4 md:max-w-2xl md:pb-10">
+        <main className="mx-auto w-full max-w-[32rem] flex-1 px-4 pb-[calc(var(--bottom-navigation-height)+var(--sticky-action-height)+16px)] pt-4 md:max-w-2xl md:pb-10">
           <AppErrorBoundary key={location.pathname}>
             <Suspense fallback={<RouteFallback />}>
               <Outlet />

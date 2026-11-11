@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy';
 import { copyText } from '@/shared/lib/clipboard';
-import { formatAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
@@ -155,7 +155,7 @@ export function WalletMenuContent({
               }
               display={
                 tokenBalance.value !== undefined && tokenBalance.decimals !== undefined
-                  ? formatAmount(tokenBalance.value, tokenBalance.decimals, 2)
+                  ? formatTokenAmount(tokenBalance.value, tokenBalance.decimals)
                   : UNKNOWN
               }
             />
@@ -176,7 +176,7 @@ export function WalletMenuContent({
               }
               display={
                 nativeBalance.value !== undefined && nativeBalance.decimals !== undefined
-                  ? formatAmount(nativeBalance.value, nativeBalance.decimals, 4)
+                  ? formatTokenAmount(nativeBalance.value, nativeBalance.decimals)
                   : UNKNOWN
               }
             />

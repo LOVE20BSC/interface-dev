@@ -6,10 +6,11 @@ import { memberNftAbi } from '@/config/abis';
 import { DEFAULT_SYMBOL } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { formatAmount, shortenAddress, UNKNOWN } from '@/shared/lib/format';
+import { formatTokenAmount, shortenAddress, UNKNOWN } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
+import { StickyAction } from '@/shared/ui/sticky-action';
 import { useAirdropEligibility } from '@/entities/airdrop/model/use-airdrop-eligibility';
 import { approveAmountFor } from '@/features/mint-identity/lib/approve-amount';
 import { describeMintError } from '@/features/mint-identity/lib/mint-errors';
@@ -266,16 +267,19 @@ export function MintIdentityPanel({
 
   const priceDisplay =
     cost !== undefined && config.paymentTokenDecimals !== undefined && symbol !== undefined
-      ? copy.mintIdentity.cost.estimate(formatAmount(cost, config.paymentTokenDecimals, 2), symbol)
+      ? copy.mintIdentity.cost.estimate(
+          formatTokenAmount(cost, config.paymentTokenDecimals),
+          symbol,
+        )
       : undefined;
   const isPriceLoading = quote.nameStatus === 'checking' || config.status === 'loading';
   const balanceDisplay =
     balance !== undefined && config.paymentTokenDecimals !== undefined
-      ? formatAmount(balance, config.paymentTokenDecimals, 2)
+      ? formatTokenAmount(balance, config.paymentTokenDecimals)
       : undefined;
   const shortfallDisplay =
     cost !== undefined && balance !== undefined && config.paymentTokenDecimals !== undefined
-      ? formatAmount(cost - balance, config.paymentTokenDecimals, 2)
+      ? formatTokenAmount(cost - balance, config.paymentTokenDecimals)
       : undefined;
 
   const approveLabel =
@@ -412,42 +416,48 @@ export function MintIdentityPanel({
         ) : (
           <>
             {needsApproval ? (
-              <div className="space-y-2">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="w-full"
-                  onClick={handleApprove}
-                  disabled={!isNameReady || isTxBusy}
-                  loading={tx.approveStage === 'wallet'}
-                >
-                  {approveLabel}
-                </Button>
-                <Button variant="secondary" size="md" className="w-full" disabled>
-                  {copy.mintIdentity.ladder.mintStep}
-                </Button>
-              </div>
+              <>
+                <StickyAction>
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    className="w-full"
+                    onClick={handleApprove}
+                    disabled={!isNameReady || isTxBusy}
+                    loading={tx.approveStage === 'wallet'}
+                  >
+                    {approveLabel}
+                  </Button>
+                </StickyAction>
+                <div className="space-y-2">
+                  <Button variant="secondary" size="md" className="w-full" disabled>
+                    {copy.mintIdentity.ladder.mintStep}
+                  </Button>
+                </div>
+              </>
             ) : (
-              <div className="space-y-2">
+              <>
                 {tx.isApproved ? (
                   <p className="flex items-center gap-1.5 text-sm font-medium text-success">
                     <Check className="h-4 w-4" aria-hidden="true" />
                     {copy.mintIdentity.ladder.approved}
                   </p>
                 ) : null}
-                <Button
-                  variant="primary"
-                  size="lg"
-                  className="w-full"
-                  onClick={() => {
-                    void handleMint();
-                  }}
-                  disabled={!canAttemptMint || isPreflighting}
-                  loading={tx.mintStage === 'wallet'}
-                >
-                  {mintLabel}
-                </Button>
-              </div>
+                <StickyAction>
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    className="w-full"
+                    onClick={() => {
+                      void handleMint();
+                    }}
+                    disabled={!canAttemptMint || isPreflighting}
+                    loading={tx.mintStage === 'wallet'}
+                  >
+                    {mintLabel}
+                  </Button>
+                </StickyAction>
+              </>
             )}
 
             {tx.isApproved && needsApproval ? (

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Gift } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy-pages';
-import { formatAmount } from '@/shared/lib/format';
+import { formatTokenAmount } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -40,7 +40,7 @@ export function MintFundsBranch({
   if (eligibility.status === 'eligible') {
     const amount =
       eligibility.claimableAmount !== undefined && paymentDecimals !== undefined
-        ? formatAmount(eligibility.claimableAmount, paymentDecimals, 2)
+        ? formatTokenAmount(eligibility.claimableAmount, paymentDecimals)
         : undefined;
 
     return (

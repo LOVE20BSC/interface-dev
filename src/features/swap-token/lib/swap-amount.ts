@@ -1,5 +1,4 @@
 import { parseUnits } from 'viem';
-import { formatAmount, UNKNOWN } from '@/shared/lib/format';
 import type { SwapPairInfo } from './swap-types';
 import { sameAddress } from './swap-types';
 import type { HexAddress } from '@/config/networks';
@@ -52,32 +51,6 @@ export function applySlippage(quoteOut: bigint, bps: number): bigint {
   return (quoteOut * BigInt(10_000 - bounded)) / 10_000n;
 }
 
-/** Percentage with up to two decimals, e.g. 123 bps → 1.23. */
-export function formatBpsPercent(bps: number): string {
-  return formatAmount(BigInt(Math.max(0, Math.round(bps))), 2, 2);
-}
-
-/**
- * 1 FROM ≈ rate TO, derived from the amount quote so no extra chain read is
- * needed. Rates below 1e-12 render as 0; the UI still labels the value 预计.
- */
-export function formatRate(
-  quoteOut: bigint,
-  amountIn: bigint,
-  fromDecimals: number,
-  toDecimals: number,
-): string {
-  if (amountIn <= 0n || fromDecimals < 0 || toDecimals < 0) return UNKNOWN;
-  const precision = 12;
-  const numerator = quoteOut * 10n ** BigInt(fromDecimals) * 10n ** BigInt(precision);
-  const denominator = amountIn * 10n ** BigInt(toDecimals);
-  if (denominator === 0n) return UNKNOWN;
-  const scaled = numerator / denominator;
-  const integerDigits = (scaled / 10n ** BigInt(precision)).toString().length;
-  const maxFraction = Math.min(precision, Math.max(2, 8 - integerDigits));
-  return formatAmount(scaled, precision, maxFraction);
-}
-
 function reserveFor(
   pair: SwapPairInfo,
   token: HexAddress,
@@ -119,10 +92,4 @@ export function priceImpactBps(
 
   if (quoteOut >= ideal) return 0;
   return Number(((ideal - quoteOut) * 10_000n + ideal / 2n) / ideal);
-}
-
-/** Human-facing amount for quotes, minimums and receipts. */
-export function formatTokenAmount(value: bigint | undefined, decimals: number | undefined): string {
-  if (value === undefined || decimals === undefined) return UNKNOWN;
-  return formatAmount(value, decimals, 6);
 }

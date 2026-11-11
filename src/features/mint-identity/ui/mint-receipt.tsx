@@ -4,7 +4,7 @@ import { Check, Copy } from '@/shared/ui/icons';
 import { NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
-import { formatAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
@@ -26,7 +26,7 @@ function ReceiptBody({ receipt, paymentSymbol, paymentDecimals, onMintAnother }:
   const burned =
     paymentDecimals !== undefined && paymentSymbol !== undefined
       ? copy.mintIdentity.receipt.value(
-          formatAmount(receipt.cost, paymentDecimals, 2),
+          formatTokenAmount(receipt.cost, paymentDecimals),
           paymentSymbol,
         )
       : UNKNOWN;

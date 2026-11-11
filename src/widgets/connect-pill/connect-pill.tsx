@@ -72,7 +72,7 @@ export function ConnectPill() {
   };
 
   return (
-    <div className="inline-flex h-12 items-stretch overflow-hidden rounded-2xl border border-line bg-surface/85 shadow-sm backdrop-blur">
+    <div className="inline-flex h-12 max-w-full min-w-0 items-stretch overflow-hidden rounded-2xl border border-line bg-surface/85 shadow-sm backdrop-blur">
       <button
         ref={setCommunityAnchor}
         type="button"
@@ -83,7 +83,7 @@ export function ConnectPill() {
         aria-expanded={openMenu === 'community'}
         aria-haspopup="dialog"
         title={copy.community.menuTitle}
-        className="flex min-w-0 items-center gap-1 pl-3 pr-2 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40"
+        className="flex min-w-0 items-center gap-1 pl-2 pr-1.5 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40 md:pl-3 md:pr-2"
       >
         {compactChip ? (
           <span
@@ -111,7 +111,7 @@ export function ConnectPill() {
         aria-label={copy.wallet.walletMenuAria}
         aria-expanded={openMenu === 'wallet'}
         aria-haspopup="dialog"
-        className="grid w-[144px] grid-cols-[minmax(0,1fr)_14px] grid-rows-2 items-center gap-x-1.5 px-2.5 py-1.5 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40 md:w-[176px]"
+        className="grid w-[108px] grid-cols-[minmax(0,1fr)_14px] grid-rows-2 items-center gap-x-1 px-2 py-1.5 text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40 min-[390px]:w-[132px] md:w-[176px] md:gap-x-1.5 md:px-2.5"
       >
         <span className="truncate font-mono text-[13px] leading-4 text-foreground">
           {shortenAddress(address)}

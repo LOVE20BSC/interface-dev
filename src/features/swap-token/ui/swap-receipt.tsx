@@ -4,12 +4,11 @@ import { Check, Copy } from '@/shared/ui/icons';
 import { NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
-import { UNKNOWN } from '@/shared/lib/format';
+import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { Sheet } from '@/shared/ui/sheet';
-import { formatTokenAmount } from '@/features/swap-token/lib/swap-amount';
 import type { SwapRecord } from '@/features/swap-token/lib/swap-receipt-record';
 
 export interface SwapReceiptProps {

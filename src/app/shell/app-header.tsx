@@ -50,7 +50,7 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-line/80 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-      <div className="mx-auto flex min-h-14 w-full max-w-2xl items-center gap-2 px-4 pt-[env(safe-area-inset-top)]">
+      <div className="mx-auto flex min-h-14 w-full max-w-2xl items-center gap-1.5 px-4 pt-[env(safe-area-inset-top)]">
         {isHome ? (
           <>
             <HomeWordmark />
@@ -66,10 +66,12 @@ export function AppHeader() {
             >
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </button>
-            <h1 className="truncate text-base font-semibold">{title ?? copy.brand.protocolLabel}</h1>
+            <h1 className="truncate text-base font-semibold">
+              {title ?? copy.brand.protocolLabel}
+            </h1>
           </div>
         )}
-        <div className="ml-auto flex min-w-0 shrink-0 items-center justify-end">
+        <div className="ml-auto flex min-w-0 items-center justify-end">
           <ConnectPill />
         </div>
       </div>

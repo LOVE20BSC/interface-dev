@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   applySlippage,
-  formatRate,
-  formatTokenAmount,
   isSlippagePercentValid,
   parseSwapAmount,
   percentToBps,
@@ -58,12 +56,7 @@ describe('price protection', () => {
   });
 });
 
-describe('rate and impact estimates', () => {
-  it('prints 1 FROM ≈ rate TO with grouping and small values', () => {
-    expect(formatRate(2_000n * 10n ** 18n, 10n ** 18n, 18, 18)).toBe('2,000');
-    expect(formatRate(5n * 10n ** 14n, 10n ** 18n, 18, 18)).toBe('0.0005');
-  });
-
+describe('impact estimates', () => {
   it('derives impact from reserves and the executed quote, including the fee', () => {
     // 1 WETH into 100 WETH / 200k token, with a 0.3% fee quote.
     const impact = priceImpactBps(10n ** 18n, 1994n * 10n ** 18n, [WETH, TOKEN], [pair()]);
@@ -74,10 +67,5 @@ describe('rate and impact estimates', () => {
 
   it('hides the impact when the quote matches the marginal price', () => {
     expect(priceImpactBps(10n ** 18n, 2_000n * 10n ** 18n, [WETH, TOKEN], [pair()])).toBe(0);
-  });
-
-  it('formats token amounts with six decimals', () => {
-    expect(formatTokenAmount(1_234_500_000_000_000_000n, 18)).toBe('1.2345');
-    expect(formatTokenAmount(undefined, 18)).toBe('—');
   });
 });

@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import { RefreshCw } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
-import { formatAmount, shortenAddress, UNKNOWN } from '@/shared/lib/format';
+import { formatTokenAmount, shortenAddress, UNKNOWN } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
+import { StickyAction } from '@/shared/ui/sticky-action';
 import { airdropUnavailableCopy } from '@/features/claim-airdrop/lib/airdrop-unavailable-copy';
 import { useAirdropClaim } from '@/features/claim-airdrop/model/use-airdrop-claim';
 import { useAirdropClaimTransaction } from '@/features/claim-airdrop/model/use-airdrop-claim-transaction';
@@ -247,7 +248,7 @@ export function ClaimAirdropPanel({
   // S5 可铸造: the only state with the 铸造空投份额 action.
   const amountText =
     claim.claimableAmount !== undefined && claim.tokenDecimals !== undefined
-      ? formatAmount(claim.claimableAmount, claim.tokenDecimals, 2)
+      ? formatTokenAmount(claim.claimableAmount, claim.tokenDecimals)
       : UNKNOWN;
   const ctaLabel =
     tx.stage === 'wallet'
@@ -279,16 +280,18 @@ export function ClaimAirdropPanel({
       </StatusCard>
 
       <div className="space-y-2">
-        <Button
-          variant="primary"
-          size="lg"
-          className="w-full"
-          onClick={tx.claim}
-          disabled={isBusy || tx.isHydrating || claim.claimableAmount === undefined}
-          loading={tx.stage === 'wallet'}
-        >
-          {ctaLabel}
-        </Button>
+        <StickyAction>
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full"
+            onClick={tx.claim}
+            disabled={isBusy || tx.isHydrating || claim.claimableAmount === undefined}
+            loading={tx.stage === 'wallet'}
+          >
+            {ctaLabel}
+          </Button>
+        </StickyAction>
 
         {tx.stage === 'pending' || tx.pendingHash !== null ? (
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-5 text-muted">
