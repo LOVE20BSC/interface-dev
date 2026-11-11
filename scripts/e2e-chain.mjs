@@ -36,6 +36,13 @@ const SUITE_PORT = 8555;
 const HUMAN_PORT = 8545;
 const EXPECTED_CHAIN_ID = 31337;
 const DEFAULT_SUITE_RPC = `http://127.0.0.1:${SUITE_PORT}`;
+/**
+ * Test-build transaction deadline. The shipped (production) value is the 90 s
+ * default in src/shared/lib/tx-watch.ts; the e2e suite must not wait 90 s for the
+ * recovery card, so the suite build bakes a short deadline via VITE_*. Defaulting
+ * it here keeps `e2e/tx-recovery.spec.ts` from silently skipping on a clean shell.
+ */
+const DEFAULT_E2E_TX_DEADLINE_MS = '4000';
 const DEPLOYMENT_FILE = resolve(ROOT, 'src/config/deployments/anvil31337_dev.json');
 
 /** Hostnames that mean "this machine"; only these can be the developer's personal chain. */
@@ -292,6 +299,15 @@ async function main() {
       (managed ? ' (managed: ensure/bootstrapped)' : ' (E2E_ANVIL_RPC override; not managed)'),
   );
   console.log('[e2e-chain] the developer chain on http://127.0.0.1:8545 is never touched by e2e');
+
+  // Bake the short deadline into the test build unless the caller chose one.
+  // Production keeps the 90 s default (VITE_TX_DEADLINE_MS is build-time only).
+  if ((process.env.VITE_TX_DEADLINE_MS ?? '').trim() === '') {
+    process.env.VITE_TX_DEADLINE_MS = DEFAULT_E2E_TX_DEADLINE_MS;
+    console.log(
+      `[e2e-chain] VITE_TX_DEADLINE_MS=${DEFAULT_E2E_TX_DEADLINE_MS} (test build only; shipped default is 90 s)`,
+    );
+  }
 
   if (managed) {
     await ensureDedicatedChain({ reset });

@@ -16,23 +16,24 @@ import { expect, test, type Page } from '@playwright/test';
  * eternal 确认中; the bounded watcher must instead show the recovery alert and
  * re-enable the primary action after the deadline.
  *
- * REQUIREMENT — build with a short deadline, e.g.:
- *
- *   VITE_TX_DEADLINE_MS=4000 pnpm e2e -- e2e/tx-recovery.spec.ts
- *
- * (`pnpm e2e` bootstraps/uses the dedicated suite chain on :8555; the env var is
- * inherited by Playwright's webServer build and baked into `import.meta.env`.)
- * Without it the test skips: the default 90 s deadline is longer than a useful
- * test and would hide the very behaviour it is supposed to prove.
+ * DEADLINE — production ships the 90 s default from `tx-watch.ts`. The 4 s value
+ * is a TEST-BUILD override only: `VITE_TX_DEADLINE_MS` is baked into the bundle at
+ * build time, so users never wait 4 s. `pnpm e2e` supplies it automatically
+ * (scripts/e2e-chain.mjs); a direct `playwright test` without it fails loudly
+ * instead of silently losing this P0 coverage, unless `E2E_ALLOW_DEFAULT_DEADLINE=1`
+ * opts into the skip (the skip message reports that the coverage was skipped).
  */
 
 const SHORT_DEADLINE_MS = Number(process.env.VITE_TX_DEADLINE_MS ?? '');
 const HAS_SHORT_DEADLINE =
   Number.isFinite(SHORT_DEADLINE_MS) && SHORT_DEADLINE_MS > 0 && SHORT_DEADLINE_MS <= 20_000;
+const ALLOW_DEFAULT_DEADLINE = process.env.E2E_ALLOW_DEFAULT_DEADLINE === '1';
 
+// Explicit escape hatch only: a plain run without the override fails loudly
+// below, so the recovery coverage cannot disappear silently.
 test.skip(
-  !HAS_SHORT_DEADLINE,
-  'tx-recovery needs a short deadline build: export VITE_TX_DEADLINE_MS=4000 before `pnpm e2e`',
+  !HAS_SHORT_DEADLINE && ALLOW_DEFAULT_DEADLINE,
+  'VITE_TX_DEADLINE_MS is not set and E2E_ALLOW_DEFAULT_DEADLINE=1: tx recovery coverage was skipped (a 90 s build would outlast the test).',
 );
 
 const deployment = JSON.parse(
@@ -138,6 +139,11 @@ async function installGhostWallet(page: Page, account: string): Promise<void> {
   );
 }
 
+async function shot(page: Page, name: string): Promise<void> {
+  mkdirSync(SHOTS, { recursive: true });
+  await page.screenshot({ path: resolve(SHOTS, name), animations: 'disabled' });
+}
+
 async function connect(page: Page): Promise<void> {
   const button = page.getByRole('button', { name: '连接钱包' }).first();
   await expect(button).toBeEnabled({ timeout: 10_000 });
@@ -147,51 +153,64 @@ async function connect(page: Page): Promise<void> {
   });
 }
 
-test('幽灵授权哈希在截止后给出恢复卡，主按钮重新可点', async ({ page }) => {
-  await installGhostWallet(page, ACCOUNT);
-  await page.goto('/mint');
-  await connect(page);
+test(
+  HAS_SHORT_DEADLINE
+    ? '幽灵授权哈希在截止后给出恢复卡，主按钮重新可点'
+    : 'tx-recovery: short deadline build required',
+  async ({ page }) => {
+    if (!HAS_SHORT_DEADLINE) {
+      throw new Error(
+        'This build has no short VITE_TX_DEADLINE_MS, so the bounded-wait path cannot be exercised. ' +
+          'Run `pnpm e2e` (it exports VITE_TX_DEADLINE_MS=4000), or set E2E_ALLOW_DEFAULT_DEADLINE=1 ' +
+          'to skip the P0 recovery coverage explicitly.',
+      );
+    }
+    await installGhostWallet(page, ACCOUNT);
+    await page.goto('/mint');
+    await connect(page);
 
-  const nameInput = page.getByLabel('给身份起个名字');
-  await expect(nameInput).toBeVisible({ timeout: 20_000 });
-  await nameInput.fill(NAME);
-  // The name check is debounced + on-chain; the approve CTA enables after 可以用.
-  await expect(page.getByText('✓ 可以用')).toBeVisible({ timeout: 20_000 });
+    const nameInput = page.getByLabel('给身份起个名字');
+    await expect(nameInput).toBeVisible({ timeout: 20_000 });
+    await nameInput.fill(NAME);
+    // The name check is debounced + on-chain; the approve CTA enables after 可以用.
+    await expect(page.getByText('✓ 可以用')).toBeVisible({ timeout: 20_000 });
 
-  const approve = page.getByRole('button', { name: '1. 授权' });
-  await expect(approve).toBeEnabled({ timeout: 20_000 });
-  await approve.click();
+    const approve = page.getByRole('button', { name: '1. 授权' });
+    await expect(approve).toBeEnabled({ timeout: 20_000 });
+    // Evidence for the ladder reading order: `1 授权` above `2 铸造身份`.
+    await shot(page, 'mint-approve-needed.png');
+    await approve.click();
 
-  // The wallet returned a hash, so the page enters the bounded pending state
-  // (this is where the old code stayed forever). The countdown is the bounded
-  // wait: a raw millisecond value must never be rendered.
-  const pending = page.getByTestId('tx-watch-pending');
-  await expect(pending).toBeVisible({ timeout: 15_000 });
-  await expect(pending).toContainText('等待上链');
+    // The wallet returned a hash, so the page enters the bounded pending state
+    // (this is where the old code stayed forever). The countdown is the bounded
+    // wait: a raw millisecond value must never be rendered.
+    const pending = page.getByTestId('tx-watch-pending');
+    await expect(pending).toBeVisible({ timeout: 15_000 });
+    await expect(pending).toContainText('等待上链');
 
-  // Past the deadline: the ghost hash is unknown to the node -> dropped. The
-  // recovery alert explains it and the primary action is clickable again.
-  const recovery = page.getByTestId('tx-watch-recovery');
-  await expect(recovery).toBeVisible({ timeout: 30_000 });
-  await expect(recovery).toContainText('这笔交易还没有被确认');
-  await expect(recovery.getByRole('button', { name: '重新查询' })).toBeVisible();
-  await expect(recovery.getByRole('button', { name: '重新提交' })).toBeVisible();
-  await expect(approve).toBeEnabled({ timeout: 10_000 });
-  // No explorer link on anvil (the environment package has none).
-  await expect(recovery.getByRole('link', { name: '在区块链浏览器查看' })).toHaveCount(0);
+    // Past the deadline: the ghost hash is unknown to the node -> dropped. The
+    // recovery alert explains it and the primary action is clickable again.
+    const recovery = page.getByTestId('tx-watch-recovery');
+    await expect(recovery).toBeVisible({ timeout: 30_000 });
+    await expect(recovery).toContainText('这笔交易还没有被确认');
+    await expect(recovery.getByRole('button', { name: '重新查询' })).toBeVisible();
+    await expect(recovery.getByRole('button', { name: '重新提交' })).toBeVisible();
+    await expect(approve).toBeEnabled({ timeout: 10_000 });
+    // No explorer link on anvil (the environment package has none).
+    await expect(recovery.getByRole('link', { name: '在区块链浏览器查看' })).toHaveCount(0);
 
-  // Screenshot the whole recovery card (its actions must not hide behind the
-  // fixed primary-action dock on a 390×844 phone).
-  await recovery.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-  mkdirSync(SHOTS, { recursive: true });
-  await page.screenshot({ path: resolve(SHOTS, 'tx-recovery-card.png'), animations: 'disabled' });
+    // Screenshot the whole recovery card (its actions must not hide behind the
+    // fixed primary-action dock on a 390×844 phone).
+    await recovery.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+    await shot(page, 'tx-recovery-card.png');
 
-  // 「重新提交」 sends a new (ghost) hash with an explicit on-chain nonce; the
-  // watcher restarts from pending instead of staying stuck on the old hash.
-  // (Only the mint hash is persisted across reloads by design; an approval is
-  // recovered from allowance(), so there is intentionally nothing to resume
-  // for the approve step documented here.)
-  await recovery.getByRole('button', { name: '重新提交' }).click();
-  await expect(page.getByTestId('tx-watch-pending')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByTestId('tx-watch-recovery')).toHaveCount(0);
-});
+    // 「重新提交」 sends a new (ghost) hash with an explicit on-chain nonce; the
+    // watcher restarts from pending instead of staying stuck on the old hash.
+    // (Only the mint hash is persisted across reloads by design; an approval is
+    // recovered from allowance(), so there is intentionally nothing to resume
+    // for the approve step documented here.)
+    await recovery.getByRole('button', { name: '重新提交' }).click();
+    await expect(page.getByTestId('tx-watch-pending')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('tx-watch-recovery')).toHaveCount(0);
+  },
+);
