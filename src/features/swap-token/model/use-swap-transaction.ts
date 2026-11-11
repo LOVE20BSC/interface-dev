@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAccount, useChainId, useTransactionReceipt, useWriteContract } from 'wagmi';
+import { useAccount, useChainId, useWriteContract } from 'wagmi';
 import { love20TokenAbi, uniswapV2Router02Abi, weth9Abi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
+import { useNextNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
 import { describeSwapError, swapRetryLabel } from '@/features/swap-token/lib/swap-errors';
 import { parseSwapReceipt } from '@/features/swap-token/lib/swap-events';
 import {
@@ -54,6 +55,10 @@ export interface SwapTransactionState {
   readonly pendingKind: SwapTxAction | null;
   readonly error: SwapTxError | null;
   readonly isHydrating: boolean;
+  /** Bounded wait for the submitted hash; `isStuck` frees the CTA + shows recovery. */
+  readonly watch: TxWatch;
+  /** Re-sends the pending step with an explicitly correct nonce (recovery card). */
+  readonly resubmit: () => void;
   readonly approve: (amount: bigint) => void;
   readonly execute: (execution: SwapExecution) => Promise<void>;
   readonly clearReceipt: () => void;
@@ -69,6 +74,16 @@ type PendingTx =
     }
   | { readonly kind: 'swap'; readonly hash: HexHash; readonly record: SwapRecord };
 
+/** The router call a swap record represents, replayable for 「重新提交」. */
+interface SwapRequest {
+  readonly kind: SwapRecord['kind'];
+  readonly fromKey: string;
+  readonly toKey: string;
+  readonly amountIn: bigint;
+  readonly minOut: bigint;
+  readonly path: readonly HexAddress[];
+}
+
 function pairReadsFromRecord(record: SwapRecord): SwapPairRead[] {
   return record.pairAddresses.flatMap((address, index) => {
     const token0 = record.pairToken0[index];
@@ -78,16 +93,36 @@ function pairReadsFromRecord(record: SwapRecord): SwapPairRead[] {
   });
 }
 
+function requestFromRecord(record: SwapRecord): SwapRequest | null {
+  if (record.amountIn === undefined || record.minOut === undefined) return null;
+  const path = record.path.filter((entry): entry is HexAddress =>
+    /^0x[0-9a-fA-F]{40}$/.test(entry),
+  );
+  return {
+    kind: record.kind,
+    fromKey: record.fromKey,
+    toKey: record.toKey,
+    amountIn: record.amountIn,
+    minOut: record.minOut,
+    path,
+  };
+}
+
 /**
  * ERC20 input: exact-amount approve first, then the swap. The mint ladder's
  * grammar is reused: wallet → 确认中 → mined. The hash (and all receipt context)
  * is persisted before waiting so a refresh resumes the pending transaction.
+ *
+ * The receipt wait is the shared bounded watcher (`useTxWatch`), not a bare
+ * receipt poll: a dropped/replaced/nonce-gapped transaction becomes an
+ * actionable recovery card instead of an endless 确认中.
  */
 export function useSwapTransaction(options: SwapTransactionInput): SwapTransactionState {
   const { router, wrappedAddress, from, to, route, nativeSymbol, onConfirmed } = options;
   const { address: account } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
+  const readNextNonce = useNextNonce(account);
 
   const [pending, setPending] = useState<PendingTx | null>(null);
   const [receipt, setReceipt] = useState<SwapRecord | null>(null);
@@ -143,15 +178,17 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
   }, [scope]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const receiptQuery = useTransactionReceipt({
-    ...(pending !== null ? { hash: pending.hash } : {}),
-    query: { enabled: pending !== null },
+  const watch = useTxWatch({
+    hash: pending?.hash ?? null,
+    wallet: account,
+    walletAction: walletAction !== null,
+    enabled: pending !== null,
   });
-  const onChainReceipt = receiptQuery.data;
+  const onChainReceipt = watch.receipt;
 
   /* eslint-disable react-hooks/set-state-in-effect -- a mined receipt is an external chain fact */
   useEffect(() => {
-    if (pending === null || onChainReceipt === undefined) return;
+    if (pending === null || onChainReceipt === null) return;
 
     if (onChainReceipt.status === 'reverted') {
       if (pending.kind === 'swap' && scope !== null) clearSwapRecord(scope);
@@ -204,21 +241,6 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
   }, [account, from?.address, onChainReceipt, pending, scope]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // A hash that no longer resolves must not leave the page in 确认中 forever.
-  /* eslint-disable react-hooks/set-state-in-effect -- one-shot receipt query result */
-  useEffect(() => {
-    if (pending === null || !receiptQuery.isError) return;
-    if (pending.kind === 'swap' && scope !== null) clearSwapRecord(scope);
-    setPending(null);
-    setError({
-      action: pending.kind,
-      message: copy.swap.errors.pendingUnknown,
-      retryLabel: undefined,
-    });
-    onConfirmedRef.current?.();
-  }, [pending, receiptQuery.isError, scope]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
   // A receipt from another pair must not disable the current form.
   const activeReceipt =
     receipt !== null &&
@@ -227,6 +249,90 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     swapRecordMatchesPair(receipt, from, to)
       ? receipt
       : null;
+
+  const deadlineSeconds = (): bigint => BigInt(Math.floor(Date.now() / 1000) + 1200);
+
+  /** One place for the three write shapes (wrap/unwrap/router), so resubmit reuses it. */
+  const writeSwapRequest = async (request: SwapRequest, nonce?: number): Promise<HexHash> => {
+    const nonceOption = nonce !== undefined ? { nonce } : {};
+    if (request.kind === 'wrap') {
+      if (wrappedAddress === undefined) throw new Error('wrapped native unavailable');
+      return writeContractAsync({
+        address: wrappedAddress,
+        abi: weth9Abi,
+        functionName: 'deposit',
+        value: request.amountIn,
+        ...nonceOption,
+      });
+    }
+    if (request.kind === 'unwrap') {
+      if (wrappedAddress === undefined) throw new Error('wrapped native unavailable');
+      return writeContractAsync({
+        address: wrappedAddress,
+        abi: weth9Abi,
+        functionName: 'withdraw',
+        args: [request.amountIn],
+        ...nonceOption,
+      });
+    }
+    if (router === undefined || account === undefined) throw new Error('router unavailable');
+    const path = [...request.path];
+    const swapDeadline = deadlineSeconds();
+    if (request.fromKey === 'native') {
+      return writeContractAsync({
+        address: router,
+        abi: uniswapV2Router02Abi,
+        functionName: 'swapExactETHForTokens',
+        args: [request.minOut, path, account, swapDeadline],
+        value: request.amountIn,
+        ...nonceOption,
+      });
+    }
+    if (request.toKey === 'native') {
+      return writeContractAsync({
+        address: router,
+        abi: uniswapV2Router02Abi,
+        functionName: 'swapExactTokensForETH',
+        args: [request.amountIn, request.minOut, path, account, swapDeadline],
+        ...nonceOption,
+      });
+    }
+    return writeContractAsync({
+      address: router,
+      abi: uniswapV2Router02Abi,
+      functionName: 'swapExactTokensForTokens',
+      args: [request.amountIn, request.minOut, path, account, swapDeadline],
+      ...nonceOption,
+    });
+  };
+
+  const submitApprove = async (
+    amount: bigint,
+    tokenAddress: HexAddress,
+    nonce?: number,
+  ): Promise<void> => {
+    if (router === undefined) return;
+    setError(null);
+    setIsApproved(false);
+    setWalletAction('approve');
+    submittingRef.current = true;
+    try {
+      const hash = await writeContractAsync({
+        address: tokenAddress,
+        abi: love20TokenAbi,
+        functionName: 'approve',
+        args: [router, amount],
+        ...(nonce !== undefined ? { nonce } : {}),
+      });
+      setPending({ kind: 'approve', hash, amount, tokenAddress });
+    } catch (cause) {
+      const message = describeSwapError(cause, { nativeSymbol, fromSymbol: from?.symbol ?? '' });
+      setError({ action: 'approve', message, retryLabel: swapRetryLabel(message) });
+    } finally {
+      setWalletAction(null);
+      submittingRef.current = false;
+    }
+  };
 
   const approve = (amount: bigint): void => {
     if (submittingRef.current || pending !== null || activeReceipt !== null) return;
@@ -239,28 +345,7 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     ) {
       return;
     }
-    const tokenAddress = from.address;
-    setError(null);
-    setIsApproved(false);
-    setWalletAction('approve');
-    submittingRef.current = true;
-    void (async () => {
-      try {
-        const hash = await writeContractAsync({
-          address: tokenAddress,
-          abi: love20TokenAbi,
-          functionName: 'approve',
-          args: [router, amount],
-        });
-        setPending({ kind: 'approve', hash, amount, tokenAddress });
-      } catch (cause) {
-        const message = describeSwapError(cause, { nativeSymbol, fromSymbol: from.symbol });
-        setError({ action: 'approve', message, retryLabel: swapRetryLabel(message) });
-      } finally {
-        setWalletAction(null);
-        submittingRef.current = false;
-      }
-    })();
+    void submitApprove(amount, from.address);
   };
 
   const execute = async (execution: SwapExecution): Promise<void> => {
@@ -279,57 +364,21 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     setError(null);
     setWalletAction('swap');
     submittingRef.current = true;
-    const deadline = BigInt(Math.floor(Date.now() / 1000) + 1200);
+    const request: SwapRequest = {
+      kind: route.kind,
+      fromKey: swapTokenKey(from),
+      toKey: swapTokenKey(to),
+      amountIn: execution.amountIn,
+      minOut: execution.minOut,
+      path: route.kind === 'swap' ? [...route.pathAddresses] : [],
+    };
     try {
-      let hash: HexHash;
-      if (route.kind === 'wrap') {
-        if (wrappedAddress === undefined) throw new Error('wrapped native unavailable');
-        hash = await writeContractAsync({
-          address: wrappedAddress,
-          abi: weth9Abi,
-          functionName: 'deposit',
-          value: execution.amountIn,
-        });
-      } else if (route.kind === 'unwrap') {
-        if (wrappedAddress === undefined) throw new Error('wrapped native unavailable');
-        hash = await writeContractAsync({
-          address: wrappedAddress,
-          abi: weth9Abi,
-          functionName: 'withdraw',
-          args: [execution.amountIn],
-        });
-      } else {
-        const path = [...route.pathAddresses];
-        if (from.kind === 'native') {
-          hash = await writeContractAsync({
-            address: router,
-            abi: uniswapV2Router02Abi,
-            functionName: 'swapExactETHForTokens',
-            args: [execution.minOut, path, account, deadline],
-            value: execution.amountIn,
-          });
-        } else if (to.kind === 'native') {
-          hash = await writeContractAsync({
-            address: router,
-            abi: uniswapV2Router02Abi,
-            functionName: 'swapExactTokensForETH',
-            args: [execution.amountIn, execution.minOut, path, account, deadline],
-          });
-        } else {
-          hash = await writeContractAsync({
-            address: router,
-            abi: uniswapV2Router02Abi,
-            functionName: 'swapExactTokensForTokens',
-            args: [execution.amountIn, execution.minOut, path, account, deadline],
-          });
-        }
-      }
-
+      const hash = await writeSwapRequest(request);
       const record: SwapRecord = {
         hash,
         kind: route.kind,
-        fromKey: swapTokenKey(from),
-        toKey: swapTokenKey(to),
+        fromKey: request.fromKey,
+        toKey: request.toKey,
         fromSymbol: from.symbol,
         toSymbol: to.symbol,
         fromDecimals: from.decimals,
@@ -359,6 +408,58 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     }
   };
 
+  /**
+   * Recovery action for a stuck hash: rebuild the same call from the persisted
+   * record and re-send it with the on-chain nonce, so a nonce gap heals itself.
+   */
+  const resubmit = (): void => {
+    if (pending === null) return;
+    const target = pending;
+    void (async () => {
+      const nonce = await readNextNonce();
+      if (nonce === undefined) {
+        setError({
+          action: target.kind,
+          message: copy.txWatch.nonceUnavailable,
+          retryLabel: undefined,
+        });
+        return;
+      }
+      if (target.kind === 'approve') {
+        await submitApprove(target.amount, target.tokenAddress, nonce);
+        return;
+      }
+      const request = requestFromRecord(target.record);
+      if (request === null) {
+        setError({ action: 'swap', message: copy.swap.errors.failedNote, retryLabel: undefined });
+        return;
+      }
+      setError(null);
+      setWalletAction('swap');
+      submittingRef.current = true;
+      try {
+        const hash = await writeSwapRequest(request, nonce);
+        const record: SwapRecord = {
+          ...target.record,
+          hash,
+          confirmed: false,
+          recordedAt: Date.now(),
+        };
+        if (scope !== null) writeSwapRecord(scope, record);
+        setPending({ kind: 'swap', hash, record });
+      } catch (cause) {
+        const message = describeSwapError(cause, {
+          nativeSymbol,
+          fromSymbol: target.record.fromSymbol,
+        });
+        setError({ action: 'swap', message, retryLabel: swapRetryLabel(message) });
+      } finally {
+        setWalletAction(null);
+        submittingRef.current = false;
+      }
+    })();
+  };
+
   const clearReceipt = (): void => {
     setReceipt(null);
     setPending(null);
@@ -368,10 +469,20 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     if (scope !== null) clearSwapRecord(scope);
   };
 
+  // A stuck hash frees the CTA and the pair controls; the recovery card owns
+  // the manual 「重新查询」/「重新提交」 actions until a new hash is submitted.
   const approveStage: SwapTxStage =
-    walletAction === 'approve' ? 'wallet' : pending?.kind === 'approve' ? 'pending' : 'idle';
+    walletAction === 'approve'
+      ? 'wallet'
+      : pending?.kind === 'approve' && !watch.isStuck
+        ? 'pending'
+        : 'idle';
   const swapStage: SwapTxStage =
-    walletAction === 'swap' ? 'wallet' : pending?.kind === 'swap' ? 'pending' : 'idle';
+    walletAction === 'swap'
+      ? 'wallet'
+      : pending?.kind === 'swap' && !watch.isStuck
+        ? 'pending'
+        : 'idle';
 
   return {
     approveStage,
@@ -383,6 +494,8 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     pendingKind: pending?.kind ?? null,
     error,
     isHydrating,
+    watch,
+    resubmit,
     approve,
     execute,
     clearReceipt,

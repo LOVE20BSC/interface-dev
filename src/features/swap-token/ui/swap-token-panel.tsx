@@ -5,16 +5,12 @@ import { ArrowDownUp, Check, RefreshCw } from '@/shared/ui/icons';
 import { NETWORK, configuredAddress, explorerAddressUrl, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import {
-  formatBpsPercent,
-  formatTokenAmount,
-  formatUnits,
-  shortenAddress,
-} from '@/shared/lib/format';
+import { formatBpsPercent, formatTokenAmount, formatUnits } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { StickyAction } from '@/shared/ui/sticky-action';
+import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import {
   applySlippage,
   DEFAULT_SLIPPAGE_PERCENT,
@@ -375,7 +371,7 @@ export function SwapTokenPanel({
   const txBusy =
     tx.approveStage !== 'idle' ||
     tx.swapStage !== 'idle' ||
-    tx.pendingHash !== null ||
+    (tx.pendingHash !== null && !tx.watch.isStuck) ||
     tx.receipt !== null;
 
   const quoteReady =
@@ -1033,12 +1029,7 @@ export function SwapTokenPanel({
           </>
         )}
 
-        {tx.pendingHash !== null ? (
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-5 text-muted">
-            <span>{copy.swap.ladder.pendingNote}</span>
-            <span className="font-mono text-[11px]">{shortenAddress(tx.pendingHash, 10, 8)}</span>
-          </p>
-        ) : null}
+        {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
 
         <div className="flex items-center justify-between gap-3 pt-1">
           <span className="text-[11px] leading-5 text-muted">{copy.swap.ladder.note}</span>
