@@ -5,7 +5,7 @@
 - 审计时间：2026-11-11
 - 审计基线：`core` @ `43d5344`、`action` @ `bceee40`、`group-chat` @ `62efe7f`、`libs` @ `65b1106`
 - 审计口径：**无后端、无索引器**的静态站，只有 RPC `eth_call` + 合约 view 函数 + Multicall3。`eth_getLogs` 不计为可用手段（BSC 公开 RPC 限 50 区块 / 拒绝，见 [`../product/m0-scope.md`](../product/m0-scope.md) 假设 1）。
-- 审计对象：M0 需要链上支撑的 6 个面（身份、铸造 MemberNFT、空投、用原生币买社区代币、首页“下一步”、流水线/倒计时）。其中“首页下一步”“流水线”按 [`../product/m0-scope.md`](../product/m0-scope.md) 属于 M1+，因为项目负责人明确把它们列入了本次审计范围，所以仍然审。
+- 审计对象：M0 需要链上支撑的 6 个面（身份、铸造 MemberNFT、空投、代币兑换（任意代币 ↔ 任意代币，含原生币）、首页“下一步”、流水线/倒计时）。其中“首页下一步”“流水线”按 [`../product/m0-scope.md`](../product/m0-scope.md) 属于 M1+，因为项目负责人明确把它们列入了本次审计范围，所以仍然审。
 - 规范基准：[`matt-gov/CONTEXT.md`](../../../matt-gov/CONTEXT.md)、[`matt-gov/docs/dev-standards.md`](../../../matt-gov/docs/dev-standards.md)、[`matt-gov/docs/naming-standards.md`](../../../matt-gov/docs/naming-standards.md)。
 
 ## 索引
@@ -15,7 +15,7 @@
 | [CI-001](001-no-member-round-index.md) | 没有按 `memberId` 的轮次/行动索引，待铸造激励无法枚举 | Blocker | 首页下一步、激励铸造、验证者任务 | Open | `core/src/Mint.sol`、`core/src/Vote.sol`、`core/src/Stake.sol`、`action/src/ActionTarget.sol`、`action/src/ExecutorBase.sol` |
 | [CI-002](002-reward-quote-linear-scan.md) | 激励报价每次都线性扫描本轮全部已投票提案 | High | 行动激励铸造、流水线 | Open | `core/src/Mint.sol`、`action/src/ActionTarget.sol`、`action/src/GroupServiceExecutor.sol` |
 | [CI-003](003-created-round-not-exposed.md) | 行动的创建轮次 `createdRound` 从未暴露 | High | 流水线/倒计时、行动参与、行动激励铸造 | Open | `action/src/ActionTarget.sol`、`action/src/ExecutorBase.sol`、`action/src/LpExecutor.sol`、`action/src/GroupActionManager.sol`、`action/src/GroupServiceExecutor.sol` |
-| [CI-004](004-member-nft-test-prefix-mismatch.md) | MemberNFT 测试前缀：报价/查重与实际铸造不一致 | High | 铸造 MemberNFT | Open | `core/src/MemberNFT.sol`、`core/script/network/anvil31337_dev/core.params` |
+| [CI-004](004-member-nft-test-prefix-mismatch.md) | MemberNFT 测试前缀：报价/查重与实际铸造不一致 | High | 铸造 MemberNFT | 已修复（core@72a1604） | `core/src/MemberNFT.sol`、`core/test/MemberNFT.t.sol`、`core/script/network/anvil31337_dev/core.params` |
 | [CI-005](005-no-onboarding-path.md) | “没币用户”的入网路径缺失：mint 只收 ERC20，空投合约不在任何仓库 | High | 铸造 MemberNFT、空投 | Open | `core/src/MemberNFT.sol`、`core/src/LOVE20Token.sol`、`core/src/Launch.sol`、`core/src/interfaces/ILaunchDistributor.sol` |
 | [CI-006](006-claim-amounts-are-live.md) | 待铸造金额按“现在”现算，会变，甚至变成 0 或被销毁 | High | 激励铸造、首页下一步 | Open | `action/src/LpExecutor.sol`、`action/src/GroupServiceExecutor.sol`、`core/src/Mint.sol`、`action/src/GroupActionExecutor.sol` |
 | [CI-007](007-round-not-started-inconsistent.md) | “轮次未开始”有三种答复：回滚 / 空数组+0 / 静默 0 | Medium | 全部读链层 | Open | `core/src/Stake.sol`、`action/src/ActionTarget.sol`、`action/src/LpExecutor.sol`、`action/src/GroupServiceExecutor.sol`、`action/src/GroupActionVerify.sol` |
@@ -26,7 +26,7 @@
 | [CI-012](012-name-homoglyph-spoofing.md) | 名称同形可伪造身份（ASCII-only 折叠 + 宽松字符集） | Medium | 身份、提案、群聊 | Open | `core/src/MemberNFT.sol` |
 | [CI-013](013-member-nft-no-token-uri.md) | MemberNFT 没有 `tokenURI`/元数据，钱包里是空白 NFT | Low | 身份 | Open | `core/src/MemberNFT.sol` |
 
-数量：1 Blocker / 5 High / 6 Medium / 1 Low。
+数量：13 条（**12 Open / 1 已修复**）；Open 条目按严重级别为 **1 Blocker / 4 High / 6 Medium / 1 Low**，已修复的 CI-004 为 High。
 
 ## 严重级别定义
 
@@ -43,8 +43,8 @@
 2. **在合约仓开分支修，前端仓只消费**。本目录所在仓（`interface-dev-dsh`）不改任何合约；修复落在 `core` / `action` / `libs`，并遵守 `matt-gov/docs/dev-standards.md`（接口唯一来源是本仓 `src/interfaces/`、事件进 `I<Name>Events`、错误进 `I<Name>Errors`、集合读取按 §4.3 的分页签名）。
 3. **ABI 形状变更 = 破坏性**。新增 `view` 是加法（可先做）；给已有返回值加字段、改参数顺序是破坏性变更（合约尚未上线，可以一次改到位，但必须同步 `matt-gov/registry/errors.json` 与前端 ABI 导出产物）。
 4. **每条修复都要带一条“前端可复跑”的验证**：`cast call` 一行（或 `forge test` 用例）证明修复前失败/返回歧义、修复后返回明确值。把该命令写进对应条目的“验证”。
-5. **修复后更新本文件的状态列**：`Open` → `Fixed @ <repo> <commit>`；若决定不修，写 `Won't fix（理由）`，不要静默删除条目。
-6. **前端在修复落地前必须使用各条的“临时绕过”**，并在 `docs/` 里记录绕过的代价；绕过不得伪装成正确值（例如把估算金额写成“可得”）。
+5. **修复后更新本文件的状态列**：`Open` → `已修复（<repo>@<commit>）`；若决定不修，写 `Won't fix（理由）`，不要静默删除条目。
+6. **前端在修复落地前必须使用各条的“临时绕过”**，并在 `docs/` 里记录绕过的代价；绕过不得伪装成正确值（例如把估算金额写成“可得”）。修复落地后，对应绕过必须从代码与文档里删除，不得继续以“临时”名义留在主路径。
 
 ## 已核实、**不是**问题的点（避免重复劳动）
 

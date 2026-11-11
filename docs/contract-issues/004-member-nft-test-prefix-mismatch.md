@@ -2,10 +2,48 @@
 
 - 严重级别：**High**
 - 影响模块：铸造 MemberNFT
-- 状态：Open
-- 关联文件：`core/src/MemberNFT.sol`、`core/src/interfaces/IMemberNFT.sol`、`core/script/network/anvil31337_dev/core.params`
+- 状态：已修复（core@72a1604）
+- 关联文件：`core/src/MemberNFT.sol`、`core/src/interfaces/IMemberNFT.sol`、`core/test/MemberNFT.t.sol`、`core/script/network/anvil31337_dev/core.params`
 
-## 现象
+## 修复内容
+
+`core` 已在 `72a1604 refactor(member-nft): stop prefixing names with Test on testnets`（2026-11-11 08:46，工作区干净）修复。采用的方案不是把前缀扩散到全部公开函数，而是**停止在测试网改写名字**：
+
+```solidity
+// core/src/MemberNFT.sol（修复后）
+function mint(
+    string calldata name
+) external returns (uint256 tokenId, uint256 mintCost) {
+    string memory normalizedName = _checkName(name);
+
+    mintCost = calculateMintCost(name);
+    tokenId = _mintMember(msg.sender, name, normalizedName, mintCost);
+    return (tokenId, mintCost);
+}
+```
+
+- 删除 `_addTestPrefixIfNeeded` 与 `TEST_PREFIX_BYTES`；`mint` 不再调用任何前缀逻辑。
+- `mint`、`calculateMintCost`、`isNameUsed`、`memberId` 现在都使用用户提交的原始 `name`，报价、查重与铸造的字符串域一致。
+- `core/test/MemberNFT.t.sol` 同步改为断言链上 `memberName(id)` 等于提交的原始名字（`abc` 存 `abc`，`Testxyz` 存 `Testxyz`，短名 `Tes` 不再被改写成 `TestTes`）。
+- 长度上限回到完整的 `MAX_NAME_LENGTH`（当前部署 32 字节）；原来的“有效上限 = 32 − 4”不再存在。
+
+## 前端义务变更
+
+修复落地后，**旧的前端前缀垫片必须删除**：
+
+```ts
+// 必须删除，不得再对 calculateMintCost / isNameUsed / mint 传改写后的名字
+const finalName = symbol.startsWith('Test') && !name.startsWith('Test') ? 'Test' + name : name;
+```
+
+取而代之的是 owner 确认的界面命名规则。理由：让 dev / test 身份在视觉上与真实身份分开，同时恢复 `Test` 命名约定；合约不再改写用户输入，规则只存在于前端。
+
+- **dev / test 变体**：铸造身份时，`name` 必须以 `Test` 开头，`T` **大小写敏感**（`testfoo`、`tesTfoo` 都不合格）；不满足时输入框下方显示一行原因并禁用提交按钮，属阻断式行内校验，不是可忽略的警告。判断依据是构建变体（dev / test / prod），不是支付代币 `symbol()` 是否以 `Test` 开头。
+- **prod 变体**：没有前缀约束，名字按用户输入原样提交；界面也不显示这条规则。
+- 字节上限在三个变体都使用完整的 `MAX_NAME_LENGTH()`（当前部署 32 字节），**不再做 `-4` 调整**；字节计数器直接对用户输入计数。
+- 这条规则是**前端校验，不是合约行为**：合约不会再改写名字，绕过前端直接调用合约仍可铸造不带 `Test` 的名字。任何界面文案都不得写成“链上会自动加 `Test`”。
+
+## 现象（修复前）
 
 `MemberNFT.mint` 会先给名字加一个 `Test` 前缀（当支付代币的 symbol 以 `Test` 开头时），**然后**才做校验和计价。但同名字符串域的另外三个公开函数——`calculateMintCost`、`isNameUsed`、`memberId`——**都不加前缀**，直接对用户传入的原始字符串做计算/查表。
 
@@ -17,7 +55,9 @@
 
 这条不是理论问题：仓库自带的 dev 部署参数里 symbol 就是 `TestLOVE20`，**该分支在所有 dev/测试环境默认生效**。
 
-## 证据
+## 证据（修复前）
+
+> 以下证据保留用于历史记录，描述的是 `core@43d5344` 时的行为；`core@72a1604` 后不再成立。
 
 ```solidity
 // core/src/MemberNFT.sol:56-66
@@ -91,7 +131,7 @@ MEMBER_MAX_NAME_LENGTH=32
 
 （`baseCost = (MAX_SUPPLY − totalSupply) / BASE_DIVISOR`，见 `MemberNFT.sol:105-107`。）
 
-## 对前端的影响
+## 对前端的影响（修复前）
 
 1. **铸造页显示的价格是错的**，最坏差 4 个数量级。用户按 10000 倍价格去 `approve` 虽然不会多扣（`safeTransferFrom` 只划 `mintCost`，见 `MemberNFT.sol:81`），但“当前价格”这个核心信息不可信，且 `approve` 额度会留一堆垃圾授权。
 2. **“这个名字可用”是假的。** 用户填了 3～6 字节的名字，`isNameUsed` 说可用，点下去回滚 `NameAlreadyExists(existingId)`——而 `existingId` 指向的是 `Testabc` 那个 NFT，用户会觉得“我明明查过没人用”。
@@ -99,7 +139,9 @@ MEMBER_MAX_NAME_LENGTH=32
 4. **`memberId(name)` 解析不了。** “按名字找身份”的功能在测试环境上对所有非 `Test` 开头的名字都返回 0。
 5. 同一个 bug 会让 E2E 用例出现“报价与余额变化不一致”，把问题误判成前端算错。
 
-## 建议修复方案（最小改动）
+## 建议修复方案（最小改动，未采用）
+
+> 以下为修复前提出的候选方案，最终没有采用；实际修复选择了停止加前缀（见「修复内容」）。保留作为历史。
 
 让前缀成为**字符串域的唯一入口**，所有公开函数都走它：
 
@@ -135,7 +177,9 @@ function finalName(string calldata name) external view returns (string memory);
 
 注意 `NameAlreadyExists(uint256 existingId)` 的载荷是 id 而不是名字（`IMemberNFT.sol:19`），修好查重后前端仍需要再查一次 `memberName(existingId)` 才能告诉用户“被谁占了”——建议同批把载荷改成 `(string name, uint256 existingId)`；合约未上线，可以一次改到位。
 
-## 临时前端绕过方案
+## 临时前端绕过方案（已作废）
+
+> 本节是修复前的临时绕过，已随 `core@72a1604` 作废；保留用于说明当时为什么必须在前端复刻前缀。新的前端义务见「前端义务变更」。
 
 - 前端复刻前缀规则：
   ```ts
@@ -143,7 +187,7 @@ function finalName(string calldata name) external view returns (string memory);
   const cost = await memberNFT.read.calculateMintCost([finalName]);   // 传前缀后的名字
   const used = await memberNFT.read.isNameUsed([finalName]);          // 传前缀后的名字
   ```
-- 代价：① 把合约里的一段字符串规则复制到 TS，规则一改就漂移；② 展示给用户的名字和链上存的名字仍然不同（用户输入 `abc`，钱包里显示 `Testabc`），必须在铸造确认页明示“测试环境会自动加 Test 前缀，实际名称为 Testabc”；③ 长度上限要写死 28 或按 `symbol` 分支算，仍是硬编码；④ 需要额外读一次 `symbol()` 并缓存。
+- 代价：① 把合约里的一段字符串规则复制到 TS，规则一改就漂移；② 展示给用户的名字和链上存的名字仍然不同（用户输入 `abc`，钱包里显示 `Testabc`），当时必须在铸造确认页明示链上名称会被改写；③ 长度上限要写死 28 或按 `symbol` 分支算，仍是硬编码；④ 需要额外读一次 `symbol()` 并缓存。
 
 ## 验证
 
@@ -156,4 +200,4 @@ cast call $MEMBER_NFT "isNameUsed(string)(bool)" abc                      # fals
 cast call $MEMBER_NFT "memberId(string)(uint256)" abc                     # 0
 ```
 
-修复后：`calculateMintCost("abc")` 与 `mint("abc")` 返回的 `mintCost` 相等，`isNameUsed("abc") == true`，`memberId("abc") != 0`。
+修复后（`core@72a1604`）：`calculateMintCost("abc")` 与 `mint("abc")` 返回的 `mintCost` 相等，`isNameUsed("abc") == true`，`memberId("abc") != 0`，`memberName(tokenId) == "abc"`。
