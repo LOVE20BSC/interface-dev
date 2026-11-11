@@ -361,3 +361,45 @@ test('reads are batched through Multicall3, never one RPC per list item', async 
   );
   expect(batched).toBe(true);
 });
+
+test('my-nft: transfer recipient can be resolved by identity name with a confirmation gate', async ({
+  page,
+}) => {
+  await installWallet(page, ACCOUNTS.withIdentity);
+  await seedIdentity(page, ACCOUNTS.withIdentity, '1');
+  await page.goto('/my-nft');
+  await connect(page);
+
+  await page.getByRole('button', { name: '转让' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+
+  // Third recipient mode: 按身份 NFT 名字. The id and address modes are unchanged.
+  const modeTrigger = page.getByTestId('transfer-mode-trigger');
+  await modeTrigger.click();
+  await page.getByTestId('transfer-mode-name').click();
+  await expect(modeTrigger).toContainText('按身份 NFT 名字');
+
+  const input = page.getByTestId('transfer-recipient-input');
+  await expect(input).toHaveAttribute('placeholder', '身份 NFT 名字');
+  await input.fill('Testdev-member-1');
+
+  // Enumerating names resolves the id and its current owner (anvil #2, 0x7099…).
+  const confirmation = page.getByTestId('transfer-name-confirmation');
+  await expect(confirmation).toBeVisible({ timeout: 15_000 });
+  await expect(confirmation).toContainText('名称「Testdev-member-1」→ 身份 NFT #2');
+  await expect(confirmation).toContainText('收款人 0x7099');
+  await expect(confirmation).toContainText('名称不是唯一依据');
+
+  // The point of the mode: a resolved name alone can never enable 转让.
+  const confirm = page.getByRole('button', { name: '确认转让' });
+  await expect(confirm).toBeDisabled();
+  await shot(page, 'transfer-drawer-name-mode.png');
+
+  await page.getByTestId('transfer-name-ack').check();
+  await expect(confirm).toBeEnabled();
+
+  // No transfer is sent: cancel leaves the drawer and the list untouched.
+  await page.getByRole('button', { name: '取消' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
