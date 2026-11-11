@@ -156,7 +156,11 @@ describe('storage boundary', () => {
  * excluded by sourceFiles(); comments and identifiers are not literals.
  */
 const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
-const CJK_ALLOWED = new Set(['shared/config/copy.ts', 'config/errors.generated.ts']);
+const CJK_ALLOWED = new Set([
+  'shared/config/copy.ts',
+  'shared/config/copy-pages.ts',
+  'config/errors.generated.ts',
+]);
 
 interface CjkLiteral {
   readonly line: number;

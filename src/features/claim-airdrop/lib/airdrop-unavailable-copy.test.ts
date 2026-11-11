@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { airdropUnavailableCopy } from './airdrop-unavailable-copy';
 
 describe('airdropUnavailableCopy', () => {

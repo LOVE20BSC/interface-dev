@@ -1,5 +1,5 @@
 import { CONTRACT_ERROR_NAMES } from '@/config/errors.generated';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import {
   extractRevertData,
   getContractErrorMessage,

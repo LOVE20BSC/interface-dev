@@ -1,5 +1,5 @@
 import { getContractErrorMessage, extractRevertData, isUserRejection } from '@/shared/lib/errors';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 
 /**
  * Airdrop custom errors are not part of the protocol error registry, so the

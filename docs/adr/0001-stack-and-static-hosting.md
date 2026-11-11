@@ -17,7 +17,7 @@
 | Google 自 2019 年起不再跟随该 404 跳转 | SPA 路由本就不会被索引，SEO 不是可争取的目标 |
 | 公开 RPC 批量上限 | BSC 官方 dataseed 上限 **100**；viem 的 `batch.batchSize` 默认 **1000** |
 | `eth_getLogs` 不可客户端化 | 1RPC 限 50 块、PublicNode 限 50 000 块、dataseed 直接拒绝；BSC 约 0.75 s 出块，50 000 块 ≈ 10 小时 |
-| 钱包层就是体积 | 仅 injected 首屏 **123 kB gzip**（研究基线）；当前骨架实测 **151.7 kB gzip**（Vite 报 155.55 kB）；+WalletConnect 总计 **449 kB gzip**；+AppKit 总计 **1 507 kB gzip**，其中 526 kB 是首屏 |
+| 钱包层就是体积 | 仅 injected 首屏 **123 kB gzip**（研究基线）；当前骨架实测 **158.9 kB gzip**（`check-bundle.mjs` level 9，Vite 报 163.0 kB）；+WalletConnect 总计 **449 kB gzip**；+AppKit 总计 **1 507 kB gzip**，其中 526 kB 是首屏 |
 
 用户是移动端为主、非加密原生人群：首屏越轻越好，任何“先下载 1.5 MB 再连接钱包”的路径都要避免。
 
@@ -47,19 +47,19 @@
 | `index.html` 最多陈旧 600 s + 旧哈希 chunk 被删 | 陈旧外壳按**证据**处理，不作常态骚扰：① 打包时写入 build id；② `visibilitychange` 时 `fetch(BASE_URL, {cache:'no-store'})` 比对 build id；③ 监听 `vite:preloadError` → `location.reload()`；④ 只有 build id 校验不一致时才阻断，提示“有新版本，请刷新”。 |
 | 公开 RPC 批量上限 100 | `batch: { batchSize: 50, wait: 16 }`（**硬上限 ≤100**），`multicall` 走 Multicall3（BSC 56 / 97 均已部署于 `0xca11bde05977b3631167028862be2a173976ca11`）；`fallback([...])` + `retryCount`，**从不依赖链的默认 RPC**（viem 的 `bsc` 默认与 `bscTestnet` 默认各有一个坑）。 |
 | `eth_getLogs` 不可用 | **不做任何客户端事件索引**。历史、排行榜、按轮统计一律来自合约的 view 函数（分页读取）。需要事件级历史 = 需要托管索引器，本期不做，也不假装能做。 |
-| 钱包层体积 | `injected()` **同步引入**；`walletConnect()` 与任何 AppKit/邮件登录**在用户点击后 `await import()`**。首屏 JS 预算按当前 injected-only 骨架（wagmi + viem + react-router）实测设定：**warn 160 kB / 硬失败 200 kB gzip**（当前 151.7 kB）。AppKit 不进入 M0（社交登录还需要 Pages 给不了的 COOP 头）。 |
+| 钱包层体积 | `injected()` **同步引入**；`walletConnect()` 与任何 AppKit/邮件登录**在用户点击后 `await import()`**。首屏 JS 预算按 injected-only 骨架（wagmi + viem + react-router）实测设定：**warn 160 kB / 硬失败 200 kB gzip**（`check-bundle.mjs` level 9；当前 158.9 kB）。AppKit 不进入 M0（社交登录还需要 Pages 给不了的 COOP 头）。 |
 | 部署产物 | Actions 构建 → `upload-pages-artifact`（`./dist`）→ `deploy-pages`；`permissions: pages: write, id-token: write`；每个变体一个 job，各自传 `--base` 与 `VITE_*`。 |
 
 ### 3. CI 门禁（体积是唯一会静默劣化的指标）
 
-1. 构建后统计 **HTML 直接引用**的 JS（module script + modulepreload），gzip 后 > **200 kB** 硬失败、> **160 kB** 打印 warn（`scripts/check-bundle.mjs`）。目标线覆盖 wagmi + viem + react-router 的 injected-only 基线；WalletConnect/AppKit 永不进入首屏（eager）chunk，由第 2 条的字节扫描门禁强制。
+1. 构建后统计 **HTML 直接引用**的 JS（module script + modulepreload），gzip（level 9）后分两档：目标线 **> 160 kB 打印 warn**，硬失败 > **200 kB**（`scripts/check-bundle.mjs`）。**首屏 = shell + home**：路由表、导航、连接钱包、首页身份/首币/社区展示；其余页面（my NFT、铸造、空投、兑换、高级详情）都是懒加载路由。只有这两处可以进入 eager 图，页面文案与页面级 ABI 一律留在懒 chunk。
 2. 用字节扫描门禁（`scripts/check-bundle.mjs`）：任何 shipped chunk（eager 与懒加载）中不得出现 WalletConnect / AppKit / MetaMask SDK 字节（一次 barrel import 就会把整套依赖拉回首屏）。
-3. 路由级 `React.lazy` 只用于二级页（历史、详情、排行）；铸造与身份首屏必须在首屏包内。
+3. 首屏体积的三个账本：① 钱包层只同步 `injected()`；② `src/shared/config/copy.ts` 只放 shell + home 文案，页面文案在 `copy-pages.ts`，由懒路由导入；③ 页面级 ABI 与完整合约调用留在懒 chunk。往 `copy.ts` 或 shell 里加东西之前先问：首屏渲染真的需要吗？
 4. E2E 用 `vite preview --base=/<repo>/` 跑（`http://localhost:4173/<repo>/`）；在 `/` 上测会掩盖所有 base 相关错误。
 
 ## Consequences
 
-**正面**：首屏实测 **151.7 kB gzip**（Vite 报 155.55 kB），在 160 kB 目标线内、距 200 kB 硬门禁有余量；没有任何服务端依赖，三个环境只是三次构建；陈旧外壳的故障从“白屏”降级为“刷新一次”；RPC 侧不会被批量上限和日志上限打爆。
+**正面**：首屏实测 **158.9 kB gzip**（`scripts/check-bundle.mjs` gzip level 9；Vite 报 163.0 kB），在 160 kB 目标线内、距 200 kB 硬门禁有余量；首屏只含 shell + home，页面文案与页面 ABI 都随懒路由加载；没有任何服务端依赖，三个环境只是三次构建；陈旧外壳的故障从“白屏”降级为“刷新一次”；RPC 侧不会被批量上限和日志上限打爆。
 
 **代价与遗留**：
 

@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { RefreshCw } from '@/shared/ui/icons';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
 import { formatAmount, shortenAddress, UNKNOWN } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';

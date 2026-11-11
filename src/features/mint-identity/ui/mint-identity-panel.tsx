@@ -4,7 +4,7 @@ import { useSimulateContract } from 'wagmi';
 import { Check, RefreshCw } from '@/shared/ui/icons';
 import { memberNftAbi } from '@/config/abis';
 import { DEFAULT_SYMBOL } from '@/config/networks';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { formatAmount, shortenAddress, UNKNOWN } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';

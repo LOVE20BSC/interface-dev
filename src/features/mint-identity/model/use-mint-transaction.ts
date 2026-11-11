@@ -3,7 +3,7 @@ import { useAccount, useChainId, useTransactionReceipt, useWriteContract } from 
 import { parseEventLogs } from 'viem';
 import { love20TokenAbi, memberNftAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { cache } from '@/shared/lib/cache';
 import { describeMintError } from '@/features/mint-identity/lib/mint-errors';
 

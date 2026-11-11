@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Check, ChevronDown, Search } from '@/shared/ui/icons';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';

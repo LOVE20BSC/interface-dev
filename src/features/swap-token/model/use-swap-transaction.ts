@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount, useChainId, useTransactionReceipt, useWriteContract } from 'wagmi';
 import { love20TokenAbi, uniswapV2Router02Abi, weth9Abi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { describeSwapError, swapRetryLabel } from '@/features/swap-token/lib/swap-errors';
 import { parseSwapReceipt } from '@/features/swap-token/lib/swap-events';
 import {

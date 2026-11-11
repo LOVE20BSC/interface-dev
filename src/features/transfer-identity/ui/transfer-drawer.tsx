@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AlertTriangle } from '@/shared/ui/icons';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { shortenAddress } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';

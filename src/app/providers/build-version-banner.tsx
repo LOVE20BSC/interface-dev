@@ -1,6 +1,6 @@
 import { Button } from '@/shared/ui/button';
 import { Sheet } from '@/shared/ui/sheet';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 
 export interface BuildVersionBannerProps {
   readonly localBuildId: string;

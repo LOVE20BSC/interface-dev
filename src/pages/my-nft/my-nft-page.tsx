@@ -1,5 +1,5 @@
 import { useAccount } from 'wagmi';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { EmptyState } from '@/widgets/empty-state/empty-state';
 import { TechnicalDetails } from '@/widgets/contract-addresses/technical-details';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';

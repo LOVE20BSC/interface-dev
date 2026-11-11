@@ -1,4 +1,4 @@
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { isUserRejection, toUserMessage } from '@/shared/lib/errors';
 
 function messageChain(value: unknown, depth = 0): string {

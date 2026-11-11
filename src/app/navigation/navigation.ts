@@ -63,10 +63,10 @@ export function isNavActive(pathname: string, item: NavItem): boolean {
 }
 
 const PAGE_TITLES: Readonly<Record<string, string>> = Object.freeze({
-  '/my-nft': copy.pages.myNft.title,
-  '/mint': copy.pages.mint.title,
-  '/airdrop': copy.pages.airdrop.title,
-  '/swap': copy.pages.swap.title,
+  '/my-nft': copy.pageTitles.myNft,
+  '/mint': copy.pageTitles.mint,
+  '/airdrop': copy.pageTitles.airdrop,
+  '/swap': copy.pageTitles.swap,
   '/gov': copy.placeholders.gov.title,
   '/act': copy.placeholders.act.title,
   '/group': copy.placeholders.group.title,

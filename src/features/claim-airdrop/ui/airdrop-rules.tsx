@@ -1,4 +1,4 @@
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import type { HexAddress } from '@/config/networks';
 
 export interface AirdropRulesProps {

@@ -14,7 +14,7 @@ describe('documentTitleFor', () => {
 
   it('prepends the page title for secondary pages with a resolved community', () => {
     expect(documentTitleFor('/mint', RESOLVED)).toBe(
-      copy.brand.pageTitle(copy.pages.mint.title, 'TestLOVE20'),
+      copy.brand.pageTitle(copy.pageTitles.mint, 'TestLOVE20'),
     );
     expect(documentTitleFor('/my-nft', RESOLVED)).toBe('我的 NFT · TestLOVE20');
   });

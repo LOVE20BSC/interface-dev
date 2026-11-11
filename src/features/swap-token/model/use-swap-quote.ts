@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useBlockNumber, useReadContract } from 'wagmi';
 import { uniswapV2Router02Abi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { QUOTE_MAX_AGE_SECONDS } from '@/features/swap-token/lib/swap-amount';
 
 export interface SwapQuote {

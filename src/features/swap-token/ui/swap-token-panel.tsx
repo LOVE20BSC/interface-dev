@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { ArrowDownUp, Check, RefreshCw } from '@/shared/ui/icons';
 import { NETWORK, configuredAddress, explorerAddressUrl, type HexAddress } from '@/config/networks';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { shortenAddress, formatUnits } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';

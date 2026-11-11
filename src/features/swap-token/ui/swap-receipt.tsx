@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, Copy } from '@/shared/ui/icons';
 import { NETWORK } from '@/config/networks';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
 import { UNKNOWN } from '@/shared/lib/format';
 import { useMediaQuery } from '@/shared/lib/use-media-query';

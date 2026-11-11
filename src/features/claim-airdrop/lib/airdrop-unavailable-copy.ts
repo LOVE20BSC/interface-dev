@@ -1,5 +1,5 @@
 import type { AirdropClaimUnavailableReason } from '@/domain/airdrop-claim';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 
 export interface AirdropUnavailableCopy {
   readonly title: string;

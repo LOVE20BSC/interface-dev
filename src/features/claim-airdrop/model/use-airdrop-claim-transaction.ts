@@ -4,7 +4,7 @@ import { useAccount, useChainId, useTransactionReceipt, useWriteContract } from 
 import { airdropAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 import type { AirdropSnapshotEntry } from '@/domain/airdrop-snapshot';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { describeAirdropClaimError } from '@/features/claim-airdrop/lib/airdrop-errors';
 import {
   clearAirdropClaimRecord,

@@ -2,7 +2,7 @@ import { lazy, Suspense, useState } from 'react';
 import { Check, RefreshCw } from '@/shared/ui/icons';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { shortenAddress, UNKNOWN } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/badge';
