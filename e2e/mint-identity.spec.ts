@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { isolateChain } from './chain';
 
 /**
  * 铸造身份 (UX spec §3.3) against the local anvil chain.
@@ -62,6 +63,9 @@ test.use({
 });
 
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
+
+// Snapshot before this file's beforeAll fixtures mutate the chain; afterAll restores it.
+isolateChain();
 
 function identityCacheKey(account: string): string {
   return `love20:v1:${CHAIN_ID}:${MEMBER_NFT.toLowerCase()}:${account.toLowerCase()}:identity`;

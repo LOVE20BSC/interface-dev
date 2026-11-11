@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { createPublicClient, http, parseAbiItem, parseEventLogs, formatUnits } from 'viem';
+import { isolateChain } from './chain';
 
 /**
  * 铸造空投份额 (UX spec §3.4) against the local anvil chain.
@@ -68,6 +69,9 @@ test.use({
 });
 
 test.describe.configure({ mode: 'serial', timeout: 120_000 });
+
+// Snapshot before this file's beforeAll fixtures mutate the chain; afterAll restores it.
+isolateChain();
 
 function snapshotEntry(account: string) {
   return snapshot.entries.find((entry) => entry.account.toLowerCase() === account.toLowerCase());

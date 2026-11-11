@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { createPublicClient, formatUnits, http, parseAbiItem, parseEventLogs } from 'viem';
+import { isolateChain } from './chain';
 
 /**
  * 通用兑换 (UX spec §3.5) against the local anvil chain.
@@ -66,6 +67,9 @@ test.use({
 });
 
 test.describe.configure({ mode: 'serial', timeout: 180_000 });
+
+// Snapshot before this file's beforeAll fixtures mutate the chain; afterAll restores it.
+isolateChain();
 
 let EMPTY_WITH_LIQUIDITY: `0x${string}` | undefined;
 let EMPTY_WITHOUT_LIQUIDITY: `0x${string}` | undefined;

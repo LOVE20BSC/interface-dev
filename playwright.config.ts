@@ -10,10 +10,16 @@ const ORIGIN = `http://127.0.0.1:${PORT}`;
  */
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  /**
+   * One worker, one file at a time. Every spec file wraps itself in an anvil
+   * snapshot/revert pair (e2e/chain.ts), which is only safe when no two files
+   * mutate the shared chain concurrently. The previous 5-worker run took
+   * ~49 s; the serial suite trades some wall time for a reusable chain.
+   */
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: process.env.CI === 'true',
   retries: process.env.CI === 'true' ? 2 : 0,
-  ...(process.env.CI === 'true' ? { workers: 1 } : {}),
   reporter: process.env.CI === 'true' ? 'github' : 'list',
   use: {
     baseURL: `${ORIGIN}${BASE_PATH}`,

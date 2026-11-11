@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { isolateChain } from './chain';
 
 /**
  * M0 identity-first pages against the local anvil chain.
@@ -177,6 +178,9 @@ async function expectCommunityWordmark(page: Page): Promise<void> {
   });
   await expect(page).toHaveTitle('TestLOVE20');
 }
+
+// Snapshot before any test touches the chain; afterAll restores it.
+isolateChain();
 
 test.beforeAll(() => {
   mkdirSync(SHOTS, { recursive: true });
