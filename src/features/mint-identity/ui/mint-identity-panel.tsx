@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSimulateContract } from 'wagmi';
 import { Check, RefreshCw } from '@/shared/ui/icons';
 import { memberNftAbi } from '@/config/abis';
-import { DEFAULT_SYMBOL } from '@/config/networks';
+import { DEFAULT_SYMBOL, NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount, shortenAddress, UNKNOWN } from '@/shared/lib/format';
@@ -104,7 +104,12 @@ export function MintIdentityPanel({
 
   const symbol = config.paymentTokenSymbol;
   const swapSymbol = symbol ?? DEFAULT_SYMBOL;
-  const swapHref = `/swap?symbol=${encodeURIComponent(swapSymbol)}`;
+  // Self-describing deep link: the mint branch buys the genesis token with the
+  // native coin, so both ends of the pair are pinned in the URL.
+  const swapHref =
+    `/swap?symbol=${encodeURIComponent(swapSymbol)}` +
+    `&from=${encodeURIComponent(NETWORK.nativeCurrency.symbol)}` +
+    `&to=${encodeURIComponent(swapSymbol)}`;
   const airdropHref = `/airdrop?symbol=${encodeURIComponent(swapSymbol)}`;
 
   const cost = quote.cost;

@@ -60,7 +60,11 @@ function identityCacheKey(account: string): string {
  * owns (accounts / chain / switching) are answered locally; everything else is
  * forwarded verbatim to the anvil RPC.
  */
-async function installWallet(page: Page, account: string): Promise<void> {
+async function installWallet(
+  page: Page,
+  account: string,
+  chainHex: string = CHAIN_HEX,
+): Promise<void> {
   await page.addInitScript(
     ({ accountAddress, chainHex, rpcUrl }) => {
       const listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
@@ -118,7 +122,7 @@ async function installWallet(page: Page, account: string): Promise<void> {
         value: provider,
       });
     },
-    { accountAddress: account, chainHex: CHAIN_HEX, rpcUrl: RPC_URL },
+    { accountAddress: account, chainHex, rpcUrl: RPC_URL },
   );
 }
 
@@ -190,6 +194,46 @@ test('home: disconnected shows connect and no identity yet', async ({ page }) =>
   await expectCommunityWordmark(page);
 
   await shot(page, 'home-disconnected.png');
+});
+
+test('home: wrong chain shows the red outlined switch pill, not a solid fill', async ({ page }) => {
+  // EIP-1193 stub reports mainnet; the app targets 31337, so the header pill
+  // must become the §1.4 outlined switch button instead of a danger fill.
+  await installWallet(page, ACCOUNTS.outsider, '0x1');
+  await page.goto('/');
+
+  const connect = page.getByRole('button', { name: '连接钱包' }).first();
+  await expect(connect).toBeEnabled({ timeout: 15_000 });
+  await connect.click();
+
+  const pill = page.getByRole('button', { name: '网络不对，点此切换' }).first();
+  await expect(pill).toBeVisible({ timeout: 15_000 });
+
+  const style = await pill.evaluate((node) => {
+    const element = node as HTMLElement;
+    const computed = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return {
+      backgroundColor: computed.backgroundColor,
+      borderTopColor: computed.borderTopColor,
+      borderTopWidth: computed.borderTopWidth,
+      color: computed.color,
+      height: rect.height,
+      paddingLeft: computed.paddingLeft,
+      paddingRight: computed.paddingRight,
+    };
+  });
+  // Transparent fill, 1px red border, red text.
+  expect(style.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  expect(style.borderTopColor).toBe('rgb(220, 38, 38)');
+  expect(style.borderTopWidth).toBe('1px');
+  expect(style.color).toBe('rgb(220, 38, 38)');
+  // The md connect-pill geometry is unchanged, so the header does not jump.
+  expect(style.height).toBe(44);
+  expect(style.paddingLeft).toBe('16px');
+  expect(style.paddingRight).toBe('16px');
+
+  await shot(page, 'home-wrong-network.png');
 });
 
 test('home: connected without identity offers 我的 NFT only', async ({ page }) => {

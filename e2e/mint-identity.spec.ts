@@ -19,6 +19,7 @@ const deployment = JSON.parse(
 ) as {
   chainId: number;
   rpcUrls: string[];
+  nativeCurrency: { symbol: string };
   addresses: {
     memberNFT: `0x${string}`;
     firstTokenAddress: `0x${string}`;
@@ -30,6 +31,7 @@ const CHAIN_ID = deployment.chainId;
 const CHAIN_HEX = `0x${CHAIN_ID.toString(16)}`;
 const MEMBER_NFT = deployment.addresses.memberNFT;
 const FIRST_TOKEN = deployment.addresses.firstTokenAddress;
+const NATIVE = deployment.nativeCurrency.symbol;
 
 // anvil's deterministic accounts (mnemonic "test test ... junk").
 const ACCOUNTS = {
@@ -258,7 +260,11 @@ test('mint: insufficient balance without airdrop eligibility goes to 用 ETH 兑
 
   const swapCta = page.getByRole('link', { name: '用 ETH 兑换' });
   await expect(swapCta).toBeVisible();
-  await expect(swapCta).toHaveAttribute('href', /\/swap\?symbol=TestLOVE20$/);
+  // The branch pins both sides of the pair, not just the community context.
+  await expect(swapCta).toHaveAttribute(
+    'href',
+    `/swap?symbol=TestLOVE20&from=${NATIVE}&to=TestLOVE20`,
+  );
 });
 
 test('mint: approve → mint produces a real receipt with MemberMinted data', async ({ page }) => {

@@ -2,7 +2,8 @@ import { Loader2 } from '@/shared/ui/icons';
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '@/shared/lib/cn';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
+export type ButtonVariant =
+  'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-outline' | 'outline';
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
 
 const VARIANTS: Record<ButtonVariant, string> = {
@@ -11,6 +12,9 @@ const VARIANTS: Record<ButtonVariant, string> = {
   secondary: 'border border-line bg-surface text-foreground hover:bg-slate-50 active:bg-slate-100',
   ghost: 'text-foreground hover:bg-slate-100 active:bg-slate-200',
   danger: 'bg-danger text-white hover:bg-red-700 active:bg-red-800',
+  // Red border + red text on a transparent background; geometry stays in SIZES.
+  'danger-outline':
+    'border border-danger bg-transparent text-danger hover:bg-danger-soft/60 active:bg-danger-soft',
   outline:
     'border border-brand/30 bg-brand-soft/40 text-brand-strong hover:bg-brand-soft active:bg-brand-soft',
 };

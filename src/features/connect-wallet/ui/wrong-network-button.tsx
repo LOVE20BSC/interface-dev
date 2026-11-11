@@ -40,8 +40,11 @@ export function WrongNetworkButton() {
 
   return (
     <>
+      {/* Same md height/padding as the connect pill it replaces: only the
+          colours change, so the header never reflows. */}
       <Button
-        variant="danger"
+        variant="danger-outline"
+        size="md"
         onClick={() => {
           preloadWalletDialogs();
           void runSwitch();
