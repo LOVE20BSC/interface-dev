@@ -19,6 +19,8 @@
     "typecheck": "node scripts/gen-build-id.mjs && tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "e2e": "playwright test",
     "gen:errors": "node scripts/gen-errors.mjs",
+    "sync:anvil": "node scripts/sync-anvil.mjs",
+    "abis:check": "node scripts/check-abis.mjs",
     "release-to": "node scripts/release-to.mjs",
     "release-to-interface-test": "node scripts/release-to.mjs interface-test",
     "release-to-interface": "node scripts/release-to.mjs interface"

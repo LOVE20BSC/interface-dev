@@ -55,5 +55,5 @@ M0 结束时的可演示路径（新用户漏斗，顺序固定）：打开页�
 - **一条产物只能服务一种托管形态**：项目路径与自定义域名必须分别构建（`--base` 烘进产物）。
 - **陈旧外壳无法根治**：Pages 固定 `max-age=600` 且不可改头，只能靠 build id 比对 + `vite:preloadError` → 刷新。
 - **本地链不方便手机**：钱包按规范须拒绝 `http:` RPC，且同一 chainId 只能添加一次；移动端联调走测试网或 HTTPS 隧道。
-- **地址不可复现**：本地部署地址依赖 nonce 与库链接顺序（历史运行从 nonce 61/75 开始），因此前端必须只消费导出的地址簿。
+- **地址可复现，但只限全新链**：`make stop && make clean && make bootstrap` 从 deployer nonce 0 开始，地址（以及 bootstrap 期间的导出块高）确定；在已经用过的链上重跑会得到另一组地址。因此前端不手写地址，只在每次 bootstrap 后跑 `pnpm sync:anvil`，并在有兄弟仓时用 `pnpm abis:check` 拦截漂移；ADR-0004 §6 记录了两次 bootstrap 同 hash 的证明命令。
 - **应用内浏览器打不开钱包**（Android 微信/Telegram 等）：平台级限制，只能在连接**之前**给出“用浏览器打开/复制链接/扫码”的横幅。

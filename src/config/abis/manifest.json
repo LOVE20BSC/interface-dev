@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "pnpm sync:anvil",
+  "anvilExport": {
+    "profile": "anvil31337_dev",
+    "path": "../anvil/export",
+    "chainId": 31337,
+    "deployBlock": 32,
+    "exportedAt": "2026-11-11T12:01:56.167Z"
+  },
+  "sources": {
+    "core": {
+      "head": "72a16048a4549cd5a820776b5a113cf1ff1932b6",
+      "path": "../core",
+      "abis": {
+        "LOVE20Token": 30,
+        "Phase": 16,
+        "Launch": 47,
+        "MemberNFT": 49,
+        "Stake": 64,
+        "Submit": 37,
+        "Vote": 30,
+        "Mint": 43
+      }
+    },
+    "action": {
+      "head": "559fdb290d889bc99e80b8e4a158a9d8edb06b34",
+      "path": "../action",
+      "abis": {
+        "ActionTarget": 43,
+        "LpExecutor": 57,
+        "GroupActionExecutor": 161,
+        "GroupServiceExecutor": 79
+      }
+    },
+    "group-chat": {
+      "head": "83b0ac274e9e68d27a331c2f75bd758d8f4b380f",
+      "path": "../group-chat",
+      "abis": {
+        "GroupChat": 67
+      }
+    },
+    "libs": {
+      "head": "65b11063133e96a54cf028aa0268c292f0d2abda",
+      "path": "../libs",
+      "abis": {},
+      "note": "no ABI is exported from this repo; its HEAD pins the linked library bytecode"
+    },
+    "dex": {
+      "head": "31464c0b455b33ff2201490ae5b042bcb4a5bd28",
+      "path": "../dex",
+      "abis": {
+        "UniswapV2Factory": 10,
+        "UniswapV2Router02": 26,
+        "UniswapV2Pair": 34
+      }
+    },
+    "anvil": {
+      "head": "f38f78715b48dd73ed65496be821ba8fc13e56fc",
+      "path": "../anvil",
+      "abis": {
+        "Airdrop": 28,
+        "WETH9": 16,
+        "Multicall3": 16
+      }
+    }
+  },
+  "modules": {
+    "MemberNFT": {
+      "file": "src/config/abis/member-nft.ts",
+      "entries": 49
+    },
+    "LOVE20Token": {
+      "file": "src/config/abis/love20-token.ts",
+      "entries": 30
+    },
+    "Launch": {
+      "file": "src/config/abis/launch.ts",
+      "entries": 47
+    },
+    "Stake": {
+      "file": "src/config/abis/stake.ts",
+      "entries": 64
+    },
+    "Phase": {
+      "file": "src/config/abis/phase.ts",
+      "entries": 16
+    },
+    "Airdrop": {
+      "file": "src/config/abis/airdrop.ts",
+      "entries": 28
+    },
+    "UniswapV2Router02": {
+      "file": "src/config/abis/uniswap-v2-router02.ts",
+      "entries": 26
+    },
+    "UniswapV2Pair": {
+      "file": "src/config/abis/uniswap-v2-pair.ts",
+      "entries": 34
+    },
+    "UniswapV2Factory": {
+      "file": "src/config/abis/uniswap-v2-factory.ts",
+      "entries": 10
+    },
+    "WETH9": {
+      "file": "src/config/abis/weth9.ts",
+      "entries": 16
+    },
+    "Multicall3": {
+      "file": "src/config/abis/multicall3.ts",
+      "entries": 16
+    }
+  }
+}
