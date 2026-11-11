@@ -15,9 +15,10 @@ import type { AirdropClaimReceipt } from '@/features/claim-airdrop/lib/airdrop-c
 export interface AirdropReceiptProps {
   readonly receipt: AirdropClaimReceipt;
   readonly totalShare: bigint | undefined;
+  readonly onDismiss: () => void;
 }
 
-function ReceiptBody({ receipt, totalShare }: AirdropReceiptProps) {
+function ReceiptBody({ receipt, totalShare, onDismiss }: AirdropReceiptProps) {
   const [copied, setCopied] = useState(false);
 
   const amountKnown =
@@ -128,7 +129,10 @@ function ReceiptBody({ receipt, totalShare }: AirdropReceiptProps) {
         <Link to="/mint" className={buttonStyles('primary', 'lg', 'w-full')}>
           {copy.airdrop.receipt.goMint}
         </Link>
-        <Link to="/" className={buttonStyles('secondary', 'md', 'w-full')}>
+        <Button variant="secondary" size="md" className="w-full" onClick={onDismiss}>
+          {copy.receiptDismiss.stayHere}
+        </Button>
+        <Link to="/" className={buttonStyles('ghost', 'md', 'w-full')}>
           {copy.airdrop.receipt.backHome}
         </Link>
       </div>
@@ -154,7 +158,13 @@ export function AirdropReceipt(props: AirdropReceiptProps) {
   }
 
   return (
-    <Sheet open onOpenChange={() => {}} title={copy.airdrop.receipt.title} dismissible={false}>
+    <Sheet
+      open
+      onOpenChange={(open) => {
+        if (!open) props.onDismiss();
+      }}
+      title={copy.airdrop.receipt.title}
+    >
       <ReceiptBody {...props} />
     </Sheet>
   );

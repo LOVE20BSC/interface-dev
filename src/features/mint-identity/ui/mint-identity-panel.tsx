@@ -19,6 +19,7 @@ import { describeMintError } from '@/features/mint-identity/lib/mint-errors';
 import { useMintConfig } from '@/features/mint-identity/model/use-mint-config';
 import { useMintQuote, type MintNameStatus } from '@/features/mint-identity/model/use-mint-quote';
 import { useMintTransaction } from '@/features/mint-identity/model/use-mint-transaction';
+import { selectMintReceiptView } from '@/features/mint-identity/lib/receipt-dismissal';
 import { MintFundsBranch } from '@/features/mint-identity/ui/mint-funds-branch';
 import { MintReceipt } from '@/features/mint-identity/ui/mint-receipt';
 
@@ -88,6 +89,8 @@ export function MintIdentityPanel({
   const [preflightStaleBlock, setPreflightStaleBlock] = useState(false);
   // The eth_call preflight is async; without this a double tap could send two mints.
   const [isPreflighting, setIsPreflighting] = useState(false);
+  // 留在此页: the receipt collapses into the in-page success strip.
+  const [dismissedReceiptHash, setDismissedReceiptHash] = useState<string | null>(null);
 
   const config = useMintConfig();
   const quote = useMintQuote(name, config);
@@ -173,12 +176,24 @@ export function MintIdentityPanel({
     tx.clearError();
   };
 
-  if (tx.receipt !== null) {
+  const receiptView = selectMintReceiptView(tx.receipt, dismissedReceiptHash);
+  const dismissReceipt = () => {
+    if (tx.receipt === null) return;
+    setDismissedReceiptHash(tx.receipt.hash);
+    // Reset the form so a refreshed quote can never re-submit the minted name.
+    setName('');
+    setPreflightError(null);
+    setPreflightStaleBlock(false);
+    tx.clearError();
+  };
+
+  if (tx.receipt !== null && receiptView === 'receipt') {
     return (
       <MintReceipt
         receipt={tx.receipt}
         paymentSymbol={config.paymentTokenSymbol}
         paymentDecimals={config.paymentTokenDecimals}
+        onDismiss={dismissReceipt}
         onMintAnother={() => {
           setName('');
           setPreflightError(null);
@@ -318,6 +333,27 @@ export function MintIdentityPanel({
 
   return (
     <div className="space-y-4">
+      {tx.receipt !== null && receiptView === 'dismissed' ? (
+        <Card data-testid="mint-success-strip" className="border-success/20 bg-success-soft/40">
+          <p className="text-sm font-semibold text-foreground">
+            {copy.receiptDismiss.mintStripTitle(tx.receipt.memberId.toString(), tx.receipt.name)}
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <Link to="/my-nft" className={buttonStyles('secondary', 'md', 'w-full sm:w-auto')}>
+              {copy.receiptDismiss.mintStripGoMyNft}
+            </Link>
+            {/* Staying is the confirmation itself: no route change, no reset. */}
+            <Button
+              variant="ghost"
+              size="md"
+              className="w-full sm:w-auto"
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            >
+              {copy.receiptDismiss.stayHere}
+            </Button>
+          </div>
+        </Card>
+      ) : null}
       <div>
         <label htmlFor="mint-name" className="text-sm font-medium text-foreground">
           {copy.mintIdentity.name.label}
@@ -408,9 +444,7 @@ export function MintIdentityPanel({
           ) : null}
 
           {symbol !== undefined ? (
-            <p className="mt-3 text-xs leading-5 text-muted">
-              {copy.mintIdentity.cost.note}
-            </p>
+            <p className="mt-3 text-xs leading-5 text-muted">{copy.mintIdentity.cost.note}</p>
           ) : null}
         </Card>
       )}

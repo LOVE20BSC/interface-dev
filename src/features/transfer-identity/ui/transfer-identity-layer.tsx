@@ -35,6 +35,7 @@ export function TransferIdentityLayer({
   return (
     <TransferDrawer
       target={target}
+      memberNftAddress={memberNftAddress}
       selfAddress={selfAddress}
       phase={transfer.phase}
       errorMessage={transfer.errorMessage}

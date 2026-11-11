@@ -12,6 +12,7 @@ import { StickyAction } from '@/shared/ui/sticky-action';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import { airdropUnavailableCopy } from '@/features/claim-airdrop/lib/airdrop-unavailable-copy';
 import { claimedAmountView } from '@/features/claim-airdrop/lib/claimed-amount-view';
+import { selectAirdropReceiptView } from '@/features/claim-airdrop/lib/airdrop-receipt-dismissal';
 import { useAirdropClaim } from '@/features/claim-airdrop/model/use-airdrop-claim';
 import { useAirdropClaimTransaction } from '@/features/claim-airdrop/model/use-airdrop-claim-transaction';
 import { useClaimedAmount } from '@/features/claim-airdrop/model/use-claimed-amount';
@@ -88,6 +89,7 @@ export function ClaimAirdropPanel({
   isWrongChain,
   connectAction,
 }: ClaimAirdropPanelProps) {
+  const [dismissedReceipt, setDismissedReceipt] = useState(false);
   const claim = useAirdropClaim();
   const tx = useAirdropClaimTransaction({
     airdropAddress: claim.airdropAddress,
@@ -110,12 +112,13 @@ export function ClaimAirdropPanel({
       ? claim.localReceipt
       : null;
   const receipt = tx.receipt ?? localReceipt;
+  const receiptView = selectAirdropReceiptView(receipt, dismissedReceipt, claim.status);
 
   // S6 only: the single injected adapter read (dev log scan today; CI-014 view
   // later). A disabled/undefined result renders the honest fallback, never a
   // fabricated or cached amount.
   const claimedAmount = useClaimedAmount({
-    enabled: claim.status === 'claimed' && receipt === null,
+    enabled: claim.status === 'claimed' && (receipt === null || dismissedReceipt),
     airdropAddress: claim.airdropAddress,
     tokenAddress: claim.tokenAddress,
   });
@@ -142,8 +145,24 @@ export function ClaimAirdropPanel({
     );
   }
 
-  if (receipt !== null) {
-    return <AirdropReceipt receipt={receipt} totalShare={claim.totalShare} />;
+  if (receipt !== null && receiptView === 'receipt') {
+    return (
+      <AirdropReceipt
+        receipt={receipt}
+        totalShare={claim.totalShare}
+        onDismiss={() => {
+          setDismissedReceipt(true);
+          // The receipt amount is confirmed; refetch so S6 owns the page.
+          claim.refetch();
+        }}
+      />
+    );
+  }
+
+  // 留在此页 with the post-claim refetch still in flight: a loading card, never
+  // the claim CTA again.
+  if (receipt !== null && dismissedReceipt && receiptView === 'waiting') {
+    return <LoadingCard meta={meta} />;
   }
 
   if (claim.status === 'unconfigured') {

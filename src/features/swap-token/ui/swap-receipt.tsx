@@ -14,6 +14,7 @@ import type { SwapRecord } from '@/features/swap-token/lib/swap-receipt-record';
 export interface SwapReceiptProps {
   readonly record: SwapRecord;
   readonly onSwapAgain: () => void;
+  readonly onDismiss: () => void;
 }
 
 function amountLine(amount: bigint | undefined, decimals: number | undefined, symbol: string) {
@@ -21,7 +22,7 @@ function amountLine(amount: bigint | undefined, decimals: number | undefined, sy
   return `${formatTokenAmount(amount, decimals)} ${symbol}`;
 }
 
-function ReceiptBody({ record, onSwapAgain }: SwapReceiptProps) {
+function ReceiptBody({ record, onSwapAgain, onDismiss }: SwapReceiptProps) {
   const [copied, setCopied] = useState(false);
   const actualText = amountLine(record.actualOut, record.toDecimals, record.toSymbol);
   const minText =
@@ -139,7 +140,10 @@ function ReceiptBody({ record, onSwapAgain }: SwapReceiptProps) {
         <Link to="/" className={buttonStyles('primary', 'lg', 'w-full')}>
           {copy.swap.receipt.goHome}
         </Link>
-        <Button variant="secondary" size="md" className="w-full" onClick={onSwapAgain}>
+        <Button variant="secondary" size="md" className="w-full" onClick={onDismiss}>
+          {copy.receiptDismiss.stayHere}
+        </Button>
+        <Button variant="ghost" size="md" className="w-full" onClick={onSwapAgain}>
           {copy.swap.receipt.swapAgain}
         </Button>
       </div>
@@ -167,11 +171,10 @@ export function SwapReceipt(props: SwapReceiptProps) {
   return (
     <Sheet
       open
-      onOpenChange={() => {
-        // Receipt is the page state; leaving happens through its two actions.
+      onOpenChange={(open) => {
+        if (!open) props.onDismiss();
       }}
       title={copy.swap.receipt.title}
-      dismissible={false}
     >
       <ReceiptBody {...props} />
     </Sheet>

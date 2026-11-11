@@ -16,9 +16,16 @@ export interface MintReceiptProps {
   readonly paymentSymbol: string | undefined;
   readonly paymentDecimals: number | undefined;
   readonly onMintAnother: () => void;
+  readonly onDismiss: () => void;
 }
 
-function ReceiptBody({ receipt, paymentSymbol, paymentDecimals, onMintAnother }: MintReceiptProps) {
+function ReceiptBody({
+  receipt,
+  paymentSymbol,
+  paymentDecimals,
+  onMintAnother,
+  onDismiss,
+}: MintReceiptProps) {
   const [copied, setCopied] = useState(false);
 
   const explorerUrl =
@@ -105,7 +112,10 @@ function ReceiptBody({ receipt, paymentSymbol, paymentDecimals, onMintAnother }:
         <Link to="/my-nft" className={buttonStyles('primary', 'lg', 'w-full')}>
           {copy.mintIdentity.receipt.goMyNft}
         </Link>
-        <Link to="/" className={buttonStyles('secondary', 'md', 'w-full')}>
+        <Button variant="secondary" size="md" className="w-full" onClick={onDismiss}>
+          {copy.receiptDismiss.stayHere}
+        </Button>
+        <Link to="/" className={buttonStyles('ghost', 'md', 'w-full')}>
           {copy.mintIdentity.receipt.backHome}
         </Link>
         <Button variant="ghost" size="sm" onClick={onMintAnother}>
@@ -136,7 +146,13 @@ export function MintReceipt(props: MintReceiptProps) {
   }
 
   return (
-    <Sheet open onOpenChange={() => {}} title={copy.mintIdentity.receipt.title} dismissible={false}>
+    <Sheet
+      open
+      onOpenChange={(open) => {
+        if (!open) props.onDismiss();
+      }}
+      title={copy.mintIdentity.receipt.title}
+    >
       <ReceiptBody {...props} />
     </Sheet>
   );

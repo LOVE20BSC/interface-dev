@@ -20,7 +20,10 @@ import {
   percentToBps,
   priceImpactBps,
 } from '@/features/swap-token/lib/swap-amount';
-import { swapRecordMatchesPair } from '@/features/swap-token/lib/swap-receipt-record';
+import {
+  selectSwapReceiptView,
+  swapPostDismiss,
+} from '@/features/swap-token/lib/swap-receipt-dismissal';
 import { selectSwapScreenState } from '@/features/swap-token/lib/swap-state';
 import { useSwapBalance } from '@/features/swap-token/model/use-swap-balance';
 import { useSwapCatalog } from '@/features/swap-token/model/use-swap-catalog';
@@ -143,11 +146,7 @@ function StateCard({
  * or the wallet is disconnected this component renders a single state card and
  * issues no quote/route request.
  */
-export function SwapTokenPanel({
-  isConnected,
-  isWrongChain,
-  connectAction,
-}: SwapTokenPanelProps) {
+export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: SwapTokenPanelProps) {
   const router = configuredAddress('router');
   const factory = configuredAddress('factory');
   const launch = configuredAddress('launch');
@@ -319,11 +318,8 @@ export function SwapTokenPanel({
     routeStatus,
   });
 
-  const receiptVisible =
-    tx.receipt !== null &&
-    from !== undefined &&
-    to !== undefined &&
-    swapRecordMatchesPair(tx.receipt, from, to);
+  const [dismissedReceiptHash, setDismissedReceiptHash] = useState<string | null>(null);
+  const receiptView = selectSwapReceiptView(tx.receipt, from, to, dismissedReceiptHash);
 
   const resetInput = () => {
     setAmountInput('');
@@ -331,6 +327,13 @@ export function SwapTokenPanel({
     setSubmitError(null);
     setHighImpactAck(false);
     setUsedNativeMax(false);
+  };
+
+  // 留在此页: collapse the receipt into the success strip, keep the form reset.
+  const dismissReceipt = () => {
+    if (tx.receipt === null) return;
+    setDismissedReceiptHash(tx.receipt.hash);
+    resetInput();
   };
 
   const handleSelect = (side: 'from' | 'to', token: SwapToken) => {
@@ -370,7 +373,7 @@ export function SwapTokenPanel({
     tx.approveStage !== 'idle' ||
     tx.swapStage !== 'idle' ||
     (tx.pendingHash !== null && !tx.watch.isStuck) ||
-    tx.receipt !== null;
+    (tx.receipt !== null && tx.receipt.hash !== dismissedReceiptHash);
 
   const quoteReady =
     route?.kind !== 'swap' ||
@@ -530,10 +533,11 @@ export function SwapTokenPanel({
     );
   }
 
-  if (receiptVisible) {
+  if (receiptView === 'receipt' && tx.receipt !== null) {
     return (
       <SwapReceipt
-        record={tx.receipt as NonNullable<typeof tx.receipt>}
+        record={tx.receipt}
+        onDismiss={dismissReceipt}
         onSwapAgain={() => {
           tx.clearReceipt();
           resetInput();
@@ -761,8 +765,37 @@ export function SwapTokenPanel({
     setSubmitError(null);
   };
 
+  const dismissedSwap =
+    receiptView === 'dismissed' && tx.receipt !== null ? swapPostDismiss(tx.receipt) : null;
+
   return (
     <div className="space-y-4">
+      {dismissedSwap !== null ? (
+        <div className={CARD} data-testid="swap-success-strip">
+          <p className="text-sm font-semibold text-foreground">
+            {copy.receiptDismiss.swapStripTitle}
+          </p>
+          <p className="mt-1 text-base font-medium text-foreground">
+            {copy.receiptDismiss.swapStripAmount(
+              `${dismissedSwap.received} ${dismissedSwap.symbol}`,
+            )}
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="secondary"
+              size="md"
+              className="w-full sm:w-auto"
+              onClick={() => {
+                tx.clearReceipt();
+                setDismissedReceiptHash(null);
+                resetInput();
+              }}
+            >
+              {copy.receiptDismiss.swapStripAgain}
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <div className={CARD}>
         <div className="rounded-2xl bg-slate-50/70 p-3">
           <div className="flex items-center justify-between gap-2">
