@@ -1,0 +1,167 @@
+# STATUS — LOVE20 界面交接状态
+
+> 采集时点：2026-11-11 18:20（Asia/Taipei）· 本仓 HEAD `b3a2a7d`（25 commits，领先 `origin/main` 11 个）· anvil HEAD `9996c8f` · 本地链高度 32370。每条事实都能由仓库、`cast` 或文中链接复核；无法确认处标「待核实」。
+
+## 1. 一句话定位
+
+LOVE20BSC 协议的纯静态、移动优先前端：无后端、无索引器、无第三方 API 调用，钱包只支持注入式。本 checkout（目录 `interface-dev-dsh`，`origin` = `LOVE20BSC/interface-dev`）是**三变体中的 dev**（链 31337 / 本地 anvil），当前处于 **M0 收尾**（身份漏斗 + 空投 + 通用兑换）：功能已落地，验收、包体与发布尚未闭环；M1 未开始。三变体定义见 [ADR-0002](adr/0002-three-environment-injection.md) §4。
+
+## 2. 当前状态
+
+M0 范围共 6 项（[m0-scope](product/m0-scope.md)「范围内」）。✅ 完成 / 🔄 部分 / ⏳ 未做。
+
+| # | M0 项 | 状态 | 证据（可复核） |
+| --- | --- | --- | --- |
+| 1 | 导航骨架 | ✅ | `src/app/navigation` + 5 条一级路由；占位页 `src/pages/{gov,act,group,me}`；`7e9b03b` |
+| 2 | 右上角连接按钮 | ✅ | [ADR-0003](adr/0003-identity-and-connect-button.md) §1；`src/widgets/connect-pill`；`6db99a4`（品牌字标/余额格式） |
+| 3 | 新用户漏斗 | 🔄 | 首页/我的 NFT `ae607dd`；铸造身份 `484af93`+`49f63ce`；空投 `1a7074f`；通用兑换 `b3a2a7d`；**未做真机验收，e2e 不可重复（§6）** |
+| 4 | 工程底座 | 🔄 | 分层+架构测试 `7e9b03b`；CI `7f9794a`；路由拆分 `7dc0949`；`.github/workflows/deploy.yml`；**缺口：HEAD 未推送，CI 未验证；ABI 缺 manifest/漂移门禁（ADR-0002 §3）** |
+| 5 | 一条命令起全栈 | ✅ | [ADR-0004](adr/0004-anvil-local-chain.md)；`anvil@9996c8f`；本次 `cast chain-id`=31337，MemberNFT `totalSupply`=6，`merkleRoot` 与快照一致 |
+| 6 | 文案纪律落地 | ✅ | 所有中文进 `src/shared/config/copy.ts`（生成的错误文案除外），`src/architecture.test.ts` 强制；`7dc0949`；对照 [GLOSSARY](../GLOSSARY.md) |
+| — | M0 验收报告 | ⏳ | `docs/` 下没有验收报告；[m0-ux-spec](product/m0-ux-spec.md) §6 的 14 步脚本仅部分自动化 |
+| — | E2E 32 条 | 🔄 | `e2e/*.spec.ts` 合计 32 个 `test()`；空投用例要求干净链（§6） |
+| — | 发布 interface-test | 🔄 | 线上 200，但 build id `mwb9werl-379de9b0`；远端 `main`=`a217ddb`，本仓 HEAD 未发布（领先 11 个） |
+| — | M1 治理 | ⏳ | 未开工；[CI-001](contract-issues/001-no-member-round-index.md) Blocker 未解 |
+
+**未完成清单（别误读为 done）**：包体压回 160 以下、三处真机体验、e2e 状态隔离、M0 验收报告、发布到 interface-test、test/prod 地址簿填充、ABI manifest 与漂移门禁。
+
+截图共 18 张：home 4 / airdrop 4 / mint 3 / my-nft 2 / swap 4 / live 1，见 [`product/screenshots/`](product/screenshots/)。本次核对用到的文件：`swap-form.png`、`mint-form.png`、`airdrop-eligible.png`、[`live/interface-test-live-2026-11-11.png`](product/screenshots/live/interface-test-live-2026-11-11.png)。
+
+## 3. 仓库与环境事实
+
+### 3.1 三个仓库与部署（2026-11-11 实测）
+
+| 仓库 | 是否存在 | 变体 / 链 | Pages |
+| --- | --- | --- | --- |
+| `LOVE20BSC/interface-dev` | 存在（`git ls-remote` 正常；本仓 `origin`） | dev / 31337 | <https://love20bsc.github.io/interface-dev/> 200，build id `mwb9t10g-85b4d354` |
+| `LOVE20BSC/interface-test` | 存在（本仓另有 `test` remote） | test / 97 占位 | <https://love20bsc.github.io/interface-test/> 200，build id `mwb9werl-379de9b0` |
+| `LOVE20BSC/interface` | **不存在**（`git ls-remote` 128 `Repository not found`；根站 404） | prod / 56 | 尚未部署 |
+
+线上两站可访问但构建早于当前 HEAD（页面标题仍是旧品牌 `LOVE20`，现应为 `LOVE20协议`）。本地跟踪分支 `test/main` 停在 `8707b6a`，远端实际 `a217ddb`，一律以 `git ls-remote` 为准。
+
+### 3.2 本地链与地址来源
+
+- RPC `http://127.0.0.1:8545`，chainId **31337**，`--block-time 1`；采集时高度 32370。
+- 地址唯一来源：`../anvil/export/deployments/anvil31337_dev.json`；前端消费副本 `src/config/deployments/anvil31337_dev.json`；ABI 来自 `../anvil/export/abis/*.json`。
+- 实测地址：MemberNFT `0xCD8a1C3ba11CF5ECfa6267617243239504a98d90`（`totalSupply`=6）；首币 `0x9FA5072032B7a7DCc49533401cec1C47bfcf350d`（`symbol`=`TestLOVE20`，`name`=`TestLOVE20@TestWETH`）；Airdrop `0x1291Be112d480055DaFd8a610b7d1e203891C274`（`merkleRoot`=`0x046a…c404`，与快照文件一致）。
+- 起链：`make -C ../anvil bootstrap`（≈70–75 s），另有 `make -C ../anvil verify` / `stop`。
+- **地址归属不交叉**：`anvil/` 只拥有本地部署；test/prod 地址只能来自合约仓 `script/network/<chain>_<type>/`（当前 core/action 只有 `anvil31337_dev`）。`src/config/deployments/bscTestnet_test.json` 与 `bscMainnet_prod.json` 各有 22 个零地址槽 → 「未配置」，test/prod 构建不会显示假数据。
+
+### 3.3 工具链（实测）
+
+- **可用**：nvm Node **v24.12.0** + pnpm **11.5.1**（`package.json` engines `>=22.12.0`；CI 用 Node 24 + pnpm 11.5.1）。
+- **不可用**：DSH 自带 Node **v24.21.0**（`~/.dsh/dsh-runtimes/dsh-primary-runtime/dependencies/node/bin/node`）。加载 rollup 原生二进制失败：`dlopen(.../@rollup/rollup-darwin-arm64/rollup.darwin-arm64.node) … code signature … different Team IDs`。同一 `.node` 在系统 Node 下加载正常。**install / build 一律用系统 Node，不要用 DSH 运行时。**
+- 代码地图：`src/` 分层 `app → pages → widgets → features → entities → shared`，`domain`/`config` 为叶子；ESLint + `src/architecture.test.ts` 双重强制，详见 [README](../README.md) §Layout。
+- 工作区：HEAD `b3a2a7d`，25 commits；采集时工作区干净，本次只新增本文件；`dist/`、`dist-*/`、`.build-id`、`.research/` 均被 gitignore。
+
+## 4. 常用命令
+
+| 目的 | 命令 | 备注 |
+| --- | --- | --- |
+| 开发 | `pnpm dev` | <http://127.0.0.1:5173>，默认 dev 变体 |
+| 类型检查 | `pnpm typecheck` | 两份 tsconfig 都跑 |
+| Lint | `pnpm lint` | `--max-warnings=0` |
+| 单元/组件测试 | `pnpm test` | Vitest；`test:watch` 可选 |
+| 构建 | `pnpm build` | typecheck → vite → 404/.nojekyll/build-id → 包体门禁；默认 **prod** 变体 |
+| dev 变体构建 | `VITE_ENV=dev pnpm build` | 测包体/本地地址簿时必须显式指定 |
+| 预览产物 | `pnpm preview` | <http://127.0.0.1:4173> |
+| E2E | `pnpm e2e` | Playwright，32 条；`playwright.config.ts` 强制 `VITE_ENV=dev` 并跑 `build && preview` |
+| 格式化 | `pnpm format` / `pnpm format:check` | Prettier |
+| 起本地链 | `make -C ../anvil bootstrap` | 重跑会重建链并重新导出地址 |
+| 发布到 test | `pnpm release-to-interface-test` | 裸仓库名别名；也可 `pnpm release-to LOVE20BSC/interface-test` |
+| 发布到 prod | `pnpm release-to-interface` | 目标仓尚不存在 |
+
+发布前置固定为：干净工作区（含未跟踪文件）→ 当前 SHA 的 CI 绿 → 目标 `main` 是 `HEAD` 祖先 → 打印 SHA/目标/提交并确认（`RELEASE_YES=1` 跳过）→ fast-forward push。命令零写入、不打 tag、不 force（[ADR-0002](adr/0002-three-environment-injection.md) §4）。
+
+CI 环境规则（`.github/workflows/deploy.yml`）：取 `github.repository` 最后一个 `/` 之后的名字转小写，含 `dev` → dev，否则含 `test` → test，否则 prod；`vars.VITE_ENV` 可覆盖，base 分别为 `/interface-dev/`、`/interface-test/`、`/`。只有 push `main` 或手动 dispatch 触发；ABI 漂移门禁不在这个 workflow（本仓无 forge/兄弟仓）。
+
+## 5. 已定的关键决策（附链接）
+
+| 决策 | 结论 | 出处 |
+| --- | --- | --- |
+| 技术栈与静态托管 | React 19 + TS + Vite + Tailwind + wagmi/viem + TanStack Query + Radix + pnpm；GitHub Pages；无 Next/PWA/自定义响应头；`base` 构建期烘入，深链靠 `404.html` | [ADR-0001](adr/0001-stack-and-static-hosting.md) |
+| 三环境注入 | 同一代码库三次构建，差异只在构建期环境包；组件/数据层零环境分支；地址、chainId、品牌全编译进产物 | [ADR-0002](adr/0002-three-environment-injection.md) §1–§2 |
+| 身份模型 | 身份 = `(chainId, MemberNFT 地址, tokenId)`；MemberNFT 由种子 core 的 `MEMBER_NFT_ADDRESS()` 解析；`balanceOf`+`tokenOfOwnerByIndex` 枚举；每次加载 `ownerOf` 重校验 | [ADR-0003](adr/0003-identity-and-connect-button.md) §2 |
+| 本地链 | `make bootstrap` 一条命令完成 preflight→fixture→anvil→部署→seed→导出→验证；`export/` 是 dev 唯一地址/ABI 来源 | [ADR-0004](adr/0004-anvil-local-chain.md) |
+| 品牌标签 | 社区名 = 链上 `symbol()`；无社区/未知回退「LOVE20协议」（协议名，不是代币社区）；`name()` = `<子币 symbol>@<父币 symbol>`，仅技术详情可见 | [m0-ux-spec](product/m0-ux-spec.md) §1.3/§2.1；[GLOSSARY](../GLOSSARY.md) 易混对 |
+| 空投页措辞 | 标题、按钮、状态统一「铸造空投份额」，不写「领取空投」；合约动作 `claim` 只留在代码/术语层 | [m0-ux-spec](product/m0-ux-spec.md) §3.4；[GLOSSARY](../GLOSSARY.md) |
+| Test 前缀 | dev/test 变体前端强制名字以 `Test` 开头（大小写敏感），prod 无此规则；`core@72a1604` 起合约不再自动加/改前缀 | [m0-ux-spec](product/m0-ux-spec.md) §3.3/§6；[CI-004](contract-issues/004-member-nft-test-prefix-mismatch.md) |
+| 通用兑换页 | 任意代币 ↔ 任意代币（含原生币），路径 ≤3 跳；报价只调 `Router.getAmountsOut`；费率不写死，读不到就写「以链上费率为准」 | [m0-ux-spec](product/m0-ux-spec.md) §3.5；`b3a2a7d` |
+| 无第三方 / 零密钥 | 钱包 injected-only；无 WalletConnect/AppKit/第三方 API/Service Worker；所有 `VITE_*` 公开，环境包不放任何密钥 | [README](../README.md) §Stack；[ADR-0002](adr/0002-three-environment-injection.md) §1 |
+| i18n 纪律 | 所有用户可见文案进 `shared/config/copy.ts`；组件内禁止 CJK 字面量（架构测试强制）；暂不引入 i18n 库 | [README](../README.md)「i18n readiness」 |
+| 缓存与错误 | 唯一存储封装 `shared/lib/cache.ts`，键 `love20:v1:<chainId>:<contractAddress>:<wallet>:<businessKey>`；合约错误 selector → 中文人话 | [ADR-0003](adr/0003-identity-and-connect-button.md) §3；[README](../README.md) §Storage |
+| 底栏与占位页 | 5 个 tab 同权重，不做中央凸起；治理/行动/链群/我的只显示「即将上线」，不出现半成品表单 | [README](../README.md)「Decisions…」；[m0-ux-spec](product/m0-ux-spec.md) §1.2 |
+
+## 6. 已知坑与注意事项
+
+1. **E2E 不可重复执行**：`e2e/airdrop-claim.spec.ts` 只找快照中「未铸造」的账户，全部铸造完后 `beforeAll` 直接失败并提示 `make -C ../anvil bootstrap`。anvil 侧没有 snapshot/revert 隔离（Makefile/脚本无 `evm_snapshot`）。本次链上 `totalSupply`=6，而 seed 只铸 5 个身份，即链上状态已被验收/测试改动过（是否全部来自 e2e 待核实）。目标：隔离后连跑两遍 32/32。
+2. **首屏包体超目标**：门禁 `scripts/check-bundle.mjs`（level-9）实测 prod **158.8 kB**、dev **164.1 kB**；Vite 自身报数 163–168 kB（[ADR-0001](adr/0001-stack-and-static-hosting.md) 记 158.9 / Vite 163.0；此前记录的 163.6 kB 是 Vite 报数，具体构建待核实）。门禁 >160 仅 warn、>200 硬失败；dev 变体已越过目标线，待压回。
+3. **三处真机（390×844）体验缺陷**：① 主按钮被固定底栏遮挡——[`swap-form.png`](product/screenshots/swap-form.png) 里「兑换」只剩上沿；② 小数位不统一——`mint-form.png` 显示 `99,998,199.99`（2 位）、`swap-form.png` `19.938012`（6 位）、`airdrop-eligible.png` `100,000,000`（0 位）；③ 6 字标题被截——`airdrop-eligible.png` 页头「铸造空投…」。
+4. **anvil 地址「随机但确定」**：地址随部署者 nonce 序列变化，同一 nonce 序列下确定；`--block-time 1` 使块高不固定。文档口径有冲突（[m0-scope](product/m0-scope.md) 风险段称「地址不可复现」，[ADR-0004](adr/0004-anvil-local-chain.md) §6 称「全新链上确定」）——冲突本身待核实；操作上只消费当次导出，绝不硬编码。
+5. **ABI 必须 generate-then-commit**：core `out/`、dex `build/` 都被各自仓库 gitignore（core `.gitignore:1`、dex `.gitignore:1`），本仓也忽略 `out/`。当前 `src/config/abis/*.ts` 头注为「copied verbatim from anvil export」，但**缺少 ADR-0002 §3 要求的 `manifest.json`（来源仓 + HEAD SHA + 条目数）和漂移门禁**。
+6. **合约问题清单已过基线**：`docs/contract-issues/README.md` 审计基线 `core@43d5344`，而 core HEAD 已是 **`72a1604`**（CI-004 在该提交标为已修复）。13 条中 12 Open / 1 修复，需按新 HEAD 复核；[CI-001](contract-issues/001-no-member-round-index.md) 仍是 M1 Blocker。
+7. **空投快照必须与链上根一致**：导出 `merkleRoot`=`0x046a5d53…c6c404` 与快照文件一致（10 个账户）。不一致时页面金额不可信，先重跑 `make fixture`/`bootstrap`，不要用旧快照解释新链。
+8. **test/prod 地址簿为空**：两份 JSON 各 22 个零地址，现在发布会得到「未配置」界面；地址只能来自合约仓 `script/network/`，不得把 anvil 地址抄过去。
+9. **Pages 缓存**：`index.html` 最多陈旧 600 s、旧哈希 chunk 会 404；只能靠 build id 比对 + `vite:preloadError` 兜底；不启用 PWA。
+10. **构建运行时**：不要用 DSH 自带 Node 跑 `pnpm install/build`（rollup 原生二进制 code-signature 失败，见 §3.3）。
+
+## 7. 下一步（按顺序）
+
+| # | 事项 | 完成标志 |
+| --- | --- | --- |
+| 1 | 包体压回 160 以下（dev 164.1） | `pnpm build` 与 `VITE_ENV=dev pnpm build` 的 gate 输出都 ≤160 kB，且不引入 WalletConnect 字节 |
+| 2 | 修三处真机体验：底栏遮挡主按钮、小数位统一、6 字标题不截断 | 按 390×844 重出 `product/screenshots/` 对照图，主按钮完整可见、金额精度有统一规则 |
+| 3 | E2E 状态隔离 | 每次运行前重建链或快照回滚；连跑两遍均 **32/32** |
+| 4 | 写 M0 验收报告 | 按 [m0-ux-spec](product/m0-ux-spec.md) §6 的 14 步 + 四个阻塞点逐条附证据（截图/交易哈希/命令输出） |
+| 5 | 发布到 interface-test | 先解决 test 地址来源（合约仓当前只有 `anvil31337_dev` 参数，前端 test 簿仍全 0）→ 干净工作区 + CI 绿 → `pnpm release-to-interface-test`；线上 build id 对应发布 commit |
+| 6 | 之后才是 M1（治理：推举/投票/激励铸造） | CI-001 解除并有 view 级枚举方案；prod 仓 `LOVE20BSC/interface` 到时才创建 |
+
+## 8. 如何接手（最短路径）
+
+1. **读什么**：先 [ADR-0001](adr/0001-stack-and-static-hosting.md)→[0004](adr/0004-anvil-local-chain.md)（0002 环境/发布、0004 起链最关键），再本文件，再 [m0-ux-spec](product/m0-ux-spec.md)；改文案前读 [GLOSSARY](../GLOSSARY.md)。
+2. **起链**：`make -C ../anvil bootstrap`；`cast chain-id --rpc-url http://127.0.0.1:8545` 应为 31337；收链 `make -C ../anvil stop`。同一时刻只允许一条链。
+3. **跑测试**：`pnpm install` → `pnpm typecheck && pnpm lint && pnpm test`；e2e 前必须干净链，`pnpm e2e` 跑 32 条；重复跑先重新 bootstrap。
+4. **改 UI 的纪律**：文案只进 `shared/config/copy.ts`；组件内禁止中文字面量；缓存只走 `shared/lib/cache.ts`；地址/chainId 只从环境包来；禁止硬编码费率；金额与倒计时必须标「约/预计」；不调 `tokenURI`、不读事件日志。
+5. **改 ABI**：从合约仓或 anvil 导出重新生成并提交生成物；不手改、不把 `out/`/`build/` 带进仓；补 manifest 与漂移门禁时按 ADR-0002 §3。
+6. **提交纪律**：显式 `git add <path>`（不要 `git add -A`）；已推送 commit 禁止 amend；不提交 `dist*/`、`.research/`、`.build-id`、`.env`。
+7. **发布纪律**：只接受 fast-forward；`pnpm release-to-interface-test` 会检查干净工作区、CI 绿、目标 `main` 是祖先；拒绝 force、拒绝网页 merge。
+8. **不确定就写「待核实」**：不要发明地址、费率、文案或合约能力；`../core`、`../action`、`../anvil` 等兄弟仓只读。
+
+## 9. 文档索引
+
+`.research/` 是本地只读输入且被 gitignore，干净 checkout 里没有这些文件；交接时需单独拷贝。
+
+| 文档 | 回答什么问题 |
+| --- | --- |
+| [STATUS.md](STATUS.md) | 本文件：当前做到哪、怎么接手、下一步 |
+| [ADR-0001](adr/0001-stack-and-static-hosting.md) | 为什么是这套栈、Pages 六条硬约束如何落到架构、包体门禁口径 |
+| [ADR-0002](adr/0002-three-environment-injection.md) | 三环境如何注入、ABI 流水线、单命令 fast-forward 发布、仓库名选环境 |
+| [ADR-0003](adr/0003-identity-and-connect-button.md) | 连接按钮三面板、身份三元组与枚举、缓存命名空间、社区切换语义 |
+| [ADR-0004](adr/0004-anvil-local-chain.md) | `make bootstrap` 做什么、seed 顺序、8545 端口策略、导出契约、phase 时长 |
+| [m0-scope](product/m0-scope.md) | M0 交付 6 项、明确不做什么、依赖/验收、仍待确认的假设 |
+| [m0-ux-spec](product/m0-ux-spec.md) | 应用外壳与 5 个页面的交互、横切规范、§6 验收脚本 |
+| [contract-issues/README](contract-issues/README.md) | 13 条合约侧问题的索引、严重级别定义、修复流程与基线 |
+| [CI-001](contract-issues/001-no-member-round-index.md) | 无按 `memberId` 的轮次/行动索引（Blocker，M1 阻塞） |
+| [CI-002](contract-issues/002-reward-quote-linear-scan.md) | 激励报价线性扫描本轮全部提案（High） |
+| [CI-003](contract-issues/003-created-round-not-exposed.md) | `createdRound` 未暴露，流水线/倒计时拿不到（High） |
+| [CI-004](contract-issues/004-member-nft-test-prefix-mismatch.md) | Test 前缀报价/查重与铸造不一致（已修复 core@72a1604） |
+| [CI-005](contract-issues/005-no-onboarding-path.md) | 没币用户入网路径缺失（High） |
+| [CI-006](contract-issues/006-claim-amounts-are-live.md) | 待铸造金额现算会变甚至归零（High） |
+| [CI-007](contract-issues/007-round-not-started-inconsistent.md) | 「轮次未开始」三种不一致答复（Medium） |
+| [CI-008](contract-issues/008-no-phase-timing-view.md) | 无阶段时间/偏移视图，倒计时要在 TS 重算（Medium） |
+| [CI-009](contract-issues/009-verifier-surface-gaps.md) | 验证者侧没有按人索引（Medium） |
+| [CI-010](contract-issues/010-address-book-not-discoverable.md) | 地址簿不可链上发现，错地址静默返回 0（Medium） |
+| [CI-011](contract-issues/011-silent-zero-ambiguity.md) | 静默 0 / 歧义 0：分不清「没有」与「未开始」（Medium） |
+| [CI-012](contract-issues/012-name-homoglyph-spoofing.md) | 名称同形可伪造身份（Medium） |
+| [CI-013](contract-issues/013-member-nft-no-token-uri.md) | MemberNFT 无 `tokenURI`，钱包里是空白 NFT（Low） |
+| [GLOSSARY](../GLOSSARY.md) | 界面中文的硬约束、一词一义、易混对（写文案前必读） |
+| [README](../README.md) | 栈、命令、分层、环境注入、连接按钮、存储/错误、i18n、托管、stub 清单 |
+| [.research/protocol-contracts.md](../.research/protocol-contracts.md) | core/action/group-chat 前端可用面与合约事实清单 |
+| [.research/domain-model.md](../.research/domain-model.md) | 领域术语、Phase/Round 语义、角色与对象关系 |
+| [.research/dex-and-anvil.md](../.research/dex-and-anvil.md) | dex/anvil 现状与本地 bootstrap 必须补什么 |
+| [.research/libs-and-artifacts.md](../.research/libs-and-artifacts.md) | libs/compatibility/cache 的产物与 ABI 生成策略 |
+| [.research/membernft-identity.md](../.research/membernft-identity.md) | MemberNFT 实现、身份发现与持有人枚举 |
+| [.research/network-and-token-acquisition.md](../.research/network-and-token-acquisition.md) | 网络配置、买币/空投、phase 时序等集成事实 |
+| [.research/static-hosting-and-ux.md](../.research/static-hosting-and-ux.md) | Pages 实测约束与消费级 dApp UX 基准 |
+| [.research/tkm-connect-and-nav.md](../.research/tkm-connect-and-nav.md) | 参考实现的连接按钮、底栏与桌面外壳 |
+| [.research/tkm-funnel-pages.md](../.research/tkm-funnel-pages.md) | 参考实现四个漏斗页的结构与文案 |
