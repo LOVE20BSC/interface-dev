@@ -61,6 +61,10 @@ E2E_ANVIL_RPC=http://127.0.0.1:8556 pnpm e2e
 
 不隔离的东西：浏览器 local storage（每个测试有独立 context）、`docs/product/screenshots/` 里的截图文件、构建产物。截图是幂等覆盖写，不会跨运行累积。
 
+## 同一时刻只跑一个 e2e 进程（文件锁）
+
+`pnpm e2e` 在触碰链或启动 Playwright 前会先取排他锁（`../anvil/.anvil/8555/e2e.lock`，兄弟仓不存在时回退到系统临时目录），锁里写入 pid、启动时间与 cwd。后到的运行会打印 `[e2e-chain] waiting for another e2e run (pid N, started HH:MM:SS) …` 并每 2 秒轮询，最多等 15 分钟，持有者退出后自动继续；超时则给出可操作报错。原因：每个 spec 文件都在 `beforeAll` 对整条链 `anvil_snapshot`、`afterAll` `anvil_revert`，两个 run 并发会互相消费快照（`anvil_revert ... returned false`），把正常的代码报成假失败。正常结束、失败与 SIGINT/SIGTERM 都会释放锁；pid 已死或锁超过 30 分钟视为陈旧并自动接管（打印警告）。不要手动删除仍被存活运行持有的锁。
+
 ## 中断与脏链
 
 - 正常失败/超时：Playwright 仍会执行 `afterAll`，链会回滚。

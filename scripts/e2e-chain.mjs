@@ -25,8 +25,17 @@
 //   --ensure-only   only ensure/inspect the suite chain, do not run Playwright
 //   --reset-chain   stop the suite chain on :8555 (if this repo started it) and bootstrap it again
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+  writeSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -36,6 +45,12 @@ const SUITE_PORT = 8555;
 const HUMAN_PORT = 8545;
 const EXPECTED_CHAIN_ID = 31337;
 const DEFAULT_SUITE_RPC = `http://127.0.0.1:${SUITE_PORT}`;
+// One suite at a time: every spec file snapshots/reverts the whole chain, so two
+// concurrent runs consume each other's snapshots (`anvil_revert ... returned false`).
+const LOCK_FILE_NAME = 'e2e.lock';
+const LOCK_POLL_MS = 2_000;
+const LOCK_WAIT_TIMEOUT_MS = 15 * 60_000;
+const LOCK_STALE_MS = 30 * 60_000;
 /**
  * Test-build transaction deadline. The shipped (production) value is the 90 s
  * default in src/shared/lib/tx-watch.ts; the e2e suite must not wait 90 s for the
@@ -54,6 +69,171 @@ const PROBE_ADDRESS_KEYS = ['tokenAddress', 'memberNFT', 'airdrop', 'multicall3'
 function fatal(...lines) {
   for (const line of lines) console.error(`[e2e-chain] ${line}`);
   process.exit(1);
+}
+
+// ------------------------------------------------------------------------------------------------
+// suite lock: serialise e2e runs (chain-global snapshots cannot overlap)
+// ------------------------------------------------------------------------------------------------
+let activeLockPath = null;
+let activeChild = null;
+
+function lockFilePath() {
+  const runtimeDir = resolve(ANVIL_REPO, '.anvil', String(SUITE_PORT));
+  if (existsSync(ANVIL_REPO)) {
+    try {
+      mkdirSync(runtimeDir, { recursive: true });
+      return resolve(runtimeDir, LOCK_FILE_NAME);
+    } catch {
+      // fall through to the OS temp dir
+    }
+  }
+  return resolve(tmpdir(), `love20-e2e-${SUITE_PORT}.lock`);
+}
+
+function readLockOwner(path) {
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8'));
+    const pid =
+      typeof parsed.pid === 'number' ? parsed.pid : Number.parseInt(String(parsed.pid), 10);
+    if (!Number.isInteger(pid) || pid <= 0) return null;
+    return {
+      pid,
+      startedAt: typeof parsed.startedAt === 'string' ? parsed.startedAt : null,
+      cwd: typeof parsed.cwd === 'string' ? parsed.cwd : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isPidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error !== null && typeof error === 'object' && error.code === 'EPERM';
+  }
+}
+
+function clockOf(iso) {
+  const parsed = typeof iso === 'string' ? Date.parse(iso) : Number.NaN;
+  if (Number.isNaN(parsed)) return 'unknown time';
+  return new Date(parsed).toLocaleTimeString('en-GB', { hour12: false });
+}
+
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Atomic lock creation (`openSync(..., 'wx')`). A live owner means wait; a dead
+ * owner (or a lock older than 30 min) is taken over with a warning. The bounded
+ * 15 min wait then fails with an actionable message instead of hanging forever.
+ */
+function acquireSuiteLock() {
+  const path = lockFilePath();
+  const waitStarted = Date.now();
+  let announcedWait = false;
+  let takeoverAttempts = 0;
+
+  for (;;) {
+    try {
+      const fd = openSync(path, 'wx');
+      writeSync(
+        fd,
+        `${JSON.stringify(
+          { pid: process.pid, startedAt: new Date().toISOString(), cwd: process.cwd() },
+          null,
+          2,
+        )}\n`,
+      );
+      closeSync(fd);
+      activeLockPath = path;
+      console.log(`[e2e-chain] acquired e2e lock ${path} (pid ${process.pid})`);
+      return;
+    } catch (error) {
+      const code = error !== null && typeof error === 'object' ? error.code : undefined;
+      if (code !== 'EEXIST') {
+        fatal(`could not create the e2e lock at ${path}: ${String(error)}`);
+      }
+    }
+
+    const owner = readLockOwner(path);
+    const alive = owner !== null && isPidAlive(owner.pid);
+    const age =
+      owner?.startedAt !== null && owner?.startedAt !== undefined
+        ? Date.now() - Date.parse(owner.startedAt)
+        : Number.POSITIVE_INFINITY;
+    const stale = owner === null || !alive || age > LOCK_STALE_MS;
+
+    if (stale) {
+      takeoverAttempts += 1;
+      if (takeoverAttempts > 5) {
+        fatal(
+          `could not take over the stale e2e lock at ${path}.`,
+          'Delete it manually if no e2e run is active.',
+        );
+      }
+      console.warn(
+        `[e2e-chain] taking over a stale e2e lock (pid ${owner?.pid ?? '?'} ${
+          alive ? `alive but started ${clockOf(owner?.startedAt)}` : 'is not running'
+        }) at ${path}`,
+      );
+      try {
+        unlinkSync(path);
+      } catch {
+        // another waiter removed it first; retry the atomic create
+      }
+      continue;
+    }
+
+    if (!announcedWait) {
+      console.log(
+        `[e2e-chain] waiting for another e2e run (pid ${owner.pid}, started ${clockOf(owner.startedAt)}) …`,
+      );
+      console.log(
+        '[e2e-chain] e2e runs are serialised because every spec file snapshots/reverts the whole chain',
+      );
+      announcedWait = true;
+    }
+    if (Date.now() - waitStarted > LOCK_WAIT_TIMEOUT_MS) {
+      fatal(
+        `another e2e run (pid ${owner.pid}, started ${clockOf(owner.startedAt)}) has held the lock for more than 15 minutes.`,
+        `Stop that run, or delete ${path} if its pid is dead.`,
+      );
+    }
+    sleepSync(LOCK_POLL_MS);
+  }
+}
+
+/** Releases only a lock this process owns; safe to call more than once. */
+function releaseSuiteLock() {
+  if (activeLockPath === null) return;
+  const path = activeLockPath;
+  activeLockPath = null;
+  const owner = readLockOwner(path);
+  if (owner !== null && owner.pid !== process.pid) {
+    console.warn(`[e2e-chain] not releasing ${path}: it belongs to pid ${owner.pid}`);
+    return;
+  }
+  try {
+    unlinkSync(path);
+    console.log(`[e2e-chain] released e2e lock ${path}`);
+  } catch {
+    // already gone; nothing to do
+  }
+}
+
+/** Crash-safe release: normal exit, SIGINT/SIGTERM (and the child they stop). */
+function installLockCleanup() {
+  process.on('exit', releaseSuiteLock);
+  for (const signal of ['SIGINT', 'SIGTERM']) {
+    process.on(signal, () => {
+      if (activeChild !== null && !activeChild.killed) activeChild.kill(signal);
+      releaseSuiteLock();
+      process.exit(signal === 'SIGINT' ? 130 : 143);
+    });
+  }
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -254,7 +434,7 @@ async function ensureDedicatedChain({ reset }) {
 // ------------------------------------------------------------------------------------------------
 // run Playwright with the resolved endpoint
 // ------------------------------------------------------------------------------------------------
-function runPlaywright(rpcUrl, passthrough) {
+async function runPlaywright(rpcUrl, passthrough) {
   const require = createRequire(import.meta.url);
   let cli;
   try {
@@ -272,17 +452,15 @@ function runPlaywright(rpcUrl, passthrough) {
     stdio: 'inherit',
     env: { ...process.env, E2E_ANVIL_RPC: rpcUrl },
   });
-  for (const signal of ['SIGINT', 'SIGTERM']) {
-    process.on(signal, () => {
-      if (!child.killed) child.kill(signal);
+  activeChild = child;
+  return await new Promise((resolvePromise) => {
+    child.on('error', (error) => {
+      fatal(`could not start Playwright: ${error.message}`);
     });
-  }
-  child.on('exit', (code, signal) => {
-    if (signal !== null) {
-      process.kill(process.pid, signal);
-      return;
-    }
-    process.exit(code ?? 1);
+    child.on('exit', (code, signal) => {
+      activeChild = null;
+      resolvePromise({ code: code ?? 1, signal });
+    });
   });
 }
 
@@ -309,25 +487,41 @@ async function main() {
     );
   }
 
-  if (managed) {
-    await ensureDedicatedChain({ reset });
-  } else {
-    const probe = await probeChain(rpcUrl);
-    if (probe.error !== undefined) {
-      fatal(
-        `${rpcUrl} is not reachable (${probe.error.message}).`,
-        'E2E_ANVIL_RPC was set explicitly, so this script does not start or bootstrap that chain.',
-        'Start it yourself, or unset E2E_ANVIL_RPC to use the managed chain on :8555.',
-      );
-    }
-    if (probe.chainId !== EXPECTED_CHAIN_ID) {
-      fatal(`${rpcUrl} answers with chain id ${probe.chainId}, expected ${EXPECTED_CHAIN_ID}.`);
-    }
-  }
+  // Serialise before touching the chain or building: snapshots are chain-global.
+  acquireSuiteLock();
+  installLockCleanup();
 
-  console.log(`[e2e-chain] export E2E_ANVIL_RPC=${rpcUrl}`);
-  if (ensureOnly) return;
-  runPlaywright(rpcUrl, passthrough);
+  try {
+    if (managed) {
+      await ensureDedicatedChain({ reset });
+    } else {
+      const probe = await probeChain(rpcUrl);
+      if (probe.error !== undefined) {
+        fatal(
+          `${rpcUrl} is not reachable (${probe.error.message}).`,
+          'E2E_ANVIL_RPC was set explicitly, so this script does not start or bootstrap that chain.',
+          'Start it yourself, or unset E2E_ANVIL_RPC to use the managed chain on :8555.',
+        );
+      }
+      if (probe.chainId !== EXPECTED_CHAIN_ID) {
+        fatal(`${rpcUrl} answers with chain id ${probe.chainId}, expected ${EXPECTED_CHAIN_ID}.`);
+      }
+    }
+
+    console.log(`[e2e-chain] export E2E_ANVIL_RPC=${rpcUrl}`);
+    if (ensureOnly) return;
+
+    const result = await runPlaywright(rpcUrl, passthrough);
+    releaseSuiteLock();
+    if (result.signal !== null) {
+      process.exit(130);
+    }
+    process.exit(result.code);
+  } finally {
+    // Reaches here for --ensure-only, fatal paths and after Playwright is done.
+    // If Playwright is still running, the process 'exit' handler / signals own it.
+    if (activeChild === null) releaseSuiteLock();
+  }
 }
 
 main().catch((error) => {
