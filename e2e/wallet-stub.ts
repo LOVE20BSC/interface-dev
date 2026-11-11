@@ -129,14 +129,18 @@ export async function seedIdentity(page: Page, account: string, tokenId: string)
 }
 
 export async function connect(page: Page): Promise<void> {
+  // Idempotent: a reload after a previous connection auto-reconnects through the
+  // injected provider (wagmi storage), so there is no 「连接钱包」 button to click
+  // and the wallet menu is already the steady state we want.
+  const trigger = page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' });
+  const button = page.getByRole('button', { name: '连接钱包' }).first();
+  await expect(trigger.or(button)).toBeVisible({ timeout: 15_000 });
+  if ((await trigger.count()) > 0) return;
   // The provider check settles asynchronously; the header pill stays disabled
   // for a beat before eth_requestAccounts is possible.
-  const button = page.getByRole('button', { name: '连接钱包' }).first();
   await expect(button).toBeEnabled({ timeout: 5_000 });
   await button.click();
-  await expect(page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' })).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(trigger).toBeVisible({ timeout: 15_000 });
 }
 
 /** Primary buttons are the only solid brand-color controls; count the visible ones. */
