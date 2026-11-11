@@ -65,6 +65,15 @@ test.describe('应用目录', () => {
   test('captures the 390×844 apps catalog screenshot', async ({ page }) => {
     await page.goto(`/apps${QUERY}`);
     await expect(page).toHaveTitle(`应用 · ${SYMBOL}`, { timeout: 15_000 });
+    // The header renders before the lazy route chunk: wait for real rows, not
+    // the route-fallback skeleton, before taking the acceptance screenshot.
+    await expect(page.getByRole('link', { name: /创世空投/ })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('按快照份额铸造创世代币')).toBeVisible();
+    // Settle the injected-wallet probe so the pill does not read 检测钱包中….
+    // The accessible name is always 连接钱包, so assert the visible label too.
+    await expect(page.getByRole('button', { name: '连接钱包' }).first()).toHaveText('连接钱包', {
+      timeout: 15_000,
+    });
     // No filled action belongs on a navigation-only page.
     await expect(page.locator('main button')).toHaveCount(0);
 
