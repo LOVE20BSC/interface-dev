@@ -431,8 +431,10 @@ export const copy = {
     actions: {
       refresh: '重新查询',
       resubmit: '重新提交',
+      reload: '刷新',
       explorer: '在区块链浏览器查看',
     },
+    staleBlock: '钱包还停留在旧链的区块上，刷新页面或重新连接钱包后再试。',
     nonceUnavailable: '暂时读不到链上状态，请稍后再试。',
   },
   advanced: {
