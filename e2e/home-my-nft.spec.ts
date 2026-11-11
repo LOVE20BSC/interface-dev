@@ -1,49 +1,29 @@
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { isolateChain } from './chain';
+import {
+  ACCOUNTS,
+  MULTICALL3,
+  RPC_URL,
+  SEEDED_NAME,
+  countSolidButtons,
+  connect,
+  expectHomeWordmark,
+  identityCacheKey,
+  installWallet,
+  seedIdentity,
+} from './wallet-stub';
 
 /**
- * M0 identity-first pages against the local anvil chain.
+ * M0 identity-first pages against the dedicated anvil chain.
  *
- * The wallet is an injected EIP-1193 stub backed by the anvil RPC: reads go
- * through the app's HTTP transport, writes through eth_sendTransaction. The
- * anvil accounts are unlocked, so no private key ever enters the test.
+ * Home is a reminder feed (UX spec §3.1, owner 2026-11-11): a thin line into
+ * 我的 plus conditional reminder cards; the old identity/balance cards and the
+ * three navigation rows are gone (they live on /apps and /me now).
  */
-
-const deployment = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'src/config/deployments/anvil31337_dev.json'), 'utf8'),
-) as {
-  chainId: number;
-  rpcUrls: string[];
-  addresses: {
-    memberNFT: `0x${string}`;
-    firstTokenAddress: `0x${string}`;
-    multicall3: `0x${string}`;
-  };
-};
-
-const RPC_URL = process.env.E2E_ANVIL_RPC ?? deployment.rpcUrls[0] ?? 'http://127.0.0.1:8545';
-const CHAIN_ID = deployment.chainId;
-const CHAIN_HEX = `0x${CHAIN_ID.toString(16)}`;
-const MEMBER_NFT = deployment.addresses.memberNFT;
-const MULTICALL3 = deployment.addresses.multicall3;
-
-// anvil's deterministic accounts (mnemonic "test test ... junk").
-const ACCOUNTS = {
-  withIdentity: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', // #1, claimed its airdrop
-  eligible: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', // in snapshot, unclaimed, no NFT
-  outsider: '0x8b3a350Cf5C34c9194ca85829a2df0ec3153bE5d', // not in snapshot, no NFT
-} as const;
 
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
-
-/**
- * The seed mints `Testdev-member-0` verbatim (anvil
- * params/anvil31337_dev/seed.params SEED_MEMBER_NAME_PREFIX=Testdev-member-).
- * core@72a1604 no longer adds `Test` on chain, so this is the fixture string.
- */
-const SEEDED_NAME = 'Testdev-member-0';
 
 test.use({
   viewport: { width: 390, height: 844 },
@@ -52,139 +32,15 @@ test.use({
   hasTouch: true,
 });
 
-function identityCacheKey(account: string): string {
-  return `love20:v1:${CHAIN_ID}:${MEMBER_NFT.toLowerCase()}:${account.toLowerCase()}:identity`;
-}
-
-/**
- * Installs window.ethereum before any app code runs. Methods the wallet spec
- * owns (accounts / chain / switching) are answered locally; everything else is
- * forwarded verbatim to the anvil RPC.
- */
-async function installWallet(
-  page: Page,
-  account: string,
-  chainHex: string = CHAIN_HEX,
-): Promise<void> {
-  await page.addInitScript(
-    ({ accountAddress, chainHex, rpcUrl }) => {
-      const listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
-      const rpc = async (method: string, params: unknown): Promise<unknown> => {
-        const response = await fetch(rpcUrl, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: params ?? [] }),
-        });
-        const body = (await response.json()) as {
-          result?: unknown;
-          error?: { code?: number; message?: string; data?: unknown };
-        };
-        if (body.error !== undefined) {
-          const error = new Error(body.error.message ?? 'rpc error') as Error & {
-            code?: number;
-            data?: unknown;
-          };
-          if (body.error.code !== undefined) error.code = body.error.code;
-          if (body.error.data !== undefined) error.data = body.error.data;
-          throw error;
-        }
-        return body.result;
-      };
-
-      const provider = {
-        isMetaMask: true,
-        isConnected: () => true,
-        request: async ({ method, params }: { method: string; params?: unknown }) => {
-          if (method === 'eth_requestAccounts' || method === 'eth_accounts') {
-            return [accountAddress];
-          }
-          if (method === 'eth_chainId') return chainHex;
-          if (method === 'net_version') return String(parseInt(chainHex, 16));
-          if (method === 'wallet_switchEthereumChain') return null;
-          if (method === 'wallet_addEthereumChain') return null;
-          return rpc(method, params);
-        },
-        on: (event: string, handler: (...args: unknown[]) => void) => {
-          (listeners[event] ??= []).push(handler);
-          return provider;
-        },
-        removeListener: (event: string, handler: (...args: unknown[]) => void) => {
-          listeners[event] = (listeners[event] ?? []).filter((entry) => entry !== handler);
-          return provider;
-        },
-        removeAllListeners: () => {
-          for (const key of Object.keys(listeners)) delete listeners[key];
-          return provider;
-        },
-      };
-
-      Object.defineProperty(window, 'ethereum', {
-        configurable: true,
-        value: provider,
-      });
-    },
-    { accountAddress: account, chainHex, rpcUrl: RPC_URL },
-  );
-}
-
-async function seedIdentity(page: Page, account: string, tokenId: string): Promise<void> {
-  await page.addInitScript(
-    ({ key, value }) => {
-      window.localStorage.setItem(key, value);
-    },
-    { key: identityCacheKey(account), value: JSON.stringify({ tokenId }) },
-  );
-}
-
-async function connect(page: Page): Promise<void> {
-  // The provider check settles asynchronously; the header pill stays disabled
-  // for a beat before eth_requestAccounts is possible.
-  const button = page.getByRole('button', { name: '连接钱包' }).first();
-  await expect(button).toBeEnabled({ timeout: 5_000 });
-  await button.click();
-  await expect(page.getByRole('button', { name: '打开钱包与身份菜单' })).toBeVisible({
-    timeout: 15_000,
-  });
-}
-
-/** Primary buttons are the only solid brand-color controls; count the visible ones. */
-async function countSolidButtons(page: Page): Promise<number> {
-  return page.evaluate(() => {
-    const solid = new Set(['rgb(37, 99, 235)', 'rgb(29, 78, 216)', 'rgb(220, 38, 38)']);
-    const nodes = Array.from(document.querySelectorAll('button, a'));
-    return nodes.filter((node) => {
-      const element = node as HTMLElement;
-      const rect = element.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return false;
-      if (rect.bottom < 0 || rect.top > window.innerHeight) return false;
-      const style = window.getComputedStyle(element);
-      return style.visibility !== 'hidden' && solid.has(style.backgroundColor);
-    }).length;
-  });
-}
-
 async function shot(page: Page, name: string): Promise<void> {
   mkdirSync(SHOTS, { recursive: true });
   await page.screenshot({ path: resolve(SHOTS, name), animations: 'disabled' });
 }
 
-/**
- * UX spec §1.3 (owner request 2026-11-11): the mobile home header has no left
- * wordmark link any more. While connected, the community symbol is still on
- * screen in the top-right pill's community trigger; while disconnected the
- * header shows only 「连接钱包」 (the accepted trade-off in §1.3). Waiting for
- * the tab title also keeps screenshots stable.
- */
-async function expectCommunityHeader(page: Page, connected: boolean): Promise<void> {
-  await expect(page.getByRole('banner').getByRole('link')).toHaveCount(0);
-  if (connected) {
-    await expect(
-      page.getByRole('button', { name: '当前代币社区 TestLOVE20，打开社区菜单' }),
-    ).toContainText('TestLOVE20');
-  } else {
-    await expect(page.getByRole('banner').getByRole('button', { name: '连接钱包' })).toBeVisible();
-  }
-  await expect(page).toHaveTitle('TestLOVE20');
+/** The home thin line into 我的 (the bottom nav/sidebar also link there). */
+function thinLine(page: Page) {
+  // Scoped by test id: the bottom nav and desktop sidebar also link to /me.
+  return page.getByTestId('home-thin-line');
 }
 
 // Snapshot before any test touches the chain; afterAll restores it.
@@ -194,16 +50,26 @@ test.beforeAll(() => {
   mkdirSync(SHOTS, { recursive: true });
 });
 
-test('home: disconnected shows connect and no identity yet', async ({ page }) => {
+test('home: disconnected shows the connect entry, the wordmark and the thin line', async ({
+  page,
+}) => {
   await installWallet(page, ACCOUNTS.withIdentity);
   await page.goto('/');
 
   await expect(page.getByRole('button', { name: '连接钱包' })).toHaveCount(2);
   await expect(page.getByText('一个钱包可以拥有多个身份，身份才是参与凭证。')).toBeVisible();
   await expect(page.getByText('你还没有身份')).toHaveCount(0);
-  await expect(page.getByText('无需操作')).toHaveCount(0);
+  await expect(page.getByText('现在没有需要你处理的事。')).toHaveCount(0);
   expect(await countSolidButtons(page)).toBe(1);
-  await expectCommunityHeader(page, false);
+  await expectHomeWordmark(page, true);
+
+  // Thin line is always visible, even disconnected: name —, balance —.
+  await expect(thinLine(page)).toBeVisible();
+  await expect(thinLine(page)).toContainText('—');
+  // The old navigation rows are gone.
+  await expect(page.getByRole('link', { name: '我的 NFT' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '兑换代币' })).toHaveCount(0);
+  await expect(page).toHaveTitle('TestLOVE20');
 
   await shot(page, 'home-disconnected.png');
 });
@@ -244,67 +110,79 @@ test('home: wrong chain shows the red outlined switch pill, not a solid fill', a
   expect(style.height).toBe(44);
   expect(style.paddingLeft).toBe('16px');
   expect(style.paddingRight).toBe('16px');
+  // Wrong chain counts as connected: the wordmark is gone (§1.3).
+  await expectHomeWordmark(page, false);
 
   await shot(page, 'home-wrong-network.png');
 });
 
-test('home: connected without identity offers 我的 NFT only', async ({ page }) => {
+test('home: connected without identity shows the 铸造身份 reminder only', async ({ page }) => {
   await installWallet(page, ACCOUNTS.outsider);
   await page.goto('/');
   await connect(page);
 
   await expect(page.getByText('你还没有身份')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('link', { name: '去我的 NFT' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '铸造身份' })).toHaveCount(0);
-  await expect(page.getByText('无需操作')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '铸造身份' })).toHaveAttribute(
+    'href',
+    '/mint?symbol=TestLOVE20',
+  );
+  await expect(page.getByRole('link', { name: '去我的 NFT' })).toHaveCount(0);
   await expect(page.getByText('你参与了销毁活动，获得空投铸造资格')).toHaveCount(0);
-  expect(await countSolidButtons(page)).toBe(0);
-  await expectCommunityHeader(page, true);
+  await expect(page.getByText('现在没有需要你处理的事。')).toHaveCount(0);
+  expect(await countSolidButtons(page)).toBe(1);
+  await expectHomeWordmark(page, false);
+  await expect(thinLine(page)).toContainText('还没有身份');
+  await expect(page).toHaveTitle('TestLOVE20');
 
-  await shot(page, 'home-connected-no-identity.png');
+  await shot(page, 'home-no-identity.png');
 });
 
-test('home: identity greeting persists across reload', async ({ page }) => {
+test('home: identity and balance stay in the thin line across reload', async ({ page }) => {
   await installWallet(page, ACCOUNTS.withIdentity);
   await seedIdentity(page, ACCOUNTS.withIdentity, '1');
   await page.goto('/');
   await connect(page);
 
-  await expect(page.getByText(`你好，${SEEDED_NAME}`)).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('身份 #1').first()).toBeVisible();
-  await expect(page.getByRole('link', { name: '切换身份' })).toBeVisible();
-  await expect(page.getByText('无需操作')).toHaveCount(0);
-  expect(await countSolidButtons(page)).toBe(0);
-  await expectCommunityHeader(page, true);
-
+  const line = thinLine(page);
+  await expect(line).toContainText(SEEDED_NAME, { timeout: 15_000 });
   // 99,799,100 renders with thousands separators, never as a wall of digits.
-  const balanceRow = page.getByRole('region', { name: 'TestLOVE20 余额' });
-  await expect(balanceRow).toContainText(/\d{1,3}(,\d{3})+/);
-  await expect(balanceRow).not.toContainText('99799100');
+  await expect(line).toContainText('99,799,100 TestLOVE20');
+  await expect(line).not.toContainText('99799100');
+  // No greeting card, no identity pill, no 切换身份 button on home.
+  await expect(page.getByText(`你好，${SEEDED_NAME}`)).toHaveCount(0);
+  await expect(page.getByText('身份 #1')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '切换身份' })).toHaveCount(0);
+  await expectHomeWordmark(page, false);
+  // The thin line is one row: it must not wrap at 390 px.
+  const box = await line.boundingBox();
+  expect(box?.height ?? 0).toBeLessThan(32);
 
   await shot(page, 'home-connected-with-identity.png');
 
   await page.reload();
-  await expect(page.getByText(`你好，${SEEDED_NAME}`)).toBeVisible({ timeout: 15_000 });
+  await expect(thinLine(page)).toContainText(SEEDED_NAME, { timeout: 15_000 });
 });
 
-test('home: eligible wallet sees the airdrop card', async ({ page }) => {
+test('home: eligible wallet sees the airdrop reminder', async ({ page }) => {
   await installWallet(page, ACCOUNTS.eligible);
   await page.goto('/');
   await connect(page);
 
-  const title = page.getByText('你参与了销毁活动，获得空投铸造资格');
-  await expect(title).toBeVisible({ timeout: 20_000 });
-  const card = page.locator('section[aria-labelledby="airdrop-eligibility-title"]');
-  await expect(card.getByRole('link', { name: '空投铸造' })).toBeVisible();
-  // The card has a title and one CTA; no subtitle, no explanation sentence.
-  await expect(card.locator('p')).toHaveCount(0);
+  const reminder = page.locator('section[aria-labelledby="home-reminder-airdrop"]');
+  await expect(reminder).toBeVisible({ timeout: 20_000 });
+  await expect(reminder.getByRole('heading')).toContainText('你有空投资格，可铸造');
+  await expect(reminder.getByRole('link', { name: '空投铸造' })).toHaveAttribute(
+    'href',
+    '/airdrop?symbol=TestLOVE20',
+  );
+  // No-identity reminder comes first and owns the one filled button.
+  await expect(page.getByText('你还没有身份')).toBeVisible();
   expect(await countSolidButtons(page)).toBe(1);
-  await expectCommunityHeader(page, true);
+  await expectHomeWordmark(page, false);
   await shot(page, 'home-airdrop-eligible.png');
 });
 
-test('home: a non-eligible account never sees the airdrop card', async ({ page }) => {
+test('home: a non-eligible account never sees the airdrop reminder', async ({ page }) => {
   await installWallet(page, ACCOUNTS.withIdentity); // claimed its share during seeding
   const snapshotLoaded = page.waitForResponse(
     (response) => response.url().includes('/airdrop/anvil31337_dev.json'),
@@ -313,19 +191,14 @@ test('home: a non-eligible account never sees the airdrop card', async ({ page }
   await page.goto('/');
   await connect(page);
   await snapshotLoaded;
-  await expect(page.getByText('你参与了销毁活动，获得空投铸造资格')).toHaveCount(0);
-  await expect(page.getByText('无需操作')).toHaveCount(0);
+  await expect(page.getByText('你有空投资格')).toHaveCount(0);
+  await expect(page.getByText('现在没有需要你处理的事。')).toBeVisible();
 });
 
 test('my-nft: card list and local selection without a transaction', async ({ page }) => {
   await installWallet(page, ACCOUNTS.withIdentity);
-  await page.goto('/');
+  await page.goto('/my-nft?symbol=TestLOVE20');
   await connect(page);
-  await page
-    .getByRole('link', { name: /我的 NFT/ })
-    .first()
-    .click();
-  await expect(page).toHaveURL(/\/my-nft/);
 
   await expect(page.getByText('持有 1 个身份')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('当前：未选择')).toBeVisible();
@@ -350,8 +223,10 @@ test('identity cache is cleared when ownerOf belongs to someone else', async ({ 
   await page.goto('/');
   await connect(page);
 
-  await expect(page.getByText('这个身份已不属于当前钱包')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('你还没有身份')).toBeVisible();
+  // Home no longer renders the neutral invalidation notice; it falls back to
+  // the no-identity reminder and the thin line. The cache is the proof.
+  await expect(page.getByText('你还没有身份')).toBeVisible({ timeout: 15_000 });
+  await expect(thinLine(page)).toContainText('还没有身份');
   await expect(page.getByText(`你好，${SEEDED_NAME}`)).toHaveCount(0);
   const stored = await page.evaluate(
     (key) => window.localStorage.getItem(key),
