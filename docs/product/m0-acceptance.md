@@ -12,6 +12,7 @@
 - STATUS §6.3 的三处移动端缺陷中，本轮复验了两处：主按钮被底栏遮挡/浮层透底（第 12 步）与 6 字标题截断（第 13 步），均未复现；**小数位统一（§6.3 ②）不在 14 步内，未复验**。
 - 未做真机、真实钱包弹窗与错误腿，见 §4「未覆盖」。
 - **2026-11-11 晚修复复核**：§3 的 O1–O4 已全部关闭；修复后的门禁、包体与同链连跑两遍 e2e 见 §3.1。§0/§1.2 保留验收当时的数字，不回填。
+- **2026-11-11 事故后的 e2e 最终验收**：O4 的「按文件快照/回滚」只解决同一条链的可重复，**不能阻止自动化运行去 bootstrap/revert 人工链 8545**。e2e 已改为自有 8555 链，验收见 **§3.2**（两遍连续全绿 + 8545 前后不变 + 杀链自愈）。
 
 ## 1 环境与前置（Phase 1，从 clean 开始）
 
@@ -66,7 +67,7 @@
 
 ## 3 验收中发现的问题
 
-> **2026-11-11 晚修复复核：O1–O4 已全部关闭。** §0/§1.2 保留的是 20:34–21:00 验收时的原始数字，不回填；修复后的复核见 §3.1。
+> **2026-11-11 晚修复复核：O1–O4 已全部关闭。** §0/§1.2 保留的是 20:34–21:00 验收时的原始数字，不回填；修复后的复核见 §3.1，e2e 隔离的最终验收见 §3.2。
 
 **14 步范围内没有 FAIL 或 PARTIAL。** 以下是不影响 14 步结论、但应在发布或后续迭代处理的观察；严重级别沿用 [contract-issues/README](../contract-issues/README.md) 的定义。
 
@@ -75,7 +76,7 @@
 | O1 | 低 | dev 首屏门禁 **160.0 kB** gzip，越过 160 kB 目标线（`[bundle] WARN`；硬限 200 未触发）。STATUS §6.2 记录的 159.9 已过时。 | **已修复（显式记录豁免）**：dev 与 prod 的 entry chunk 是同一份源码图，raw 均为 **547.35 kB**；dev 只大 **0.8 kB gzip**，差异来自内联的部署包——anvil 是真实地址 + HTTP RPC（部署 JSON `gzip -9` **1,358 B**），prod 的 22 个零地址占位压缩率高得多（**688 B**）。测试网横幅/dev 标识是真实首屏 UI，其文案在两个变体里都在包里，不是 dev-only 代码泄漏。`scripts/check-bundle.mjs` 因此给 dev 显式 **+1 kB 部署数据豁免**（`target ≤ 161 kB for VITE_ENV=dev`，硬限 200 仍适用），prod 仍按 160 kB 执行；复核时 prod **159.2–159.3 kB** / dev **160.0–160.1 kB**（build id 每次构建重新生成并内联，门禁数有 ±0.1 kB 抖动）。 |
 | O2 | 低 | 链不对时右上角药丸是**实心** danger 按钮（截图 [11-swap-wrong-network.png](acceptance/11-swap-wrong-network.png) 顶部），Spec §1.4 要求「红色描边按钮」。 | **已修复**：`WrongNetworkButton` 改用新增的 `danger-outline` 变体——透明底、1px `#dc2626` 描边、红字，尺寸仍是 `h-11 px-4`（与连接药丸一致，页头不跳）。证据：[home-wrong-network.png](screenshots/home-wrong-network.png)（e2e 在 390×844 下重出，并断言 computed style：背景透明、描边/文字 `rgb(220, 38, 38)`、高 44px、左右 padding 16px）；单测 `src/features/connect-wallet/ui/wrong-network-button.test.tsx`。页内主 CTA 仍保持实心。 |
 | O3 | 低 | 铸造余额不足的兑换分支 href 只带 `?symbol=TestLOVE20`（[05-mint-branch-swap.png](acceptance/05-mint-branch-swap.png) 的链接），Spec §3.3 要求同时预填 `from=<原生币>&to=<首币>`。落地后兑换页会把 `from=ETH&to=TestLOVE20` 补写进 URL，功能等价。 | **已修复**：`mint-identity-panel` 的 `swapHref` 现在显式拼成 `/swap?symbol=TestLOVE20&from=ETH&to=TestLOVE20`（`from` 取环境包 `nativeCurrency.symbol`，`to` 取创世代币 `symbol()`），文案与行为不变；`e2e/mint-identity.spec.ts` 改成精确断言该 href。 |
-| O4 | 中 | E2E 空投用例仍依赖干净链：本轮验收 + e2e 已把快照未铸造账户 #6/#8/#9 全部用掉，**同一条链再跑 `pnpm e2e` 会在 airdrop `beforeAll` 失败**（与 STATUS §6.1 一致，本轮未修复）。 | **已修复**：新增 `e2e/chain.ts`，每个 spec 文件在 `beforeAll` 前 `anvil_snapshot`、文件结束 `anvil_revert`（anvil 1.8.1；`evm_*` 为同义别名），回滚交易/余额/nonce/事件/区块头；`playwright.config.ts` 固定 `workers: 1`、`fullyParallel: false`，保证同一时刻只有一个文件改链。选择按文件而非按测试回滚（文件内测试共享夹具，如 mint 收据 → my-nft 列表），理由与操作写入 [e2e/README.md](../../e2e/README.md)。复核：同一条 clean bootstrap 链**连跑两遍，中间无 bootstrap，均 33/33 通过**（各 1.2m；snapshot id 0x1–0x4 → 0x5–0x8，id 未重置即链未重启），见 §3.1。 |
+| O4 | 中 | E2E 空投用例仍依赖干净链：本轮验收 + e2e 已把快照未铸造账户 #6/#8/#9 全部用掉，**同一条链再跑 `pnpm e2e` 会在 airdrop `beforeAll` 失败**（与 STATUS §6.1 一致，本轮未修复）。 | **已修复**：新增 `e2e/chain.ts`，每个 spec 文件在 `beforeAll` 前 `anvil_snapshot`、文件结束 `anvil_revert`（anvil 1.8.1；`evm_*` 为同义别名），回滚交易/余额/nonce/事件/区块头；`playwright.config.ts` 固定 `workers: 1`、`fullyParallel: false`，保证同一时刻只有一个文件改链。选择按文件而非按测试回滚（文件内测试共享夹具，如 mint 收据 → my-nft 列表），理由与操作写入 [e2e/README.md](../../e2e/README.md)。复核：同一条 clean bootstrap 链**连跑两遍，中间无 bootstrap，均 33/33 通过**（各 1.2m；snapshot id 0x1–0x4 → 0x5–0x8，id 未重置即链未重启），见 §3.1。**注意：这一修复只是「同一条链可重复」，并不构成隔离**——它允许自动化运行在人工正在使用的 8545 上快照/回滚/bootstrap（2026-11-11 事故即由此发生）。最终验收已改为独立 8555 链，见 §3.2。 |
 
 ### 3.1 修复后复核（2026-11-11 21:20–21:35，Asia/Taipei）
 
@@ -89,6 +90,25 @@
 | 截图 | `pnpm e2e` | 重出 390×844 截图；新增 [home-wrong-network.png](screenshots/home-wrong-network.png)，其余受链上状态影响的图按干净基线刷新 |
 
 > 复核时的链：`make -C ../anvil stop && make -C ../anvil clean && make -C ../anvil bootstrap`（仅两遍 e2e 之前执行一次，两遍之间没有重建）。E2E 从 32 条增至 33 条：多出的是 O2 的链不对回归用例。
+
+### 3.2 e2e 独立链隔离（2026-11-11 事故后，取代 §3.1 的「快照即隔离」）
+
+**事故经过（2026-11-11）**：`pnpm e2e` 原先直接跑在开发者浏览器钱包连接的人工链 `http://127.0.0.1:8545` 上，并按 spec 文件做 `anvil_snapshot` / `anvil_revert`。产品负责人在浏览器里手工测 /mint 时，一次自动化运行在 8545 上重新 bootstrap/回滚：账户 #1 `0x70997970C51812dc3A010C7d01b50e0d17dc79C8` 的链上 nonce 从 68 变回 3，他签名的 `approve(...)`（tx `0x94071607fbc2da1ec363fbb56d3cd5a0a6a3e87ff594cea9b4a57465ebec6cb1`，nonce 68，selector `0x095ea7b3`，to `0x8aCd85898458400f7Db866d53FCFF6f0D49741FF`）永远进不了块，页面卡在「确认中…」；期间 `anvil_getAutomine` 一度是 `false`，块高从 943 回退到 936。**结论：「按文件快照/回滚」只能保证同一条链可重复，无法阻止自动化运行触碰人工链；隔离必须靠独立链 + 独立端口。**
+
+**新验收（取代 O4/§3.1 的同链重复）**：`pnpm e2e` 在独立 **8555** 链上**连跑两遍全绿**，且 8545 人工链的 block / nonce / automine / pid 前后完全不变；杀掉 8555 链后重跑能自举自愈；发布构建不含 8555 端点。
+
+| 项 | 命令 | 结果 |
+| --- | --- | --- |
+| E2E 第一遍 | `pnpm e2e` | **33 passed (1.3m)**；快照 `0x0`–`0x3`，全部在 `http://127.0.0.1:8555`；启动日志 `[e2e-chain] reusing the bootstrapped suite chain on http://127.0.0.1:8555 (chain 31337)` |
+| E2E 第二遍（同链，中间无 bootstrap） | `pnpm e2e` | **33 passed (1.3m)**；快照 `0x4`–`0x7`（id 连续 = 链未重启） |
+| 杀链自愈 | `make -C ../anvil stop PORT=8555 && pnpm e2e` | 自动 `make -C ../anvil bootstrap PORT=8555`（pid 38606 → 46275），**33 passed (1.3m)**，快照重新从 `0x0` 开始 |
+| 人工链 8545 未被触碰 | 两遍前后 `cast block-number` / `cast nonce 0x7099…` / `cast rpc anvil_getAutomine` / `cat ../anvil/.anvil/anvil.pid` | **969 → 969；69 → 69；true → true；`13323 127.0.0.1 8545` 不变**（全程只读查询，未重启 pid 13323） |
+| 8545 硬拒绝 | `E2E_ANVIL_RPC=http://127.0.0.1:8545 pnpm e2e` | **立即 exit 1**：`[e2e-chain] REFUSING TO RUN: ... the developer's personal chain`，不发起任何 RPC；直接 `playwright test` 由 `playwright.config.ts` 同样拒绝 |
+| 地址簿复用 | 8555 clean bootstrap 后 `git -C ../anvil status --short` | 导出/ABI 无 diff（clean bootstrap 从 deployer nonce 0 开始，地址与提交的 `src/config/deployments/anvil31337_dev.json` 一致）；仅 `export/VERIFIED.md` 被重写（报告里的 rpc 与示例命令跟着端口变成 8555，另有时间戳），已还原 HEAD——提交的报告必须记录规范链 8545，不能让人按 8555 手工复查 |
+| 发布包不泄漏 | `unset E2E_ANVIL_RPC; pnpm build`（vite 产物） | `dist/` 中 `8555` 命中 **0**；`vite.config.ts` / `scripts/release-to.mjs` 未改动；dev 变体地址簿仍只含人工链 RPC `8545` |
+
+机制：`scripts/e2e-chain.mjs` 是 `pnpm e2e` 的入口——解析 `E2E_ANVIL_RPC`（默认 `http://127.0.0.1:8555`），命中本机 `:8545` 立即失败；未显式设置时确保 8555 上有一条 bootstrapped 链（首次 `make -C ../anvil bootstrap PORT=8555`，之后复用；链脏/被强杀时 `pnpm e2e:reset-chain`）。`playwright.config.ts` 把同一端点作为 `VITE_ANVIL_RPC` 烘进构建，页面与 spec 永远同链。anvil 仓按端口隔离运行时状态：8545 保持平铺 `.anvil/`，其它端口用 `.anvil/<port>/`，`make stop/clean PORT=8555` 不可能碰到 8545。操作见 [e2e/README.md](../../e2e/README.md)，环境事实见 [STATUS](../STATUS.md) §3.2/§6.1。
+
 
 ## 4 未覆盖
 
@@ -120,7 +140,7 @@ VITE_ENV=dev pnpm build    # 走查产物；门禁 160.0 kB WARN
 pnpm preview --port 4400 --strictPort
 node docs/product/acceptance/run.mjs      # 结果写入 acceptance/results.json
 
-# 4) 既有 e2e（干净链上可重复；按文件快照/回滚，两条命令之间不需要 bootstrap）
+# 4) e2e：独立 8555 自动化链（首次 pnpm e2e 自举，之后复用；按文件快照/回滚，连跑两遍）
 pnpm e2e
 pnpm e2e
 ```
