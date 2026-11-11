@@ -7,6 +7,7 @@ import { copy } from '@/shared/config/copy-pages';
 import { cache } from '@/shared/lib/cache';
 import { describeMintError } from '@/features/mint-identity/lib/mint-errors';
 import { useNextNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
+import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 
 type HexHash = `0x${string}`;
 type PendingKind = 'approve' | 'mint';
@@ -34,6 +35,16 @@ export type MintTxStage = 'idle' | 'wallet' | 'pending';
 export interface MintTransactionError {
   readonly action: PendingKind;
   readonly message: string;
+  /** Send-time recovery family: nonce mismatch / stale wallet block view. */
+  readonly kind?: 'nonce' | 'staleBlock';
+}
+
+type ResendTarget =
+  | { readonly kind: 'approve'; readonly amount: bigint }
+  | { readonly kind: 'mint'; readonly name: string };
+
+function recoveryKindFor(cause: unknown): 'nonce' | 'staleBlock' | undefined {
+  return txSendRecoveryKind(cause);
 }
 
 export interface MintTransactionState {
@@ -105,6 +116,7 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
   const [isApproved, setIsApproved] = useState(false);
   const [approvedAmount, setApprovedAmount] = useState<bigint | null>(null);
   const [error, setError] = useState<MintTransactionError | null>(null);
+  const lastAttemptRef = useRef<ResendTarget | null>(null);
 
   const onConfirmedRef = useRef<(() => void) | undefined>(onConfirmed);
   useEffect(() => {
@@ -208,6 +220,7 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
     if (memberNftAddress === undefined || paymentTokenAddress === undefined || amount <= 0n) {
       return;
     }
+    lastAttemptRef.current = { kind: 'approve', amount };
     setError(null);
     setIsApproved(false);
     setWalletAction('approve');
@@ -224,9 +237,11 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
         });
         setPending({ kind: 'approve', hash, amount });
       } catch (cause) {
+        const recovery = recoveryKindFor(cause);
         setError({
           action: 'approve',
           message: describeMintError(cause, { paymentSymbol: paymentTokenSymbol }),
+          ...(recovery !== undefined ? { kind: recovery } : {}),
         });
       } finally {
         setWalletAction(null);
@@ -236,6 +251,7 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
 
   const mint = (name: string, nonce?: number): void => {
     if (memberNftAddress === undefined || name.length === 0) return;
+    lastAttemptRef.current = { kind: 'mint', name };
     setError(null);
     setWalletAction('mint');
     void (async () => {
@@ -251,9 +267,11 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
         if (scope !== null) cache.set(scope, MINT_TASK_KEY, { hash, name });
         setPending({ kind: 'mint', hash, name });
       } catch (cause) {
+        const recovery = recoveryKindFor(cause);
         setError({
           action: 'mint',
           message: describeMintError(cause, { paymentSymbol: paymentTokenSymbol }),
+          ...(recovery !== undefined ? { kind: recovery } : {}),
         });
       } finally {
         setWalletAction(null);
@@ -262,16 +280,23 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
   };
 
   const resubmit = (): void => {
-    if (pending === null) return;
-    const target = pending;
+    const target: ResendTarget | null =
+      pending === null
+        ? lastAttemptRef.current
+        : pending.kind === 'approve'
+          ? { kind: 'approve', amount: pending.amount ?? 0n }
+          : pending.name !== undefined
+            ? { kind: 'mint', name: pending.name }
+            : lastAttemptRef.current;
+    if (target === null) return;
     void (async () => {
       const nonce = await readNextNonce();
       if (nonce === undefined) {
         setError({ action: target.kind, message: copy.txWatch.nonceUnavailable });
         return;
       }
-      if (target.kind === 'approve') approve(target.amount ?? 0n, nonce);
-      else mint(target.name ?? '', nonce);
+      if (target.kind === 'approve') approve(target.amount, nonce);
+      else mint(target.name, nonce);
     })();
   };
 

@@ -25,6 +25,46 @@ describe('describeMintError', () => {
     );
   });
 
+  it('maps a stale wallet nonce to the actionable nonce copy, never to generic', () => {
+    for (const message of [
+      'nonce too low',
+      'nonce has already been used',
+      'Nonce too high. Expected nonce to be 3 but got 68.',
+      'replacement transaction underpriced',
+      'already known',
+    ]) {
+      const described = describeMintError({
+        name: 'TransactionExecutionError',
+        cause: { message },
+      });
+      expect(described).toBe(copy.txWatch.bodies.nonceGap);
+      expect(described).not.toBe(copy.errors.generic);
+    }
+    const viemShape = Object.assign(new Error('nonce too low'), { name: 'NonceTooLowError' });
+    expect(describeMintError(viemShape)).toBe(copy.txWatch.bodies.nonceGap);
+  });
+
+  it('maps a stale wallet block view to the reload copy, never to generic', () => {
+    const described = describeMintError({
+      name: 'TransactionExecutionError',
+      cause: {
+        message: 'Invalid params: BlockOutOfRangeError: block height is 970 but requested was 982',
+      },
+    });
+    expect(described).toBe(copy.txWatch.staleBlock);
+    expect(described).not.toBe(copy.errors.generic);
+    expect(describeMintError({ name: 'BlockOutOfRangeError' })).toBe(copy.txWatch.staleBlock);
+  });
+
+  it('does not regress user rejection or insufficient funds', () => {
+    expect(describeMintError({ code: 4001, message: 'user rejected' })).toBe(
+      copy.mintIdentity.errors.rejected,
+    );
+    expect(describeMintError({ message: 'insufficient funds for gas' })).toBe(
+      copy.errors.insufficientFunds,
+    );
+  });
+
   it('falls back to the registry / shared copy without leaking revert data', () => {
     const message = describeMintError(revert('0xffffffff'));
     expect(message).toBe(copy.errors.contractGeneric);

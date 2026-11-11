@@ -6,6 +6,7 @@ import {
   isUserRejection,
   toUserMessage,
 } from '@/shared/lib/errors';
+import { isTxSendNonceError, isTxStaleBlockError } from '@/shared/lib/tx-send-errors';
 
 export interface MintErrorContext {
   readonly paymentSymbol?: string | undefined;
@@ -28,6 +29,10 @@ const ERC20_INSUFFICIENT_BALANCE = '0xe450d38c';
  */
 export function describeMintError(error: unknown, context: MintErrorContext = {}): string {
   if (isUserRejection(error)) return copy.mintIdentity.errors.rejected;
+  // A stale wallet nonce is not 「请稍后重试」: give the actionable wallet copy
+  // and let the page offer 「重新提交」 with an explicit on-chain nonce.
+  if (isTxSendNonceError(error)) return copy.txWatch.bodies.nonceGap;
+  if (isTxStaleBlockError(error)) return copy.txWatch.staleBlock;
 
   const data = extractRevertData(error);
   const selector = data !== null ? data.slice(0, 10).toLowerCase() : null;

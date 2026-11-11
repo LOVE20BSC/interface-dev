@@ -12,6 +12,7 @@ import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { StickyAction } from '@/shared/ui/sticky-action';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 import { useAirdropEligibility } from '@/entities/airdrop/model/use-airdrop-eligibility';
 import { approveAmountFor } from '@/features/mint-identity/lib/approve-amount';
 import { describeMintError } from '@/features/mint-identity/lib/mint-errors';
@@ -87,6 +88,9 @@ export function MintIdentityPanel({
 }: MintIdentityPanelProps) {
   const [name, setName] = useState('');
   const [preflightError, setPreflightError] = useState<string | null>(null);
+  // A stale wallet chain view can also break the eth_call preflight; the card
+  // then needs the same 「刷新」 action as a send-time stale-block failure.
+  const [preflightStaleBlock, setPreflightStaleBlock] = useState(false);
   // The eth_call preflight is async; without this a double tap could send two mints.
   const [isPreflighting, setIsPreflighting] = useState(false);
 
@@ -148,6 +152,7 @@ export function MintIdentityPanel({
   const handleMint = async () => {
     if (!canAttemptMint || isPreflighting) return;
     setPreflightError(null);
+    setPreflightStaleBlock(false);
     setIsPreflighting(true);
     try {
       // §3.3: the eth_call simulation is authoritative for the name at submit time.
@@ -156,6 +161,7 @@ export function MintIdentityPanel({
         setPreflightError(
           describeMintError(result.error, { paymentSymbol: config.paymentTokenSymbol }),
         );
+        setPreflightStaleBlock(txSendRecoveryKind(result.error) === 'staleBlock');
         quote.refetch();
         return;
       }
@@ -168,6 +174,7 @@ export function MintIdentityPanel({
   const handleNameChange = (value: string) => {
     setName(value);
     setPreflightError(null);
+    setPreflightStaleBlock(false);
     tx.clearError();
   };
 
@@ -302,6 +309,14 @@ export function MintIdentityPanel({
         : copy.mintIdentity.ladder.mint;
 
   const errorMessage = preflightError ?? tx.error?.message ?? null;
+  const recoveryKind =
+    tx.error?.kind ?? (preflightStaleBlock ? ('staleBlock' as const) : undefined);
+  const recoveryAction =
+    recoveryKind === 'nonce'
+      ? { run: tx.resubmit, label: copy.txWatch.actions.resubmit }
+      : recoveryKind === 'staleBlock'
+        ? { run: () => window.location.reload(), label: copy.txWatch.actions.reload }
+        : null;
   const retryFailedWrite = () => {
     if (tx.error?.action === 'approve' && cost !== undefined) {
       tx.approve(approveAmountFor(cost));
@@ -491,15 +506,17 @@ export function MintIdentityPanel({
             className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger"
           >
             <p>{errorMessage}</p>
-            {tx.error !== null && (tx.error.action === 'approve' ? isNameReady : canAttemptMint) ? (
+            {recoveryAction !== null ||
+            (tx.error !== null &&
+              (tx.error.action === 'approve' ? isNameReady : canAttemptMint)) ? (
               <Button
                 variant="secondary"
                 size="sm"
                 className="mt-2"
-                onClick={retryFailedWrite}
+                onClick={recoveryAction !== null ? recoveryAction.run : retryFailedWrite}
                 leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
               >
-                {copy.mintIdentity.states.retry}
+                {recoveryAction !== null ? recoveryAction.label : copy.mintIdentity.states.retry}
               </Button>
             ) : null}
           </div>
