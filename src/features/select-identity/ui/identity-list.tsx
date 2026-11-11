@@ -66,8 +66,6 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
     setBusy(false);
   };
   const count = identity.balance !== undefined ? identity.balance.toString() : UNKNOWN;
-  const currentName =
-    identity.selected !== null ? (identity.selected.name ?? UNKNOWN) : copy.common.notSelected;
 
   if (identity.status === 'loading') {
     return <ListSkeleton />;
@@ -94,7 +92,6 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
   if (identity.status === 'empty') {
     return (
       <div className="space-y-4">
-        <Summary count={count} current={copy.common.notSelected} />
         <p className="text-sm leading-6 text-muted">{copy.pages.myNft.intro}</p>
         {successRecipient !== null ? <TransferReceipt recipient={successRecipient} /> : null}
         <div className="rounded-3xl border border-dashed border-line bg-surface/70 px-5 py-8 text-center">
@@ -118,7 +115,7 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
   if (identity.status === 'needs-selection' || identity.status === 'ready') {
     return (
       <div className="space-y-4">
-        <Summary count={count} current={currentName} />
+        <Summary count={count} />
         <p className="text-sm leading-6 text-muted">{copy.pages.myNft.intro}</p>
         {identity.isInvalidated ? <InvalidatedNotice /> : null}
         {busy ? (
@@ -250,14 +247,11 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
   return null;
 }
 
-function Summary({ count, current }: { readonly count: string; readonly current: string }) {
+function Summary({ count }: { readonly count: string }) {
   return (
-    <div>
-      <h2 className="text-xl font-semibold tracking-tight text-foreground">
-        {copy.pages.myNft.summary(count)}
-      </h2>
-      <p className="mt-1 text-sm text-muted">{copy.pages.myNft.currentLabel(current)}</p>
-    </div>
+    <h2 className="text-xl font-semibold tracking-tight text-foreground">
+      {copy.pages.myNft.summary(count)}
+    </h2>
   );
 }
 
@@ -286,9 +280,13 @@ function RowActions({
   return (
     <>
       {current ? (
-        <Button size="sm" variant="secondary" disabled aria-label={copy.pages.myNft.currentAction}>
-          {copy.pages.myNft.currentAction}
-        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled
+          aria-label={copy.pages.myNft.currentAction}
+          leadingIcon={<Check className="h-4 w-4" aria-hidden="true" />}
+        />
       ) : (
         <Button size="sm" variant="secondary" onClick={onUse}>
           {copy.pages.myNft.useAction}

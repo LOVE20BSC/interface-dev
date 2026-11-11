@@ -101,12 +101,10 @@ export const copy = {
     disconnect: '断开连接',
     footer: '身份保存在这台设备；换浏览器需要重新选择。',
     menuTitle: '钱包与身份',
-    menuDescription: '钱包地址、当前身份与余额。',
     noWalletTitle: '没有检测到钱包',
-    noWalletBody: '当前浏览器没有可用的钱包。你可以换一个入口打开本页。',
-    noWalletStepInApp: '在手机钱包 App 的内置浏览器中打开本页。',
-    noWalletStepInstall: '或在电脑浏览器安装钱包扩展后刷新。',
-    noWalletStepRefresh: '如果已经在钱包里，仍然看不到，请关闭应用内浏览器再试。',
+    noWalletBody: '你可以换一个入口打开本页。',
+    noWalletStepInApp: '在手机钱包 App 的内置浏览器中打开本页；已经在内置浏览器里，关掉再打开。',
+    noWalletStepInstall: '在电脑浏览器安装钱包扩展后刷新。',
     noWalletCopyLink: '复制本页链接',
     noWalletDismiss: '知道了',
     connectErrorTitle: '连接没有完成',
@@ -125,7 +123,6 @@ export const copy = {
     notWired: '未接入',
     switchHint: '切换社区不会切换网络，也不会刷新页面。',
     menuTitle: '代币社区',
-    menuDescription: '最近访问与代币树。',
     chipAria: (symbol: string) => `当前代币社区 ${symbol}，打开社区菜单`,
     unknownTitle: '没有找到这个代币社区',
     unknownDescription: (symbol: string) =>
@@ -227,15 +224,15 @@ export const copy = {
   placeholders: {
     gov: {
       title: '治理',
-      body: '用身份对提案投票，按治理轮结算。M0 只做身份与兑换，这一页还没有内容。',
+      body: '用身份对提案投票，按治理轮结算。M0 只做身份与兑换。',
     },
     act: {
       title: '行动',
-      body: '链群行动、链群服务、LP 行动将在后续版本开放。',
+      body: '链群行动、链群服务、LP 行动。',
     },
     group: {
       title: '链群',
-      body: '链群是成员身份组成的协作单位，后续版本开放。',
+      body: '链群是成员身份组成的协作单位。',
     },
     me: {
       title: '我的',
@@ -248,7 +245,7 @@ export const copy = {
   banners: {
     testnet: '测试网 · 没有真实价值',
     buildMismatchTitle: '有新版本，请刷新',
-    buildMismatchBody: '页面资源已经更新。刷新后继续，当前输入会丢失。',
+    buildMismatchBody: '当前输入会丢失。',
     buildMismatchAction: '刷新页面',
     buildMismatchClose: '稍后',
   },
@@ -274,7 +271,7 @@ export const copy = {
   },
   notFound: {
     title: '页面不存在',
-    body: '这个地址没有对应的页面，可能是链接过期或拼错了。',
+    body: '可能是链接过期或拼错了。',
     action: '回首页',
   },
   build: {

@@ -26,11 +26,7 @@ export interface MintIdentityPanelProps {
   readonly isConnected: boolean;
   readonly isWrongChain: boolean;
   readonly connectAction: ReactNode;
-  readonly wrongNetworkAction: ReactNode;
 }
-
-const TEXT_LINK =
-  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40';
 
 const NAME_CHECK_TONE: Record<MintNameStatus, string> = {
   empty: 'text-muted',
@@ -48,13 +44,13 @@ function StateCard({
   description,
   children,
 }: {
-  readonly title: string;
+  readonly title?: string;
   readonly description: string;
   readonly children: ReactNode;
 }) {
   return (
     <Card>
-      <CardTitle>{title}</CardTitle>
+      {title !== undefined ? <CardTitle>{title}</CardTitle> : null}
       <CardDescription>{description}</CardDescription>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">{children}</div>
     </Card>
@@ -84,7 +80,6 @@ export function MintIdentityPanel({
   isConnected,
   isWrongChain,
   connectAction,
-  wrongNetworkAction,
 }: MintIdentityPanelProps) {
   const [name, setName] = useState('');
   const [preflightError, setPreflightError] = useState<string | null>(null);
@@ -206,11 +201,7 @@ export function MintIdentityPanel({
 
   if (isWrongChain) {
     return (
-      <StateCard
-        title={copy.mintIdentity.states.wrongChainTitle}
-        description={copy.mintIdentity.states.wrongChainBody}
-      >
-        <div className="[&>button]:w-full sm:[&>button]:w-auto">{wrongNetworkAction}</div>
+      <StateCard description={copy.mintIdentity.states.wrongChainBody}>
         <Link to="/" className={buttonStyles('ghost', 'md', 'w-full sm:w-auto')}>
           {copy.mintIdentity.states.backHome}
         </Link>
@@ -337,7 +328,6 @@ export function MintIdentityPanel({
           type="text"
           value={name}
           onChange={(event) => handleNameChange(event.target.value)}
-          placeholder={copy.mintIdentity.name.placeholder}
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
@@ -419,7 +409,7 @@ export function MintIdentityPanel({
 
           {symbol !== undefined ? (
             <p className="mt-3 text-xs leading-5 text-muted">
-              {copy.mintIdentity.cost.note(symbol)}
+              {copy.mintIdentity.cost.note}
             </p>
           ) : null}
         </Card>
@@ -523,12 +513,6 @@ export function MintIdentityPanel({
             ) : null}
           </div>
         ) : null}
-
-        <div className="pt-1">
-          <Link to="/" className={TEXT_LINK}>
-            {copy.mintIdentity.states.backHome}
-          </Link>
-        </div>
 
         {/* The approve ladder dock is one subdued row taller than the reserved
             --sticky-action-height; this keeps the last content reachable. */}

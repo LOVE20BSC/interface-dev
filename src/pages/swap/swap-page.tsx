@@ -1,6 +1,5 @@
 import { useAccount } from 'wagmi';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
-import { WrongNetworkButton } from '@/features/connect-wallet/ui/wrong-network-button';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
 import { SwapTokenPanel } from '@/features/swap-token/ui/swap-token-panel';
 
@@ -18,7 +17,6 @@ export function SwapPage() {
       isConnected={isConnected}
       isWrongChain={isWrongChain}
       connectAction={<ConnectWalletButton />}
-      wrongNetworkAction={<WrongNetworkButton />}
     />
   );
 }

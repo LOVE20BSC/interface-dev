@@ -346,7 +346,9 @@ test('swap: ETH → TestLOVE20 shows path/min-out and a receipt from the pair Sw
   const hash = (await page.getByTestId('swap-receipt-hash').innerText()).trim() as `0x${string}`;
   expect(hash).toMatch(/^0x[0-9a-f]{64}$/i);
   await expect(page.getByTestId('swap-receipt-path')).toContainText(`${NATIVE} → TestLOVE20`);
-  await expect(page.getByTestId('swap-receipt-min-check')).toContainText('实际到账不低于最少到账');
+  await expect(page.getByTestId('swap-receipt-min-check')).not.toContainText(
+    '实际到账不低于最少到账',
+  );
 
   const ledger = await ledgerFromReceipt(hash, GENESIS_PAIR, WETH);
   expect(actualText).toBe(`${displayAmount(ledger.amountOut)} TestLOVE20`);

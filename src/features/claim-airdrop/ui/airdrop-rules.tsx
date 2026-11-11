@@ -8,8 +8,10 @@ export interface AirdropRulesProps {
 
 /**
  * Low-weight rules fold (UX spec §3.4 block 3): why the distributed token is the
- * genesis token, where the share comes from, and why the amount changes. It is a
- * <details> element, not a primary surface, so it never competes with the CTA.
+ * genesis token, where the share comes from, and the contract address. Why the
+ * amount changes already sits directly under the estimate, so it is not repeated
+ * here. It is a <details> element, not a primary surface, so it never competes
+ * with the CTA.
  */
 export function AirdropRules({ symbol, airdropAddress }: AirdropRulesProps) {
   return (
@@ -20,7 +22,6 @@ export function AirdropRules({ symbol, airdropAddress }: AirdropRulesProps) {
       <ul className="mt-2 space-y-1.5 text-xs leading-5 text-muted">
         {symbol !== undefined ? <li>{copy.airdrop.rules.genesis(symbol)}</li> : null}
         <li>{copy.airdrop.rules.snapshot}</li>
-        <li>{copy.airdrop.rules.dynamic}</li>
         {airdropAddress !== undefined ? (
           <li className="flex flex-col gap-0.5">
             <span>{copy.airdrop.rules.contract}</span>

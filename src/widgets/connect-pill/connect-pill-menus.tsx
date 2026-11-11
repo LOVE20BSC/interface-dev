@@ -41,7 +41,6 @@ export function ConnectPillMenus({
           if (!open) onClose();
         }}
         title={copy.community.menuTitle}
-        description={copy.community.menuDescription}
         anchor={communityAnchor}
         align="start"
       >
@@ -61,7 +60,6 @@ export function ConnectPillMenus({
         if (!open) onClose();
       }}
       title={copy.wallet.menuTitle}
-      description={copy.wallet.menuDescription}
       anchor={walletAnchor}
     >
       <WalletMenuContent

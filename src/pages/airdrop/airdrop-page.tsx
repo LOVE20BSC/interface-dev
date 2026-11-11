@@ -1,6 +1,5 @@
 import { useAccount } from 'wagmi';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
-import { WrongNetworkButton } from '@/features/connect-wallet/ui/wrong-network-button';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
 import { ClaimAirdropPanel } from '@/features/claim-airdrop/ui/claim-airdrop-panel';
 
@@ -18,7 +17,6 @@ export function AirdropPage() {
       isConnected={isConnected}
       isWrongChain={isWrongChain}
       connectAction={<ConnectWalletButton />}
-      wrongNetworkAction={<WrongNetworkButton />}
     />
   );
 }

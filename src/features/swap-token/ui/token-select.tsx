@@ -187,8 +187,11 @@ function TokenList({
           <p className="px-2.5 py-2 text-xs text-muted">{copy.swap.searchLoading}</p>
         ) : null}
         {nothing ? <p className="px-2.5 py-2 text-xs text-muted">{copy.swap.searchEmpty}</p> : null}
-        {nothing && communityTokens.length === 0 ? (
-          <p className="px-2.5 pt-1 text-xs text-muted">{copy.swap.noCommunityTokens}</p>
+        {query.length === 0 &&
+        communityTokens.length === 0 &&
+        !isLoading &&
+        searchStatus !== 'loading' ? (
+          <p className="px-2.5 py-2 text-xs text-muted">{copy.swap.noCommunityTokens}</p>
         ) : null}
       </div>
 

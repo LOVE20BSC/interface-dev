@@ -64,7 +64,14 @@ describe('ConnectWalletButton', () => {
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('没有检测到钱包')).toBeInTheDocument();
-    expect(screen.getByText('在手机钱包 App 的内置浏览器中打开本页。')).toBeInTheDocument();
+    expect(screen.getByText('你可以换一个入口打开本页。')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        '在手机钱包 App 的内置浏览器中打开本页；已经在内置浏览器里，关掉再打开。',
+      ),
+    ).toBeInTheDocument();
+    // The old third step (「如果已经在钱包里…」) is folded into step 1.
+    expect(screen.queryByText(/如果已经在钱包里/)).toBeNull();
     expect(screen.getByRole('button', { name: '复制本页链接' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '知道了' })).toBeInTheDocument();
   });

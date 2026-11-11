@@ -7,7 +7,7 @@ export interface MenuLayerProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly title: string;
-  readonly description: string;
+  readonly description?: string;
   readonly anchor: HTMLElement | null;
   readonly align?: 'start' | 'center' | 'end';
   readonly children: ReactNode;

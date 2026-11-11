@@ -22,7 +22,6 @@ export interface ClaimAirdropPanelProps {
   readonly isConnected: boolean;
   readonly isWrongChain: boolean;
   readonly connectAction: ReactNode;
-  readonly wrongNetworkAction: ReactNode;
 }
 
 const TEXT_LINK =
@@ -88,7 +87,6 @@ export function ClaimAirdropPanel({
   isConnected,
   isWrongChain,
   connectAction,
-  wrongNetworkAction,
 }: ClaimAirdropPanelProps) {
   const claim = useAirdropClaim();
   const tx = useAirdropClaimTransaction({
@@ -134,10 +132,8 @@ export function ClaimAirdropPanel({
   if (isWrongChain) {
     return (
       <StatusCard meta={meta}>
-        <CardTitle>{copy.airdrop.states.wrongChainTitle}</CardTitle>
         <CardDescription>{copy.airdrop.states.wrongChainBody}</CardDescription>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="[&>button]:w-full sm:[&>button]:w-auto">{wrongNetworkAction}</div>
           <Link to="/" className={buttonStyles('ghost', 'md', 'w-full sm:w-auto')}>
             {copy.airdrop.states.backHome}
           </Link>

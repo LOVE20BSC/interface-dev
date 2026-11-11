@@ -25,7 +25,6 @@ export interface SwapInfoProps {
   readonly onSelectSlippage: (percent: number, mode: 'preset' | 'custom') => void;
   readonly onCustomSlippageChange: (value: string) => void;
   readonly priceImpactBps: number | undefined;
-  readonly ageSeconds: number;
   readonly remainingSeconds: number;
   readonly isExpired: boolean;
   readonly isFetching: boolean;
@@ -80,7 +79,6 @@ export function SwapInfo(props: SwapInfoProps) {
     onSelectSlippage,
     onCustomSlippageChange,
     priceImpactBps,
-    ageSeconds,
     remainingSeconds,
     isExpired,
     isFetching,
@@ -217,7 +215,7 @@ export function SwapInfo(props: SwapInfoProps) {
       {!isWrap && amountOut !== undefined ? (
         <div className="flex items-center justify-between gap-3 border-t border-line/70 pt-2">
           <span className="text-[11px] leading-5 text-muted">
-            {isExpired ? copy.swap.expired : copy.swap.freshness(String(ageSeconds))}
+            {isExpired ? copy.swap.expired : null}
           </span>
           <span className="text-[11px] leading-5 text-muted" data-testid="swap-quote-freshness">
             {isExpired

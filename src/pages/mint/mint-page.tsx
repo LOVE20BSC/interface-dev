@@ -1,6 +1,5 @@
 import { useAccount } from 'wagmi';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
-import { WrongNetworkButton } from '@/features/connect-wallet/ui/wrong-network-button';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
 import { MintIdentityPanel } from '@/features/mint-identity/ui/mint-identity-panel';
 
@@ -17,7 +16,6 @@ export function MintPage() {
       isConnected={isConnected}
       isWrongChain={isWrongChain}
       connectAction={<ConnectWalletButton />}
-      wrongNetworkAction={<WrongNetworkButton />}
     />
   );
 }

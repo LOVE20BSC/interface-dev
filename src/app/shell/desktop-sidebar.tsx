@@ -104,9 +104,6 @@ export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
               <Badge tone={APP_ENV.isProd ? 'success' : 'warning'}>
                 {variantLabel(APP_ENV.variant)}
               </Badge>
-              {!APP_ENV.isProd ? (
-                <span className="text-[10px] text-muted">{copy.common.testnet}</span>
-              ) : null}
             </div>
             <p className="font-mono text-[10px] text-muted">
               {copy.build.version(formatBuildId(BUILD_ID))}

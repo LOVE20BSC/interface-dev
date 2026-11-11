@@ -201,19 +201,21 @@ test('my-nft: card list and local selection without a transaction', async ({ pag
   await connect(page);
 
   await expect(page.getByText('持有 1 个身份')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('当前：未选择')).toBeVisible();
+  await expect(page.getByRole('button', { name: '当前身份' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '使用此身份' })).toBeVisible();
   await shot(page, 'my-nft-list.png');
 
   await page.getByRole('button', { name: '使用此身份' }).click();
-  await expect(page.getByText(`当前：${SEEDED_NAME}`)).toBeVisible();
+  // The row keeps its 当前 pill + tint; the disabled button carries the state
+  // only as its accessible name (the visible duplicate is gone).
+  await expect(page.getByText('当前', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '当前身份' })).toBeDisabled();
   // No wallet confirmation appeared: selection is a local cache write.
   await expect(page.getByRole('button', { name: '打开钱包与身份菜单' })).toBeVisible();
   await shot(page, 'my-nft-selected.png');
 
   await page.reload();
-  await expect(page.getByText(`当前：${SEEDED_NAME}`)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('当前', { exact: true })).toBeVisible({ timeout: 15_000 });
 });
 
 test('identity cache is cleared when ownerOf belongs to someone else', async ({ page }) => {
@@ -240,8 +242,10 @@ test('my-nft: empty wallet gets the mint identity next step', async ({ page }) =
   await page.goto('/my-nft');
   await connect(page);
 
-  await expect(page.getByText('持有 0 个身份')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('你还没有身份。')).toBeVisible();
+  // Empty state: no summary bar above the card (「持有 0 个身份」 was the same
+  // fact as 「你还没有身份。」).
+  await expect(page.getByText('你还没有身份。')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('持有 0 个身份')).toHaveCount(0);
   await expect(page.getByRole('link', { name: '铸造身份' })).toHaveAttribute('href', '/mint');
 });
 

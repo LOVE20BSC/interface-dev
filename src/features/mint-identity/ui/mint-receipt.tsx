@@ -59,12 +59,6 @@ function ReceiptBody({ receipt, paymentSymbol, paymentDecimals, onMintAnother }:
 
       <dl className="space-y-2.5 rounded-2xl border border-line bg-slate-50/70 p-3 text-sm">
         <div className="flex items-start justify-between gap-3">
-          <dt className="shrink-0 text-muted">{copy.mintIdentity.receipt.nameLabel}</dt>
-          <dd className="min-w-0 break-all text-right font-medium text-foreground">
-            {receipt.name}
-          </dd>
-        </div>
-        <div className="flex items-start justify-between gap-3">
           <dt className="shrink-0 text-muted">{copy.mintIdentity.receipt.burnedLabel}</dt>
           <dd className="text-right font-medium text-foreground" data-testid="mint-receipt-burned">
             {burned}

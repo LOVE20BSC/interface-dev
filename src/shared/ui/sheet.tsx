@@ -8,7 +8,7 @@ export interface SheetProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly title: string;
-  readonly description?: string;
+  readonly description?: string | undefined;
   readonly children: ReactNode;
   /** Build-version mismatch and other blocking states set this to false. */
   readonly dismissible?: boolean;

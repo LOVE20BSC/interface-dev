@@ -94,7 +94,7 @@ export function MintFundsBranch({
   return (
     <Card className="border-warning/25 bg-warning-soft/30">
       <p className="text-sm leading-6 text-foreground">
-        {copy.mintIdentity.branch.swap(paymentSymbol)}
+        {copy.mintIdentity.branch.swap()}
       </p>
       <Link to={swapHref} className={buttonStyles('primary', 'lg', 'mt-4 w-full')}>
         {copy.mintIdentity.branch.swapCta}

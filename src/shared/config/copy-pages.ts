@@ -21,8 +21,6 @@ export const copy = {
       title: '我的 NFT',
       intro: '一个 NFT 就是一个身份，可以在多个社区使用。换钱包不会改身份，只有转让才换控制者。',
       summary: (count: string) => `持有 ${count} 个身份`,
-      currentLabel: (name: string) => `当前：${name}`,
-      currentNone: '当前：未选择',
       tableNumber: '编号',
       tableName: '名称',
       tableActions: '操作',
@@ -45,6 +43,7 @@ export const copy = {
       busyReason: '有一个操作正在进行',
       invalidatedRow: '已失效',
       disconnectedTitle: '连接钱包后查看你的身份。',
+      disconnectedBody: '没有身份也能先看看这里能做什么。',
       emptyTitle: '你还没有身份。',
       emptyBody: '铸造需要一个名字和少量 LOVE20。',
       emptyMint: '铸造身份',
@@ -83,7 +82,6 @@ export const copy = {
   mintIdentity: {
     name: {
       label: '给身份起个名字',
-      placeholder: '给身份起个名字',
       bytes: (used: string, max: string) => `${used}/${max} 字节`,
       rule: '中文 3 字节、英文与数字 1 字节；名字越短，价格越高',
       testRule: '名称必须以 Test 开头',
@@ -95,7 +93,7 @@ export const copy = {
           memberId === undefined ? '✗ 这个名字已经被用了' : `✗ 这个名字已经被用了（#${memberId}）`,
         tooLong: (maxBytes: string) => `✗ 太长了（最多 ${maxBytes} 字节）`,
         invalid: '✗ 含有不可用的字符',
-        prefix: '✗ 名称必须以 Test 开头',
+        prefix: '✗ 还没加 Test 前缀',
         error: '暂时检查不了这个名字',
         retry: '重新检查',
       },
@@ -107,8 +105,7 @@ export const copy = {
       balanceLabelFallback: '余额',
       swapLink: '去兑换代币',
       short: (amount: string, symbol: string) => `余额不足，还需要 ${amount} ${symbol}`,
-      note: (symbol: string) =>
-        `费用以创世代币 ${symbol} 计价，与当前社区无关；价格随已铸造数量变化，提交时以链上为准。`,
+      note: '价格随已铸造数量变化，提交时以链上为准。',
       readFailed: '价格暂时读不到',
     },
     branch: {
@@ -117,7 +114,7 @@ export const copy = {
           ? '你还有空投份额可以铸造，铸造后就够了。'
           : `你还有空投份额可以铸造，预计 ${amount} ${symbol}，铸造后就够了。`,
       airdropCta: '空投铸造',
-      swap: (symbol: string) => `${symbol} 不够。可以用 ${NATIVE_SYMBOL} 换一些，再回来铸造。`,
+      swap: () => `可以用 ${NATIVE_SYMBOL} 换一些，再回来铸造。`,
       swapCta: `用 ${NATIVE_SYMBOL} 兑换`,
       unknown: '暂时确认不了你的空投资格。',
       retry: '重试',
@@ -142,13 +139,12 @@ export const copy = {
     receipt: {
       title: '铸造成功',
       memberId: (id: string) => `身份 #${id}`,
-      nameLabel: '名称',
       burnedLabel: '已销毁',
       value: (amount: string, symbol: string) => `${amount} ${symbol}`,
       hashLabel: '交易哈希',
       explorerLink: '在区块浏览器里查看',
       copyHash: '复制交易哈希',
-      notSelected: '这个身份还没有设为当前身份，到「我的 NFT」里选择它。',
+      notSelected: '还没有设为当前身份。',
       goMyNft: '去我的 NFT 使用这个身份',
       backHome: '回首页',
       mintAnother: '再铸造一个身份',
@@ -165,7 +161,6 @@ export const copy = {
       notDeployedBody: '地址簿里还没有 MemberNFT 合约。填充部署地址后才能铸造身份。',
       connectTitle: '连接钱包后铸造身份。',
       connectBody: '铸造需要一个名字和少量 LOVE20。连接后可以先看到价格和余额。',
-      wrongChainTitle: '当前钱包连接的网络不对。',
       wrongChainBody: '切换到这个应用使用的网络后再铸造。',
       errorTitle: '铸造配置暂时读不到。',
       errorBody: '网络可能不稳，你的资产没有变化。',
@@ -199,10 +194,9 @@ export const copy = {
       readErrorTitle: '空投数据暂时读不到',
       readErrorBody: '你的资产没有变化。',
       snapshotErrorTitle: '空投资格暂时读不到',
-      snapshotErrorBody: '你的资产没有变化。可以重试，或稍后再来。',
+      snapshotErrorBody: '你的资产没有变化。',
       notDeployedTitle: '空投铸造还没有接入',
       notDeployedBody: '地址簿里还没有 Airdrop 合约。接入后会先检查资格，再显示可铸造份额。',
-      wrongChainTitle: '当前钱包连接的网络不对。',
       wrongChainBody: '切换到这个应用使用的网络后再进行空投铸造。',
       ineligibleTitle: '这个钱包不在空投名单里。',
       ineligibleBody: '空投只面向快照时的参与者，不影响你现在参与。',
@@ -246,7 +240,6 @@ export const copy = {
       summary: '规则',
       genesis: (symbol: string) => `这次空投发的是首币 ${symbol}，和当前选择的社区无关。`,
       snapshot: '份额来自销毁活动快照，地址和份额在部署时固定。',
-      dynamic: '空投池余额和剩余份额会随着别人铸造而变化，所以金额是预计值；铸造时以链上为准。',
       contract: '空投合约地址',
     },
     pending: {
@@ -314,7 +307,7 @@ export const copy = {
     noCommunityTokens: '还没有发现社区代币。',
     rate: (from: string, rate: string, to: string) => `1 ${from} ≈ ${rate} ${to}`,
     rateWrap: (from: string, to: string) =>
-      `1 ${from} = 1 ${to}（包装/解包，不经过交易对，无手续费与价格影响）`,
+      `1 ${from} = 1 ${to}（包装/解包，不经过交易对）`,
     pathLabel: '路径',
     minOutLabel: '最少到账',
     feeNone: '无手续费（1:1 包装/解包）',
@@ -328,15 +321,13 @@ export const copy = {
     slippageRange: '自定义值需要在 0.01% 到 50% 之间。',
     feeLabel: '手续费率',
     feeChain: '以链上费率为准',
-    priceImpactHigh: (percent: string) => `价格影响约 ${percent}%，这笔兑换会明显改变池子价格。`,
-    freshness: (seconds: string) => `更新于 ${seconds} 秒前`,
+    priceImpactHigh: '这笔兑换会明显改变池子价格，继续前请确认。',
     freshnessCountdown: (seconds: string) => `${seconds}s 后更新`,
     expired: '报价已过期',
     quoteRefreshing: '正在更新报价…',
     states: {
       connectTitle: '连接钱包后兑换。',
       connectBody: '兑换需要钱包确认。连接后先读取余额与报价。',
-      wrongChainTitle: '当前钱包连接的网络不对。',
       wrongChainBody: '切换到这个应用使用的网络后再兑换。',
       unconfiguredTitle: '这个环境还没有配置兑换。',
       unconfiguredBody: '地址簿里还没有 Router、Factory 或 Launch。',
@@ -381,7 +372,6 @@ export const copy = {
       actualUnknown: '回执里没有读到实际到账，请以钱包余额为准。',
       pathLabel: '路径',
       minLabel: '最少到账',
-      minOk: '实际到账不低于最少到账。',
       minFailed: '实际到账低于最少到账，这笔交易本应被拒绝；请核对链上记录。',
       paidLabel: '实际支付',
       hashLabel: '交易哈希',
@@ -419,7 +409,7 @@ export const copy = {
   txWatch: {
     pending: {
       submitted: '交易已经提交，等待上链。',
-      remaining: (seconds: string) => `约 ${seconds} 秒后仍未确认时，可以重新查询或重新提交一笔。`,
+      remaining: (seconds: string) => `约 ${seconds} 秒后仍未确认，可以重新提交一笔。`,
       refresh: '重新查询',
     },
     titles: {
@@ -429,11 +419,11 @@ export const copy = {
       nonceGap: '这笔交易还卡在钱包里',
     },
     bodies: {
-      slow: '交易已经提交，但一直没有上链，网络可能比较拥堵。可以重新查询，或重新提交一笔。',
-      dropped: '链上没有找到这笔交易，它可能已经丢失。可以重新提交一笔，不需要再等。',
+      slow: '一直没有上链，网络可能比较拥堵。',
+      dropped: '链上没有找到这笔交易，它可能已经丢失。',
       replaced: '同一个交易位置已经由另一笔交易完成，这一笔不会再上链。以钱包里的最新记录为准。',
       nonceGap:
-        '钱包保存的交易记录和链上没有对上，这笔交易暂时不会上链。可以重新提交一笔；如果一直没有反应，请在钱包里清除活动记录，或先处理未完成的交易。',
+        '钱包保存的交易记录和链上没有对上，这笔交易暂时不会上链。如果一直没有反应，请在钱包里清除活动记录，或先处理未完成的交易。',
     },
     actions: {
       refresh: '重新查询',

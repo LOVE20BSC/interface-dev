@@ -88,13 +88,11 @@ function ReceiptBody({ record, onSwapAgain }: SwapReceiptProps) {
           data-testid="swap-receipt-min-check"
           role={belowMinOut ? 'alert' : undefined}
         >
-          {minKnown ? (
-            <p className={belowMinOut ? 'font-medium text-danger' : 'text-success'}>
-              {belowMinOut ? copy.swap.receipt.minFailed : copy.swap.receipt.minOk}
-            </p>
-          ) : (
+          {belowMinOut ? (
+            <p className="font-medium text-danger">{copy.swap.receipt.minFailed}</p>
+          ) : !minKnown ? (
             <p className="text-muted">{copy.swap.receipt.actualUnknown}</p>
-          )}
+          ) : null}
         </div>
         {paidText !== undefined ? (
           <div className="flex items-start justify-between gap-3">

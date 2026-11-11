@@ -20,7 +20,7 @@ export function MyNftPage() {
       {!isConnected ? (
         <EmptyState
           title={copy.pages.myNft.disconnectedTitle}
-          description={copy.identity.disconnectedBody}
+          description={copy.pages.myNft.disconnectedBody}
           action={<ConnectWalletButton />}
         />
       ) : (

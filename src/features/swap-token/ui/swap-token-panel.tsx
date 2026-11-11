@@ -5,7 +5,7 @@ import { ArrowDownUp, Check, RefreshCw } from '@/shared/ui/icons';
 import { NETWORK, configuredAddress, explorerAddressUrl, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { formatBpsPercent, formatTokenAmount, formatUnits } from '@/shared/lib/format';
+import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -38,7 +38,6 @@ export interface SwapTokenPanelProps {
   readonly isConnected: boolean;
   readonly isWrongChain: boolean;
   readonly connectAction: ReactNode;
-  readonly wrongNetworkAction: ReactNode;
 }
 
 const TEXT_LINK =
@@ -121,14 +120,14 @@ function StateCard({
   children,
   technical,
 }: {
-  readonly title: string;
+  readonly title?: string;
   readonly description: string;
   readonly children: ReactNode;
   readonly technical?: ReactNode;
 }) {
   return (
     <Card>
-      <CardTitle>{title}</CardTitle>
+      {title !== undefined ? <CardTitle>{title}</CardTitle> : null}
       <CardDescription>{description}</CardDescription>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         {children}
@@ -148,7 +147,6 @@ export function SwapTokenPanel({
   isConnected,
   isWrongChain,
   connectAction,
-  wrongNetworkAction,
 }: SwapTokenPanelProps) {
   const router = configuredAddress('router');
   const factory = configuredAddress('factory');
@@ -524,11 +522,7 @@ export function SwapTokenPanel({
 
   if (screen === 'wrong-chain') {
     return (
-      <StateCard
-        title={copy.swap.states.wrongChainTitle}
-        description={copy.swap.states.wrongChainBody}
-      >
-        <div className="[&>button]:w-full sm:[&>button]:w-auto">{wrongNetworkAction}</div>
+      <StateCard description={copy.swap.states.wrongChainBody}>
         <Link to="/" className={buttonStyles('ghost', 'md', 'w-full sm:w-auto')}>
           {copy.swap.states.backHome}
         </Link>
@@ -904,7 +898,6 @@ export function SwapTokenPanel({
           }}
           onCustomSlippageChange={handleSlippageCustom}
           priceImpactBps={impact}
-          ageSeconds={quote.ageSeconds}
           remainingSeconds={quote.remainingSeconds}
           isExpired={quote.isExpired}
           isFetching={quote.isFetching}
@@ -923,7 +916,7 @@ export function SwapTokenPanel({
           role="alert"
           className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger"
         >
-          <p>{copy.swap.priceImpactHigh(formatBpsPercent(impact ?? 0))}</p>
+          <p>{copy.swap.priceImpactHigh}</p>
           <Button
             variant="danger"
             size="sm"

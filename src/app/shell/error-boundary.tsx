@@ -2,7 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { RefreshCw } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy';
 import { buttonStyles } from '@/shared/ui/button';
-import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
+import { Card, CardTitle } from '@/shared/ui/card';
 import { hrefFor } from '@/app/router/base-path';
 
 interface Props {
@@ -34,7 +34,6 @@ export class AppErrorBoundary extends Component<Props, State> {
     return (
       <Card>
         <CardTitle>{copy.errors.generic}</CardTitle>
-        <CardDescription>{copy.errors.network}</CardDescription>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <button
             type="button"

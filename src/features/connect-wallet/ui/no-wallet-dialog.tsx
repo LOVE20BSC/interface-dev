@@ -40,7 +40,6 @@ export function NoWalletDialog({ open, onOpenChange }: NoWalletDialogProps) {
         <ol className="list-decimal space-y-2 pl-4 text-sm leading-6 text-foreground">
           <li>{copy.wallet.noWalletStepInApp}</li>
           <li>{copy.wallet.noWalletStepInstall}</li>
-          <li>{copy.wallet.noWalletStepRefresh}</li>
         </ol>
       </div>
       <div className="mt-4 flex flex-col gap-2">

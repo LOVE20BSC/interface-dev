@@ -187,7 +187,7 @@ test('mint: dev blocks a name that does not start with Test', async ({ page }) =
   await expect(input).toBeVisible({ timeout: 15_000 });
   await input.fill(NON_TEST_NAME);
 
-  await expect(page.getByText('✗ 名称必须以 Test 开头')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('✗ 还没加 Test 前缀')).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText('为了让测试身份和真实身份一眼能分开。')).toBeVisible();
   // The rule line is dev/test copy, and the old "contract adds Test" note is gone.
   await expect(page.getByText('名称必须以 Test 开头', { exact: true })).toBeVisible();
@@ -199,7 +199,7 @@ test('mint: dev blocks a name that does not start with Test', async ({ page }) =
 
   // Once the name satisfies the rule the local error disappears and the quote runs.
   await input.fill(`Test${NON_TEST_NAME}`);
-  await expect(page.getByText('✗ 名称必须以 Test 开头')).toHaveCount(0);
+  await expect(page.getByText('✗ 还没加 Test 前缀')).toHaveCount(0);
   await expect(page.getByText('✓ 可以用')).toBeVisible({ timeout: 10_000 });
 });
 
@@ -258,7 +258,7 @@ test('mint: insufficient balance without airdrop eligibility goes to 用 ETH 兑
   await input.fill(BRANCH_NAME);
 
   await expect(page.getByText('✓ 可以用')).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText('TestLOVE20 不够。可以用 ETH 换一些，再回来铸造。')).toBeVisible({
+  await expect(page.getByText('可以用 ETH 换一些，再回来铸造。')).toBeVisible({
     timeout: 20_000,
   });
 

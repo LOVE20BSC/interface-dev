@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { AlertTriangle } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { shortenAddress } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';
 import { Sheet } from '@/shared/ui/sheet';
 import type { MemberIdentity } from '@/entities/member-identity/model/use-member-identities';
@@ -128,13 +127,6 @@ function TransferForm({
       {phase === 'error' && errorMessage !== null ? (
         <p className="rounded-2xl border border-danger/20 bg-danger-soft/60 px-3 py-2 text-xs leading-5 text-danger">
           {errorMessage}
-        </p>
-      ) : null}
-
-      {phase === 'pending' ? (
-        <p className="text-xs leading-5 text-muted">
-          {copy.pages.myNft.transferring}
-          {recipient.length > 0 ? ` → ${shortenAddress(recipient)}` : ''}
         </p>
       ) : null}
 
