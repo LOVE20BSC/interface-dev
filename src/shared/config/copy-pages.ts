@@ -402,6 +402,39 @@ export const copy = {
       quoteFailed: '价格暂时读不到，没有发起交易。',
     },
   },
+  /**
+   * 交易确认的有界等待 (UX spec §4.2 / §4.4). Shared by all three write flows so a
+   * pending transaction can never become a dead end: inside the deadline the
+   * page offers 「重新查询」, after it the role="alert" card explains what happened
+   * and offers 「重新提交」 plus the wallet-activity cure for a nonce gap.
+   * No gas/approve/allowance/nonce/revert words and never raw hex or RPC errors.
+   */
+  txWatch: {
+    pending: {
+      submitted: '交易已经提交，等待上链。',
+      remaining: (seconds: string) => `约 ${seconds} 秒后仍未确认时，可以重新查询或重新提交一笔。`,
+      refresh: '重新查询',
+    },
+    titles: {
+      slow: '这笔交易还没有被确认',
+      dropped: '这笔交易还没有被确认',
+      replaced: '这笔交易已经被替换或取消',
+      nonceGap: '这笔交易还卡在钱包里',
+    },
+    bodies: {
+      slow: '交易已经提交，但一直没有上链，网络可能比较拥堵。可以重新查询，或重新提交一笔。',
+      dropped: '链上没有找到这笔交易，它可能已经丢失。可以重新提交一笔，不需要再等。',
+      replaced: '同一个交易位置已经由另一笔交易完成，这一笔不会再上链。以钱包里的最新记录为准。',
+      nonceGap:
+        '钱包保存的交易记录和链上没有对上，这笔交易暂时不会上链。可以重新提交一笔；如果一直没有反应，请在钱包里清除活动记录，或先处理未完成的交易。',
+    },
+    actions: {
+      refresh: '重新查询',
+      resubmit: '重新提交',
+      explorer: '在区块链浏览器查看',
+    },
+    nonceUnavailable: '暂时读不到链上状态，请稍后再试。',
+  },
   advanced: {
     summary: '高级',
     contractAddresses: '合约地址',
