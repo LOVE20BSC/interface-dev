@@ -82,8 +82,6 @@ function nameErrorCopy(status: MemberNameRecipientState['status']): string | nul
       return copy.transferIdentity.nameNotFound;
     case 'self':
       return copy.transferIdentity.nameSelf;
-    case 'capped':
-      return copy.transferIdentity.nameCapped;
     case 'error':
       return copy.transferIdentity.nameFailed;
     default:

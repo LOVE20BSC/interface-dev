@@ -8,8 +8,7 @@ import {
   type MemberNameReader,
 } from '@/features/transfer-identity/lib/member-name-recipient';
 
-export type MemberNameRecipientStatus =
-  'idle' | 'reading' | 'ok' | 'self' | 'not-found' | 'capped' | 'error';
+export type MemberNameRecipientStatus = 'idle' | 'reading' | 'ok' | 'self' | 'not-found' | 'error';
 
 export interface MemberNameRecipientState {
   readonly status: MemberNameRecipientStatus;
@@ -28,7 +27,7 @@ const IDLE: MemberNameRecipientState = {
   retry: () => {},
 };
 
-const NAME_DEBOUNCE_MS = 400;
+export const NAME_DEBOUNCE_MS = 400;
 
 /**
  * Session cache of name → id. Ownership is never cached: the drawer always
@@ -41,33 +40,20 @@ type PublicClientLike = NonNullable<ReturnType<typeof usePublicClient>>;
 
 function chainReader(client: PublicClientLike, address: HexAddress): MemberNameReader {
   return {
-    totalSupply: async () =>
+    memberId: async (name) =>
       (await client.readContract({
         address,
         abi: memberNftAbi,
-        functionName: 'totalSupply',
-      })) as bigint,
-    normalizeName: async (name) =>
-      (await client.readContract({
-        address,
-        abi: memberNftAbi,
-        functionName: 'normalizeName',
+        functionName: 'memberId',
         args: [name],
+      })) as bigint,
+    memberName: async (memberId) =>
+      (await client.readContract({
+        address,
+        abi: memberNftAbi,
+        functionName: 'memberName',
+        args: [memberId],
       })) as string,
-    memberNames: async (ids) => {
-      const results = await client.multicall({
-        allowFailure: true,
-        contracts: ids.map((id) => ({
-          address,
-          abi: memberNftAbi,
-          functionName: 'memberName' as const,
-          args: [id] as const,
-        })),
-      });
-      return results.map((entry) =>
-        entry.status === 'success' && typeof entry.result === 'string' ? entry.result : null,
-      );
-    },
     ownerOf: async (memberId) =>
       (await client.readContract({
         address,
@@ -105,10 +91,11 @@ function toState(
 }
 
 /**
- * 按身份 NFT 名字: the typed name is normalised by the contract and matched by
- * enumerating totalSupply()/memberName() in ≤100-id Multicall3 chunks, capped at
- * 1000 ids. The lookup runs once per debounced input (plus an explicit retry);
- * there is no polling or interval refetch.
+ * 按身份 NFT 名字: the typed name is resolved with the contract's O(1)
+ * `memberId(name)` getter (the contract normalises the input itself); the
+ * canonical on-chain name is then read for the confirmation gate. The lookup
+ * runs once per debounced input (plus an explicit retry); there is no polling
+ * or interval refetch.
  */
 export function useMemberNameRecipient(
   memberNftAddress: HexAddress | undefined,

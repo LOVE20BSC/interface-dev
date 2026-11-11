@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { BaseError, ContractFunctionRevertedError } from 'viem';
+import { memberNftAbi } from '@/config/abis';
 import {
-  NAME_SCAN_CAP,
-  NAME_SCAN_CHUNK,
   createMemberNameCache,
   normalizeMemberName,
   resolveMemberNameByName,
@@ -11,28 +11,45 @@ import {
 const SELF = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 const OTHER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
 
-/** In-memory chain: ids are 1-based, names[0] belongs to id 1. */
+/**
+ * In-memory chain keyed by normalised name, like MemberNFT.memberId(): the
+ * contract lowercases the input itself. Names keep their canonical casing, as
+ * `memberName(id)` returns the stored name.
+ */
 function readerWith(
-  names: readonly string[],
+  chain: Readonly<Record<string, { readonly id: bigint; readonly name: string }>>,
   overrides: Partial<MemberNameReader> = {},
-): MemberNameReader & { readonly chunks: readonly number[] } {
-  const chunks: number[] = [];
-  const reader: MemberNameReader = {
-    totalSupply: async () => BigInt(names.length),
-    // Mirrors MemberNFT.normalizeName (ASCII lowercasing only).
-    normalizeName: async (name) => normalizeMemberName(name),
-    memberNames: async (ids) => {
-      chunks.push(ids.length);
-      return ids.map((id) => names[Number(id) - 1] ?? null);
+): MemberNameReader {
+  return {
+    memberId: async (rawName) => chain[normalizeMemberName(rawName)]?.id ?? 0n,
+    memberName: async (memberId) => {
+      for (const entry of Object.values(chain)) {
+        if (entry.id === memberId) return entry.name;
+      }
+      return '';
     },
     ownerOf: async () => OTHER,
     ...overrides,
   };
-  return Object.assign(reader, { chunks });
+}
+
+const CHAIN = {
+  'testdev-member-1': { id: 2n, name: 'Testdev-member-1' },
+  'testdev-member-2': { id: 3n, name: 'Testdev-member-2' },
+};
+
+function revertedMemberId(): BaseError {
+  return new BaseError('call failed', {
+    cause: new ContractFunctionRevertedError({
+      abi: memberNftAbi,
+      functionName: 'memberId',
+      message: 'execution reverted',
+    }),
+  });
 }
 
 describe('normalizeMemberName', () => {
-  it('lowercases ASCII exactly like MemberNFT.normalizeName', () => {
+  it('lowercases ASCII exactly like MemberNFT._toLowerCase', () => {
     expect(normalizeMemberName('Testdev-MEMBER-1')).toBe('testdev-member-1');
     expect(normalizeMemberName('中文ABC')).toBe('中文abc');
     expect(normalizeMemberName(' already-lower ')).toBe(' already-lower ');
@@ -40,74 +57,64 @@ describe('normalizeMemberName', () => {
 });
 
 describe('resolveMemberNameByName', () => {
-  it('normalises the typed name before comparing memberName() results', async () => {
-    const reader = readerWith(['Testdev-member-0', 'Testdev-member-1', 'Other']);
-    await expect(resolveMemberNameByName('  TESTDEV-mEmBeR-1  ', SELF, reader)).resolves.toEqual({
+  it('resolves one id through the getter and reads its canonical on-chain name', async () => {
+    const reader = readerWith(CHAIN);
+    const memberId = vi.spyOn(reader, 'memberId');
+    const memberName = vi.spyOn(reader, 'memberName');
+    const ownerOf = vi.spyOn(reader, 'ownerOf');
+
+    await expect(
+      resolveMemberNameByName('  TESTDEV-mEmBeR-1  ', SELF, reader),
+    ).resolves.toEqual({
       status: 'ok',
       memberId: 2n,
       name: 'Testdev-member-1',
       address: OTHER,
     });
+
+    // One getter call, no enumeration, and the raw typed name goes to the
+    // contract because memberId() normalises internally.
+    expect(memberId).toHaveBeenCalledTimes(1);
+    expect(memberId).toHaveBeenCalledWith('TESTDEV-mEmBeR-1');
+    expect(memberName).toHaveBeenCalledWith(2n);
+    expect(ownerOf).toHaveBeenCalledWith(2n);
   });
 
-  it('stops at the first normalised match', async () => {
-    const reader = readerWith(['Testdev-member-1', 'Testdev-member-1-copy']);
-    const ownerOf = vi.fn(async () => OTHER);
-    const result = await resolveMemberNameByName('Testdev-MEMBER-1', SELF, {
-      ...reader,
-      ownerOf,
+  it('treats a 0 id as not-found without reading a name', async () => {
+    const reader = readerWith(CHAIN);
+    const memberName = vi.spyOn(reader, 'memberName');
+    const ownerOf = vi.spyOn(reader, 'ownerOf');
+
+    await expect(resolveMemberNameByName('missing-name', SELF, reader)).resolves.toEqual({
+      status: 'not-found',
     });
-    expect(result).toEqual({
-      status: 'ok',
-      memberId: 1n,
-      name: 'Testdev-member-1',
-      address: OTHER,
-    });
-    expect(ownerOf).toHaveBeenCalledTimes(1);
+    expect(memberName).not.toHaveBeenCalled();
+    expect(ownerOf).not.toHaveBeenCalled();
   });
 
-  it('reads totalSupply in chunks of at most 100 ids', async () => {
-    const names = Array.from({ length: 250 }, (_, index) => `Testdev-member-${index}`);
-    const reader = readerWith(names);
-    await expect(resolveMemberNameByName('Testdev-member-249', SELF, reader)).resolves.toEqual({
-      status: 'ok',
-      memberId: 250n,
-      name: 'Testdev-member-249',
-      address: OTHER,
+  it('treats a reverted getter as not-found', async () => {
+    const reader = readerWith(CHAIN, {
+      memberId: async () => {
+        throw revertedMemberId();
+      },
     });
-    expect(reader.chunks).toEqual([100, 100, 50]);
-    expect(Math.max(...reader.chunks)).toBeLessThanOrEqual(NAME_SCAN_CHUNK);
-  });
-
-  it('caps the scan at 1000 ids and degrades with capped', async () => {
-    const names = Array.from({ length: 1500 }, (_, index) => `Testdev-member-${index}`);
-    const reader = readerWith(names);
-    await expect(resolveMemberNameByName('not-here', SELF, reader)).resolves.toEqual({
-      status: 'capped',
-    });
-    expect(reader.chunks.reduce((sum, size) => sum + size, 0)).toBe(NAME_SCAN_CAP);
-    expect(reader.chunks).toHaveLength(NAME_SCAN_CAP / NAME_SCAN_CHUNK);
-  });
-
-  it('returns not-found when the whole collection was scanned', async () => {
-    const reader = readerWith(['Testdev-member-0', 'Testdev-member-1']);
-    await expect(resolveMemberNameByName('Testdev-member-9', SELF, reader)).resolves.toEqual({
+    await expect(resolveMemberNameByName('Testdev-member-1', SELF, reader)).resolves.toEqual({
       status: 'not-found',
     });
   });
 
-  it('returns self when the matched id belongs to the connected wallet', async () => {
-    const reader = readerWith(['Testdev-member-1'], { ownerOf: async () => SELF });
+  it('returns self when the resolved id belongs to the connected wallet', async () => {
+    const reader = readerWith(CHAIN, { ownerOf: async () => SELF });
     await expect(resolveMemberNameByName('testdev-member-1', SELF, reader)).resolves.toEqual({
       status: 'self',
-      memberId: 1n,
+      memberId: 2n,
       name: 'Testdev-member-1',
     });
   });
 
-  it('treats a failed scan read as retryable, not as not-found', async () => {
-    const reader = readerWith(['Testdev-member-1'], {
-      memberNames: async () => {
+  it('keeps a transient getter failure retryable, not not-found', async () => {
+    const reader = readerWith(CHAIN, {
+      memberId: async () => {
         throw new Error('fetch failed');
       },
     });
@@ -116,17 +123,38 @@ describe('resolveMemberNameByName', () => {
     });
   });
 
+  it('keeps a transient canonical-name failure retryable', async () => {
+    const reader = readerWith(CHAIN, {
+      memberName: async () => {
+        throw new Error('fetch failed');
+      },
+    });
+    await expect(resolveMemberNameByName('testdev-member-1', SELF, reader)).resolves.toEqual({
+      status: 'error',
+    });
+  });
+
+  it('does not read the chain for blank input', async () => {
+    const reader = readerWith(CHAIN);
+    const memberId = vi.spyOn(reader, 'memberId');
+    await expect(resolveMemberNameByName('   ', SELF, reader)).resolves.toEqual({
+      status: 'not-found',
+    });
+    expect(memberId).not.toHaveBeenCalled();
+  });
+
   it('caches name → id for the session but reads ownership fresh', async () => {
-    const names = ['Testdev-member-0', 'Testdev-member-1'];
-    const reader = readerWith(names);
+    const reader = readerWith(CHAIN);
     const cache = createMemberNameCache();
-    const memberNames = vi.spyOn(reader, 'memberNames');
+    const memberId = vi.spyOn(reader, 'memberId');
+    const memberName = vi.spyOn(reader, 'memberName');
     const ownerOf = vi.spyOn(reader, 'ownerOf');
 
     await resolveMemberNameByName('Testdev-member-1', SELF, reader, cache);
     await resolveMemberNameByName('TESTDEV-MEMBER-1', SELF, reader, cache);
 
-    expect(memberNames).toHaveBeenCalledTimes(1);
+    expect(memberId).toHaveBeenCalledTimes(1);
+    expect(memberName).toHaveBeenCalledTimes(1);
     expect(ownerOf).toHaveBeenCalledTimes(2);
   });
 });

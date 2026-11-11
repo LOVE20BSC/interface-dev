@@ -2,21 +2,11 @@ import { BaseError, ContractFunctionRevertedError } from 'viem';
 import type { HexAddress } from '@/config/networks';
 import { isSameAddress } from '@/shared/lib/format';
 
-/** Chain ids read per Multicall3 batch; the deployed Multicall3 accepts 100+ calls. */
-export const NAME_SCAN_CHUNK = 100;
-
 /**
- * Owner rule (2026-11-12): a name scan is bounded so a huge collection can never
- * turn the transfer drawer into a spinner. Beyond this the UI asks for an id or
- * an address instead of guessing.
- */
-export const NAME_SCAN_CAP = 1000;
-
-/**
- * The contract has `memberName(tokenId)` but no `normalizedName(tokenId)` in its
- * ABI; `normalizeName(name)` is a pure ASCII lowercasing (`_toLowerCase`). This
- * mirrors that rule byte-for-byte so `memberName()` results can be compared in
- * the browser without one extra eth_call per id.
+ * Cache-key mirror of the contract's `_toLowerCase` (ASCII A–Z only). The
+ * contract's `memberId(name)` normalises its own input, so this is never sent
+ * on-chain: it only lets `Testdev-Member-1` and `testdev-member-1` share one
+ * session-cache entry instead of two `memberId` reads.
  */
 export function normalizeMemberName(value: string): string {
   return value.replace(/[A-Z]/g, (character) => String.fromCharCode(character.charCodeAt(0) + 32));
@@ -31,16 +21,14 @@ export type MemberNameResolution =
     }
   | { readonly status: 'self'; readonly memberId: bigint; readonly name: string }
   | { readonly status: 'not-found' }
-  | { readonly status: 'capped' }
   | { readonly status: 'error' };
 
-/** The only chain reads the resolver needs; injected so the scan is unit-testable. */
+/** The only chain reads the resolver needs; injected so the lookup is unit-testable. */
 export interface MemberNameReader {
-  readonly totalSupply: () => Promise<bigint>;
-  /** Contract `normalizeName(input)`, the authoritative form of the typed name. */
-  readonly normalizeName: (name: string) => Promise<string>;
-  /** `memberName(id)` for every id, in order; null when a single read failed. */
-  readonly memberNames: (ids: readonly bigint[]) => Promise<readonly (string | null)[]>;
+  /** Contract `memberId(rawName)`: O(1), returns 0 for an unused name. */
+  readonly memberId: (rawName: string) => Promise<bigint>;
+  /** Canonical on-chain name for the id, shown in the confirmation gate. */
+  readonly memberName: (memberId: bigint) => Promise<string>;
   readonly ownerOf: (memberId: bigint) => Promise<string>;
 }
 
@@ -66,14 +54,13 @@ export function createMemberNameCache(): MemberNameCache {
 }
 
 /**
- * Resolve an identity name to its id and current owner by enumerating
- * 1..totalSupply in ≤100-id Multicall3 chunks and comparing the contract's
- * normalised form. Stops at the first match. Never polls.
+ * Resolve an identity name to its id and current owner with the contract's
+ * O(1) `memberId(rawName)` getter. The contract lowercases the input itself,
+ * so the typed name is passed through unchanged apart from trimming.
  *
- * - not-found: the scan finished inside the cap with no match.
- * - capped: totalSupply > 1000 and no match inside the first 1000 ids; the UI
- *   asks for an id/address rather than silently continuing.
- * - error: any read failed (transient); the caller offers retry.
+ * - not-found: `memberId` returned 0, or the call reverted (unknown name /
+ *   older deployment without the getter).
+ * - error: any other read failed (transient); the caller offers retry.
  */
 export async function resolveMemberNameByName(
   input: string,
@@ -84,55 +71,29 @@ export async function resolveMemberNameByName(
   const trimmed = input.trim();
   if (trimmed === '') return { status: 'not-found' };
 
-  let normalizedInput: string;
-  try {
-    normalizedInput = (await reader.normalizeName(trimmed)).trim();
-  } catch {
-    return { status: 'error' };
-  }
-  if (normalizedInput === '') return { status: 'not-found' };
-
-  const cached = cache?.get(normalizedInput);
+  const cacheKey = normalizeMemberName(trimmed);
+  const cached = cache?.get(cacheKey);
   if (cached !== undefined) {
     return resolveOwner(cached.memberId, cached.name, self, reader);
   }
 
-  let total: bigint;
+  let memberId: bigint;
   try {
-    total = await reader.totalSupply();
-  } catch {
-    return { status: 'error' };
+    memberId = await reader.memberId(trimmed);
+  } catch (error) {
+    return { status: classifyReadError(error) };
   }
+  if (memberId === 0n) return { status: 'not-found' };
 
-  const cap = BigInt(NAME_SCAN_CAP);
-  const scanLimit = total < cap ? total : cap;
-  const chunk = BigInt(NAME_SCAN_CHUNK);
-
-  for (let first = 1n; first <= scanLimit; first += chunk) {
-    const last = first + chunk - 1n < scanLimit ? first + chunk - 1n : scanLimit;
-    const ids: bigint[] = [];
-    for (let id = first; id <= last; id += 1n) ids.push(id);
-
-    let names: readonly (string | null)[];
-    try {
-      names = await reader.memberNames(ids);
-    } catch {
-      return { status: 'error' };
-    }
-
-    for (let index = 0; index < ids.length; index += 1) {
-      const rawName = names[index];
-      const memberId = ids[index];
-      if (rawName === undefined || rawName === null || rawName === '' || memberId === undefined) {
-        continue;
-      }
-      if (normalizeMemberName(rawName) !== normalizedInput) continue;
-      cache?.set(normalizedInput, { memberId, name: rawName });
-      return resolveOwner(memberId, rawName, self, reader);
-    }
+  let name: string;
+  try {
+    name = await reader.memberName(memberId);
+  } catch (error) {
+    return { status: classifyReadError(error) };
   }
-
-  return total > cap ? { status: 'capped' } : { status: 'not-found' };
+  const canonicalName = name === '' ? trimmed : name;
+  cache?.set(cacheKey, { memberId, name: canonicalName });
+  return resolveOwner(memberId, canonicalName, self, reader);
 }
 
 async function resolveOwner(
@@ -147,7 +108,7 @@ async function resolveOwner(
   } catch (error) {
     // A vanished token is not the same as a transient RPC failure, but for a
     // name that just matched an existing id both mean "cannot safely send".
-    return { status: classifyOwnerReadError(error) };
+    return { status: classifyReadError(error) };
   }
   if (self !== undefined && isSameAddress(owner, self)) {
     return { status: 'self', memberId, name };
@@ -155,7 +116,7 @@ async function resolveOwner(
   return { status: 'ok', memberId, name, address: owner as HexAddress };
 }
 
-function classifyOwnerReadError(error: unknown): 'not-found' | 'error' {
+function classifyReadError(error: unknown): 'not-found' | 'error' {
   if (error instanceof BaseError) {
     const reverted = error.walk((cause) => cause instanceof ContractFunctionRevertedError);
     if (reverted !== null) return 'not-found';

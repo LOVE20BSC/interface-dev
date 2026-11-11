@@ -482,7 +482,6 @@ export const copy = {
     nameNotFound: '没有找到这个名称对应的身份 NFT。',
     nameSelf: '这个名称属于你自己的身份 NFT。',
     nameFailed: '这个名称暂时查不到，网络可能不稳。',
-    nameCapped: '名字太多，请用 ID 或地址。',
     nameRetry: '重试',
     nameConfirmTitle: (name: string, memberId: string) => `名称「${name}」→ 身份 NFT #${memberId}`,
     nameConfirmRecipient: (address: string) => `收款人 ${address}`,
