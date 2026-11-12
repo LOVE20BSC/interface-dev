@@ -2,7 +2,7 @@
  * 轮次门槛 (round gate) for the 空投铸造 page (UX spec §3.4).
  *
  * `AirdropDistributor.claim` reverts `ClaimRoundNotReached` while
- * `Phase.currentPhase() < claimableFromRoundByTokenAddress(token)`. The UI must
+ * `Phase.currentPhase() < airdropInfo(token).claimableFromRound`. The UI must
  * show that window as its own state with a *relative* wait — never an absolute
  * timestamp, because Phase counts blocks, not seconds, and `sync()` can change
  * the block length (CI-008).
@@ -16,7 +16,7 @@
 export interface RoundGateInput {
   /** `Phase.currentPhase()`; null until the read resolves. */
   readonly currentRound: bigint | null;
-  /** `claimableFromRoundByTokenAddress(token)`; null until the read resolves. */
+  /** `airdropInfo(token).claimableFromRound`; null until the read resolves. */
   readonly claimableFromRound: bigint | null;
 }
 

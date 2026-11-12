@@ -6,7 +6,7 @@ import { formatTokenAmount } from '@/shared/lib/format';
  *
  * The amount is injected so the "no amount available" branch can be tested
  * without a chain. The panel only feeds it `readClaimedAmount()`'s result —
- * one `claimedAmountByTokenAddressByClaimer` call (CI-014) — no other module
+ * one `claimedAmount` call (CI-014) — no other module
  * may invent a number.
  */
 export interface ClaimedAmountViewInput {

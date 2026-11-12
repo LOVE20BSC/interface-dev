@@ -25,7 +25,7 @@ function requestUrl(source: AirdropSnapshotSource): string {
  * Lazily fetches the merkle snapshot as a static same-origin file (genesis,
  * bundled at build time) or from the launcher-registered on-chain URI (future
  * Launch tokens, CI-015). The document is never trusted until the caller
- * compares its root with the on-chain `merkleRootByTokenAddress`.
+ * compares its root with the on-chain `airdropInfo(token).merkleRoot`.
  *
  * It is deliberately NOT a bundled import: the home page must render identity,
  * balance and entries before this request starts (UX spec §3.1). Retry drops the

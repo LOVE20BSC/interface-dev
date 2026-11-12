@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useAccount, useChainId, useReadContract, useReadContracts } from 'wagmi';
+import { useAccount, useChainId, useReadContracts } from 'wagmi';
 import { airdropDistributorAbi } from '@/config/abis';
 import { configuredAddress } from '@/config/networks';
 import {
@@ -7,6 +7,7 @@ import {
   isAirdropEligible,
   snapshotMatchesChain,
 } from '@/domain/airdrop-snapshot';
+import { useAirdropInfo } from '@/entities/airdrop/model/use-airdrop-info';
 import { useAirdropSnapshot } from '@/entities/airdrop/model/use-airdrop-snapshot';
 
 export type AirdropEligibilityStatus =
@@ -30,12 +31,14 @@ export interface AirdropEligibility {
 }
 
 /**
- * Airdrop eligibility: snapshot entry exists ∧ !isClaimedByTokenAddressByClaimer
+ * Airdrop eligibility: snapshot entry exists ∧ !isClaimed
  * ∧ claimableAmount(token,wallet,share,proof) > 0.
  *
  * The snapshot document is trusted only after its merkleRoot matches
- * `merkleRootByTokenAddress(token)` (and it belongs to this chain). A mismatch
- * disables the card instead of showing a wrong answer.
+ * `airdropInfo(token).merkleRoot` (and it belongs to this chain). One
+ * `airdropInfo` read also supplies the snapshot URI, so eligibility no longer
+ * needs a separate root/URI getter. A mismatch disables the card instead of
+ * showing a wrong answer.
  */
 export function useAirdropEligibility(): AirdropEligibility {
   const { address: account } = useAccount();
@@ -44,26 +47,21 @@ export function useAirdropEligibility(): AirdropEligibility {
   const tokenAddress = configuredAddress('firstTokenAddress') ?? configuredAddress('tokenAddress');
   const genesisTokenAddress = configuredAddress('firstTokenAddress');
 
+  const infoState = useAirdropInfo({ airdropAddress, tokenAddress });
+  const info = infoState.info;
+
   const snapshotState = useAirdropSnapshot({
     enabled: account !== undefined,
-    airdropAddress,
+    snapshotUri: info?.snapshotUri,
     tokenAddress,
     genesisTokenAddress,
-  });
-
-  const rootRead = useReadContract({
-    address: airdropAddress,
-    abi: airdropDistributorAbi,
-    functionName: 'merkleRootByTokenAddress',
-    args: tokenAddress !== undefined ? [tokenAddress] : undefined,
-    query: { enabled: airdropAddress !== undefined && tokenAddress !== undefined },
   });
 
   const snapshot = snapshotState.snapshot;
   const rootMatches =
     snapshot !== null &&
-    rootRead.data !== undefined &&
-    snapshotMatchesChain(snapshot, { chainId, merkleRoot: rootRead.data });
+    info !== null &&
+    snapshotMatchesChain(snapshot, { chainId, merkleRoot: info.merkleRoot });
 
   const entry = useMemo(
     () => (rootMatches && snapshot !== null ? findSnapshotEntry(snapshot, account) : null),
@@ -76,7 +74,7 @@ export function useAirdropEligibility(): AirdropEligibility {
       {
         address: airdropAddress,
         abi: airdropDistributorAbi,
-        functionName: 'isClaimedByTokenAddressByClaimer' as const,
+        functionName: 'isClaimed' as const,
         args: [tokenAddress, account] as const,
       },
       {
@@ -94,8 +92,8 @@ export function useAirdropEligibility(): AirdropEligibility {
   });
 
   const refetch = () => {
+    infoState.refetch();
     snapshotState.retry();
-    rootRead.refetch();
     checks.refetch();
   };
 
@@ -118,9 +116,9 @@ export function useAirdropEligibility(): AirdropEligibility {
     status = 'unconfigured';
   } else if (snapshotState.status === 'unavailable') {
     status = 'unavailable';
-  } else if (snapshotState.status === 'loading' || rootRead.isLoading) {
+  } else if (snapshotState.status === 'loading' || infoState.status === 'loading') {
     status = 'loading';
-  } else if (snapshotState.status === 'error' || rootRead.isError) {
+  } else if (snapshotState.status === 'error' || infoState.status === 'error') {
     status = 'error';
   } else if (snapshot === null) {
     status = 'error';

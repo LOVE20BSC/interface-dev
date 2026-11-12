@@ -106,7 +106,7 @@ export interface ChainSnapshotBinding {
 
 /**
  * The document root must equal the root registered for this token on chain
- * (`merkleRootByTokenAddress`). This is the one check that makes a bundled or
+ * (`airdropInfo(token).merkleRoot`). This is the one check that makes a bundled or
  * remotely fetched JSON trustworthy: the contract verifies every proof against
  * that same root, so a mismatch can only mean the wrong file.
  */
@@ -136,7 +136,7 @@ export type AirdropSnapshotSource =
   | { readonly kind: 'none' };
 
 export interface AirdropSnapshotSourceInput {
-  /** `snapshotUriByTokenAddress(token)`; empty for the genesis token by design (CI-017). */
+  /** `airdropInfo(token).snapshotUri`; empty for the genesis token by design (CI-017). */
   readonly snapshotUri: string | null | undefined;
   /** Build-time bundled genesis snapshot path, or null in variants that ship none. */
   readonly bundledPath: string | null;

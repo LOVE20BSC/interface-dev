@@ -35,7 +35,7 @@ describe('readClaimedAmount', () => {
     expect(readContract).toHaveBeenCalledWith({
       address: AIRDROP,
       abi: expect.anything(),
-      functionName: 'claimedAmountByTokenAddressByClaimer',
+      functionName: 'claimedAmount',
       args: [TOKEN, WALLET],
     });
     expect(getContractEvents).not.toHaveBeenCalled();

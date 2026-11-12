@@ -1,5 +1,6 @@
 import { useReadContract } from 'wagmi';
 import { love20TokenAbi, memberNftAbi } from '@/config/abis';
+import { useAirdropInfo } from '@/entities/airdrop/model/use-airdrop-info';
 import { configuredAddress } from '@/config/networks';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
 import { useFirstToken } from '@/entities/community-token/model/use-first-token';
@@ -21,7 +22,7 @@ export interface AboutChainData {
   readonly communityDecimals: number | undefined;
   /** MemberNFT.totalSupply() (identity NFTs are whole units). */
   readonly memberNftSupply: AboutValue<bigint>;
-  /** Community token balance held by the AirdropDistributor contract. */
+  /** `airdropInfo(firstToken).remainingAmount`: the distributor's on-chain pool. */
   readonly airdropPool: AboutValue<bigint>;
   readonly airdropDecimals: number | undefined;
   readonly airdropSymbol: string | undefined;
@@ -71,12 +72,11 @@ export function useAboutChainData(symbol: string): AboutChainData {
     query: { enabled: memberNft.address !== undefined },
   });
 
-  const poolBalance = useReadContract({
-    address: firstToken.address,
-    abi: love20TokenAbi,
-    functionName: 'balanceOf',
-    args: airdropAddress !== undefined ? [airdropAddress] : undefined,
-    query: { enabled: firstToken.address !== undefined && airdropAddress !== undefined },
+  // The distributor reports its own remaining pool in `airdropInfo`; reading the
+  // token balance would be a second source of the same number.
+  const airdropInfo = useAirdropInfo({
+    airdropAddress,
+    tokenAddress: firstToken.address,
   });
 
   let communitySymbol: AboutValue<string>;
@@ -117,14 +117,16 @@ export function useAboutChainData(symbol: string): AboutChainData {
   let airdropPool: AboutValue<bigint>;
   if (airdropAddress === undefined || firstToken.address === undefined) {
     airdropPool = { status: 'unconfigured', value: undefined };
-  } else if (firstToken.status === 'error' || poolBalance.isError) {
+  } else if (firstToken.status === 'error' || airdropInfo.status === 'error') {
     airdropPool = { status: 'error', value: undefined };
   } else {
     airdropPool = readState(
       true,
       false,
-      firstToken.status === 'loading' || poolBalance.isPending,
-      poolBalance.data,
+      firstToken.status === 'loading' ||
+        airdropInfo.status === 'loading' ||
+        airdropInfo.status === 'idle',
+      airdropInfo.info?.remainingAmount,
     );
   }
 

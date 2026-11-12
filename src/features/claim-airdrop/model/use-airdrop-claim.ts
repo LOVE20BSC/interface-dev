@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useAccount, useBlockNumber, useChainId, useReadContract, useReadContracts } from 'wagmi';
-import { airdropDistributorAbi, love20TokenAbi, phaseAbi } from '@/config/abis';
+import { airdropDistributorAbi, phaseAbi } from '@/config/abis';
 import { configuredAddress, type HexAddress } from '@/config/networks';
 import {
   selectAirdropClaimState,
@@ -9,6 +9,7 @@ import {
   type AirdropClaimStatus,
   type AirdropClaimUnavailableReason,
 } from '@/domain/airdrop-claim';
+import { useAirdropInfo } from '@/entities/airdrop/model/use-airdrop-info';
 import {
   estimateRoundWait,
   roundGateReached,
@@ -67,12 +68,13 @@ function successBool(result: { status: string; result?: unknown } | undefined): 
 /**
  * Read model for 空投铸造 (UX spec §3.4).
  *
- * The snapshot is trusted only when its chain id and merkle root match the root
- * registered for this token (`merkleRootByTokenAddress`); a mismatch never
- * becomes "no eligibility". The claim values are read in a single Multicall3
- * batch (isClaimedByTokenAddressByClaimer, claimableAmount, distributor balance,
- * remainingShare, TOTAL_SHARE) so the dynamic amount is re-read on every mount
- * and after a receipt, never polled.
+ * One `airdropInfo(tokenAddress)` read supplies every per-token fact: the
+ * merkle root used to trust the snapshot, `claimableFromRound` for the round
+ * gate, `snapshotUri` for the document source, and `remainingAmount` /
+ * `totalRemainingShare` for the pool/remaining-share display. The per-claimer
+ * facts (`isClaimed`, `claimableAmount`) and `TOTAL_SHARE` ride one Multicall3
+ * batch so the dynamic amount is re-read on every mount and after a receipt,
+ * never polled.
  *
  * The round gate reads the same Phase the distributor uses and turns the block
  * distance into 「约 X 分钟」 (never an absolute timestamp, CI-008).
@@ -87,26 +89,22 @@ export function useAirdropClaim(): AirdropClaimState {
 
   // Genesis token metadata: the airdrop unit is the first token, never ?symbol=.
   const firstToken = useFirstToken();
+
+  const infoState = useAirdropInfo({ airdropAddress, tokenAddress });
+  const info = infoState.info;
+
   const snapshotState = useAirdropSnapshot({
     enabled: account !== undefined,
-    airdropAddress,
+    snapshotUri: info?.snapshotUri,
     tokenAddress,
     genesisTokenAddress,
-  });
-
-  const rootRead = useReadContract({
-    address: airdropAddress,
-    abi: airdropDistributorAbi,
-    functionName: 'merkleRootByTokenAddress',
-    args: tokenAddress !== undefined ? [tokenAddress] : undefined,
-    query: { enabled: airdropAddress !== undefined && tokenAddress !== undefined },
   });
 
   const snapshot = snapshotState.snapshot;
   const rootMatches =
     snapshot !== null &&
-    rootRead.data !== undefined &&
-    snapshotMatchesChain(snapshot, { chainId, merkleRoot: rootRead.data });
+    info !== null &&
+    snapshotMatchesChain(snapshot, { chainId, merkleRoot: info.merkleRoot });
 
   const entry = useMemo(
     () => (rootMatches && snapshot !== null ? findSnapshotEntry(snapshot, account) : null),
@@ -116,6 +114,7 @@ export function useAirdropClaim(): AirdropClaimState {
   const contracts = useMemo(() => {
     if (
       !rootMatches ||
+      info === null ||
       entry === null ||
       airdropAddress === undefined ||
       tokenAddress === undefined ||
@@ -127,7 +126,7 @@ export function useAirdropClaim(): AirdropClaimState {
       {
         address: airdropAddress,
         abi: airdropDistributorAbi,
-        functionName: 'isClaimedByTokenAddressByClaimer' as const,
+        functionName: 'isClaimed' as const,
         args: [tokenAddress, account] as const,
       },
       {
@@ -137,24 +136,12 @@ export function useAirdropClaim(): AirdropClaimState {
         args: [tokenAddress, account, entry.share, entry.proof] as const,
       },
       {
-        address: tokenAddress,
-        abi: love20TokenAbi,
-        functionName: 'balanceOf' as const,
-        args: [airdropAddress] as const,
-      },
-      {
-        address: airdropAddress,
-        abi: airdropDistributorAbi,
-        functionName: 'remainingShareByTokenAddress' as const,
-        args: [tokenAddress] as const,
-      },
-      {
         address: airdropAddress,
         abi: airdropDistributorAbi,
         functionName: 'TOTAL_SHARE' as const,
       },
     ];
-  }, [account, airdropAddress, entry, rootMatches, tokenAddress]);
+  }, [account, airdropAddress, entry, info, rootMatches, tokenAddress]);
 
   const checks = useReadContracts({
     contracts,
@@ -163,27 +150,22 @@ export function useAirdropClaim(): AirdropClaimState {
 
   const claimed = successBool(checks.data?.[0]);
   const claimableAmount = successBigInt(checks.data?.[1]);
-  const poolBalance = successBigInt(checks.data?.[2]);
-  const remainingShare = successBigInt(checks.data?.[3]);
-  const totalShare = successBigInt(checks.data?.[4]);
+  const totalShare = successBigInt(checks.data?.[2]);
+  // Pool and share totals come from `airdropInfo`, never from re-deriving the
+  // distributor balance or from subtracting locally.
+  const poolBalance = info?.remainingAmount ?? null;
+  const remainingShare = info?.totalRemainingShare ?? null;
 
   // ── round gate ────────────────────────────────────────────────────────────
-  // Reads only happen once the snapshot is trusted and the token is known.
-  const gateEnabled = rootMatches && tokenAddress !== undefined && airdropAddress !== undefined;
-  const claimableFromRead = useReadContract({
-    address: airdropAddress,
-    abi: airdropDistributorAbi,
-    functionName: 'claimableFromRoundByTokenAddress',
-    args: tokenAddress !== undefined ? [tokenAddress] : undefined,
-    query: { enabled: gateEnabled },
-  });
+  // `claimableFromRound` is part of the same airdropInfo struct (no extra read).
+  const gateEnabled = info !== null && tokenAddress !== undefined && airdropAddress !== undefined;
+  const claimableFromRound = info?.claimableFromRound ?? null;
   const currentRoundRead = useReadContract({
     address: phaseAddress,
     abi: phaseAbi,
     functionName: 'currentPhase',
     query: { enabled: gateEnabled && phaseAddress !== undefined },
   });
-  const claimableFromRound = claimableFromRead.data ?? null;
   const currentRound = currentRoundRead.data ?? null;
   const roundReached = roundGateReached({ currentRound, claimableFromRound });
 
@@ -234,18 +216,13 @@ export function useAirdropClaim(): AirdropClaimState {
   });
 
   const anyReadFailed = checks.data?.some((result) => result.status === 'failure') ?? false;
-  const gateReadFailed = claimableFromRead.isError || currentRoundRead.isError;
+  const gateReadFailed = currentRoundRead.isError;
   let reads: AirdropClaimReadStatus;
   if (contracts.length === 0) {
     reads = 'idle';
   } else if (checks.isError || anyReadFailed || gateReadFailed) {
     reads = 'error';
-  } else if (
-    checks.isLoading ||
-    checks.data === undefined ||
-    currentRoundRead.isLoading ||
-    claimableFromRead.isLoading
-  ) {
+  } else if (checks.isLoading || checks.data === undefined || currentRoundRead.isLoading) {
     reads = 'loading';
   } else {
     reads = 'ready';
@@ -255,11 +232,8 @@ export function useAirdropClaim(): AirdropClaimState {
     snapshotState.status === 'idle'
       ? 'loading'
       : (snapshotState.status as 'loading' | 'loaded' | 'error' | 'unavailable');
-  const rootStatus = rootRead.isError
-    ? 'error'
-    : rootRead.isLoading || rootRead.data === undefined
-      ? 'loading'
-      : 'loaded';
+  const rootStatus =
+    infoState.status === 'error' ? 'error' : info === null ? 'loading' : 'loaded';
 
   let selection = selectAirdropClaimState({
     connected: account !== undefined,
@@ -303,10 +277,9 @@ export function useAirdropClaim(): AirdropClaimState {
       : undefined;
 
   const refetch = () => {
+    infoState.refetch();
     snapshotState.retry();
-    rootRead.refetch();
     checks.refetch();
-    claimableFromRead.refetch();
     currentRoundRead.refetch();
     phaseInfoRead.refetch();
     observationsRead.refetch();

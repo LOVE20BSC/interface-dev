@@ -5,7 +5,7 @@ import type { HexAddress } from '@/config/networks';
 /**
  * ONE adapter for "how much did this wallet already mint from the airdrop?".
  *
- * `AirdropDistributor.claimedAmountByTokenAddressByClaimer(token, account)` is a
+ * `AirdropDistributor.claimedAmount(token, account)` is a
  * single `eth_call`, available on every chain this app ships to (CI-014). The
  * old dev-only `AirdropClaimed` log scan described in CI-014 is gone: it was a
  * fallback for a pre-CI-014 chain that no longer exists, and a whole-history
@@ -44,7 +44,7 @@ export async function readClaimedAmount(
     const value = await client.readContract({
       address: airdropAddress,
       abi: airdropDistributorAbi,
-      functionName: 'claimedAmountByTokenAddressByClaimer',
+      functionName: 'claimedAmount',
       args: [tokenAddress, wallet],
     });
     return typeof value === 'bigint' ? value : undefined;

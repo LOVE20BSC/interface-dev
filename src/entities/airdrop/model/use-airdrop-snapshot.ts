@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useReadContract } from 'wagmi';
 import { AIRDROP_SNAPSHOT_PATH } from '@/config/airdrop';
-import { airdropDistributorAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 import {
   selectAirdropSnapshotSource,
@@ -23,7 +21,8 @@ export interface AirdropSnapshotState {
 
 export interface AirdropSnapshotOptions {
   readonly enabled: boolean;
-  readonly airdropAddress: HexAddress | undefined;
+  /** `airdropInfo(token).snapshotUri`; empty for the genesis token by design (CI-017). */
+  readonly snapshotUri: string | null | undefined;
   readonly tokenAddress: HexAddress | undefined;
   /** Deployment genesis token: its on-chain URI is empty by design (CI-017). */
   readonly genesisTokenAddress: HexAddress | undefined;
@@ -46,18 +45,19 @@ function sourceKeyOf(source: AirdropSnapshotSource | null): string | null {
 /**
  * Resolves and loads the snapshot document for one token (spec §3.4).
  *
- * Two sources coexist:
- *   - `snapshotUriByTokenAddress(token)` when non-empty (future Launch tokens);
+ * The URI comes from the caller's single `airdropInfo(token)` read. Two sources
+ * coexist:
+ *   - a non-empty `snapshotUri` (future Launch tokens);
  *   - the build-time bundled JSON for the genesis token, whose URI is empty by
  *     design (CI-017). An empty URI is therefore NOT an error for genesis.
  * The document is still untrusted here: callers compare its root with
- * `merkleRootByTokenAddress(token)` before reading any share or proof.
+ * `airdropInfo(token).merkleRoot` before reading any share or proof.
  *
  * Starts after the first paint; until it resolves the home page shows no
  * eligibility placeholder. While no wallet is connected nothing is fetched.
  */
 export function useAirdropSnapshot(options: AirdropSnapshotOptions): AirdropSnapshotState {
-  const { enabled, airdropAddress, tokenAddress, genesisTokenAddress } = options;
+  const { enabled, snapshotUri, tokenAddress, genesisTokenAddress } = options;
   const [data, setData] = useState<SnapshotData>({
     status: 'idle',
     snapshot: null,
@@ -66,27 +66,22 @@ export function useAirdropSnapshot(options: AirdropSnapshotOptions): AirdropSnap
   });
   const [attempt, setAttempt] = useState(0);
 
-  const uriRead = useReadContract({
-    address: airdropAddress,
-    abi: airdropDistributorAbi,
-    functionName: 'snapshotUriByTokenAddress',
-    args: tokenAddress !== undefined ? [tokenAddress] : undefined,
-    query: { enabled: enabled && airdropAddress !== undefined && tokenAddress !== undefined },
-  });
-
   const isGenesis =
     tokenAddress !== undefined &&
     genesisTokenAddress !== undefined &&
     tokenAddress.toLowerCase() === genesisTokenAddress.toLowerCase();
 
-  const source = useMemo<AirdropSnapshotSource | null>(() => {
-    if (uriRead.data === undefined) return null;
-    return selectAirdropSnapshotSource({
-      snapshotUri: uriRead.data,
-      bundledPath: AIRDROP_SNAPSHOT_PATH,
-      isGenesis,
-    });
-  }, [isGenesis, uriRead.data]);
+  const source = useMemo<AirdropSnapshotSource | null>(
+    () =>
+      snapshotUri === undefined
+        ? null
+        : selectAirdropSnapshotSource({
+            snapshotUri,
+            bundledPath: AIRDROP_SNAPSHOT_PATH,
+            isGenesis,
+          }),
+    [isGenesis, snapshotUri],
+  );
 
   const sourceKey = sourceKeyOf(source);
   const canLoad = enabled && tokenAddress !== undefined && source !== null;
@@ -114,16 +109,15 @@ export function useAirdropSnapshot(options: AirdropSnapshotOptions): AirdropSnap
 
   const retry = useCallback(() => {
     if (!enabled) return;
-    uriRead.refetch();
     resetAirdropSnapshotCache();
     setAttempt((value) => value + 1);
-  }, [enabled, uriRead]);
+  }, [enabled]);
 
   if (!enabled || tokenAddress === undefined) {
     return { status: 'idle', snapshot: null, retry };
   }
   if (source === null) {
-    // The on-chain URI read has not resolved yet.
+    // The caller's `airdropInfo` read has not resolved yet.
     return { status: 'loading', snapshot: null, retry };
   }
   if (source.kind === 'none') {
