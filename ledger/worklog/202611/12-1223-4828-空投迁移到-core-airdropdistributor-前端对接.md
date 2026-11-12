@@ -1,8 +1,9 @@
 # 20261112-1223-4828-空投迁移到-core-airdropdistributor-前端对接: 空投迁移到 core AirdropDistributor（前端对接）
 
-- **Tags**: 空投, 合约迁移, 前端
-- **Status**: doing · 2026-11-12 12:55:52 · @test · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Tags**: 空投, 合约迁移, 前端, anvil
+- **Status**: done · 2026-11-12 15:42:41 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 - **Created**: 2026-11-12 12:23:55 · @test · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Sealed**: 2026-11-12 15:42:41 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 
 <!-- Header lines are maintained by the script, fixed order: Tags → Status → Created → Sealed.
      The `- **Tags**: …` line is inserted at the top by new --tags; omitted when there are no tags
@@ -49,3 +50,4 @@ owner 2026-11-12 说明：他正在**重构 Airdrop 接口**，完成后通知�
 - 2026-11-12 12:23:55 · new · @test · 47d39b07-9d74-4077-8a12-8ab9280ea25d · created and claimed
 - 2026-11-12 12:29:35 · log · @test · 47d39b07-9d74-4077-8a12-8ab9280ea25d · 按 owner 决定 B 暂停前端接口迁移：回退 ABI sync/空投页重写改动，保留 anvil@d81f4eb 迁移；core 本地参数已与 anvil 对齐 4 个值（未提交）；等重构完成再一次性适配
 - 2026-11-12 12:55:52 · log · @test · 47d39b07-9d74-4077-8a12-8ab9280ea25d · 迁移已完成并全绿（379 单测 / e2e 52-52 双跑 / 157.9kB / abis:check 绿），main@c49eafd，wip/airdrop-distributor 分支同点备份；待 owner 确认 A(保留并发布) 或 B(回退)
+- 2026-11-12 15:42:41 · close · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · sealed: 前端空投改用 core AirdropDistributor：claim(tokenAddress,share,proof)/claimedAmount/claimableFromRound 轮次门槛(S5-G)/创世快照内置+链上 root 校验；anvil 去 vendor 改由 core 部署，地址 0x2279…2eBe6，PHASE 位移；379 单测、e2e 52/52 双跑、157.9 kB。后续 core 重构接口后由下一任务续做
