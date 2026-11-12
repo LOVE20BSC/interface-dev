@@ -306,15 +306,22 @@
 ### 3.4 空投铸造
 
 **用户一句话目标**：三十秒内知道自己有没有、能铸造多少、现在能不能铸造，并一次完成。
-**进入条件与前置**：需连接；S6 已铸造态的金额必须能在**任意设备**上显示（不得依赖本机缓存，见 [CI-014](../contract-issues/014-airdrop-claimed-amount-not-readable.md)）；资格来自部署时固定的 Merkle 快照（share + proof，按需 `import()` 的快照 JSON，**不进首屏包**）。空投代币固定为首币 LOVE20，**与当前社区无关**，切换社区不改变本页内容。页头标题只写「空投铸造」，**不设副标题或解释句**；「本次空投：LOVE20」是状态卡首行的一行元信息，快照机制收进「规则」折叠。界面任何位置都不写「领取」；合约动作 `claim` 只保留在代码、合约与术语表里。
+**进入条件与前置**：需连接；S6 已铸造态的金额必须能在**任意设备**上显示（不得依赖本机缓存，见 [CI-014](../contract-issues/014-airdrop-claimed-amount-not-readable.md)）；资格来自 Merkle 快照（share + proof），快照来源按代币分两条路径（见下），文档按需懒加载、**不进首屏包**。空投代币固定为首币 LOVE20，**与当前社区无关**，切换社区不改变本页内容。页头标题只写「空投铸造」，**不设副标题或解释句**；「本次空投：LOVE20」是状态卡首行的一行元信息，快照机制收进「规则」折叠。界面任何位置都不写「领取」；合约动作 `claim` 只保留在代码、合约与术语表里。
+
+**数据源与快照（2026-11-12 起）**
+- 合约是 `AirdropDistributor`（地址簿 `airdropDistributor`，`/about` 标签「空投分发器」）。`claim(tokenAddress, share, proof)` 只付给 `msg.sender`，**没有 account 参数**；账户永远是当前连接的钱包。
+- 报价与状态：`claimableAmount(token, account, share, proof)`、`isClaimedByTokenAddressByClaimer(token, account)`、`claimedAmountByTokenAddressByClaimer(token, account)`（一次 `eth_call`，不再扫事件）。金额与份额都用 `remainingShareByTokenAddress(token)`、`TOTAL_SHARE()`。
+- 快照来源：**创世代币**的 `snapshotUriByTokenAddress(genesisToken)` 由合约保证永久为空（[CI-017](../contract-issues/017-genesis-snapshot-uri-locked.md)），所以用构建内置的 `public/airdrop/<variant>.json`；使用前必须核对文档 `merkleRoot` 与链上 `merkleRootByTokenAddress(genesisToken)` **完全相等**，不一致按 S2「空投资格暂时读不到」+「重试」处理，绝不显示数字。空 URI 对创世**不是错误**。
+- **后续 Launch 的代币**：沿用同一套代码，优先从链上 `snapshotUriByTokenAddress(token)` 拉取 JSON（仅接受 http(s)），同样先用 `merkleRootByTokenAddress(token)` 校验 root；失败态可重试。
+- **轮次门槛**：`Phase.currentPhase() < claimableFromRoundByTokenAddress(token)` 时 `claim` 会回滚 `ClaimRoundNotReached`。此时页面显示独立门槛态（见 S5-G），不显示金额、不出现「空投铸造」。等待时间只用「剩余区块 × 观测秒/块」估算成「约 X 分钟」（`observations(0,2,true)`，不足两条时退回 `TARGET_SECONDS / currentPhaseBlocks`），**不得显示绝对时间戳**。
 
 **区块顺序**
-1. **状态与金额卡** — 七态之一（见下）；首行元信息「本次空投：LOVE20」；金额行「预计可得 {X} LOVE20」+ 小字「按铸造时的池子余额与剩余份额计算，别人铸造后金额会变。」数据：`claimableAmount(LOVE20, wallet, share, proof)`、`balanceOf(airdrop)`。
-2. **主按钮区** — 仅「可铸造」态出现「空投铸造」。
+1. **状态与金额卡** — 七态之一（见下）或轮次门槛态；首行元信息「本次空投：LOVE20」；金额行「预计可得 {X} LOVE20」+ 小字「按铸造时的池子余额与剩余份额计算，别人铸造后金额会变。」数据：`claimableAmount(LOVE20, wallet, share, proof)`、`balanceOf(airdropDistributor)`、`claimableFromRoundByTokenAddress(LOVE20)`。
+2. **主按钮区** — 仅「可铸造」态出现「空投铸造」；轮次门槛态没有任何铸造 CTA。
 3. **规则折叠** — 「首币与当前社区无关」「快照来源」；空投合约地址在 `/about`（§3.8），折叠里不再重复；「为什么金额会变」已在金额卡内联小字里说过，折叠不再重复。
 4. **收据** — 铸造成功后整页替换（§4.3）。
 
-**状态**：S0 未连接 / S1 加载 / S2 错误 / S3 空（无资格）/ S4 暂不可铸造 / S5 可铸造 / S6 已铸造；pending 走 §4.2（铸造中 → 已上链），成功即 S6 收据（§4.3），失败回到 S5 + 错误卡。
+**状态**：S0 未连接 / S1 加载 / S2 错误 / S3 空（无资格）/ S4 暂不可铸造 / S5 可铸造 / S6 已铸造；S5 之前另有门槛态 **S5-G 轮次未到**（不改变 S0–S6 的编号：轮次到了就进入 S5）。pending 走 §4.2（铸造中 → 已上链），成功即 S6 收据（§4.3），失败回到 S5 + 错误卡。
 
 **七态文案（互斥，同屏只显示一条）**
 
@@ -325,17 +332,20 @@
 | S2 读取失败 | 「空投数据暂时读不到。你的资产没有变化。」+「重试」 |
 | S3 无资格 | 「这个钱包不在空投名单里。」+「空投只面向快照时的参与者，不影响你现在参与。」+ 主「用 BNB 兑换 LOVE20」次「回首页」 |
 | S4 暂不可铸造 | 池子空：「你有一份空投，但空投池还没有代币。」；份额为 0：「你的份额为 0。」+ 主「先用 BNB 兑换 LOVE20」次「复制本页链接」 |
+| S5-G 轮次未到 | 「还没到可铸造轮次」+「约 X 分钟」（只有区块/秒估算，不出现时间戳）+「轮次到了以后，这里会出现「空投铸造」。」；**没有任何铸造 CTA**，只保留「回首页」 |
 | S5 可铸造 | 「预计可得 {X} LOVE20」+「空投铸造」 |
-| S6 已铸造 | 「已铸造 {X} LOVE20」+ 哈希 +「去铸造身份 NFT」；{X} 是这笔实际铸造到的数量，来自合约只读方法 `claimedAmount(LOVE20, wallet)`（[CI-014](../contract-issues/014-airdrop-claimed-amount-not-readable.md)）；方法未上线前，本地 anvil 用 `AirdropClaimed` 事件读出真实值，其他环境只写「已铸造」并说明「金额可在区块浏览器查看」，**不得编造、也不得显示本机缓存的过期值** |
+| S6 已铸造 | 「已铸造 {X} LOVE20」+ 哈希 +「去铸造身份 NFT」；{X} 是这笔实际铸造到的数量，来自 `claimedAmountByTokenAddressByClaimer(LOVE20, wallet)`（[CI-014](../contract-issues/014-airdrop-claimed-amount-not-readable.md)），一次 `eth_call`；读不到时只写「已铸造」并说明金额以链上记录为准，**不得编造、也不得显示本机缓存的过期值** |
 
-**主 CTA 与次要入口**：整页只有一个实心按钮；S5 是「空投铸造」，其他态的主按钮是各自的出路（连接 / 重试 / 兑换）。次入口固定为「回首页」或「复制链接」。
+**主 CTA 与次要入口**：整页只有一个实心按钮；S5 是「空投铸造」，其他态的主按钮是各自的出路（连接 / 重试 / 兑换）；S5-G 没有实心按钮。次入口固定为「回首页」或「复制链接」。
 **死路处理**：无资格与暂不可铸造都必须给出「换一条路」的按钮，禁止出现「无空投份额。」这类一句话终局；`claimableAmount` 为 0 时必须区分「池子空」与「份额为 0」两种原因（读 `balanceOf(airdrop)` 与快照 share 判断）。
 **加载骨架**：状态行一条短灰条 + 金额一条 40% 灰条 + 按钮整块灰；骨架期间不出现任何数字（`0` 也不渲染）。
 **验收**
 - 无资格用户应看到原因与「用 BNB 兑换 LOVE20」，而不是一句「无空投」。
-- 有资格用户应看到带「预计」的金额与唯一「空投铸造」按钮；页面上没有「领取」二字，也没有标题副标题。
+- 有资格且已到轮次的用户应看到带「预计」的金额与唯一「空投铸造」按钮；页面上没有「领取」二字，也没有标题副标题。
+- 未到 `claimableFromRound` 时用户看到「还没到可铸造轮次」+「约 X 分钟」，页面上没有铸造按钮、没有金额、没有绝对时间。
 - 铸造成功后金额应来自本笔交易回执（`AirdropClaimed.amount`），刷新后仍显示「已铸造 {X} LOVE20」；换浏览器、清缓存后用同一钱包打开，数量必须一致。
-- 已铸造但换设备打开时，仍应显示真实的已铸造数量（读合约 `claimedAmount`）；该只读方法上线前，允许只显示「已铸造」+ 区块浏览器入口，但不得编造金额、也不得把本机缓存当成链上事实。
+- 已铸造但换设备打开时，仍应显示真实的已铸造数量（读 `claimedAmountByTokenAddressByClaimer`），不得编造金额、也不得把本机缓存当成链上事实。
+- 内置创世快照的 root 与链上不一致时，页面显示「空投资格暂时读不到」+「重试」，**不显示任何份额或金额**；创世 URI 为空本身不产生错误。
 
 ### 3.5 兑换代币
 
