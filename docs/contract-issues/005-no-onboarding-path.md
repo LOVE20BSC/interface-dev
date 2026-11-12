@@ -2,7 +2,7 @@
 
 - 严重级别：**High**
 - 影响模块：铸造 MemberNFT、空投
-- 状态：Open
+- 状态：已修复（`core@f209300` 起空投随 core 交付：`AirdropDistributor` 由 `DeployCore` 部署，`claimDelayRounds` 控制可铸造轮次，创世代币首供铸给 distributor；2026-11-12 复核）
 - 关联文件：`core/src/MemberNFT.sol`、`core/src/LOVE20Token.sol`、`core/src/interfaces/ILOVE20Token.sol`、`core/src/Launch.sol`、`core/src/interfaces/ILaunchDistributor.sol`、`interface-dev-dsh/docs/product/m0-scope.md`
 
 ## 现象

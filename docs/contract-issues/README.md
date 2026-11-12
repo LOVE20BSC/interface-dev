@@ -16,7 +16,7 @@
 | [CI-002](002-reward-quote-linear-scan.md) | 激励报价每次都线性扫描本轮全部已投票提案 | High | 行动激励铸造、流水线 | Open | `core/src/Mint.sol`、`action/src/ActionTarget.sol`、`action/src/GroupServiceExecutor.sol` |
 | [CI-003](003-created-round-not-exposed.md) | 行动的创建轮次 `createdRound` 从未暴露 | High | 流水线/倒计时、行动参与、行动激励铸造 | Open | `action/src/ActionTarget.sol`、`action/src/ExecutorBase.sol`、`action/src/LpExecutor.sol`、`action/src/GroupActionManager.sol`、`action/src/GroupServiceExecutor.sol` |
 | [CI-004](004-member-nft-test-prefix-mismatch.md) | MemberNFT 测试前缀：报价/查重与实际铸造不一致 | High | 铸造 MemberNFT | 已修复（core@72a1604） | `core/src/MemberNFT.sol`、`core/test/MemberNFT.t.sol`、`core/script/network/anvil31337_dev/core.params` |
-| [CI-005](005-no-onboarding-path.md) | “没币用户”的入网路径缺失：mint 只收 ERC20，空投合约不在任何仓库 | High | 铸造 MemberNFT、空投 | Open | `core/src/MemberNFT.sol`、`core/src/LOVE20Token.sol`、`core/src/Launch.sol`、`core/src/interfaces/ILaunchDistributor.sol` |
+| [CI-005](005-no-onboarding-path.md) | “没币用户”的入网路径缺失：mint 只收 ERC20，空投合约不在任何仓库 | High | 铸造 MemberNFT、空投 | 已修复（core@f209300：AirdropDistributor 随 core 交付） | `core/src/MemberNFT.sol`、`core/src/LOVE20Token.sol`、`core/src/Launch.sol`、`core/src/interfaces/ILaunchDistributor.sol` |
 | [CI-006](006-claim-amounts-are-live.md) | 待铸造金额按“现在”现算，会变，甚至变成 0 或被销毁 | High | 激励铸造、首页下一步 | Open | `action/src/LpExecutor.sol`、`action/src/GroupServiceExecutor.sol`、`core/src/Mint.sol`、`action/src/GroupActionExecutor.sol` |
 | [CI-007](007-round-not-started-inconsistent.md) | “轮次未开始”有三种答复：回滚 / 空数组+0 / 静默 0 | Medium | 全部读链层 | Open | `core/src/Stake.sol`、`action/src/ActionTarget.sol`、`action/src/LpExecutor.sol`、`action/src/GroupServiceExecutor.sol`、`action/src/GroupActionVerify.sol` |
 | [CI-008](008-no-phase-timing-view.md) | 没有阶段时间/阶段偏移视图，倒计时与验证开放窗口要在 TS 重算 | Medium | 流水线/倒计时 | Open | `core/src/Phase.sol`、`core/src/interfaces/IPhase.sol`、`action/src/GroupActionVerify.sol`、`action/src/*RoundAxis.sol` |
@@ -25,9 +25,11 @@
 | [CI-011](011-silent-zero-ambiguity.md) | 静默 0 / 歧义 0：分不清“没有”与“未开始/不可铸造” | Medium | 激励铸造、质押、行动加入 | Open | `action/src/ActionTarget.sol`、`action/src/LpExecutor.sol`、`action/src/GroupActionExecutor.sol`、`action/src/GroupServiceExecutor.sol`、`core/src/Stake.sol` |
 | [CI-012](012-name-homoglyph-spoofing.md) | 名称同形可伪造身份（ASCII-only 折叠 + 宽松字符集） | Medium | 身份、提案、群聊 | Open | `core/src/MemberNFT.sol` |
 | [CI-013](013-member-nft-no-token-uri.md) | MemberNFT 没有 `tokenURI`/元数据，钱包里是空白 NFT | Low | 身份 | Open | `core/src/MemberNFT.sol` |
-| [CI-014](014-airdrop-claimed-amount-not-readable.md) | 空投没有「按账户查已铸造金额」的只读方法 | High | 空投铸造 | 已修复（burn@5f3b733，需重新部署生效） | `anvil/src/vendor/Airdrop.sol`、`src/config/abis/airdrop.ts`、`src/features/claim-airdrop/` |
+| [CI-014](014-airdrop-claimed-amount-not-readable.md) | 空投没有「按账户查已铸造金额」的只读方法 | High | 空投铸造 | 已修复（core@a9a5ac6：claimedAmountByTokenAddressByClaimer） | `anvil/src/vendor/Airdrop.sol`、`src/config/abis/airdrop.ts`、`src/features/claim-airdrop/` |
+| [CI-015](015-snapshot-uri-trust.md) | 空投快照改为链上 URI：信任、可用性与被篡改风险 | Medium | 空投铸造 | Open | `core/src/distributor/AirdropDistributor.sol` |
+| [CI-016](016-airdrop-infos-cost.md) | `airdropInfos` 返回结构体数组（含 string），分页与成本上限未定 | Low | 空投铸造（多空投列表） | Open | `core/src/interfaces/distributor/IAirdropDistributor.sol` |
 
-数量：14 条（**12 Open / 2 已修复**）；Open 条目按严重级别为 **1 Blocker / 4 High / 6 Medium / 1 Low**，已修复的 CI-004（core@72a1604）与 CI-014（burn@5f3b733）均为 High。
+数量：16 条（**11 Open / 5 已修复**）；Open 条目按严重级别为 **1 Blocker / 3 High / 7 Medium / 1 Low**；已修复：CI-004（core@72a1604，High）、CI-005（core@f209300，High）、CI-014（core@a9a5ac6，High）、以及此前记录的 CI-004/CI-014 早期版本。详见各行。
 
 ## 严重级别定义
 
