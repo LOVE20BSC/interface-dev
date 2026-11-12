@@ -2,7 +2,15 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { createPublicClient, http, parseAbiItem, parseEventLogs, formatUnits } from 'viem';
+import {
+  createPublicClient,
+  encodeAbiParameters,
+  formatUnits,
+  http,
+  keccak256,
+  parseAbiItem,
+  parseEventLogs,
+} from 'viem';
 import { isolateChain } from './chain';
 
 /**
@@ -26,8 +34,9 @@ const deployment = JSON.parse(
   chainId: number;
   rpcUrls: string[];
   addresses: {
-    airdrop: `0x${string}`;
+    airdropDistributor: `0x${string}`;
     firstTokenAddress: `0x${string}`;
+    phase: `0x${string}`;
   };
 };
 
@@ -42,7 +51,7 @@ const snapshot = JSON.parse(
 const RPC_URL = process.env.E2E_ANVIL_RPC ?? deployment.rpcUrls[0] ?? 'http://127.0.0.1:8545';
 const CHAIN_ID = deployment.chainId;
 const CHAIN_HEX = `0x${CHAIN_ID.toString(16)}`;
-const AIRDROP = deployment.addresses.airdrop;
+const AIRDROP = deployment.addresses.airdropDistributor;
 const TOKEN = deployment.addresses.firstTokenAddress;
 
 // anvil's deterministic accounts (mnemonic "test test ... junk").
@@ -53,12 +62,17 @@ const CANDIDATE_CLAIMERS = [
 ] as const;
 const ALREADY_CLAIMED = '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955'; // #7
 const OUTSIDER = '0x8b3a350Cf5C34c9194ca85829a2df0ec3153bE5d'; // not in snapshot
+const GATE_ACCOUNT = '0xa0Ee7A142d267C1f36714E4a8F75612F20a79720'; // #9, kept unclaimed
 
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
 const CLAIM_EVENT = parseAbiItem(
-  'event AirdropClaimed(address indexed token, address indexed account, uint256 share, uint256 amount, uint256 remainingShare)',
+  'event AirdropClaimed(address indexed tokenAddress, address indexed claimer, uint256 share, uint256 amount, uint256 remainingShare)',
 );
 const publicClient = createPublicClient({ transport: http(RPC_URL) });
+/** `_claimableFromRoundByTokenAddress` is storage slot 2 in AirdropDistributor. */
+const CLAIMABLE_FROM_ROUND_SLOT = keccak256(
+  encodeAbiParameters([{ type: 'address' }, { type: 'uint256' }], [TOKEN, 2n]),
+);
 
 let claimer: `0x${string}` = CANDIDATE_CLAIMERS[0];
 /** Set by beforeAll from the fixture claim's cast receipt (independent of the app). */
@@ -91,7 +105,9 @@ function castCall(signature: string, ...args: string[]): string {
 }
 
 function isClaimed(account: string): boolean {
-  return castCall('isClaimed(address,address)(bool)', TOKEN, account) === 'true';
+  return (
+    castCall('isClaimedByTokenAddressByClaimer(address,address)(bool)', TOKEN, account) === 'true'
+  );
 }
 
 function proofArg(proof: readonly string[]): string {
@@ -114,6 +130,10 @@ function tokenUint(signature: string, ...args: string[]): bigint {
   return parseUint(castCallTo(TOKEN, signature, ...args), signature);
 }
 
+function phaseUint(signature: string, ...args: string[]): bigint {
+  return parseUint(castCallTo(deployment.addresses.phase, signature, ...args), signature);
+}
+
 function claimableAmount(account: string, share: string, proof: readonly string[]): bigint {
   return castUint(
     'claimableAmount(address,address,uint256,bytes32[])(uint256)',
@@ -132,9 +152,8 @@ function claimOutsideBrowser(account: `0x${string}`): void {
     [
       'send',
       AIRDROP,
-      'claim(address,address,uint256,bytes32[])',
+      'claim(address,uint256,bytes32[])',
       TOKEN,
-      account,
       entry.share,
       proofArg(entry.proof),
       '--from',
@@ -153,7 +172,11 @@ function claimOutsideBrowser(account: `0x${string}`): void {
  * value the page must show in S6.
  */
 function castClaimedAmount(account: string): bigint {
-  return castUint('claimedAmount(address,address)(uint256)', TOKEN, account);
+  return castUint(
+    'claimedAmountByTokenAddressByClaimer(address,address)(uint256)',
+    TOKEN,
+    account,
+  );
 }
 
 /** Mirrors formatTokenAmount's grouping for the 18-decimals genesis token (6 digits). */
@@ -302,8 +325,8 @@ test('airdrop: eligible wallet sees the estimate, claims, and gets a real receip
   });
   const event = events.find(
     (candidate) =>
-      candidate.args.account.toLowerCase() === claimer.toLowerCase() &&
-      candidate.args.token.toLowerCase() === TOKEN.toLowerCase(),
+      candidate.args.claimer.toLowerCase() === claimer.toLowerCase() &&
+      candidate.args.tokenAddress.toLowerCase() === TOKEN.toLowerCase(),
   );
   expect(event).toBeDefined();
   if (event === undefined) return;
@@ -381,6 +404,68 @@ test('airdrop: already claimed on-chain shows the real minted amount, not a loca
   await expect(page.getByTestId('airdrop-claimed-title')).toHaveText(expectedTitle, {
     timeout: 20_000,
   });
+});
+
+test('airdrop: before claimableFromRound the page shows the round gate, not a number', async ({
+  page,
+}) => {
+  expect(isClaimed(GATE_ACCOUNT)).toBe(false);
+  const currentRound = phaseUint('currentPhase()(uint256)');
+  const gateRound = currentRound + 2n;
+
+  // The running seed chain is already past the genesis round, so pin the gate to
+  // a future round by writing the distributor's own storage (anvil only, inside
+  // this file's snapshot; reverted by isolateChain). All reads stay real.
+  const originalSlotValue = execFileSync(
+    'cast',
+    ['storage', AIRDROP, CLAIMABLE_FROM_ROUND_SLOT, '--rpc-url', RPC_URL],
+    { encoding: 'utf8' },
+  ).trim();
+  execFileSync(
+    'cast',
+    [
+      'rpc',
+      'anvil_setStorageAt',
+      AIRDROP,
+      CLAIMABLE_FROM_ROUND_SLOT,
+      `0x${gateRound.toString(16).padStart(64, '0')}`,
+      '--rpc-url',
+      RPC_URL,
+    ],
+    { encoding: 'utf8' },
+  );
+
+  try {
+    await installWallet(page, GATE_ACCOUNT);
+    await page.goto('/airdrop');
+    await connect(page);
+
+    await expect(page.getByTestId('airdrop-round-gate-title')).toHaveText(
+      '还没到可铸造轮次',
+      { timeout: 20_000 },
+    );
+    await expect(page.getByTestId('airdrop-round-gate-wait')).toHaveText(/^约 \d+ 分钟$/);
+    await expect(page.getByRole('button', { name: '空投铸造' })).toHaveCount(0);
+    // Never an absolute timestamp, never an amount for a gated wallet.
+    await expect(page.getByText(/\d{4}-\d{2}-\d{2}|\d{1,2}:\d{2}/)).toHaveCount(0);
+    await expect(page.getByTestId('airdrop-expected-amount')).toHaveCount(0);
+
+    await shot(page, 'airdrop-round-not-reached.png');
+  } finally {
+    execFileSync(
+      'cast',
+      [
+        'rpc',
+        'anvil_setStorageAt',
+        AIRDROP,
+        CLAIMABLE_FROM_ROUND_SLOT,
+        originalSlotValue,
+        '--rpc-url',
+        RPC_URL,
+      ],
+      { encoding: 'utf8' },
+    );
+  }
 });
 
 test('airdrop: a wallet outside the snapshot gets the reason and a way out', async ({ page }) => {
