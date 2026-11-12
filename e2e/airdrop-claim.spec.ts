@@ -69,7 +69,25 @@ const CLAIM_EVENT = parseAbiItem(
   'event AirdropClaimed(address indexed tokenAddress, address indexed claimer, uint256 share, uint256 amount, uint256 remainingShare)',
 );
 const publicClient = createPublicClient({ transport: http(RPC_URL) });
-/** `_claimableFromRoundByTokenAddress` is storage slot 2 in AirdropDistributor. */
+/**
+ * `claimableFromRound(token)` lives in the per-token mapping at storage slot 2.
+ *
+ * AirdropDistributor's storage layout after core@0cdbe44:
+ *   0: token-address array (its length lives in slot 0)
+ *   1: token → merkle root
+ *   2: token → claimable-from round
+ *   3: token → cumulative claimed share
+ *   4: token → cumulative claimed amount   (added by the refactor)
+ *   5: token → claimer → is-claimed flag
+ *   6: token → claimer → claimed amount
+ *   7: token → snapshot URI
+ *   8: token → launcher member id
+ *
+ * The refactor inserted slot 4, which shifts the claimer maps and URI but not
+ * `claimableFromRound`; the mapping slot is still keccak256(abi.encode(token, 2)).
+ * Verified against the running suite chain with `cast storage <airdrop> <slot>`
+ * (= 2) and `cast index address <token> 2`.
+ */
 const CLAIMABLE_FROM_ROUND_SLOT = keccak256(
   encodeAbiParameters([{ type: 'address' }, { type: 'uint256' }], [TOKEN, 2n]),
 );
@@ -106,7 +124,7 @@ function castCall(signature: string, ...args: string[]): string {
 
 function isClaimed(account: string): boolean {
   return (
-    castCall('isClaimedByTokenAddressByClaimer(address,address)(bool)', TOKEN, account) === 'true'
+    castCall('isClaimed(address,address)(bool)', TOKEN, account) === 'true'
   );
 }
 
@@ -172,7 +190,7 @@ function claimOutsideBrowser(account: `0x${string}`): void {
  * value the page must show in S6.
  */
 function castClaimedAmount(account: string): bigint {
-  return castUint('claimedAmountByTokenAddressByClaimer(address,address)(uint256)', TOKEN, account);
+  return castUint('claimedAmount(address,address)(uint256)', TOKEN, account);
 }
 
 /** Mirrors formatTokenAmount's grouping for the 18-decimals genesis token (6 digits). */
@@ -382,9 +400,9 @@ test('airdrop: already claimed on-chain shows the real minted amount, not a loca
   await page.goto('/airdrop');
   await connect(page);
 
-  // No local record in this context: the adapter reads the chain (CI-014 view on
-  // a redeployed chain, dev AirdropClaimed logs on the current one), so S6 must
-  // equal the amount cast read independently in beforeAll.
+  // No local record in this context: the adapter reads the chain's
+  // `claimedAmount(token, account)` view (CI-014), so S6 must equal the amount
+  // cast reads independently in beforeAll.
   const expectedTitle = `已铸造 ${displayAmount(alreadyClaimedAmount)} TestLOVE20`;
   const title = page.getByTestId('airdrop-claimed-title');
   await expect(title).toBeVisible({ timeout: 20_000 });
