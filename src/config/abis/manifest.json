@@ -6,11 +6,11 @@
     "path": "../anvil/export",
     "chainId": 31337,
     "deployBlock": 32,
-    "exportedAt": "2026-11-11T19:33:11.381Z"
+    "exportedAt": "2026-11-12T11:54:41.821Z"
   },
   "sources": {
     "core": {
-      "head": "48cfd4905c524d921e6d965edd2b41c413196db3",
+      "head": "141c9313855bf2957efd04ad2226292a53655668",
       "path": "../core",
       "abis": {
         "LOVE20Token": 30,
@@ -20,11 +20,12 @@
         "Stake": 64,
         "Submit": 37,
         "Vote": 30,
-        "Mint": 43
+        "Mint": 43,
+        "AirdropDistributor": 38
       }
     },
     "action": {
-      "head": "5b078c7f3a6270c1070dbe78e058efa3998f8d53",
+      "head": "8ae0a2371cfbde51a6f8e1ac6131fd97cc3b619a",
       "path": "../action",
       "abis": {
         "ActionTarget": 43,
@@ -34,7 +35,7 @@
       }
     },
     "group-chat": {
-      "head": "6040f7de8f429dcfdb42e85ba516f4aaf82e74b4",
+      "head": "0ea1606392a4ceebad8b3206a455558cdea6cd00",
       "path": "../group-chat",
       "abis": {
         "GroupChat": 67
@@ -56,10 +57,9 @@
       }
     },
     "anvil": {
-      "head": "f3d038c0b1730f0675e982124d24faefd9cfafcd",
+      "head": "d81f4eb068bdf10412c803429afd856228b29d6f",
       "path": "../anvil",
       "abis": {
-        "Airdrop": 29,
         "WETH9": 16,
         "Multicall3": 16
       }
@@ -86,9 +86,9 @@
       "file": "src/config/abis/phase.ts",
       "entries": 16
     },
-    "Airdrop": {
-      "file": "src/config/abis/airdrop.ts",
-      "entries": 29
+    "AirdropDistributor": {
+      "file": "src/config/abis/airdrop-distributor.ts",
+      "entries": 38
     },
     "UniswapV2Router02": {
       "file": "src/config/abis/uniswap-v2-router02.ts",

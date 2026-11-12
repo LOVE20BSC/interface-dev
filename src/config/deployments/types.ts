@@ -27,7 +27,7 @@ export interface AddressBook {
   readonly factory: HexAddress;
   readonly router: HexAddress;
   readonly multicall3: HexAddress;
-  readonly airdrop: HexAddress;
+  readonly airdropDistributor: HexAddress;
   readonly firstTokenAddress: HexAddress;
   readonly pair: HexAddress;
 }
@@ -81,7 +81,7 @@ const ADDRESS_KEYS = [
   'factory',
   'router',
   'multicall3',
-  'airdrop',
+  'airdropDistributor',
   'firstTokenAddress',
   'pair',
 ] as const satisfies readonly (keyof AddressBook)[];

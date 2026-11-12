@@ -97,7 +97,7 @@ export const ADDRESS_BOOK_KEYS = [
   'factory',
   'router',
   'multicall3',
-  'airdrop',
+  'airdropDistributor',
   'firstTokenAddress',
   'pair',
 ] as const satisfies readonly (keyof AddressBook)[];

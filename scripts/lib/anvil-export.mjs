@@ -47,7 +47,11 @@ export const ABI_MODULES = [
   { file: 'launch.ts', exportName: 'launchAbi', contract: 'Launch' },
   { file: 'stake.ts', exportName: 'stakeAbi', contract: 'Stake' },
   { file: 'phase.ts', exportName: 'phaseAbi', contract: 'Phase' },
-  { file: 'airdrop.ts', exportName: 'airdropAbi', contract: 'Airdrop' },
+  {
+    file: 'airdrop-distributor.ts',
+    exportName: 'airdropDistributorAbi',
+    contract: 'AirdropDistributor',
+  },
   {
     file: 'uniswap-v2-router02.ts',
     exportName: 'uniswapV2Router02Abi',
@@ -69,12 +73,22 @@ export const ABI_MODULES = [
  * GroupServiceExecutor delegatecall into.
  */
 const REPO_ABIS = {
-  core: ['LOVE20Token', 'Phase', 'Launch', 'MemberNFT', 'Stake', 'Submit', 'Vote', 'Mint'],
+  core: [
+    'LOVE20Token',
+    'Phase',
+    'Launch',
+    'MemberNFT',
+    'Stake',
+    'Submit',
+    'Vote',
+    'Mint',
+    'AirdropDistributor',
+  ],
   action: ['ActionTarget', 'LpExecutor', 'GroupActionExecutor', 'GroupServiceExecutor'],
   'group-chat': ['GroupChat'],
   libs: [],
   dex: ['UniswapV2Factory', 'UniswapV2Router02', 'UniswapV2Pair'],
-  anvil: ['Airdrop', 'WETH9', 'Multicall3'],
+  anvil: ['WETH9', 'Multicall3'],
 };
 
 const ADDRESS_KEYS = {
@@ -97,7 +111,7 @@ const ADDRESS_KEYS = {
   factory: 'UNISWAP_V2_FACTORY_ADDRESS',
   router: 'UNISWAP_V2_ROUTER02_ADDRESS',
   multicall3: 'MULTICALL3_ADDRESS',
-  airdrop: 'AIRDROP_ADDRESS',
+  airdropDistributor: 'AIRDROP_DISTRIBUTOR_ADDRESS',
   firstTokenAddress: 'LOVE20_TOKEN_ADDRESS',
   pair: 'UNISWAP_V2_PAIR_ADDRESS',
 };
@@ -288,23 +302,27 @@ function verifyMerkle(snapshot, expectedRoot) {
 
 export function validateAirdrop(exportData) {
   const { snapshot, deployment } = exportData;
-  const exportAirdrop = deployment.airdrop ?? {};
-  if (exportAirdrop.address !== exportData.addresses.AIRDROP_ADDRESS) {
-    fail('export.airdrop.address disagrees with export.addresses.AIRDROP_ADDRESS');
+  const exportAirdrop = deployment.airdropDistributor ?? {};
+  if (exportAirdrop.address !== exportData.addresses.AIRDROP_DISTRIBUTOR_ADDRESS) {
+    fail(
+      'export.airdropDistributor.address disagrees with export.addresses.AIRDROP_DISTRIBUTOR_ADDRESS',
+    );
   }
   if (exportAirdrop.token !== exportData.addresses.LOVE20_TOKEN_ADDRESS) {
-    fail('export.airdrop.token disagrees with export.addresses.LOVE20_TOKEN_ADDRESS');
+    fail(
+      'export.airdropDistributor.token disagrees with export.addresses.LOVE20_TOKEN_ADDRESS',
+    );
   }
   if (
     String(exportAirdrop.merkleRoot).toLowerCase() !== String(snapshot.merkleRoot).toLowerCase()
   ) {
     fail(
-      `export.airdrop.merkleRoot ${exportAirdrop.merkleRoot} disagrees with ` +
+      `export.airdropDistributor.merkleRoot ${exportAirdrop.merkleRoot} disagrees with ` +
         `snapshot merkleRoot ${snapshot.merkleRoot}`,
     );
   }
   if (String(exportAirdrop.totalShare) !== String(snapshot.totalShare)) {
-    fail('export.airdrop.totalShare disagrees with the snapshot');
+    fail('export.airdropDistributor.totalShare disagrees with the snapshot');
   }
   return verifyMerkle(snapshot, exportAirdrop.merkleRoot);
 }

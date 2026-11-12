@@ -68,7 +68,14 @@ const DEPLOYMENT_FILE = resolve(ROOT, 'src/config/deployments/anvil31337_dev.jso
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '0.0.0.0']);
 
 /** Contract keys probed to decide whether :8555 carries the committed clean deployment. */
-const PROBE_ADDRESS_KEYS = ['tokenAddress', 'memberNFT', 'airdrop', 'multicall3', 'weth', 'pair'];
+const PROBE_ADDRESS_KEYS = [
+  'tokenAddress',
+  'memberNFT',
+  'airdropDistributor',
+  'multicall3',
+  'weth',
+  'pair',
+];
 
 function fatal(...lines) {
   for (const line of lines) console.error(`[e2e-chain] ${line}`);

@@ -8,7 +8,7 @@ export { love20TokenAbi } from './love20-token';
 export { launchAbi } from './launch';
 export { stakeAbi } from './stake';
 export { phaseAbi } from './phase';
-export { airdropAbi } from './airdrop';
+export { airdropDistributorAbi } from './airdrop-distributor';
 export { uniswapV2Router02Abi } from './uniswap-v2-router02';
 export { uniswapV2PairAbi } from './uniswap-v2-pair';
 export { uniswapV2FactoryAbi } from './uniswap-v2-factory';
