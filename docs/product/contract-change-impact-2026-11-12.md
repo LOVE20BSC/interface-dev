@@ -66,7 +66,7 @@ function airdropInfos(uint256 offset, uint256 limit, bool reverse) external view
 | `claimedAmount(token, account)`（CI-014 我们加的） | `claimedAmountByTokenAddressByClaimer(token, account)` |
 | 立即铸造 | **轮次门槛**：`claimableFromRound > currentRound` → `ClaimRoundNotReached`，页面需要「还没到可铸造轮次」状态 + 按 phase 块数估算「约 X 分钟」 |
 | 只有一份空投 | `airdropInfos(offset, limit, reverse)` 可列多份；M0 仍只展示当前社区代币那一份，但读取路径按「按 token 查」 |
-| 快照内置于产物 | **运行时从 URI 拉 JSON**：需要 CORS 可达、失败态（拉不到 → 「空投资格暂时读不到」+ 重试）、**并用链上 merkleRoot 校验快照 root**，不一致则拒绝使用快照 |
+| 快照内置于产物 | **创世代币：仍内置**（链上无 URI，见 CI-017）；**后续 Launch 的代币：运行时从链上 URI 拉 JSON**（CORS 可达、失败态 + 重试、**用链上 merkleRoot 校验快照 root**，不一致即拒用） |
 
 ### C. 合约问题清单需要更新
 

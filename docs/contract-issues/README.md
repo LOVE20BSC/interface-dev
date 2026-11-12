@@ -28,8 +28,9 @@
 | [CI-014](014-airdrop-claimed-amount-not-readable.md) | 空投没有「按账户查已铸造金额」的只读方法 | High | 空投铸造 | 已修复（core@a9a5ac6：claimedAmountByTokenAddressByClaimer） | `anvil/src/vendor/Airdrop.sol`、`src/config/abis/airdrop.ts`、`src/features/claim-airdrop/` |
 | [CI-015](015-snapshot-uri-trust.md) | 空投快照改为链上 URI：信任、可用性与被篡改风险 | Medium | 空投铸造 | Open | `core/src/distributor/AirdropDistributor.sol` |
 | [CI-016](016-airdrop-infos-cost.md) | `airdropInfos` 返回结构体数组（含 string），分页与成本上限未定 | Low | 空投铸造（多空投列表） | Open | `core/src/interfaces/distributor/IAirdropDistributor.sol` |
+| [CI-017](017-genesis-snapshot-uri-locked.md) | 创世空投快照 URI 永远无法登记，前端只能内置创世快照 | Medium | 空投铸造（创世代币） | Open | `core/src/distributor/AirdropDistributor.sol` |
 
-数量：16 条（**11 Open / 5 已修复**）；Open 条目按严重级别为 **1 Blocker / 3 High / 7 Medium / 1 Low**；已修复：CI-004（core@72a1604，High）、CI-005（core@f209300，High）、CI-014（core@a9a5ac6，High）、以及此前记录的 CI-004/CI-014 早期版本。详见各行。
+数量：17 条（**12 Open / 5 已修复**）；Open 条目按严重级别为 **1 Blocker / 3 High / 8 Medium / 1 Low**；已修复：CI-004（core@72a1604，High）、CI-005（core@f209300，High）、CI-014（core@a9a5ac6，High）、以及此前记录的 CI-004/CI-014 早期版本。详见各行。
 
 ## 严重级别定义
 
