@@ -1,8 +1,9 @@
 # 20261112-1419-45e8-按-core-重构后的-airdropdistributor-接口重导-anvi: 按 core 重构后的 AirdropDistributor 接口重导 anvil 并适配前端
 
 - **Tags**: 空投, 合约迁移, anvil, 前端
-- **Status**: doing · 2026-11-12 15:03:48 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Status**: done · 2026-11-12 15:42:45 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 - **Created**: 2026-11-12 14:19:53 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Sealed**: 2026-11-12 15:42:45 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 
 <!-- Header lines are maintained by the script, fixed order: Tags → Status → Created → Sealed.
      The `- **Tags**: …` line is inserted at the top by new --tags; omitted when there are no tags
@@ -54,3 +55,4 @@
 - 2026-11-12 14:19:53 · new · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · created and claimed
 - 2026-11-12 14:30:57 · log · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · anvil 重导完成（eb83b29/1a5c998/2b5182a）：airdropInfo 单次读取、导出新字段、两链重建且确定性三跑一致；前端适配 agent 已开工
 - 2026-11-12 15:03:48 · log · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · 前端适配完成并发布：main@89d1ccb（385 单测 / 双跑 e2e 52-52 / 158.3kB / abis:check 绿），已推送 interface-dev 并 release 到 interface-test；调用收敛为单次 airdropInfo
+- 2026-11-12 15:42:45 · close · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · sealed: 按 core@4200d35 重构后的 AirdropDistributor 重导 anvil（airdropInfo 单次读取、导出新字段、三次 bootstrap 导出哈希一致）并适配前端调用面（六读取合一、claimedAmount/isClaimed 改名、池子用 totalClaimedAmount/remainingAmount、轮次门槛 slot 2 不变）；385 单测、e2e 52/52 双跑、158.3 kB；已推送 interface-dev 并 release interface-test

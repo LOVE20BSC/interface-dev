@@ -1,7 +1,6 @@
 {
   "identity": {"uuid": "47d39b07-9d74-4077-8a12-8ab9280ea25d"},
   "tasks": {
-    "20261112-1419-45e8-按-core-重构后的-airdropdistributor-接口重导-anvi": {"category": null, "created": "2026-11-12 14:19:53", "creator": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "creator_name": "tester", "finished": null, "owner": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "owner_name": "tester", "started": "2026-11-12 14:19:53", "status": "doing", "tags": ["空投", "合约迁移", "anvil", "前端"], "title": "按 core 重构后的 AirdropDistributor 接口重导 anvil 并适配前端", "updated": "2026-11-12 15:03:48", "worklog": "worklog/202611/12-1419-45e8-按-core-重构后的-airdropdistributor-接口重导-anvi.md"}
   },
   "version": "20261022000000"
 }
