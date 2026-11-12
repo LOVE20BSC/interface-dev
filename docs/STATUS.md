@@ -19,12 +19,12 @@ M0 范围共 6 项（[m0-scope](product/m0-scope.md)「范围内」）。✅ 完
 | 5 | 一条命令起全栈 | ✅ | [ADR-0004](adr/0004-anvil-local-chain.md)；clean bootstrap 两次导出同 sha256；本次 `cast chain-id`=31337，`merkleRoot` 与快照一致；前端地址簿由 `pnpm sync:anvil` 生成 |
 | 6 | 文案纪律落地 | ✅ | 所有中文进 `src/shared/config/copy.ts`（生成的错误文案除外），`src/architecture.test.ts` 强制；`7dc0949`；对照 [GLOSSARY](../GLOSSARY.md) |
 | — | M0 验收报告 | ✅ | [m0-acceptance](product/m0-acceptance.md)（14 步 + 证据；§3 的 O1–O4 已修复复核，见 §3.1） |
-| — | E2E 50 条 | 🔄 | `e2e/*.spec.ts` 合计 50 个 `test()`；跑在独立 **8555** 链（`pnpm e2e` 自举/复用），按文件 `anvil_snapshot`/`anvil_revert` 隔离；**2026-11-12 本轮未跑成：`../anvil` 的 `DeployLocal.s.sol` 编译失败，8555 无法 bootstrap（§6.1）** |
+| — | E2E 52 条 | ✅ | `e2e/*.spec.ts` 合计 52 个 `test()`；跑在独立 **8555** 链（`pnpm e2e` 自举/复用），按文件 `anvil_snapshot`/`anvil_revert` 隔离；**2026-11-12 AirdropDistributor 重构适配后连跑两遍均 52/52**（§6.1） |
 | — | 首页身份读取状态 | ✅ | `loading` / `error` / `unconfigured` 不再只剩问候：骨架卡、错误卡 +「重试」、未部署说明；无身份与未选择卡不变；[m0-ux-spec](product/m0-ux-spec.md) §3.1 · `home-identity-error.png` / `home-no-identity.png` |
 | — | 发布 interface-test | 🔄 | 线上 200，但 build id `mwb9werl-379de9b0`；远端 `main`=`a217ddb`，本仓 HEAD 未发布（领先 11 个） |
 | — | M1 治理 | ⏳ | 未开工；[CI-001](contract-issues/001-no-member-round-index.md) Blocker 未解 |
 
-**未完成清单（别误读为 done）**：三处真机体验、发布到 interface-test、test/prod 地址簿填充。e2e 已隔离到独立 8555 链（§6.1）；包体 prod 157.9 / dev 160.0–160.1 kB（prod 为 2026-11-12 空投迁移后实测；dev 有 1 kB 部署数据豁免，§6.2）；ABI manifest 与漂移门禁已补（§6.5）。
+**未完成清单（别误读为 done）**：三处真机体验、发布到 interface-test、test/prod 地址簿填充。e2e 已隔离到独立 8555 链（§6.1）；包体 prod 158.3 / dev 159.2 kB（2026-11-12 airdropInfo 重构后实测；dev 有 1 kB 部署数据豁免，§6.2）；ABI manifest 与漂移门禁已补（§6.5）。
 
 截图共 33 张：home 7（含链不对药丸与身份读取错误卡）/ airdrop 6（含「还没到可铸造轮次」）/ mint 5 / my-nft 2 / swap 4 / about 2 / apps 1 / me 1 / transfer 3 / tx-recovery 1 / live 1，见 [`product/screenshots/`](product/screenshots/)。本次核对用到的文件：`home-identity-error.png`、`home-no-identity.png`、`swap-form.png`、`mint-form.png`、`airdrop-eligible.png`、[`live/interface-test-live-2026-11-11.png`](product/screenshots/live/interface-test-live-2026-11-11.png)。
 
@@ -69,7 +69,7 @@ M0 范围共 6 项（[m0-scope](product/m0-scope.md)「范围内」）。✅ 完
 | 构建 | `pnpm build` | typecheck → vite → 404/.nojekyll/build-id → 包体门禁；默认 **prod** 变体 |
 | dev 变体构建 | `VITE_ENV=dev pnpm build` | 测包体/本地地址簿时必须显式指定 |
 | 预览产物 | `pnpm preview` | <http://127.0.0.1:4173> |
-| E2E | `pnpm e2e` | Playwright，**50 条**；在独立 **8555** 自动化链上自举/复用（`scripts/e2e-chain.mjs`），`playwright.config.ts` 强制 `VITE_ENV=dev` 并跑 `build && preview`，把解析出的 RPC 作为 `VITE_ANVIL_RPC` 烘进构建 |
+| E2E | `pnpm e2e` | Playwright，**52 条**；在独立 **8555** 自动化链上自举/复用（`scripts/e2e-chain.mjs`），`playwright.config.ts` 强制 `VITE_ENV=dev` 并跑 `build && preview`，把解析出的 RPC 作为 `VITE_ANVIL_RPC` 烘进构建 |
 | 只看 e2e 链 | `pnpm e2e:ensure-chain` | 打印 8555 端点与「自举/复用」结果，不跑测试；`pnpm e2e:reset-chain` 重建 |
 | 格式化 | `pnpm format` / `pnpm format:check` | Prettier |
 | 起人工链（8545） | `make stop && make clean && make bootstrap` | 只从全新链/nonce 0 部署；旧链会被拒绝 |
@@ -110,7 +110,7 @@ CI 环境规则（`.github/workflows/deploy.yml`）：取 `github.repository` �
    - `pnpm e2e` 由 `scripts/e2e-chain.mjs` 守护：默认链 `http://127.0.0.1:8555`，本机命中 `:8545` **立即失败**（`playwright.config.ts` 对直接 `playwright test` 同样拒绝）；未显式设置 `E2E_ANVIL_RPC` 时首次在 8555 上 `make -C ../anvil bootstrap PORT=8555`、之后复用。
    - `e2e/chain.ts` 仍按 spec 文件 `anvil_snapshot`/`anvil_revert`（文件内测试共享夹具，如 mint 收据给 my-nft 列表用；按测试回滚会抹掉下一个测试依赖的状态），`playwright.config.ts` 固定 `workers: 1`——快照作用于整条链，不能让两个文件同时改链。现在它只作用于自动化链，**链脏/被强杀用 `pnpm e2e:reset-chain` 重建，不要去动 8545**。
    - 复核（2026-11-11 21:53–21:58 +08:00）：`pnpm e2e` 连跑两遍均 **33/33**（各 1.3m，中间无 bootstrap；快照 id 0x0–0x3 → 0x4–0x7 连续）；杀掉 8555 后重跑自动 bootstrap 并再次 33/33；两遍前后 8545 的 `block-number` 969→969、`nonce 0x7099…` 69→69、`anvil_getAutomine` true→true、pid 13323 不变。操作见 [e2e/README.md](../e2e/README.md)。
-2. **首屏包体（修复后复核）**：门禁 `scripts/check-bundle.mjs`（level-9）实测 prod **157.9 kB**（2026-11-12 空投迁移后；迁移前 159.2–159.3）、dev **160.0–160.1 kB** gzip（build id 每次构建重新生成，±0.1 kB 抖动）；Vite 自身报数更高（prod 163.36 kB / dev 164.18 kB，统计口径不同）。dev 多出的 ~0.8 kB 已定位为**部署数据压缩率差异**，不是 dev-only 代码：两者 raw 均 547.35 kB，部署 JSON `gzip -9` dev 1,358 B vs prod 688 B（anvil 真实地址 vs 零地址占位），测试网横幅/dev 标识是两个变体共有的真实 UI。门禁因此给 dev 显式 **+1 kB 数据豁免**（dev 目标 161 kB，硬限 200 仍适用；prod 仍按 160 kB），不再输出无法行动的 WARN。后续 prod 不得超 160、dev 不得超 161。
+2. **首屏包体（修复后复核）**：门禁 `scripts/check-bundle.mjs`（level-9）实测 prod **158.3 kB**、dev **159.2 kB** gzip（2026-11-12 `airdropInfo` 重构后；迁移前 159.2–159.3 / 160.0–160.1）；Vite 自身报数更高（统计口径不同）。dev 与 prod 的差异来自**部署数据压缩率**，不是 dev-only 代码：两者 raw 约 530 kB，部署 JSON 的 anvil 真实地址比零地址占位更难压缩，测试网横幅/dev 标识是两个变体共有的真实 UI。门禁因此给 dev 显式 **+1 kB 数据豁免**（dev 目标 161 kB，硬限 200 仍适用；prod 仍按 160 kB），不再输出无法行动的 WARN。后续 prod 不得超 160、dev 不得超 161。
 3. **三处真机（390×844）体验缺陷**：① 主按钮被固定底栏遮挡——[`swap-form.png`](product/screenshots/swap-form.png) 里「兑换」只剩上沿；② 小数位不统一——`mint-form.png` 显示 `99,998,199.99`（2 位）、`swap-form.png` `19.938012`（6 位）、`airdrop-eligible.png` `100,000,000`（0 位）；③ 6 字标题被截——`airdrop-eligible.png` 页头「铸造空投…」。
 4. **地址确定性已收敛（冲突已解决）**：clean bootstrap 从 deployer nonce 0 开始，地址确定；bootstrap 期间 automine，导出块高也确定（§6 有两次 sha256 相同的证明命令）。只有「已用过的链」会得到另一组地址，所以 `make bootstrap` 现在拒绝复用任何运行中的链，`export.py` 还会拒绝 nonce 首笔不为 0 的 broadcast。`m0-scope` 与 ADR-0004 已按「deterministic-from-clean」统一；操作上仍只消费 `pnpm sync:anvil` 生成物，绝不硬编码、绝不手设 nonce。
 5. **ABI 必须 generate-then-commit（已补齐）**：core `out/`、dex `build/` 都被各自仓库 gitignore（core `.gitignore:1`、dex `.gitignore:1`），本仓也忽略 `out/`。`pnpm sync:anvil` 生成 `src/config/abis/*.ts`（含 `airdrop-distributor.ts`）、`src/config/abis/manifest.json`（core/action/group-chat/libs/dex/anvil 的 HEAD、导出块高/时间、每合约条目数）与快照；`pnpm abis:check` 在有 `../anvil/export` 时逐字节校验，缺失时明确跳过。不要把 `abi` 手改后再提交。
@@ -125,7 +125,7 @@ CI 环境规则（`.github/workflows/deploy.yml`）：取 `github.repository` �
 
 | # | 事项 | 完成标志 |
 | --- | --- | --- |
-| 1 | ✅ 包体保持预算内 | prod gate ≤160 kB（复核 159.2–159.3 kB）；dev ≤161 kB（复核 160.0–160.1 kB，含 `check-bundle.mjs` 显式 1 kB 部署数据豁免）；不引入 WalletConnect 字节 |
+| 1 | ✅ 包体保持预算内 | prod gate ≤160 kB（复核 158.3 kB）；dev ≤161 kB（复核 159.2 kB，含 `check-bundle.mjs` 显式 1 kB 部署数据豁免）；不引入 WalletConnect 字节 |
 | 2 | 修三处真机体验：底栏遮挡主按钮、小数位统一、6 字标题不截断 | 按 390×844 重出 `product/screenshots/` 对照图，主按钮完整可见、金额精度有统一规则 |
 | 3 | ✅ E2E 独立链隔离 | 自动化链 8555（`pnpm e2e` 自举/复用，8545 硬拒绝）；按文件快照/回滚；连跑两遍均 **33/33** 且 8545 前后不变（§6.1） |
 | 4 | 写 M0 验收报告 | 按 [m0-ux-spec](product/m0-ux-spec.md) §6 的 14 步 + 四个阻塞点逐条附证据（截图/交易哈希/命令输出） |
@@ -136,7 +136,7 @@ CI 环境规则（`.github/workflows/deploy.yml`）：取 `github.repository` �
 
 1. **读什么**：先 [ADR-0001](adr/0001-stack-and-static-hosting.md)→[0004](adr/0004-anvil-local-chain.md)（0002 环境/发布、0004 起链最关键），再本文件，再 [m0-ux-spec](product/m0-ux-spec.md)；改文案前读 [GLOSSARY](../GLOSSARY.md)。
 2. **起链**：`make -C ../anvil bootstrap`；`cast chain-id --rpc-url http://127.0.0.1:8545` 应为 31337；收链 `make -C ../anvil stop`。同一时刻只允许一条链。
-3. **跑测试**：`pnpm install` → `pnpm typecheck && pnpm lint && pnpm test`；`pnpm e2e` 跑 50 条，首次需干净链，之后可按文件快照/回滚重复跑（见 [e2e/README.md](../e2e/README.md)）。
+3. **跑测试**：`pnpm install` → `pnpm typecheck && pnpm lint && pnpm test`；`pnpm e2e` 跑 52 条，首次需干净链，之后可按文件快照/回滚重复跑（见 [e2e/README.md](../e2e/README.md)）。
 4. **改 UI 的纪律**：文案只进 `shared/config/copy.ts`；组件内禁止中文字面量；缓存只走 `shared/lib/cache.ts`；地址/chainId 只从环境包来；禁止硬编码费率；金额与倒计时必须标「约/预计」；不调 `tokenURI`、不读事件日志。
 5. **改 ABI/地址**：先 clean bootstrap，再 `pnpm sync:anvil` 生成并提交；不手改、不把 `out/`/`build/` 带进仓，不为了匹配旧地址簿调 nonce。漂移门禁 `pnpm abis:check`。
 6. **提交纪律**：显式 `git add <path>`（不要 `git add -A`）；已推送 commit 禁止 amend；不提交 `dist*/`、`.research/`、`.build-id`、`.env`。
