@@ -32,6 +32,33 @@ export interface AddressBook {
   readonly pair: HexAddress;
 }
 
+/**
+ * Bootstrap metadata copied from the anvil export's `airdropDistributor` block.
+ *
+ * This is *not* a runtime data source: the page always reads
+ * `AirdropDistributor.airdropInfo(token)` for merkle root, claimable-from round,
+ * totals and snapshot URI. Recording the export block keeps the committed
+ * deployment book comparable with the sibling export. uint256 values are
+ * decimal strings because JSON numbers cannot represent them exactly.
+ */
+export interface AirdropDistributorDeployment {
+  readonly address: HexAddress;
+  readonly token: HexAddress;
+  readonly merkleRoot: `0x${string}`;
+  readonly totalShare: string;
+  readonly accountCount: string;
+  readonly claimDelayRounds: number;
+  readonly claimableFromRound: string;
+  readonly totalClaimedShare: string;
+  readonly totalRemainingShare: string;
+  readonly totalClaimedAmount: string;
+  readonly remainingAmount: string;
+  /** Empty for the genesis token (CI-017); http(s) for launched tokens. */
+  readonly snapshotUri: string;
+  readonly intendedSnapshotUri: string;
+  readonly snapshotFile: string;
+}
+
 export interface NativeCurrency {
   readonly name: string;
   readonly symbol: string;
@@ -58,6 +85,8 @@ export interface DeploymentConfig {
   readonly deployment: {
     readonly blockNumber: number | null;
   };
+  /** Present for the anvil dev book; test/prod stay address-only until deployed. */
+  readonly airdropDistributor?: AirdropDistributorDeployment;
   readonly addresses: AddressBook;
 }
 
@@ -97,6 +126,20 @@ function record(value: unknown, label: string): Record<string, unknown> {
     throw new Error(`deployment: "${label}" must be an object`);
   }
   return value as Record<string, unknown>;
+}
+
+function decimalString(value: unknown, label: string): string {
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) {
+    throw new Error(`deployment: "${label}" must be a decimal string`);
+  }
+  return value;
+}
+
+function hash32(value: unknown, label: string): `0x${string}` {
+  if (typeof value !== 'string' || !/^0x[0-9a-fA-F]{64}$/.test(value)) {
+    throw new Error(`deployment: "${label}" must be a 0x-prefixed 32-byte hash`);
+  }
+  return value as `0x${string}`;
 }
 
 function string(value: unknown, label: string): string {
@@ -161,6 +204,47 @@ export function parseDeployment(input: unknown, expectedVariant?: EnvVariant): D
     parsedAddresses[key] = value;
   }
 
+  const airdropRaw = root.airdropDistributor;
+  let airdropDistributor: AirdropDistributorDeployment | undefined;
+  if (airdropRaw !== undefined && airdropRaw !== null) {
+    const block = record(airdropRaw, 'airdropDistributor');
+    const uint = (key: keyof AirdropDistributorDeployment) =>
+      decimalString(block[key], `airdropDistributor.${String(key)}`);
+    const claimDelayRounds = block.claimDelayRounds;
+    if (
+      typeof claimDelayRounds !== 'number' ||
+      !Number.isSafeInteger(claimDelayRounds) ||
+      claimDelayRounds < 0
+    ) {
+      throw new Error('deployment: "airdropDistributor.claimDelayRounds" must be a safe integer');
+    }
+    if (!isHexAddress(block.address) || !isHexAddress(block.token)) {
+      throw new Error('deployment: "airdropDistributor.address/token" must be addresses');
+    }
+    if (typeof block.snapshotUri !== 'string') {
+      throw new Error('deployment: "airdropDistributor.snapshotUri" must be a string');
+    }
+    airdropDistributor = {
+      address: block.address,
+      token: block.token,
+      merkleRoot: hash32(block.merkleRoot, 'airdropDistributor.merkleRoot'),
+      totalShare: uint('totalShare'),
+      accountCount: uint('accountCount'),
+      claimDelayRounds,
+      claimableFromRound: uint('claimableFromRound'),
+      totalClaimedShare: uint('totalClaimedShare'),
+      totalRemainingShare: uint('totalRemainingShare'),
+      totalClaimedAmount: uint('totalClaimedAmount'),
+      remainingAmount: uint('remainingAmount'),
+      snapshotUri: block.snapshotUri,
+      intendedSnapshotUri: string(
+        block.intendedSnapshotUri,
+        'airdropDistributor.intendedSnapshotUri',
+      ),
+      snapshotFile: string(block.snapshotFile, 'airdropDistributor.snapshotFile'),
+    };
+  }
+
   const deployment = record(root.deployment ?? {}, 'deployment');
   const blockNumber = deployment.blockNumber;
   if (blockNumber !== null && blockNumber !== undefined) {
@@ -194,6 +278,7 @@ export function parseDeployment(input: unknown, expectedVariant?: EnvVariant): D
     deployment: {
       blockNumber: typeof blockNumber === 'number' ? blockNumber : null,
     },
+    ...(airdropDistributor !== undefined ? { airdropDistributor } : {}),
     addresses: parsedAddresses,
   };
 }

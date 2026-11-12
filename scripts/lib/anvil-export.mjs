@@ -124,7 +124,7 @@ function fail(message) {
   throw new ExportError(message);
 }
 
-export function readJson(path, label) {
+function readJsonText(path, label) {
   if (!existsSync(path)) {
     fail(
       `missing ${label}: ${path}\n` +
@@ -133,7 +133,74 @@ export function readJson(path, label) {
     );
   }
   try {
-    return JSON.parse(readFileSync(path, 'utf8'));
+    return readFileSync(path, 'utf8');
+  } catch (error) {
+    fail(`cannot read ${label}: ${path}\n  ${error.message}`);
+  }
+}
+
+export function readJson(path, label) {
+  try {
+    return JSON.parse(readJsonText(path, label));
+  } catch (error) {
+    if (error instanceof ExportError) throw error;
+    fail(`${label} is not valid JSON: ${path}\n  ${error.message}`);
+  }
+}
+
+/**
+ * Quotes JSON integer literals that cannot be represented exactly by `Number`
+ * so `JSON.parse` keeps their decimal digits. The export writes uint256 values
+ * (shares, amounts) as JSON numbers; a plain parse would round
+ * 500000000000000000000000000 to 5e+26 and corrupt the deployment metadata.
+ * Only literals outside strings are touched, and only plain integers (no
+ * fraction/exponent).
+ */
+function quoteUnsafeIntegers(text) {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      out += char;
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      out += char;
+      continue;
+    }
+    if (char === '-' || (char >= '0' && char <= '9')) {
+      const start = index;
+      if (char === '-') index += 1;
+      while (index + 1 < text.length && text[index + 1] >= '0' && text[index + 1] <= '9') {
+        index += 1;
+      }
+      const next = text[index + 1];
+      const token = text.slice(start, index + 1);
+      const digits = token.replace(/^-/, '');
+      const plainlyIntegral = next !== '.' && next !== 'e' && next !== 'E';
+      if (plainlyIntegral && digits.replace(/^0+/, '').length > 15) {
+        out += `"${token}"`;
+      } else {
+        out += token;
+      }
+      continue;
+    }
+    out += char;
+  }
+  return out;
+}
+
+/** `readJson` for documents whose uint256 values must keep their exact digits. */
+function readJsonExact(path, label) {
+  const text = readJsonText(path, label);
+  try {
+    return JSON.parse(quoteUnsafeIntegers(text));
   } catch (error) {
     fail(`${label} is not valid JSON: ${path}\n  ${error.message}`);
   }
@@ -175,7 +242,7 @@ export function loadAnvilExport() {
     );
   }
 
-  const deployment = readJson(DEPLOYMENT_FILE, 'anvil deployment export');
+  const deployment = readJsonExact(DEPLOYMENT_FILE, 'anvil deployment export');
   const snapshot = readJson(AIRDROP_FILE, 'anvil airdrop snapshot');
 
   const chainId = requireUint(deployment.chainId, 'export.chainId');
@@ -206,6 +273,53 @@ export function loadAnvilExport() {
   return { deployment, snapshot, abis, chainId, deployBlock, network, rpcUrl, addresses };
 }
 
+function requireDecimal(value, label) {
+  const text =
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+      ? String(value)
+      : typeof value === 'string' && /^\d+$/.test(value)
+        ? value
+        : null;
+  if (text === null) {
+    fail(`${label} is not a non-negative decimal integer: ${JSON.stringify(value)}`);
+  }
+  return text;
+}
+
+/**
+ * The export's `airdropDistributor` block is *bootstrap metadata*, not a runtime
+ * data source: the UI always reads `airdropInfo(token)` from the chain. It is
+ * recorded in the deployment book so the committed metadata and the exported
+ * block stay comparable, and uint256 values are plain decimal strings so no
+ * precision is lost in JSON (see `quoteUnsafeIntegers`).
+ */
+function airdropDistributorMetadata(deployment) {
+  const block = deployment.airdropDistributor;
+  if (typeof block !== 'object' || block === null || Array.isArray(block)) {
+    fail('export.airdropDistributor must be an object');
+  }
+  const label = (field) => `export.airdropDistributor.${field}`;
+  if (typeof block.snapshotUri !== 'string') {
+    fail(`${label('snapshotUri')} must be a string`);
+  }
+  return {
+    address: requireAddress(block.address, label('address')),
+    token: requireAddress(block.token, label('token')),
+    merkleRoot: requireHash(block.merkleRoot, label('merkleRoot')),
+    totalShare: requireDecimal(block.totalShare, label('totalShare')),
+    accountCount: requireDecimal(block.accountCount, label('accountCount')),
+    claimDelayRounds: requireUint(block.claimDelayRounds, label('claimDelayRounds')),
+    claimableFromRound: requireDecimal(block.claimableFromRound, label('claimableFromRound')),
+    totalClaimedShare: requireDecimal(block.totalClaimedShare, label('totalClaimedShare')),
+    totalRemainingShare: requireDecimal(block.totalRemainingShare, label('totalRemainingShare')),
+    totalClaimedAmount: requireDecimal(block.totalClaimedAmount, label('totalClaimedAmount')),
+    remainingAmount: requireDecimal(block.remainingAmount, label('remainingAmount')),
+    snapshotUri: block.snapshotUri,
+    intendedSnapshotUri: requireString(block.intendedSnapshotUri, label('intendedSnapshotUri')),
+    snapshotFile: requireString(block.snapshotFile, label('snapshotFile')),
+  };
+}
+
 export function buildAddressBook(exportData, existing) {
   if (typeof existing !== 'object' || existing === null || Array.isArray(existing)) {
     fail(`existing frontend deployment ${FRONTEND_DEPLOYMENT_FILE} must be an object`);
@@ -234,6 +348,8 @@ export function buildAddressBook(exportData, existing) {
         : {}),
       blockNumber: exportData.deployBlock,
     },
+    // Bootstrap metadata from the export; runtime reads still go to the chain.
+    airdropDistributor: airdropDistributorMetadata(exportData.deployment),
     addresses,
   };
 }
@@ -309,9 +425,7 @@ export function validateAirdrop(exportData) {
     );
   }
   if (exportAirdrop.token !== exportData.addresses.LOVE20_TOKEN_ADDRESS) {
-    fail(
-      'export.airdropDistributor.token disagrees with export.addresses.LOVE20_TOKEN_ADDRESS',
-    );
+    fail('export.airdropDistributor.token disagrees with export.addresses.LOVE20_TOKEN_ADDRESS');
   }
   if (
     String(exportAirdrop.merkleRoot).toLowerCase() !== String(snapshot.merkleRoot).toLowerCase()

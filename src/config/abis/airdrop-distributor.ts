@@ -101,6 +101,67 @@ export const airdropDistributorAbi = [
   },
   {
     type: 'function',
+    name: 'airdropInfo',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: 'info',
+        type: 'tuple',
+        internalType: 'struct AirdropInfo',
+        components: [
+          {
+            name: 'tokenAddress',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'merkleRoot',
+            type: 'bytes32',
+            internalType: 'bytes32',
+          },
+          {
+            name: 'claimableFromRound',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'totalClaimedShare',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'totalRemainingShare',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'totalClaimedAmount',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'remainingAmount',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'snapshotUri',
+            type: 'string',
+            internalType: 'string',
+          },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'airdropInfos',
     inputs: [
       {
@@ -141,17 +202,22 @@ export const airdropDistributorAbi = [
             internalType: 'uint256',
           },
           {
-            name: 'claimedShare',
+            name: 'totalClaimedShare',
             type: 'uint256',
             internalType: 'uint256',
           },
           {
-            name: 'remainingShare',
+            name: 'totalRemainingShare',
             type: 'uint256',
             internalType: 'uint256',
           },
           {
-            name: 'contractBalance',
+            name: 'totalClaimedAmount',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'remainingAmount',
             type: 'uint256',
             internalType: 'uint256',
           },
@@ -235,26 +301,7 @@ export const airdropDistributorAbi = [
   },
   {
     type: 'function',
-    name: 'claimableFromRoundByTokenAddress',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'claimedAmountByTokenAddressByClaimer',
+    name: 'claimedAmount',
     inputs: [
       {
         name: 'tokenAddress',
@@ -278,26 +325,7 @@ export const airdropDistributorAbi = [
   },
   {
     type: 'function',
-    name: 'claimedShareByTokenAddress',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'isClaimedByTokenAddressByClaimer',
+    name: 'isClaimed',
     inputs: [
       {
         name: 'tokenAddress',
@@ -315,25 +343,6 @@ export const airdropDistributorAbi = [
         name: '',
         type: 'bool',
         internalType: 'bool',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'launcherMemberIdByTokenAddress',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
       },
     ],
     stateMutability: 'view',
@@ -364,25 +373,6 @@ export const airdropDistributorAbi = [
   },
   {
     type: 'function',
-    name: 'merkleRootByTokenAddress',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'bytes32',
-        internalType: 'bytes32',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'onTokenLaunched',
     inputs: [
       {
@@ -408,44 +398,6 @@ export const airdropDistributorAbi = [
     ],
     outputs: [],
     stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    name: 'remainingShareByTokenAddress',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'snapshotUriByTokenAddress',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'string',
-        internalType: 'string',
-      },
-    ],
-    stateMutability: 'view',
   },
   {
     type: 'function',

@@ -73,6 +73,41 @@ describe('deployment documents', () => {
     expect(() => parseDeployment({ ...devJson, rpcUrls: [] })).toThrow(/rpcUrls/);
   });
 
+  it('keeps the exported airdropDistributor bootstrap metadata (uint256 as exact strings)', () => {
+    const parsed = parseDeployment(devJson, 'dev');
+    const airdrop = parsed.airdropDistributor;
+    expect(airdrop).toBeDefined();
+    expect(airdrop?.address).toBe(parsed.addresses.airdropDistributor);
+    expect(airdrop?.merkleRoot).toBe(
+      '0x046a5d5357fd4da6986a88fb1e2baf3603375d2099ce9f46b9d6fbe333c6c404',
+    );
+    expect(airdrop?.claimableFromRound).toBe('2');
+    expect(airdrop?.totalShare).toBe('1000000000000000000');
+    expect(airdrop?.totalClaimedShare).toBe('500000000000000000');
+    expect(airdrop?.totalRemainingShare).toBe('500000000000000000');
+    const amount = '500000000000000000000000000';
+    expect(airdrop?.totalClaimedAmount).toBe(amount);
+    expect(airdrop?.remainingAmount).toBe(amount);
+    // Genesis URI is empty by design (CI-017); the intent is only bootstrap metadata.
+    expect(airdrop?.snapshotUri).toBe('');
+    expect(airdrop?.intendedSnapshotUri).toMatch(/^http:\/\//);
+  });
+
+  it('rejects malformed airdropDistributor metadata', () => {
+    expect(() =>
+      parseDeployment({
+        ...devJson,
+        airdropDistributor: { ...devJson.airdropDistributor, merkleRoot: '0x1234' },
+      }),
+    ).toThrow(/airdropDistributor\.merkleRoot/);
+    expect(() =>
+      parseDeployment({
+        ...devJson,
+        airdropDistributor: { ...devJson.airdropDistributor, totalShare: 1e18 },
+      }),
+    ).toThrow(/airdropDistributor\.totalShare/);
+  });
+
   it('exposes the address format guard', () => {
     expect(isHexAddress(ZERO_ADDRESS)).toBe(true);
     expect(isHexAddress('0x1234')).toBe(false);
