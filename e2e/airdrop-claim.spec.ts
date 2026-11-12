@@ -172,11 +172,7 @@ function claimOutsideBrowser(account: `0x${string}`): void {
  * value the page must show in S6.
  */
 function castClaimedAmount(account: string): bigint {
-  return castUint(
-    'claimedAmountByTokenAddressByClaimer(address,address)(uint256)',
-    TOKEN,
-    account,
-  );
+  return castUint('claimedAmountByTokenAddressByClaimer(address,address)(uint256)', TOKEN, account);
 }
 
 /** Mirrors formatTokenAmount's grouping for the 18-decimals genesis token (6 digits). */
@@ -334,7 +330,12 @@ test('airdrop: eligible wallet sees the estimate, claims, and gets a real receip
   expect(eventAmount).toBe(estimate);
   expect(receiptAmountText).toBe(`${displayAmount(eventAmount)} TestLOVE20`);
 
-  // Outside the browser: the claim flipped isClaimed and moved exactly this amount.
+  // Outside the browser: the receipt amount equals the distributor's own
+  // claimedAmount view (the same number S6 shows after a reload), and the claim
+  // flipped isClaimed and moved exactly this amount.
+  const claimedOnChain = castClaimedAmount(claimer);
+  expect(claimedOnChain).toBe(eventAmount);
+  expect(receiptAmountText).toBe(`${displayAmount(claimedOnChain)} TestLOVE20`);
   expect(isClaimed(claimer)).toBe(true);
   expect(tokenUint('balanceOf(address)(uint256)', claimer)).toBe(eventAmount);
 
@@ -440,10 +441,9 @@ test('airdrop: before claimableFromRound the page shows the round gate, not a nu
     await page.goto('/airdrop');
     await connect(page);
 
-    await expect(page.getByTestId('airdrop-round-gate-title')).toHaveText(
-      '还没到可铸造轮次',
-      { timeout: 20_000 },
-    );
+    await expect(page.getByTestId('airdrop-round-gate-title')).toHaveText('还没到可铸造轮次', {
+      timeout: 20_000,
+    });
     await expect(page.getByTestId('airdrop-round-gate-wait')).toHaveText(/^约 \d+ 分钟$/);
     await expect(page.getByRole('button', { name: '空投铸造' })).toHaveCount(0);
     // Never an absolute timestamp, never an amount for a gated wallet.
