@@ -29,7 +29,7 @@ function renderPage(path = '/apps?symbol=LOVE20&utm=test'): void {
 }
 
 beforeEach(() => {
-  configure(['airdrop', 'memberNFT', 'router']);
+  configure(['airdropDistributor', 'memberNFT', 'router']);
 });
 
 describe('AppsPage', () => {

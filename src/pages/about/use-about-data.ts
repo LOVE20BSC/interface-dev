@@ -21,7 +21,7 @@ export interface AboutChainData {
   readonly communityDecimals: number | undefined;
   /** MemberNFT.totalSupply() (identity NFTs are whole units). */
   readonly memberNftSupply: AboutValue<bigint>;
-  /** Community token balance held by the Airdrop contract. */
+  /** Community token balance held by the AirdropDistributor contract. */
   readonly airdropPool: AboutValue<bigint>;
   readonly airdropDecimals: number | undefined;
   readonly airdropSymbol: string | undefined;
@@ -55,7 +55,7 @@ export function useAboutChainData(symbol: string): AboutChainData {
   const memberNft = useMemberNftAddress();
   const firstToken = useFirstToken();
   const phase = useCurrentPhase();
-  const airdropAddress = configuredAddress('airdrop');
+  const airdropAddress = configuredAddress('airdropDistributor');
 
   const tokenSupply = useReadContract({
     address: token.address,

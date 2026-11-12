@@ -31,7 +31,7 @@ const APP_ICONS: Readonly<Record<AppIconKey, LucideIcon>> = Object.freeze({
 /** Build availability from the address book, never from a per-page env branch. */
 function currentCatalog(): readonly AppEntry[] {
   return resolveAppsCatalog({
-    airdrop: configuredAddress('airdrop') !== undefined,
+    airdrop: configuredAddress('airdropDistributor') !== undefined,
     memberNFT: configuredAddress('memberNFT') !== undefined,
     router: configuredAddress('router') !== undefined,
   });

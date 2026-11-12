@@ -26,7 +26,7 @@ const deployment = JSON.parse(
   ),
 ) as {
   brand: { docsUrl: string };
-  addresses: { memberNFT: string; airdrop: string; multicall3: string };
+  addresses: { memberNFT: string; airdropDistributor: string; multicall3: string };
 };
 
 test.use({
@@ -75,8 +75,11 @@ test.describe('关于页', () => {
     await expect(page.getByTestId('about-address-memberNFT')).toContainText(
       deployment.addresses.memberNFT,
     );
-    await expect(page.getByTestId('about-address-airdrop')).toContainText(
-      deployment.addresses.airdrop,
+    await expect(page.getByTestId('about-address-airdropDistributor')).toContainText(
+      deployment.addresses.airdropDistributor,
+    );
+    await expect(page.getByTestId('about-address-airdropDistributor')).toContainText(
+      '空投分发器',
     );
     // anvil has no block explorer, so no explorer link may be rendered.
     await expect(page.getByRole('link', { name: /在区块浏览器查看/ })).toHaveCount(0);

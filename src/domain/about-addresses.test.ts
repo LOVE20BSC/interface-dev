@@ -9,7 +9,7 @@ import {
 
 const ZERO = '0x0000000000000000000000000000000000000000';
 const MEMBER_NFT = '0x610178dA211FEF7D417bC0e6FeD39F05609AD788';
-const AIRDROP = '0xa513E6E4b8f2a923D98304ec87F64353C4D5C853';
+const AIRDROP = '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6';
 
 function fullBook(): Record<AboutAddressKey, string> {
   return Object.fromEntries(
@@ -33,13 +33,13 @@ describe('about address groups', () => {
   });
 
   it('keeps a zero address visible as 未配置 (undefined) instead of dropping the row', () => {
-    const book = { ...fullBook(), memberNFT: ZERO, airdrop: ZERO };
+    const book = { ...fullBook(), memberNFT: ZERO, airdropDistributor: ZERO };
     const groups = resolveAboutAddressGroups(book, 'https://bscscan.com');
 
     const rows = groups.flatMap((group) => group.rows);
     expect(rows).toHaveLength(22);
     const member = rows.find((row) => row.key === 'memberNFT');
-    const airdrop = rows.find((row) => row.key === 'airdrop');
+    const airdrop = rows.find((row) => row.key === 'airdropDistributor');
     expect(member?.address).toBeUndefined();
     expect(member?.explorerUrl).toBeNull();
     expect(airdrop?.address).toBeUndefined();
@@ -47,7 +47,7 @@ describe('about address groups', () => {
   });
 
   it('builds explorer links only when the deployment provides a block explorer', () => {
-    const book = { ...fullBook(), memberNFT: MEMBER_NFT, airdrop: AIRDROP };
+    const book = { ...fullBook(), memberNFT: MEMBER_NFT, airdropDistributor: AIRDROP };
 
     const withExplorer = resolveAboutAddressGroups(book, 'https://bscscan.com/');
     const withoutExplorer = resolveAboutAddressGroups(book, null);
@@ -57,7 +57,7 @@ describe('about address groups', () => {
       .find((row) => row.key === 'memberNFT');
     const airdropWithout = withoutExplorer
       .flatMap((group) => group.rows)
-      .find((row) => row.key === 'airdrop');
+      .find((row) => row.key === 'airdropDistributor');
 
     expect(member?.address).toBe(MEMBER_NFT);
     expect(member?.explorerUrl).toBe(`https://bscscan.com/address/${MEMBER_NFT}`);
