@@ -56,7 +56,9 @@ function airdropInfos(uint256 offset, uint256 limit, bool reverse) external view
 5. `export.py` 输出新增 `airdropDistributor` 地址与 ABI；地址确定性（deployer nonce 0）必须保持。
 6. 前端 `pnpm sync:anvil` → 新 ABI + 地址簿新增 `airdropDistributor`，`abis:check` 通过。
 
-### B. 空投页重写（M0 内的行为变化）
+### B. 空投页重写（M0 内的行为变化）— **已完成（2026-11-12）**
+
+> 状态：**DONE**。前端已切到 `AirdropDistributor`：`claim(tokenAddress, share, proof)`（`msg.sender` 即账户）、`claimableAmount` / `isClaimedByTokenAddressByClaimer` / `claimedAmountByTokenAddressByClaimer` / `claimableFromRoundByTokenAddress`；创世快照用内置 JSON 并以 `merkleRootByTokenAddress(genesisToken)` 校验，后续 Launch 代币走 `snapshotUriByTokenAddress`；新增「还没到可铸造轮次」门槛态（「约 X 分钟」，无绝对时间）；删除 CI-014 时代的 dev 事件扫描兜底。
 
 | 现状 | 变更后 |
 | --- | --- |
@@ -66,12 +68,12 @@ function airdropInfos(uint256 offset, uint256 limit, bool reverse) external view
 | `claimedAmount(token, account)`（CI-014 我们加的） | `claimedAmountByTokenAddressByClaimer(token, account)` |
 | 立即铸造 | **轮次门槛**：`claimableFromRound > currentRound` → `ClaimRoundNotReached`，页面需要「还没到可铸造轮次」状态 + 按 phase 块数估算「约 X 分钟」 |
 | 只有一份空投 | `airdropInfos(offset, limit, reverse)` 可列多份；M0 仍只展示当前社区代币那一份，但读取路径按「按 token 查」 |
-| 快照内置于产物 | **创世代币：仍内置**（链上无 URI，见 CI-017）；**后续 Launch 的代币：运行时从链上 URI 拉 JSON**（CORS 可达、失败态 + 重试、**用链上 merkleRoot 校验快照 root**，不一致即拒用） |
+| 快照内置于产物 | **创世代币：仍内置**（链上 URI 永久为空，见 CI-017），使用前用 `merkleRootByTokenAddress(genesisToken)` 校验；**后续 Launch 的代币：运行时从链上 URI 拉 JSON**（仅 http(s)、失败态 + 重试、**用链上 merkleRoot 校验快照 root**，不一致即拒用）——代码路径已实现 |
 
 ### C. 合约问题清单需要更新
 
 - **CI-005**（空投合约不在任何仓库、入网路径缺失）→ **已修复**：空投随 `core` 交付。
-- **CI-014**（没有按账户查已铸造金额）→ **已修复**：`claimedAmountByTokenAddressByClaimer`。
+- **CI-014**（没有按账户查已铸造金额）→ **已修复**：`claimedAmountByTokenAddressByClaimer`（前端已改为一次 view 调用，无日志扫描）。
 - 新增候选问题：
   1. **快照 URI 的信任与可用性**：URI 由 launcher 设定且可被 `updateSnapshotUri` 修改；前端必须只信链上 `merkleRoot`，快照仅作为 proof 来源，root 不一致即拒用。另需确认主网 URI 是否可能被墙/CORS 拒绝——静态站对此只能用「失败态 + 重试」兜底。
   2. **`airdropInfos` 的返回成本**：返回结构体数组且含 `string snapshotUri`，分页大小需要压测（BSC 公共 RPC 的 `eth_call` 返回体积/耗时）。
@@ -81,8 +83,8 @@ function airdropInfos(uint256 offset, uint256 limit, bool reverse) external view
 
 | 项 | 建议 |
 | --- | --- |
-| `tools/BatchTransfer` | M2 再做「批量发币」工具页（应用目录里新增「工具」分类） |
-| `tools/UniswapV2Zap` | 与「社区流动性」一起做（M1/M2），需要 quote 视图 + 退款开关的 UI 表达 |
+| `tools/BatchTransfer` | **已定（owner 2026-11-12）：先不做**，M2 再做「批量发币」工具页（应用目录里新增「工具」分类） |
+| `tools/UniswapV2Zap` | **已定（owner 2026-11-12）：先不做**，与「社区流动性」一起做（M1/M2），需要 quote 视图 + 退款开关的 UI 表达 |
 | `group-chat` 群名前缀 | M2 群聊实现时遵守「不再加 Test 前缀」 |
 | `stake` 新字段 → M1「我的激励」 | core 定稿后重审 CI-001 / CI-003 |
 
