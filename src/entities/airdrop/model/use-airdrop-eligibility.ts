@@ -116,10 +116,12 @@ export function useAirdropEligibility(): AirdropEligibility {
     status = 'unconfigured';
   } else if (snapshotState.status === 'unavailable') {
     status = 'unavailable';
+  } else if (snapshotState.status === 'error' || infoState.status === 'error') {
+    // A failed airdropInfo read is terminal; the snapshot loader may still say
+    // "loading" because it never got a URI.
+    status = 'error';
   } else if (snapshotState.status === 'loading' || infoState.status === 'loading') {
     status = 'loading';
-  } else if (snapshotState.status === 'error' || infoState.status === 'error') {
-    status = 'error';
   } else if (snapshot === null) {
     status = 'error';
   } else if (!rootMatches) {

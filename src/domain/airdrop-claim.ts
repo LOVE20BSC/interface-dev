@@ -65,10 +65,13 @@ export function selectAirdropClaimState(input: AirdropClaimSelectionInput): Aird
   // state rather than a wrong eligibility answer.
   if (input.snapshot === 'unavailable') return { status: 'error', errorKind: 'snapshot' };
 
-  if (input.snapshot === 'loading' || input.root === 'loading') return { status: 'loading' };
+  // A failed root/`airdropInfo` read is terminal even while the snapshot loader
+  // still reports "loading" (it has no URI to fetch yet). Check errors first so
+  // one failed `airdropInfo` read never renders a permanent skeleton.
   if (input.snapshot === 'error' || input.root === 'error') {
     return { status: 'error', errorKind: 'read' };
   }
+  if (input.snapshot === 'loading' || input.root === 'loading') return { status: 'loading' };
   if (!input.rootMatches) return { status: 'error', errorKind: 'snapshot' };
   if (!input.hasEntry) return { status: 'ineligible' };
 
