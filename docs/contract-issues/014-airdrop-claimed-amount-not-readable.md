@@ -2,7 +2,7 @@
 
 - 严重级别：**High**（按「能否做出正确界面」口径可判 Blocker，理由见文末）
 - 影响模块：空投铸造（`/airdrop`）
-- 状态：已修复（两处来源）：① `LOVE20TKM/burn@5f3b733` 的 `claimedAmount(token, account)`（2026-11-11）；② **BSC 侧 `core@a9a5ac6` 的 `AirdropDistributor.claimedAmountByTokenAddressByClaimer(tokenAddress, claimer)`**（2026-11-12，最终采用这一处，burn 仓不再使用）
+- 状态：已修复（两处来源）：① `LOVE20TKM/burn@5f3b733` 的 `claimedAmount(token, account)`（2026-11-11）；② **BSC 侧 `core@a9a5ac6` 的 `AirdropDistributor.claimedAmount(tokenAddress, claimer)`**（2026-11-12，最终采用这一处，burn 仓不再使用；`core@0cdbe44` 重构后仍是这个签名）
 - 关联文件：`anvil/src/vendor/Airdrop.sol`、`anvil/src/vendor/IAirdrop.sol`（合约源在 LOVE20TKM 旧库，本仓以 vendor 形式引入）、前端 `src/config/abis/airdrop.ts`、`src/features/claim-airdrop/`
 
 ## 现象

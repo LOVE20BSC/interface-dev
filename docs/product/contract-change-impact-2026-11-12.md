@@ -11,19 +11,22 @@
 | --- | --- | --- |
 | `a9a5ac6` | 新增 `AirdropDistributor`（作为 Launch 的 distributor，按 merkle 快照分发创世代币）；`ILaunchDistributor` 移到 `src/interfaces/distributor/`；`Launch` 改为按 distributor 注册 | **是，重构空投页** |
 | `f209300` | `DeployCore` 自己部署 `AirdropDistributor`（`CoreConfig` 不再有 `distributor` 字段，改为 `genesisMerkleRoot` + `genesisClaimDelayRounds`；`DeploymentAddresses` 增加 `airdropDistributor`） | **是，anvil 部署脚本必须迁移** |
-| `141c931` | launcher 可在链上登记快照 URI：`updateSnapshotUri` / `snapshotUriByTokenAddress` / `AirdropSnapshotUriUpdated` | **是，快照不再随前端打包** |
+| `141c931` | launcher 可在链上登记快照 URI：`updateSnapshotUri` / 快照 URI 只读视图（`0cdbe44` 后并入 `airdropInfo(...).snapshotUri`） / `AirdropSnapshotUriUpdated` | **是，快照不再随前端打包** |
 
 `AirdropDistributor` 关键接口（`core/src/interfaces/distributor/IAirdropDistributor.sol`）：
 
 ```solidity
-function claim(address tokenAddress, uint256 share, bytes32[] calldata proof) external returns (uint256 amount);
+struct AirdropInfo {
+    address tokenAddress; bytes32 merkleRoot; uint256 claimableFromRound;
+    uint256 totalClaimedShare; uint256 totalRemainingShare;
+    uint256 totalClaimedAmount; uint256 remainingAmount; string snapshotUri;
+}
+function airdropInfo(address tokenAddress) external view returns (AirdropInfo memory);
+function airdropInfos(uint256 offset, uint256 limit, bool reverse) external view returns (AirdropInfo[] memory, uint256);
+function isClaimed(address tokenAddress, address claimer) external view returns (bool);
+function claimedAmount(address tokenAddress, address claimer) external view returns (uint256);
 function claimableAmount(address tokenAddress, address claimer, uint256 share, bytes32[] calldata proof) external view returns (uint256);
-function claimedAmountByTokenAddressByClaimer(address tokenAddress, address claimer) external view returns (uint256);
-function isClaimedByTokenAddressByClaimer(address tokenAddress, address claimer) external view returns (bool);
-function claimableFromRoundByTokenAddress(address tokenAddress) external view returns (uint256);
-function snapshotUriByTokenAddress(address tokenAddress) external view returns (string memory);
-function launcherMemberIdByTokenAddress(address tokenAddress) external view returns (uint256);
-function airdropInfos(uint256 offset, uint256 limit, bool reverse) external view returns (AirdropInfo[] memory infos, uint256 totalCount);
+function claim(address tokenAddress, uint256 share, bytes32[] calldata proof) external returns (uint256);
 ```
 
 新增错误里与前端文案直接相关的：`ClaimRoundNotReached(token, currentRound, claimableFromRound)`、`SnapshotUriEmpty`、`SnapshotUriTooLong`、`AirdropAlreadyClaimed`、`InvalidProof`、`TokenNotConfigured`、`NotSnapshotUriUpdater`。
@@ -52,28 +55,37 @@ function airdropInfos(uint256 offset, uint256 limit, bool reverse) external view
 1. 删掉 `src/vendor/Airdrop.sol` / `IAirdrop.sol`（当初因为 burn 不在 remapping 范围才 vendor；现在空投在 core 里，不再需要）。
 2. 改为用 core 的 `DeployCore` 部署 body：`CoreConfig` 用 `genesisMerkleRoot` + `genesisClaimDelayRounds`（`params/anvil31337_dev/core.params` 里已有 `GENESIS_AIRDROP_MERKLE_ROOT` / `GENESIS_AIRDROP_CLAIM_DELAY_ROUNDS`），部署产物里取 `airdropDistributor`。
 3. seed 流程改为：种子成员铸造身份后，由 launcher 成员调用 `updateSnapshotUri(genesisToken, <本地快照地址>)`，把快照 URI 登记到链上（本地可用 `http://127.0.0.1:5180/airdrop/anvil31337_dev.json`，dev server 已托管该文件）。
-4. `verify.sh` 改为校验 `AirdropDistributor`：`merkleRootByTokenAddress` = 参数值、`claimableFromRound` 计算正确、`claimedAmountByTokenAddressByClaimer(seed[0])` = 预期值、`isClaimed` 与 `remainingShare` 一致。
+4. `verify.sh` 改为校验 `AirdropDistributor`：一次 `cast call --json airdropInfo(token)` 同时取 `merkleRoot` = 参数值、`claimableFromRound` 计算正确、总计字段一致，再用 `claimedAmount(seed[0])` = 预期值、`isClaimed` 与 `totalRemainingShare` 一致。
 5. `export.py` 输出新增 `airdropDistributor` 地址与 ABI；地址确定性（deployer nonce 0）必须保持。
 6. 前端 `pnpm sync:anvil` → 新 ABI + 地址簿新增 `airdropDistributor`，`abis:check` 通过。
 
 ### B. 空投页重写（M0 内的行为变化）— **已完成（2026-11-12）**
 
-> 状态：**DONE**。前端已切到 `AirdropDistributor`：`claim(tokenAddress, share, proof)`（`msg.sender` 即账户）、`claimableAmount` / `isClaimedByTokenAddressByClaimer` / `claimedAmountByTokenAddressByClaimer` / `claimableFromRoundByTokenAddress`；创世快照用内置 JSON 并以 `merkleRootByTokenAddress(genesisToken)` 校验，后续 Launch 代币走 `snapshotUriByTokenAddress`；新增「还没到可铸造轮次」门槛态（「约 X 分钟」，无绝对时间）；删除 CI-014 时代的 dev 事件扫描兜底。
+> 状态：**DONE**。前端已切到 `AirdropDistributor`：`claim(tokenAddress, share, proof)`（`msg.sender` 即账户）、`claimableAmount` / `isClaimed` / `claimedAmount` / `airdropInfo`；创世快照用内置 JSON 并以 `airdropInfo(genesisToken).merkleRoot` 校验，后续 Launch 代币走 `airdropInfo(token).snapshotUri`；新增「还没到可铸造轮次」门槛态（「约 X 分钟」，无绝对时间）；删除 CI-014 时代的 dev 事件扫描兜底。
 
 | 现状 | 变更后 |
 | --- | --- |
 | 单一 `Airdrop` 合约 + 前端打包的快照 JSON | `AirdropDistributor`，**按 token 多份空投**；快照来自链上 `snapshotUri` |
 | `claim(token, account, share, proof)` | `claim(tokenAddress, share, proof)`（`msg.sender` 即账户） |
-| `isClaimed(token, account)` | `isClaimedByTokenAddressByClaimer(token, account)` |
-| `claimedAmount(token, account)`（CI-014 我们加的） | `claimedAmountByTokenAddressByClaimer(token, account)` |
+| `isClaimed(token, account)` | `isClaimed(token, account)`（2026-11-12 重构回同名） |
+| `claimedAmount(token, account)`（CI-014 我们加的） | `claimedAmount(token, account)`（2026-11-12 重构回同名） |
 | 立即铸造 | **轮次门槛**：`claimableFromRound > currentRound` → `ClaimRoundNotReached`，页面需要「还没到可铸造轮次」状态 + 按 phase 块数估算「约 X 分钟」 |
 | 只有一份空投 | `airdropInfos(offset, limit, reverse)` 可列多份；M0 仍只展示当前社区代币那一份，但读取路径按「按 token 查」 |
-| 快照内置于产物 | **创世代币：仍内置**（链上 URI 永久为空，见 CI-017），使用前用 `merkleRootByTokenAddress(genesisToken)` 校验；**后续 Launch 的代币：运行时从链上 URI 拉 JSON**（仅 http(s)、失败态 + 重试、**用链上 merkleRoot 校验快照 root**，不一致即拒用）——代码路径已实现 |
+| 快照内置于产物 | **创世代币：仍内置**（链上 URI 永久为空，见 CI-017），使用前用 `airdropInfo(genesisToken).merkleRoot` 校验；**后续 Launch 的代币：运行时从链上 `airdropInfo(token).snapshotUri` 拉 JSON**（仅 http(s)、失败态 + 重试、**用链上 merkleRoot 校验快照 root**，不一致即拒用）——代码路径已实现 |
+
+### B2. 2026-11-12 重构通过（refactor pass）
+
+`core@0cdbe44`（+ `4200d35` 修正 deploy 读取）把六个按 token 的 getter 合并为一个 `airdropInfo(token)` 结构体，并把两个按账户的 getter 改回 `isClaimed` / `claimedAmount`。前端在 `c49eafd` 之后重导 anvil 导出并完成适配：
+
+- `pnpm sync:anvil` 重生成 `airdrop-distributor.ts`（38 → 33 条目）与部署书；部署书新增 `airdropDistributor` 启动元数据块（uint256 以十进制字符串保存，避免 JSON number 精度丢失）。
+- 空投页/首页资格卡都只读一次 `airdropInfo(token)`：`merkleRoot` 校验快照、`claimableFromRound` 做 S5-G 门槛、`snapshotUri` 选快照来源、`totalRemainingShare` / `remainingAmount` 显示份额与池额（不再 `balanceOf(distributor)` 重算）。
+- S6「已铸造 X」与 e2e 的链上断言改用 `claimedAmount(token, account)`。
+- 依次通过 `typecheck` / `lint` / `test` / `build` / `abis:check`，并在 8555 自动化链连跑两遍 e2e。
 
 ### C. 合约问题清单需要更新
 
 - **CI-005**（空投合约不在任何仓库、入网路径缺失）→ **已修复**：空投随 `core` 交付。
-- **CI-014**（没有按账户查已铸造金额）→ **已修复**：`claimedAmountByTokenAddressByClaimer`（前端已改为一次 view 调用，无日志扫描）。
+- **CI-014**（没有按账户查已铸造金额）→ **已修复**：`claimedAmount`（前端已改为一次 view 调用，无日志扫描）。
 - 新增候选问题：
   1. **快照 URI 的信任与可用性**：URI 由 launcher 设定且可被 `updateSnapshotUri` 修改；前端必须只信链上 `merkleRoot`，快照仅作为 proof 来源，root 不一致即拒用。另需确认主网 URI 是否可能被墙/CORS 拒绝——静态站对此只能用「失败态 + 重试」兜底。
   2. **`airdropInfos` 的返回成本**：返回结构体数组且含 `string snapshotUri`，分页大小需要压测（BSC 公共 RPC 的 `eth_call` 返回体积/耗时）。

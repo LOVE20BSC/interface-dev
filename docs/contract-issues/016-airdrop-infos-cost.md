@@ -10,7 +10,8 @@
 ```solidity
 struct AirdropInfo {
     address tokenAddress; bytes32 merkleRoot; uint256 claimableFromRound;
-    uint256 claimedShare; uint256 remainingShare; uint256 contractBalance; string snapshotUri;
+    uint256 totalClaimedShare; uint256 totalRemainingShare;
+    uint256 totalClaimedAmount; uint256 remainingAmount; string snapshotUri;
 }
 function airdropInfos(uint256 offset, uint256 limit, bool reverse)
     external view returns (AirdropInfo[] memory infos, uint256 totalCount);
@@ -20,7 +21,7 @@ function airdropInfos(uint256 offset, uint256 limit, bool reverse)
 
 ## 前端应对
 
-- M0 只按当前社区 `tokenAddress` 读单条（`merkleRootByTokenAddress` 等），**不调用** `airdropInfos`。
+- M0 只按当前社区 `tokenAddress` 读单条 `airdropInfo(token)`，**不调用** `airdropInfos`。
 - 将来做列表时先压测 5/10/20/50 条的实际返回体积与耗时，再定分页常量；超时/体积超限时降级为「按 token 直查」。
 
 ## 建议

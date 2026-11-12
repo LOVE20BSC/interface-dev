@@ -15,12 +15,12 @@ core/test/AirdropDistributor.t.sol
   testGenesisTokenHasZeroLauncherMemberIdAndEmptySnapshotUri
 ```
 
-即：**创世空投的 `snapshotUriByTokenAddress(genesisToken)` 永远是空字符串**，没有 setter、也没有 Launch 路径可以设置（只有后续经 Launch 发起的代币才有 `launcherMemberId` 从而可登记 URI）。
+即：**创世空投的 `airdropInfo(genesisToken).snapshotUri` 永远是空字符串**，没有 setter、也没有 Launch 路径可以设置（只有后续经 Launch 发起的代币才有 `launcherMemberId` 从而可登记 URI）。
 
 ## 前端后果
 
 - 后续Launch 出来的代币：快照按链上 URI 取（见 CI-015）。
-- **创世代币**：链上没有 URI，前端只能把创世快照内置在构建产物里（`public/airdrop/<variant>.json`），并用链上 `merkleRootByTokenAddress` 校验内容。也就是「两套取快照路径」并存：创世用内置、后续 launch 用 URI。
+- **创世代币**：链上没有 URI，前端只能把创世快照内置在构建产物里（`public/airdrop/<variant>.json`），并用链上 `airdropInfo(genesisToken).merkleRoot` 校验内容。也就是「两套取快照路径」并存：创世用内置、后续 launch 用 URI。
 - 若某个环境（例如生产首币）想在不重新发版的情况下更新创世快照，**当前合约无法支持**。
 
 ## 建议（三选一，需 owner 定）

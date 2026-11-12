@@ -25,7 +25,7 @@
 | [CI-011](011-silent-zero-ambiguity.md) | 静默 0 / 歧义 0：分不清“没有”与“未开始/不可铸造” | Medium | 激励铸造、质押、行动加入 | Open | `action/src/ActionTarget.sol`、`action/src/LpExecutor.sol`、`action/src/GroupActionExecutor.sol`、`action/src/GroupServiceExecutor.sol`、`core/src/Stake.sol` |
 | [CI-012](012-name-homoglyph-spoofing.md) | 名称同形可伪造身份（ASCII-only 折叠 + 宽松字符集） | Medium | 身份、提案、群聊 | Open | `core/src/MemberNFT.sol` |
 | [CI-013](013-member-nft-no-token-uri.md) | MemberNFT 没有 `tokenURI`/元数据，钱包里是空白 NFT | Low | 身份 | Open | `core/src/MemberNFT.sol` |
-| [CI-014](014-airdrop-claimed-amount-not-readable.md) | 空投没有「按账户查已铸造金额」的只读方法 | High | 空投铸造 | 已修复（core@a9a5ac6：claimedAmountByTokenAddressByClaimer） | `anvil/src/vendor/Airdrop.sol`、`src/config/abis/airdrop.ts`、`src/features/claim-airdrop/` |
+| [CI-014](014-airdrop-claimed-amount-not-readable.md) | 空投没有「按账户查已铸造金额」的只读方法 | High | 空投铸造 | 已修复（core@a9a5ac6：claimedAmount；core@0cdbe44 保持该签名） | `anvil/src/vendor/Airdrop.sol`、`src/config/abis/airdrop.ts`、`src/features/claim-airdrop/` |
 | [CI-015](015-snapshot-uri-trust.md) | 空投快照改为链上 URI：信任、可用性与被篡改风险 | Medium | 空投铸造 | Open | `core/src/distributor/AirdropDistributor.sol` |
 | [CI-016](016-airdrop-infos-cost.md) | `airdropInfos` 返回结构体数组（含 string），分页与成本上限未定 | Low | 空投铸造（多空投列表） | Open | `core/src/interfaces/distributor/IAirdropDistributor.sol` |
 | [CI-017](017-genesis-snapshot-uri-locked.md) | 创世空投快照 URI 永远无法登记，前端只能内置创世快照 | Medium | 空投铸造（创世代币） | Open | `core/src/distributor/AirdropDistributor.sol` |

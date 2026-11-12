@@ -3,7 +3,7 @@
 - 严重级别：**Medium**
 - 影响模块：空投铸造（`/airdrop`）
 - 状态：Open（设计取舍待定）
-- 关联文件：`core/src/distributor/AirdropDistributor.sol`、`core/src/interfaces/distributor/IAirdropDistributor.sol`（`updateSnapshotUri` / `snapshotUriByTokenAddress` / `SnapshotUriEmpty` / `SnapshotUriTooLong` / `NotSnapshotUriUpdater`）
+- 关联文件：`core/src/distributor/AirdropDistributor.sol`、`core/src/interfaces/distributor/IAirdropDistributor.sol`（`updateSnapshotUri` / `airdropInfo(...).snapshotUri` / `SnapshotUriEmpty` / `SnapshotUriTooLong` / `NotSnapshotUriUpdater`）
 
 ## 现象
 
@@ -11,12 +11,12 @@
 
 ```solidity
 function updateSnapshotUri(address tokenAddress, string calldata snapshotUri) external;
-function snapshotUriByTokenAddress(address tokenAddress) external view returns (string memory);
+function airdropInfo(address tokenAddress) external view returns (AirdropInfo memory); // .snapshotUri
 ```
 
 前端要拿到 `share` + `proof` 就必须**在运行时去取这个 URI 指向的 JSON**。带来三个新问题：
 
-1. **信任**：URI 可被 launcher 修改（`AirdropSnapshotUriUpdated`），服务端也可能悄悄改内容。合约本身只校验 `proof` 对 `merkleRootByTokenAddress` 成立，所以用户资产安全；但界面上的「预计可得」会随 URI 内容而变，**前端必须用链上 root 校验快照 root，不一致就拒绝使用该快照**，否则界面可能长期显示错误金额。
+1. **信任**：URI 可被 launcher 修改（`AirdropSnapshotUriUpdated`），服务端也可能悄悄改内容。合约本身只校验 `proof` 对 `airdropInfo(token).merkleRoot` 成立，所以用户资产安全；但界面上的「预计可得」会随 URI 内容而变，**前端必须用链上 root 校验快照 root，不一致就拒绝使用该快照**，否则界面可能长期显示错误金额。
 2. **可用性**：URI 若是普通对象存储/HTTP 站点，可能被 CORS 拒绝、被墙或失效；静态站没有后端，只能给「资格暂时读不到 + 重试」。
 3. **隐私**：从第三方 URI 加载会向该域暴露访问者 IP/UA（空投名单本身是公开的，但请求行为不是）。
 
