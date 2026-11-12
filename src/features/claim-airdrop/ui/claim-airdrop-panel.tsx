@@ -214,6 +214,34 @@ export function ClaimAirdropPanel({
     );
   }
 
+  if (claim.status === 'round-gated') {
+    const minutes = claim.roundGate.minutes;
+    return (
+      <div className="space-y-4">
+        <StatusCard meta={meta}>
+          <CardTitle data-testid="airdrop-round-gate-title">
+            {copy.airdrop.roundGate.title}
+          </CardTitle>
+          {minutes !== null ? (
+            <p
+              className="mt-2 text-lg font-semibold tracking-tight text-foreground"
+              data-testid="airdrop-round-gate-wait"
+            >
+              {copy.airdrop.roundGate.wait(String(minutes))}
+            </p>
+          ) : null}
+          <CardDescription>{copy.airdrop.roundGate.body}</CardDescription>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <Link to="/" className={buttonStyles('ghost', 'md', 'w-full sm:w-auto')}>
+              {copy.airdrop.states.backHome}
+            </Link>
+          </div>
+        </StatusCard>
+        <AirdropRules symbol={symbol} />
+      </div>
+    );
+  }
+
   if (claim.status === 'ineligible') {
     return (
       <div className="space-y-4">

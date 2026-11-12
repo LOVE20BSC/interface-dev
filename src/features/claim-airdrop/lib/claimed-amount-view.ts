@@ -5,8 +5,9 @@ import { formatTokenAmount } from '@/shared/lib/format';
  * S6 (已铸造) presentation for the airdrop claim page, pure and chain-free.
  *
  * The amount is injected so the "no amount available" branch can be tested
- * without a chain (CI-014 view not yet deployed). The panel only feeds it
- * `readClaimedAmount()`'s result — no other module may invent a number.
+ * without a chain. The panel only feeds it `readClaimedAmount()`'s result —
+ * one `claimedAmountByTokenAddressByClaimer` call (CI-014) — no other module
+ * may invent a number.
  */
 export interface ClaimedAmountViewInput {
   readonly amount: bigint | undefined;

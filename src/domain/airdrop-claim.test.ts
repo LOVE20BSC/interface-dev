@@ -10,6 +10,7 @@ const BASE: AirdropClaimSelectionInput = {
   hasEntry: true,
   reads: 'ready',
   claimed: false,
+  roundReached: true,
   share: 100n,
   claimableAmount: 1_000n,
   poolBalance: 10_000n,
@@ -61,6 +62,15 @@ describe('selectAirdropClaimState', () => {
 
   it('reports already claimed even though claimableAmount is 0', () => {
     expect(select({ claimed: true, claimableAmount: 0n })).toEqual({ status: 'claimed' });
+  });
+
+  it('shows the round gate before the zero-amount reasons', () => {
+    expect(select({ roundReached: false, claimableAmount: 0n, poolBalance: 0n })).toEqual({
+      status: 'round-gated',
+    });
+    expect(select({ roundReached: null })).toEqual({ status: 'error', errorKind: 'read' });
+    // Already claimed wins even if the gate read is stale/unavailable.
+    expect(select({ claimed: true, roundReached: false })).toEqual({ status: 'claimed' });
   });
 
   it('distinguishes an empty pool from a zero share and a floor-to-zero amount', () => {

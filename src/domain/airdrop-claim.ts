@@ -18,6 +18,7 @@ export type AirdropClaimStatus =
   | 'unconfigured'
   | 'loading'
   | 'error'
+  | 'round-gated'
   | 'ineligible'
   | 'unavailable'
   | 'eligible'
@@ -42,6 +43,8 @@ export interface AirdropClaimSelectionInput {
   readonly reads: AirdropClaimReadStatus;
   /** undefined/null mean unknown until the reads are ready, never 0. */
   readonly claimed: boolean | null;
+  /** currentPhase >= claimableFromRound; null while unknown. */
+  readonly roundReached: boolean | null;
   readonly share: bigint | null;
   readonly claimableAmount: bigint | null;
   readonly poolBalance: bigint | null;
@@ -82,6 +85,10 @@ export function selectAirdropClaimState(input: AirdropClaimSelectionInput): Aird
   }
 
   if (input.claimed) return { status: 'claimed' };
+  // The distributor's claim() reverts before the round; claimableAmount is 0
+  // during that window, so the gate must be checked before "no amount".
+  if (input.roundReached === false) return { status: 'round-gated' };
+  if (input.roundReached === null) return { status: 'error', errorKind: 'read' };
   if (input.claimableAmount > 0n) return { status: 'eligible' };
 
   if (input.poolBalance === 0n) {

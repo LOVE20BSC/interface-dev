@@ -3,28 +3,22 @@ import { isTxSendNonceError, isTxStaleBlockError } from '@/shared/lib/tx-send-er
 import { copy } from '@/shared/config/copy-pages';
 
 /**
- * Airdrop custom errors are not part of the protocol error registry, so the
- * handful the claim can actually produce are mapped by selector. Signatures
- * from the vendored contract ABI:
- *   AirdropAlreadyClaimed()                  → 0xe4ca4c0b
- *   InvalidAccount()                         → 0x6d187b28
- *   InvalidProof()                           → 0x09bde339
- *   InvalidShare()                           → 0x100d5f74
- *   NoClaimableAmount()                      → 0x493c1ab7
- *   ShareExceedsRemaining(uint256,uint256)   → 0x079c232c
- *   UnauthorizedClaimer()                    → 0x5c4aa7dc
- *   InvalidToken()                           → 0xc1ab6dc1
- *   SafeERC20FailedOperation(address)        → 0x5274afe7
+ * AirdropDistributor custom errors are not part of the protocol error registry,
+ * so the handful the claim can actually produce are mapped by selector. Signatures
+ * from `export/abis/AirdropDistributor.json`:
+ *   AirdropAlreadyClaimed(address,address)          → 0x3349f079
+ *   InvalidProof()                                  → 0x09bde339
+ *   ClaimRoundNotReached(address,uint256,uint256)   → 0xff978a22
+ *   ShareExceedsRemaining(uint256,uint256)          → 0x079c232c
+ *   TokenNotConfigured(address)                     → 0xa5be5e0f
+ *   SafeERC20FailedOperation(address)               → 0x5274afe7
  */
 const AIRDROP_ERRORS: Readonly<Record<string, string>> = Object.freeze({
-  '0xe4ca4c0b': copy.airdrop.errors.alreadyClaimed,
-  '0x6d187b28': copy.airdrop.errors.unauthorized,
+  '0x3349f079': copy.airdrop.errors.alreadyClaimed,
   '0x09bde339': copy.airdrop.errors.invalidProof,
-  '0x100d5f74': copy.airdrop.errors.invalidShare,
-  '0x493c1ab7': copy.airdrop.errors.noAmount,
+  '0xff978a22': copy.airdrop.errors.roundNotReached,
   '0x079c232c': copy.airdrop.errors.shareExceeds,
-  '0x5c4aa7dc': copy.airdrop.errors.unauthorized,
-  '0xc1ab6dc1': copy.airdrop.errors.generic,
+  '0xa5be5e0f': copy.airdrop.errors.tokenNotConfigured,
   '0x5274afe7': copy.airdrop.errors.tokenFailed,
 });
 

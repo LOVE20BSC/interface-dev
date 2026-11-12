@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useAccount, useChainId, useReadContract, useReadContracts } from 'wagmi';
-import { airdropAbi } from '@/config/abis';
+import { airdropDistributorAbi } from '@/config/abis';
 import { configuredAddress } from '@/config/networks';
 import {
   findSnapshotEntry,
@@ -30,26 +30,33 @@ export interface AirdropEligibility {
 }
 
 /**
- * Airdrop eligibility: snapshot entry exists ∧ !isClaimed(token,wallet) ∧
- * claimableAmount(token,wallet,share,proof) > 0.
+ * Airdrop eligibility: snapshot entry exists ∧ !isClaimedByTokenAddressByClaimer
+ * ∧ claimableAmount(token,wallet,share,proof) > 0.
  *
- * The snapshot document is trusted only after its merkleRoot matches the root
- * baked into the deployed Airdrop contract (and it belongs to this chain). A
- * mismatch disables the card instead of showing a wrong answer.
+ * The snapshot document is trusted only after its merkleRoot matches
+ * `merkleRootByTokenAddress(token)` (and it belongs to this chain). A mismatch
+ * disables the card instead of showing a wrong answer.
  */
 export function useAirdropEligibility(): AirdropEligibility {
   const { address: account } = useAccount();
   const chainId = useChainId();
-  const airdropAddress = configuredAddress('airdrop');
+  const airdropAddress = configuredAddress('airdropDistributor');
   const tokenAddress = configuredAddress('firstTokenAddress') ?? configuredAddress('tokenAddress');
+  const genesisTokenAddress = configuredAddress('firstTokenAddress');
 
-  const snapshotState = useAirdropSnapshot(account !== undefined);
+  const snapshotState = useAirdropSnapshot({
+    enabled: account !== undefined,
+    airdropAddress,
+    tokenAddress,
+    genesisTokenAddress,
+  });
 
   const rootRead = useReadContract({
     address: airdropAddress,
-    abi: airdropAbi,
-    functionName: 'merkleRoot',
-    query: { enabled: airdropAddress !== undefined && account !== undefined },
+    abi: airdropDistributorAbi,
+    functionName: 'merkleRootByTokenAddress',
+    args: tokenAddress !== undefined ? [tokenAddress] : undefined,
+    query: { enabled: airdropAddress !== undefined && tokenAddress !== undefined },
   });
 
   const snapshot = snapshotState.snapshot;
@@ -68,13 +75,13 @@ export function useAirdropEligibility(): AirdropEligibility {
     return [
       {
         address: airdropAddress,
-        abi: airdropAbi,
-        functionName: 'isClaimed' as const,
+        abi: airdropDistributorAbi,
+        functionName: 'isClaimedByTokenAddressByClaimer' as const,
         args: [tokenAddress, account] as const,
       },
       {
         address: airdropAddress,
-        abi: airdropAbi,
+        abi: airdropDistributorAbi,
         functionName: 'claimableAmount' as const,
         args: [tokenAddress, account, entry.share, entry.proof] as const,
       },

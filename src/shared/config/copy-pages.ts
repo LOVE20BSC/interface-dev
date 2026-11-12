@@ -167,7 +167,7 @@ export const copy = {
       snapshotErrorTitle: '空投资格暂时读不到',
       snapshotErrorBody: '你的资产没有变化。',
       notDeployedTitle: '空投铸造还没有接入',
-      notDeployedBody: '地址簿里还没有 Airdrop 合约。接入后会先检查资格，再显示可铸造份额。',
+      notDeployedBody: '地址簿里还没有空投分发器合约。接入后会先检查资格，再显示可铸造份额。',
       wrongChainBody: '切换到这个应用使用的网络后再进行空投铸造。',
       ineligibleTitle: '这个钱包不在空投名单里。',
       ineligibleBody: '空投只面向快照时的参与者，不影响你现在参与。',
@@ -177,6 +177,11 @@ export const copy = {
       copied: '已复制',
       backHome: '回首页',
       retry: '重试',
+    },
+    roundGate: {
+      title: '还没到可铸造轮次',
+      wait: (minutes: string) => `约 ${minutes} 分钟`,
+      body: '轮次到了以后，这里会出现「空投铸造」。',
     },
     eligible: {
       expectedLabel: '预计可得',
@@ -210,7 +215,7 @@ export const copy = {
     rules: {
       summary: '规则',
       genesis: (symbol: string) => `这次空投发的是首币 ${symbol}，和当前选择的社区无关。`,
-      snapshot: '份额来自销毁活动快照，地址和份额在部署时固定。',
+      snapshot: '份额来自销毁活动快照；这一份的根记录在链上，前端会先核对再显示。',
     },
     pending: {
       wallet: '铸造中…',
@@ -234,11 +239,10 @@ export const copy = {
     errors: {
       rejected: '你在钱包里点了取消，没有扣款。',
       alreadyClaimed: '这次空投份额已经铸造过了，没有重复扣款。',
-      unauthorized: '这个钱包不在空投名单里，没有发起交易。',
       invalidProof: '这份空投资格与链上快照没有对上，你的份额没有变化。',
-      invalidShare: '这份空投份额不正确，你的份额没有变化。',
       shareExceeds: '你的份额超过了链上空投池的剩余份额，这次没有铸造。',
-      noAmount: '按现在的情况，这次可铸造金额是 0，没有发起扣款。',
+      roundNotReached: '还没到可铸造轮次，这次没有发起交易。',
+      tokenNotConfigured: '这个代币还没有配置空投，暂时不能铸造。',
       tokenFailed: '空投池暂时付不出代币，这次没有铸造。',
       reverted: '交易上链了，但没有成功。你的份额没有变化。',
       generic: '这次操作没有完成，请稍后重试。',
@@ -552,7 +556,7 @@ export const copy = {
         factory: '交易对工厂',
         router: '兑换路由',
         multicall3: '批量读取',
-        airdrop: '空投',
+        airdropDistributor: '空投分发器',
         pair: '交易对',
       },
     },

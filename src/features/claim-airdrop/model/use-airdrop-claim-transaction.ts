@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseEventLogs } from 'viem';
 import { useAccount, useChainId, useWriteContract } from 'wagmi';
-import { airdropAbi } from '@/config/abis';
+import { airdropDistributorAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 import type { AirdropSnapshotEntry } from '@/domain/airdrop-snapshot';
 import { copy } from '@/shared/config/copy-pages';
@@ -150,7 +150,7 @@ export function useAirdropClaimTransaction(
     const events = (() => {
       try {
         return parseEventLogs({
-          abi: airdropAbi,
+          abi: airdropDistributorAbi,
           logs: onChainReceipt.logs,
           eventName: 'AirdropClaimed',
         });
@@ -160,14 +160,14 @@ export function useAirdropClaimTransaction(
     })();
     const event = events.find((candidate) => {
       const args = candidate.args;
-      const eventAccount = args.account;
-      const eventToken = args.token;
+      const eventClaimer = args.claimer;
+      const eventToken = args.tokenAddress;
       return (
         account !== undefined &&
         tokenAddress !== undefined &&
-        typeof eventAccount === 'string' &&
+        typeof eventClaimer === 'string' &&
         typeof eventToken === 'string' &&
-        eventAccount.toLowerCase() === account.toLowerCase() &&
+        eventClaimer.toLowerCase() === account.toLowerCase() &&
         eventToken.toLowerCase() === tokenAddress.toLowerCase()
       );
     });
@@ -219,9 +219,9 @@ export function useAirdropClaimTransaction(
     try {
       const hash = await writeContractAsync({
         address: airdropAddress,
-        abi: airdropAbi,
+        abi: airdropDistributorAbi,
         functionName: 'claim',
-        args: [tokenAddress, account, entry.share, entry.proof],
+        args: [tokenAddress, entry.share, entry.proof],
         ...(nonce !== undefined ? { nonce } : {}),
       });
       // Persist before waiting: a refresh while pending must recover this hash.

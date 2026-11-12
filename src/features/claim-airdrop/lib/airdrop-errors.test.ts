@@ -31,8 +31,11 @@ describe('describeAirdropClaimError', () => {
 
   it('keeps the existing claim mappings intact', () => {
     expect(describeAirdropClaimError({ code: 4001 })).toBe(copy.airdrop.errors.rejected);
-    expect(describeAirdropClaimError({ data: `0xe4ca4c0b${'0'.repeat(64)}` })).toBe(
+    expect(describeAirdropClaimError({ data: `0x3349f079${'0'.repeat(64)}` })).toBe(
       copy.airdrop.errors.alreadyClaimed,
+    );
+    expect(describeAirdropClaimError({ data: `0xff978a22${'0'.repeat(64)}` })).toBe(
+      copy.airdrop.errors.roundNotReached,
     );
   });
 });

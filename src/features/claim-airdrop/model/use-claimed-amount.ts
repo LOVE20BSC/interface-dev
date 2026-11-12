@@ -19,9 +19,10 @@ export interface UseClaimedAmountOptions {
 /**
  * Thin React wrapper around the single `readClaimedAmount` adapter.
  *
- * The UI never talks to logs or contract views itself: when CI-014 lands, only
- * the adapter changes. A failed/unavailable read surfaces as `undefined`, which
- * the S6 view turns into the honest 「已铸造」 fallback (spec §3.4).
+ * The UI never talks to contract views itself: the adapter owns the single
+ * `claimedAmountByTokenAddressByClaimer` read. A failed/unavailable read
+ * surfaces as `undefined`, which the S6 view turns into the honest 「已铸造」
+ * fallback (spec §3.4).
  */
 export function useClaimedAmount(options: UseClaimedAmountOptions): ClaimedAmountState {
   const { enabled, airdropAddress, tokenAddress } = options;
