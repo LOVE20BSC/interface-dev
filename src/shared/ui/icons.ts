@@ -13,6 +13,7 @@ export { default as Check } from 'lucide-react/icons/check';
 export { default as ChevronDown } from 'lucide-react/icons/chevron-down';
 export { default as ChevronRight } from 'lucide-react/icons/chevron-right';
 export { default as Coins } from 'lucide-react/icons/coins';
+export { default as Droplets } from 'lucide-react/icons/droplets';
 export { default as Copy } from 'lucide-react/icons/copy';
 export { default as Gift } from 'lucide-react/icons/gift';
 export { default as Home } from 'lucide-react/icons/house';
