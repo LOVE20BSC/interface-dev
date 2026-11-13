@@ -45,9 +45,51 @@ owner 2026-11-14：新仓 `periphery`（`LOVE20Hub`，平替旧库 `UniswapV2Zap
 
 <!-- Pitfalls and evidence: with revision + file:line or symbol names -->
 
+### 2026-11-14 05:19–05:35 · 实现者 @anvil-hub
+
+环境：`PATH=$HOME/.foundry/bin:/Users/BigPolarBear/.nvm/versions/node/v24.12.0/bin:$HOME/Library/pnpm/bin:$PATH`（forge 1.8.1 / node v24.12.0 / pnpm 11.5.1）。开工前 `git -C ../anvil status` 干净；全程只用 **PORT=8556**，8545 未部署、未发交易、未 snapshot、未 clean，收尾已 `make stop PORT=8556`。
+
+1) 挂接兄弟仓（anvil 侧，兄弟仓只读）：
+   - `ln -sfn ../../periphery .siblings/periphery`、`ln -sfn ../../tools .siblings/tools`（提交为符号链接，同既有 5 个）。
+   - `remappings.txt` 追加 `periphery/=.siblings/periphery/`、`tools/=.siblings/tools/`；`foundry.toml` 的 `allow_paths` 加 `../periphery`、`../tools`；`script/local.sh` 的 `ensure_symlinks()` 与 preflight 兄弟仓清单同步加这两个仓（换 checkout 后能自愈）。
+   - 证据：`cd ../anvil && forge build` → `Compiling 35 files with Solc 0.8.37` / `Compiler run successful!`。
+   - creation bytecode keccak：`BatchTransfer 0xb03600383290c562556ebb1c15b37f3a7639235421edb2f93885faa49e4ca629`（3560 B，runtime 3532 B）；`LOVE20Hub 0xda89d7055685b0a0cf6b13fd6bc0cc33fae7bbcdccc74184c210eb24b255cb73`（17349 B，runtime 15638 B）。
+
+2) 追加部署（`../anvil` commit `cda5908`）：
+   - `script/DeployLocal.s.sol`：`TokenActionMainMgr` 之后、`vm.stopBroadcast()` 之前依次 `new BatchTransfer()` → `new LOVE20Hub(address(deployed.stake))`；`Deployed` 结构体加 `batchTransfer`/`hub`；新增 `_validatePeriphery()` 读回 Hub 从 Stake 派生的 ROUTER/PAIR_FACTORY/LAUNCH/MEMBER_NFT/WRAPPED_NATIVE 与费率；`_writeAddresses` 写 `BATCH_TRANSFER_ADDRESS`/`HUB_ADDRESS`；`_logSummary` 打印两行。
+   - `script/export.py`：`CONTRACTS` 加 `BatchTransfer→(BATCH_TRANSFER_ADDRESS,"tools")`、`LOVE20Hub→(HUB_ADDRESS,"periphery")`；`ABI_SOURCES` 两项从**本仓 `out/`** 导出（跨仓编译，ABI 与真正部署的字节码一致；兄弟仓自己的 `out/` 属于另一个 checkout，可能过期或缺失）。
+   - 关键不变量：两个 CREATE 在部署序列最末，既有 34 个地址的 nonce 不变。
+
+3) 确定性（两次 `make clean PORT=8556 && make bootstrap PORT=8556`，各约 45 s，均以 `ALL CHECKS PASSED` 结束）：
+   - `shasum -a 256` 两次导出完全相同：
+     `9e811d4d719b96aaa51b707baef3bb9dbcd0a8118bf0e198aa5ca4e17fcbd44c  export/deployments/anvil31337_dev.json`
+   - 与上一版导出逐键比对 `addresses`：`before keys: 34 after: 36`、`address diffs: 2`（只有 `BATCH_TRANSFER_ADDRESS`、`HUB_ADDRESS`）、`existing unchanged: 34 / 34`、`existing contract block diffs: []`。
+   - 新增地址：BatchTransfer `0xc3e53F4d16Ae77Db1c982e75a937B9f60FE63690`（block 33）、LOVE20Hub `0x84eA74d481Ee0A5332c457a4d796187F6Ba67fEB`（block 34），`deployBlock` 32 → 34。
+
+4) 前端接入（本前端仓本次提交）：
+   - `scripts/lib/anvil-export.mjs`：`ADDRESS_KEYS` 加 `batchTransfer: 'BATCH_TRANSFER_ADDRESS'` / `hub: 'HUB_ADDRESS'`；`ABI_MODULES` 加 `batch-transfer.ts`/`love20-hub.ts`；`REPO_ABIS`/`repoPaths` 加 `periphery`、`tools`（manifest 因此记录两仓 HEAD）。
+   - `src/config/deployments/types.ts` 的 `AddressBook` 与 `ADDRESS_KEYS`、`src/config/networks.ts` 的 `ADDRESS_BOOK_KEYS` 各加两个键；dev 地址簿由 `pnpm sync:anvil` 生成真实地址，test/prod 各加 2 个零地址槽（22 → 24）。
+   - `pnpm sync:anvil` 生成 `src/config/abis/batch-transfer.ts`、`love20-hub.ts`、更新 `index.ts`/`manifest.json`/dev 地址簿；`pnpm abis:check` → `[abis:check] ABIs, manifest, address book and airdrop snapshot match ../anvil/export.`
+
+5) 坑与外部影响（重要）：
+   - **兄弟仓在本轮被别的任务改动**：`../core` 有未提交改动（`src/Stake.sol` 等，05:19–05:26 仍在写）、`../periphery` 有未提交改动（`src/LOVE20Hub.sol` 等）。按约定不动兄弟仓，但 anvil 编译的是它们当前工作区，所以 ABI 一律取本仓 `out/`。
+   - `export/abis/Stake.json`（entries 64 → 69）与 `export/abis/LOVE20Hub.json`（47 → 50）一并刷新：committed 版本落后于两个兄弟仓的新提交（core `8d604a2` 拆分质押费率错误、构造函数改 `DexConfig` 元组；periphery `3b825a5` 镜像 Stake 收费守卫），这是 bootstrap 重新编译后自然追平真正部署的字节码，不是本任务的合约改动；部署地址与块号不变，导出 json sha256 仍是 `9e811d4d…fcbd44c`。
+   - `export/VERIFIED.md` 被 bootstrap 在 8556 上重写；按 README「提交的报告必须描述规范 8545 链」，用 `git show HEAD:export/VERIFIED.md > export/VERIFIED.md` 还原（未用 `git checkout`）。因此该报告尚未包含两个新合约；下次在 8545 上 `make bootstrap`/`make verify` 后应重新提交它。
+   - **前端两条门禁被并行「主题」任务在途文件染红**（非本任务改动）：`pnpm lint` 的 11 条全部落在未跟踪的 `scripts/theme-screenshots.mjs`；`pnpm test` 唯一失败是 `src/features/connect-wallet/ui/wrong-network-button.test.tsx` 期望 `text-danger`，而未提交的 `src/shared/ui/button.tsx` 把 `danger-outline` 改成 `text-danger-strong`。隔离证据：HEAD worktree 里同一测试 `1 passed`、`eslint . --max-warnings=0` exit 0；本任务改动路径单独 `npx eslint` 绿；其余 397/398 用例通过。修这两处会覆盖并行任务的在途编辑，故未改，留给该任务或 Lead 在其提交后复跑。
+
+
 ## Conclusion
 
 <!-- What got done, what got left behind -->
+
+- anvil 侧完成并提交 `cda5908`：periphery/tools 挂接、DeployLocal 末尾追加 `BatchTransfer` + `LOVE20Hub(stake)`、地址簿/导出/ABI、README。两次 8556 clean bootstrap 导出 sha256 相同（`9e811d4d…fcbd44c`），既有 34 个地址逐键不变、块号不变，仅新增两项。
+- 前端侧完成：`sync-anvil` 键映射、`AddressBook`/`ADDRESS_BOOK_KEYS`、三个 deployment JSON、两个 ABI 模块 + manifest/index、`docs/STATUS.md` §3.2/§6.8；`pnpm sync:anvil` 与 `pnpm abis:check` 绿，`pnpm typecheck` 绿。
+- 遗留风险：
+  1. `core` 里在途的 Stake 改动若最终落盘与本次编译不同，`abis:check` 会红：需重跑 `make -C ../anvil bootstrap`（或 export）+ `pnpm sync:anvil` 再提交。
+  2. `export/VERIFIED.md` 未按 36 个导出地址重生成（只在 8556 上验证过）；在 8545 上 bootstrap/verify 后应一并提交。
+  3. `pnpm test`/`pnpm lint` 的两处红来自并行主题任务的未提交文件（`button.tsx`、`scripts/theme-screenshots.mjs`），需由该任务修或由 Lead 复跑；与本任务改动无关。
+  4. 地址簿键名沿用 org 惯例的 UPPER_SNAKE（`BATCH_TRANSFER_ADDRESS`/`HUB_ADDRESS`）导出，前端映射为 `batchTransfer`/`hub`；台账里写的 `addresses.batchTransfer` 是前端键，不是 anvil 导出键。
+
 
 ## Execution Log
 

@@ -30,6 +30,10 @@ export interface AddressBook {
   readonly airdropDistributor: HexAddress;
   readonly firstTokenAddress: HexAddress;
   readonly pair: HexAddress;
+  /** tools/BatchTransfer — 批量转账工具，无构造函数参数。 */
+  readonly batchTransfer: HexAddress;
+  /** periphery/LOVE20Hub — 一键加池/单边加流动性，构造时只注入 Stake。 */
+  readonly hub: HexAddress;
 }
 
 /**
@@ -113,6 +117,8 @@ const ADDRESS_KEYS = [
   'airdropDistributor',
   'firstTokenAddress',
   'pair',
+  'batchTransfer',
+  'hub',
 ] as const satisfies readonly (keyof AddressBook)[];
 
 const HEX_ADDRESS = /^0x[0-9a-fA-F]{40}$/;

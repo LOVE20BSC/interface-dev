@@ -100,6 +100,8 @@ export const ADDRESS_BOOK_KEYS = [
   'airdropDistributor',
   'firstTokenAddress',
   'pair',
+  'batchTransfer',
+  'hub',
 ] as const satisfies readonly (keyof AddressBook)[];
 
 export function addressBookStatus(): {

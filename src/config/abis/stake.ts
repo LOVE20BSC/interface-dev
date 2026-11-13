@@ -27,14 +27,31 @@ export const stakeAbi = [
         internalType: 'address',
       },
       {
-        name: 'routerAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'pairFactoryAddress',
-        type: 'address',
-        internalType: 'address',
+        name: 'dexConfig',
+        type: 'tuple',
+        internalType: 'struct DexConfig',
+        components: [
+          {
+            name: 'router',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'pairFactory',
+            type: 'address',
+            internalType: 'address',
+          },
+          {
+            name: 'swapFeeForLpRatio',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+          {
+            name: 'swapFeeForProtocolRatio',
+            type: 'uint256',
+            internalType: 'uint256',
+          },
+        ],
       },
       {
         name: 'promisedWaitingPhasesMin',
@@ -203,6 +220,32 @@ export const stakeAbi = [
         name: '',
         type: 'address',
         internalType: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'SWAP_FEE_FOR_LP_RATIO',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'SWAP_FEE_FOR_PROTOCOL_RATIO',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
       },
     ],
     stateMutability: 'view',
@@ -451,11 +494,6 @@ export const stakeAbi = [
       },
       {
         name: 'parentTokenAmount',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'slippage',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -837,6 +875,18 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
+        name: 'caller',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
+      },
+      {
+        name: 'memberOwner',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
+      },
+      {
         name: 'boostAmount',
         type: 'uint256',
         indexed: false,
@@ -844,6 +894,12 @@ export const stakeAbi = [
       },
       {
         name: 'promisedWaitingPhases',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'prevPromisedWaitingPhases',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1020,6 +1076,18 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
+        name: 'caller',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
+      },
+      {
+        name: 'memberOwner',
+        type: 'address',
+        indexed: false,
+        internalType: 'address',
+      },
+      {
         name: 'tokenAmount',
         type: 'uint256',
         indexed: false,
@@ -1038,13 +1106,13 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'govVotesAdded',
+        name: 'prevPromisedWaitingPhases',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
       },
       {
-        name: 'govVotes',
+        name: 'govVotesAdded',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1432,6 +1500,48 @@ export const stakeAbi = [
   },
   {
     type: 'error',
+    name: 'PromisedWaitingPhasesRewritten',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'memberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'requested',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'current',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'ProtocolFeeRatioNotBelowLpRatio',
+    inputs: [
+      {
+        name: 'swapFeeForLpRatio',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'swapFeeForProtocolRatio',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
     name: 'RoundNotStarted',
     inputs: [
       {
@@ -1454,22 +1564,6 @@ export const stakeAbi = [
         name: 'token',
         type: 'address',
         internalType: 'address',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'SlippageExceeded',
-    inputs: [
-      {
-        name: 'actualDeviation',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'maxDeviation',
-        type: 'uint256',
-        internalType: 'uint256',
       },
     ],
   },
@@ -1505,6 +1599,22 @@ export const stakeAbi = [
       },
       {
         name: 'memberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'SwapFeeRatiosConsumeTheWholeAmount',
+    inputs: [
+      {
+        name: 'swapFeeForLpRatio',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'swapFeeForProtocolRatio',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -1593,6 +1703,11 @@ export const stakeAbi = [
   {
     type: 'error',
     name: 'ZeroLiquidityMinted',
+    inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'ZeroLpFeeRatio',
     inputs: [],
   },
   {

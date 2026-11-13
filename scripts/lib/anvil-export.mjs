@@ -65,6 +65,8 @@ export const ABI_MODULES = [
   },
   { file: 'weth9.ts', exportName: 'weth9Abi', contract: 'WETH9' },
   { file: 'multicall3.ts', exportName: 'multicall3Abi', contract: 'Multicall3' },
+  { file: 'batch-transfer.ts', exportName: 'batchTransferAbi', contract: 'BatchTransfer' },
+  { file: 'love20-hub.ts', exportName: 'love20HubAbi', contract: 'LOVE20Hub' },
 ];
 
 /**
@@ -89,6 +91,8 @@ const REPO_ABIS = {
   libs: [],
   dex: ['UniswapV2Factory', 'UniswapV2Router02', 'UniswapV2Pair'],
   anvil: ['WETH9', 'Multicall3'],
+  periphery: ['LOVE20Hub'],
+  tools: ['BatchTransfer'],
 };
 
 const ADDRESS_KEYS = {
@@ -114,6 +118,8 @@ const ADDRESS_KEYS = {
   airdropDistributor: 'AIRDROP_DISTRIBUTOR_ADDRESS',
   firstTokenAddress: 'LOVE20_TOKEN_ADDRESS',
   pair: 'UNISWAP_V2_PAIR_ADDRESS',
+  batchTransfer: 'BATCH_TRANSFER_ADDRESS',
+  hub: 'HUB_ADDRESS',
 };
 
 const HEX_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
@@ -461,6 +467,8 @@ export function buildManifest(exportData) {
     libs: resolve(anvilDir, '../libs'),
     dex: resolve(anvilDir, '../dex'),
     anvil: anvilDir,
+    periphery: resolve(anvilDir, '../periphery'),
+    tools: resolve(anvilDir, '../tools'),
   };
 
   const sources = {};
