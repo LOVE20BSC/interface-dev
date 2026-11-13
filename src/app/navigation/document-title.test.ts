@@ -19,6 +19,7 @@ describe('documentTitleFor', () => {
     expect(documentTitleFor('/my-nft', RESOLVED)).toBe('我的 NFT · TestLOVE20');
     expect(documentTitleFor('/about', RESOLVED)).toBe('关于 · TestLOVE20');
     expect(documentTitleFor('/theme', RESOLVED)).toBe('主题 · TestLOVE20');
+    expect(documentTitleFor('/transfer', RESOLVED)).toBe('代币转账 · TestLOVE20');
   });
 
   it('writes only the protocol label while the community is unresolved', () => {

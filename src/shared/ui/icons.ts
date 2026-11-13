@@ -28,6 +28,7 @@ export { default as PanelLeftOpen } from 'lucide-react/icons/panel-left-open';
 export { default as Palette } from 'lucide-react/icons/palette';
 export { default as RefreshCw } from 'lucide-react/icons/refresh-cw';
 export { default as Search } from 'lucide-react/icons/search';
+export { default as Send } from 'lucide-react/icons/send';
 export { default as ShieldCheck } from 'lucide-react/icons/shield-check';
 export { default as UserRound } from 'lucide-react/icons/user-round';
 export { default as UsersRound } from 'lucide-react/icons/users-round';

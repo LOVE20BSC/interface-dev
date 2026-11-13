@@ -16,6 +16,7 @@ import {
   NotFoundPage,
   SwapPage,
   ThemePage,
+  TransferPage,
 } from '@/app/router/lazy-routes';
 import { documentTitleFor } from '@/app/navigation/document-title';
 import { useCommunityDisplay } from '@/entities/community-token/model/use-community-display';
@@ -53,6 +54,7 @@ export function AppRouter() {
           <Route path="mint" element={<MintPage />} />
           <Route path="airdrop" element={<AirdropPage />} />
           <Route path="swap" element={<SwapPage />} />
+          <Route path="transfer" element={<TransferPage />} />
           <Route path="apps" element={<AppsPage />} />
           <Route path="about" element={<AboutPage />} />
           <Route path="gov" element={<GovPage />} />

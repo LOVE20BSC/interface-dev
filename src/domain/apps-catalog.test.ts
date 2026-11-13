@@ -13,11 +13,12 @@ const ALL_CONFIGURED: AppAddressConfiguration = {
 };
 
 describe('apps catalog', () => {
-  it('lists the five feature pages in owner order with stable routes', () => {
+  it('lists the six feature pages in owner order with stable routes', () => {
     expect(APP_CATALOG.map((entry) => entry.id)).toEqual([
       'airdrop',
       'myNft',
       'swap',
+      'transfer',
       'about',
       'theme',
     ]);
@@ -25,12 +26,14 @@ describe('apps catalog', () => {
       '/airdrop',
       '/my-nft',
       '/swap',
+      '/transfer',
       '/about',
       '/theme',
     ]);
     expect(APP_CATALOG.map((entry) => entry.category)).toEqual([
       'token',
       'identity',
+      'token',
       'token',
       'about',
       'settings',
@@ -39,12 +42,14 @@ describe('apps catalog', () => {
       'gift',
       'identity',
       'swap',
+      'send',
       'book',
       'palette',
     ]);
-    // 关于 (docs) and 主题 (local display preference) need no contract slot.
+    // 代币转账 needs no protocol contract (native + custom ERC20 suffice), and
+    // 关于 / 主题 need no contract slot either.
     expect(APP_CATALOG.filter((entry) => entry.requires === null).map((entry) => entry.id)).toEqual(
-      ['about', 'theme'],
+      ['transfer', 'about', 'theme'],
     );
   });
 
@@ -69,7 +74,7 @@ describe('apps catalog', () => {
     ).toBe(true);
   });
 
-  it('disables the three contract-backed rows against an empty address book, but never 关于/主题', () => {
+  it('disables the three contract-backed rows against an empty address book, but never 代币转账/关于/主题', () => {
     const apps = resolveAppsCatalog({ airdrop: false, memberNFT: false, router: false });
 
     expect(apps.map((entry) => entry.availability)).toEqual([
@@ -78,11 +83,13 @@ describe('apps catalog', () => {
       'unavailable',
       'available',
       'available',
+      'available',
     ]);
     expect(apps.map((entry) => entry.unavailableReason)).toEqual([
       'airdropNotConfigured',
       'memberNftNotConfigured',
       'routerNotConfigured',
+      undefined,
       undefined,
       undefined,
     ]);
@@ -101,7 +108,11 @@ describe('apps catalog', () => {
       'about',
       'settings',
     ]);
-    expect(groups?.[0]?.entries.map((entry) => entry.id)).toEqual(['airdrop', 'swap']);
+    expect(groups?.[0]?.entries.map((entry) => entry.id)).toEqual([
+      'airdrop',
+      'swap',
+      'transfer',
+    ]);
     expect(groups?.[1]?.entries.map((entry) => entry.id)).toEqual(['myNft']);
     expect(groups?.[2]?.entries.map((entry) => entry.id)).toEqual(['about']);
     expect(groups?.[3]?.entries.map((entry) => entry.id)).toEqual(['theme']);

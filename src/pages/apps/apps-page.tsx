@@ -9,7 +9,15 @@ import {
 } from '@/domain/apps-catalog';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { ArrowDownUp, BookOpen, ChevronRight, Gift, Palette, UserRound } from '@/shared/ui/icons';
+import {
+  ArrowDownUp,
+  BookOpen,
+  ChevronRight,
+  Gift,
+  Palette,
+  Send,
+  UserRound,
+} from '@/shared/ui/icons';
 
 /**
  * 应用 (UX spec §3.6): the feature-directory surface behind the fourth tab.
@@ -25,6 +33,7 @@ const APP_ICONS: Readonly<Record<AppIconKey, LucideIcon>> = Object.freeze({
   gift: Gift,
   identity: UserRound,
   swap: ArrowDownUp,
+  send: Send,
   book: BookOpen,
   palette: Palette,
 });

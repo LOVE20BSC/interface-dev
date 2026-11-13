@@ -14,14 +14,14 @@
  * link.
  */
 
-export type AppId = 'airdrop' | 'myNft' | 'swap' | 'about' | 'theme';
+export type AppId = 'airdrop' | 'myNft' | 'swap' | 'transfer' | 'about' | 'theme';
 
 export type AppCategoryKey = 'token' | 'identity' | 'about' | 'settings';
 
 /** Icon keys are stable data; the page maps them to lucide components. */
-export type AppIconKey = 'gift' | 'identity' | 'swap' | 'book' | 'palette';
+export type AppIconKey = 'gift' | 'identity' | 'swap' | 'send' | 'book' | 'palette';
 
-export type AppRoute = '/airdrop' | '/my-nft' | '/swap' | '/about' | '/theme';
+export type AppRoute = '/airdrop' | '/my-nft' | '/swap' | '/transfer' | '/about' | '/theme';
 
 export type AppAvailability = 'available' | 'unavailable';
 
@@ -99,6 +99,16 @@ export const APP_CATALOG: readonly AppCatalogEntry[] = Object.freeze([
     icon: 'swap',
     category: 'token',
     requires: 'router',
+  },
+  {
+    id: 'transfer',
+    labelKey: 'transfer',
+    descriptionKey: 'transfer',
+    route: '/transfer',
+    icon: 'send',
+    category: 'token',
+    // A plain transfer needs no protocol contract: any chain with a wallet works.
+    requires: null,
   },
   {
     id: 'about',

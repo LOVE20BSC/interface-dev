@@ -172,6 +172,7 @@ export const copy = {
     apps: '应用',
     about: '关于',
     theme: '主题',
+    transfer: '代币转账',
   },
   placeholders: {
     gov: {
