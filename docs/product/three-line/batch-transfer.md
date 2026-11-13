@@ -172,7 +172,7 @@ export PATH="/Users/BigPolarBear/.foundry/bin:/Users/BigPolarBear/.nvm/versions/
 node scripts/verify/batch-transfer-contract.mjs
 ```
 
-2026-11-14 06:52 实测 **56/56 PASS**（退出码 0）。用例顺序 A → B → C → D → E；每条用例都在自己的 before 读数上断言，A/E 都从 #6 出金也互不影响；结束时 `anvil_revert` 后复查四个账户回到 §0 值。
+2026-11-14 06:52 实测 **56/56 PASS**（退出码 0），07:05 复跑同样 **56/56 PASS**。用例顺序 A → B → C → D → E；每条用例都在自己的 before 读数上断言，A/E 都从 #6 出金也互不影响；结束时 `anvil_revert` 后复查四个账户回到 §0 值。
 
 | 用例 | 链上交易 / 读取 | 合约值（wei） | 与理论值差值 |
 | --- | --- | --- | --- |
@@ -194,7 +194,7 @@ node scripts/verify/batch-transfer-contract.mjs
 E2E_PORT=4178 E2E_ANVIL_RPC=http://127.0.0.1:8569 pnpm e2e --grep "批量转账"
 ```
 
-2026-11-14 06:58 实测 **9 passed**（6 条前端线 + 3 条截图用例），链快照 `0x7` 已回滚。Playwright 只读页面文字；下表就是页面实际渲染的字符串：
+2026-11-14 07:04 实测 **9 passed**（6 条前端线 + 3 条截图用例），链快照 `0x9` 已回滚；06:58 / 07:02 两次复跑同样 9 passed。Playwright 只读页面文字；下表就是页面实际渲染的字符串：
 
 | 用例 | 页面断言（精确字符串） | 与理论值差值 |
 | --- | --- | --- |
