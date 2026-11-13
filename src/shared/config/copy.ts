@@ -171,6 +171,7 @@ export const copy = {
     swap: '兑换代币',
     apps: '应用',
     about: '关于',
+    theme: '主题',
   },
   placeholders: {
     gov: {

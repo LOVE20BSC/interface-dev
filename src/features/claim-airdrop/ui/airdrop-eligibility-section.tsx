@@ -45,7 +45,7 @@ export function AirdropEligibilitySection() {
         <button
           type="button"
           onClick={eligibility.refetch}
-          className="shrink-0 font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+          className="shrink-0 font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           {copy.common.retry}
         </button>

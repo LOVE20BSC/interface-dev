@@ -33,7 +33,7 @@ export function NoWalletDialog({ open, onOpenChange }: NoWalletDialogProps) {
       title={copy.wallet.noWalletTitle}
       description={copy.wallet.noWalletBody}
     >
-      <div className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4">
+      <div className="flex items-start gap-3 rounded-2xl bg-elevated p-4">
         <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand-strong">
           <Wallet className="h-4 w-4" aria-hidden="true" />
         </span>

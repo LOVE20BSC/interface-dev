@@ -64,7 +64,7 @@ function ReceiptBody({
         </p>
       </div>
 
-      <dl className="space-y-2.5 rounded-2xl border border-line bg-slate-50/70 p-3 text-sm">
+      <dl className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3 text-sm">
         <div className="flex items-start justify-between gap-3">
           <dt className="shrink-0 text-muted">{copy.mintIdentity.receipt.burnedLabel}</dt>
           <dd className="text-right font-medium text-foreground" data-testid="mint-receipt-burned">

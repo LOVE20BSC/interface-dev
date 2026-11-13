@@ -9,7 +9,7 @@ import {
 } from '@/domain/apps-catalog';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { ArrowDownUp, BookOpen, ChevronRight, Gift, UserRound } from '@/shared/ui/icons';
+import { ArrowDownUp, BookOpen, ChevronRight, Gift, Palette, UserRound } from '@/shared/ui/icons';
 
 /**
  * 应用 (UX spec §3.6): the feature-directory surface behind the fourth tab.
@@ -26,6 +26,7 @@ const APP_ICONS: Readonly<Record<AppIconKey, LucideIcon>> = Object.freeze({
   identity: UserRound,
   swap: ArrowDownUp,
   book: BookOpen,
+  palette: Palette,
 });
 
 /** Build availability from the address book, never from a per-page env branch. */
@@ -47,7 +48,7 @@ function AppRow({ entry, search }: { readonly entry: AppEntry; readonly search: 
       <span
         className={cn(
           'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl',
-          disabled ? 'bg-slate-100 text-muted' : 'bg-brand-soft text-brand-strong',
+          disabled ? 'bg-elevated text-muted' : 'bg-brand-soft text-brand-strong',
         )}
       >
         <Icon className="h-5 w-5" aria-hidden="true" />
@@ -71,7 +72,7 @@ function AppRow({ entry, search }: { readonly entry: AppEntry; readonly search: 
         <div
           aria-disabled="true"
           data-app-id={entry.id}
-          className="flex min-h-14 items-center gap-3 bg-slate-50/60 px-4 py-3"
+          className="flex min-h-14 items-center gap-3 bg-elevated/60 px-4 py-3"
         >
           {body}
         </div>
@@ -84,7 +85,7 @@ function AppRow({ entry, search }: { readonly entry: AppEntry; readonly search: 
       <Link
         to={{ pathname: entry.route, search }}
         data-app-id={entry.id}
-        className="flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-soft/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40"
+        className="flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-soft/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
       >
         {body}
         <ChevronRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />

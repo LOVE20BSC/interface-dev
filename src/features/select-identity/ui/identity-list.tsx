@@ -22,7 +22,7 @@ export interface IdentityListProps {
 }
 
 const TEXT_LINK =
-  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40';
+  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
 
 function SummarySkeleton() {
   return (
@@ -46,7 +46,7 @@ function ListSkeleton() {
 
 function InvalidatedNotice() {
   return (
-    <p className="mb-3 rounded-xl border border-line bg-slate-50 px-3 py-2 text-xs leading-5 text-muted">
+    <p className="mb-3 rounded-xl border border-line bg-elevated px-3 py-2 text-xs leading-5 text-muted">
       {copy.home.identityInvalidated}
     </p>
   );
@@ -159,7 +159,7 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
 
         <div className="hidden overflow-hidden rounded-2xl border border-line md:block">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs text-muted">
+            <thead className="bg-elevated text-xs text-muted">
               <tr>
                 <th scope="col" className="px-4 py-2.5 font-medium">
                   {copy.pages.myNft.tableNumber}
@@ -295,7 +295,7 @@ function RowActions({
       <Button
         size="sm"
         variant="ghost"
-        className="text-danger hover:bg-danger-soft"
+        className="text-danger-strong hover:bg-danger-soft"
         disabled={busy}
         title={busy ? copy.pages.myNft.busyReason : undefined}
         onClick={onTransfer}

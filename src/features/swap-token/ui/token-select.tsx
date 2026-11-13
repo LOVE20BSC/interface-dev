@@ -46,7 +46,7 @@ function TokenRow({
       onClick={() => onSelect(token)}
       className={cn(
         'flex w-full items-center justify-between gap-3 rounded-xl px-2.5 py-2.5 text-left text-sm',
-        'hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40',
+        'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
         selected && 'bg-brand-soft/60',
       )}
     >
@@ -199,7 +199,7 @@ function TokenList({
         <button
           type="button"
           onClick={onLoadMore}
-          className="mt-2 w-full rounded-xl border border-line px-3 py-2 text-xs font-medium text-foreground hover:bg-slate-50"
+          className="mt-2 w-full rounded-xl border border-line px-3 py-2 text-xs font-medium text-foreground hover:bg-elevated"
         >
           {copy.swap.loadMore}
         </button>
@@ -229,7 +229,7 @@ export function TokenSelect(props: TokenSelectProps) {
       className={cn(
         'inline-flex h-10 items-center gap-1.5 rounded-2xl border border-line bg-surface px-3 text-sm font-semibold text-foreground shadow-soft',
         triggerLabel === undefined ? 'max-w-[11rem]' : 'max-w-none',
-        'hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 disabled:opacity-60',
+        'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60',
         triggerClassName,
       )}
     >

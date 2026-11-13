@@ -38,7 +38,7 @@ export function Sheet({
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="l20-overlay fixed inset-0 z-50 bg-slate-950/45 backdrop-blur-[2px]" />
+        <DialogPrimitive.Overlay className="l20-overlay fixed inset-0 z-50 bg-overlay backdrop-blur-[2px]" />
         <DialogPrimitive.Content
           className={cn(
             'l20-sheet fixed inset-x-0 bottom-0 z-50 max-h-[82dvh] overflow-y-auto rounded-t-3xl border border-line bg-surface px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 shadow-2xl focus:outline-none',
@@ -53,7 +53,7 @@ export function Sheet({
           }}
         >
           <div
-            className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200 md:hidden"
+            className="mx-auto mb-3 h-1 w-10 rounded-full bg-line-strong md:hidden"
             aria-hidden="true"
           />
           <div className="flex items-start justify-between gap-3">
@@ -74,7 +74,7 @@ export function Sheet({
             {dismissible ? (
               <DialogPrimitive.Close
                 aria-label={copy.common.close}
-                className="-mr-1 -mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-slate-100"
+                className="-mr-1 -mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-elevated"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </DialogPrimitive.Close>

@@ -110,7 +110,7 @@ function ModeOption({
         onClick={() => onSelect(mode)}
         className={cn(
           'flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm',
-          'hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40',
+          'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
           selected && 'bg-brand-soft/60 font-medium',
         )}
       >
@@ -245,11 +245,11 @@ export function TransferForm({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-line bg-slate-50 p-3">
+      <div className="rounded-2xl border border-line bg-elevated p-3">
         <IdentityPill identity={target} />
       </div>
 
-      <p className="flex items-start gap-2 rounded-2xl border border-danger/20 bg-danger-soft/60 p-3 text-xs leading-5 text-danger">
+      <p className="flex items-start gap-2 rounded-2xl border border-danger/20 bg-danger-soft/60 p-3 text-xs leading-5 text-danger-strong">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         {copy.pages.myNft.transferWarning}
       </p>
@@ -266,7 +266,7 @@ export function TransferForm({
                 data-testid="transfer-mode-trigger"
                 aria-label={`${copy.transferIdentity.modeLabel}: ${selectedModeLabel}`}
                 disabled={busy}
-                className="inline-flex h-11 shrink-0 items-center gap-1 rounded-l-2xl border border-r-0 border-line bg-slate-50 px-2.5 text-xs font-medium text-foreground hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-brand/40 disabled:opacity-60"
+                className="inline-flex h-11 shrink-0 items-center gap-1 rounded-l-2xl border border-r-0 border-line bg-elevated px-2.5 text-xs font-medium text-foreground hover:bg-elevated focus:outline-none focus:ring-2 focus:ring-brand disabled:opacity-60"
               >
                 {selectedModeLabel}
                 <ChevronDown className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
@@ -312,7 +312,7 @@ export function TransferForm({
             aria-invalid={invalid}
             className={cn(
               'h-11 min-w-0 flex-1 rounded-r-2xl border bg-surface px-3 font-mono text-sm text-foreground',
-              'focus:outline-none focus:ring-2 focus:ring-brand/40',
+              'focus:outline-none focus:ring-2 focus:ring-brand',
               invalid ? 'border-danger/50' : 'border-line',
             )}
           />
@@ -320,7 +320,7 @@ export function TransferForm({
       </div>
 
       {mode === 'address' && addressMessage !== null ? (
-        <p className="text-xs text-danger" role="alert">
+        <p className="text-xs text-danger-strong" role="alert">
           {addressMessage}
         </p>
       ) : null}
@@ -338,7 +338,7 @@ export function TransferForm({
       ) : null}
 
       {mode === 'member' && memberMessage !== null ? (
-        <p className="text-xs text-danger" role="alert">
+        <p className="text-xs text-danger-strong" role="alert">
           {memberMessage}
           {member.status === 'error' ? (
             <button
@@ -353,7 +353,7 @@ export function TransferForm({
       ) : null}
 
       {mode === 'name' && nameMessage !== null ? (
-        <p className="text-xs text-danger" role="alert">
+        <p className="text-xs text-danger-strong" role="alert">
           {nameMessage}
           {nameRecipient.status === 'error' ? (
             <button
@@ -409,7 +409,7 @@ export function TransferForm({
       ) : null}
 
       {phase === 'error' && errorMessage !== null ? (
-        <p className="rounded-2xl border border-danger/20 bg-danger-soft/60 px-3 py-2 text-xs leading-5 text-danger">
+        <p className="rounded-2xl border border-danger/20 bg-danger-soft/60 px-3 py-2 text-xs leading-5 text-danger-strong">
           {errorMessage}
         </p>
       ) : null}

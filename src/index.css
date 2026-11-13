@@ -7,20 +7,35 @@
   --font-mono:
     ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
+  /*
+   * Semantic colour tokens (ADR-0005). Every surface/text/border class in src/
+   * must consume one of these; hardcoded palette utilities (slate/white/indigo)
+   * break the dark theme. The dark values below are the Binance-inspired
+   * palette agreed with the owner (2026-11-14); contrast pairs are proven in
+   * docs/product/three-line/theme.md.
+   */
   --color-background: #f6f7fb;
   --color-surface: #ffffff;
+  --color-elevated: #f8fafc;
+  --color-elevated-hover: #f1f5f9;
   --color-foreground: #0f172a;
   --color-muted: #64748b;
   --color-line: #e5e9f1;
+  --color-line-strong: #cbd5e1;
   --color-brand: #2563eb;
   --color-brand-strong: #1d4ed8;
   --color-brand-soft: #dbeafe;
+  /* Text/glyph colour drawn on top of --color-brand (white on blue, near-black on yellow). */
+  --color-on-brand: #ffffff;
   --color-danger: #dc2626;
+  --color-danger-strong: #b91c1c;
   --color-danger-soft: #fee2e2;
   --color-warning: #b45309;
   --color-warning-soft: #fef3c7;
   --color-success: #047857;
   --color-success-soft: #d1fae5;
+  /* Sheet/dialog scrim; needs its own token because it is not a flat surface. */
+  --color-overlay: rgb(15 23 42 / 0.45);
 
   --shadow-soft: 0 18px 40px -24px rgb(15 23 42 / 0.35);
 }
@@ -44,6 +59,43 @@
     --bottom-navigation-height: 0px;
     --sticky-action-height: 0px;
   }
+}
+
+/*
+ * Dark theme = Binance-inspired palette (owner 2026-11-14).
+ * canvas #0B0E11 · card #1E2329 · elevated/hover #2B3139 · weak separator #2B3139
+ * strong separator #474D57 · text #EAECEF · secondary #848E9C · brand #FCD535
+ * (text on brand #181A20) · success/up #0ECB81 · danger/down #F6465D.
+ *
+ * Declared outside @layer so it wins over the @theme defaults in `@layer theme`.
+ * The inline bootstrap script in index.html applies the same attribute before
+ * the first paint, so these values are in effect from frame one.
+ */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-background: #0b0e11;
+  --color-surface: #1e2329;
+  --color-elevated: #2b3139;
+  --color-elevated-hover: #2b3139;
+  --color-foreground: #eaecef;
+  --color-muted: #848e9c;
+  --color-line: #2b3139;
+  --color-line-strong: #474d57;
+  --color-brand: #fcd535;
+  --color-brand-strong: #fcd535;
+  --color-brand-soft: #3a331a;
+  --color-on-brand: #181a20;
+  --color-danger: #f6465d;
+  --color-danger-strong: #ff6b7a;
+  --color-danger-soft: #3a1e24;
+  --color-warning: #f0b90b;
+  --color-warning-soft: #3a3212;
+  --color-success: #0ecb81;
+  --color-success-soft: #123027;
+  --color-overlay: rgb(0 0 0 / 0.62);
+
+  --shadow-soft: 0 18px 40px -24px rgb(0 0 0 / 0.8);
 }
 
 @layer base {

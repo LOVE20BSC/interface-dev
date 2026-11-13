@@ -15,6 +15,7 @@ const loadGovPage = () => import('@/pages/gov/gov-page');
 const loadActPage = () => import('@/pages/act/act-page');
 const loadGroupPage = () => import('@/pages/group/group-page');
 const loadMePage = () => import('@/pages/me/me-page');
+const loadThemePage = () => import('@/pages/theme/theme-page');
 const loadNotFoundPage = () => import('@/pages/not-found/not-found-page');
 
 export const MyNftPage = lazy(async () => {
@@ -57,6 +58,10 @@ export const MePage = lazy(async () => {
   const module = await loadMePage();
   return { default: module.MePage };
 });
+export const ThemePage = lazy(async () => {
+  const module = await loadThemePage();
+  return { default: module.ThemePage };
+});
 export const NotFoundPage = lazy(async () => {
   const module = await loadNotFoundPage();
   return { default: module.NotFoundPage };
@@ -74,6 +79,7 @@ const ROUTE_LOADERS: Readonly<Record<string, () => Promise<unknown>>> = Object.f
   '/act': loadActPage,
   '/group': loadGroupPage,
   '/me': loadMePage,
+  '/theme': loadThemePage,
 });
 
 /**

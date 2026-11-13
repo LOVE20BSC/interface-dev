@@ -14,14 +14,14 @@
  * link.
  */
 
-export type AppId = 'airdrop' | 'myNft' | 'swap' | 'about';
+export type AppId = 'airdrop' | 'myNft' | 'swap' | 'about' | 'theme';
 
-export type AppCategoryKey = 'token' | 'identity' | 'about';
+export type AppCategoryKey = 'token' | 'identity' | 'about' | 'settings';
 
 /** Icon keys are stable data; the page maps them to lucide components. */
-export type AppIconKey = 'gift' | 'identity' | 'swap' | 'book';
+export type AppIconKey = 'gift' | 'identity' | 'swap' | 'book' | 'palette';
 
-export type AppRoute = '/airdrop' | '/my-nft' | '/swap' | '/about';
+export type AppRoute = '/airdrop' | '/my-nft' | '/swap' | '/about' | '/theme';
 
 export type AppAvailability = 'available' | 'unavailable';
 
@@ -108,6 +108,16 @@ export const APP_CATALOG: readonly AppCatalogEntry[] = Object.freeze([
     icon: 'book',
     category: 'about',
     // Documentation + read-only chain data: no contract address can disable it.
+    requires: null,
+  },
+  {
+    // Owner 2026-11-14: 主题 is a local display preference, never chain-backed.
+    id: 'theme',
+    labelKey: 'theme',
+    descriptionKey: 'theme',
+    route: '/theme',
+    icon: 'palette',
+    category: 'settings',
     requires: null,
   },
 ]);

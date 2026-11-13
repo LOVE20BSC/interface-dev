@@ -5,7 +5,7 @@ export function Skeleton({ className }: { readonly className?: string }) {
   return (
     <span
       aria-hidden="true"
-      className={cn('block animate-pulse rounded-lg bg-slate-200/70', className)}
+      className={cn('block animate-pulse rounded-lg bg-line-strong/70', className)}
     />
   );
 }

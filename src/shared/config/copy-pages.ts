@@ -439,6 +439,7 @@ export const copy = {
       token: '代币',
       identity: '身份 NFT',
       about: '资料',
+      settings: '设置',
     },
     items: {
       airdrop: {
@@ -457,12 +458,31 @@ export const copy = {
         label: '开源文档',
         description: '文档、合约地址与链上数据',
       },
+      theme: {
+        label: '主题',
+        description: '切换浅色或深色界面配色',
+      },
     },
     unavailable: {
       airdropNotConfigured: '这个环境还没有配置空投铸造。',
       memberNftNotConfigured: '这个环境还没有配置身份 NFT 合约。',
       routerNotConfigured: '这个环境还没有配置代币兑换。',
     },
+  },
+  // ───────────────────────────────────────────────────────────────────────────
+  // 主题 (ADR-0005). Two explicit palettes, no "follow system": the lazy /theme
+  // page is the only consumer, so these strings stay out of the first screen.
+  // ───────────────────────────────────────────────────────────────────────────
+  theme: {
+    intro: '选择一套界面配色，点一下就生效，并记住在这台设备上。',
+    groupLabel: '界面配色',
+    options: {
+      light: '浅色',
+      dark: '深色',
+    },
+    selected: '当前使用',
+    previewLabel: (name: string) => `${name}配色小样`,
+    note: '主题只改变显示，不影响链上数据；换设备或换浏览器需要重新选择。',
   },
   // ───────────────────────────────────────────────────────────────────────────
   // BEGIN UX-child block: 转让身份 NFT 收款人模式 + 交易回执收起 (keep verbatim;

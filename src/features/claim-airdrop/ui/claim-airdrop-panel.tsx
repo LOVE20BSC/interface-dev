@@ -26,7 +26,7 @@ export interface ClaimAirdropPanelProps {
 }
 
 const TEXT_LINK =
-  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40';
+  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
 
 function StatusCard({
   meta,
@@ -395,7 +395,7 @@ export function ClaimAirdropPanel({
         {tx.error !== null ? (
           <div
             role="alert"
-            className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger"
+            className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
           >
             <p>{tx.error}</p>
             <Button

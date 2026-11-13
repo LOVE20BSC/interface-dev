@@ -8,13 +8,14 @@ export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
-    'bg-brand text-white shadow-soft hover:bg-brand-strong active:bg-brand-strong disabled:bg-brand/60',
-  secondary: 'border border-line bg-surface text-foreground hover:bg-slate-50 active:bg-slate-100',
-  ghost: 'text-foreground hover:bg-slate-100 active:bg-slate-200',
-  danger: 'bg-danger text-white hover:bg-red-700 active:bg-red-800',
+    'bg-brand text-on-brand shadow-soft hover:bg-brand-strong active:bg-brand-strong disabled:bg-brand/60',
+  secondary:
+    'border border-line bg-surface text-foreground hover:bg-elevated active:bg-elevated-hover',
+  ghost: 'text-foreground hover:bg-elevated active:bg-line-strong',
+  danger: 'bg-danger text-on-brand hover:bg-danger/90 active:bg-danger/80',
   // Red border + red text on a transparent background; geometry stays in SIZES.
   'danger-outline':
-    'border border-danger bg-transparent text-danger hover:bg-danger-soft/60 active:bg-danger-soft',
+    'border border-danger bg-transparent text-danger-strong hover:bg-danger-soft/60 active:bg-danger-soft',
   outline:
     'border border-brand/30 bg-brand-soft/40 text-brand-strong hover:bg-brand-soft active:bg-brand-soft',
 };
@@ -33,7 +34,7 @@ export function buttonStyles(
 ): string {
   return cn(
     'inline-flex select-none items-center justify-center font-medium transition-colors',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background',
     'disabled:pointer-events-none disabled:opacity-60',
     VARIANTS[variant],
     SIZES[size],

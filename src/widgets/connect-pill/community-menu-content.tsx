@@ -65,7 +65,7 @@ export function CommunityMenuContent({
                 }}
                 className={cn(
                   'flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm',
-                  'hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40',
+                  'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                 )}
               >
                 <span className="font-mono text-[13px] font-semibold text-foreground">

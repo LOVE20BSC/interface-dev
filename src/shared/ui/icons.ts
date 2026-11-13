@@ -25,6 +25,7 @@ export { default as Loader2 } from 'lucide-react/icons/loader-2';
 export { default as LogOut } from 'lucide-react/icons/log-out';
 export { default as PanelLeftClose } from 'lucide-react/icons/panel-left-close';
 export { default as PanelLeftOpen } from 'lucide-react/icons/panel-left-open';
+export { default as Palette } from 'lucide-react/icons/palette';
 export { default as RefreshCw } from 'lucide-react/icons/refresh-cw';
 export { default as Search } from 'lucide-react/icons/search';
 export { default as ShieldCheck } from 'lucide-react/icons/shield-check';

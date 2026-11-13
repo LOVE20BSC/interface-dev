@@ -27,7 +27,7 @@ export function BuildVersionBanner({
       dismissible={false}
     >
       <div className="flex flex-col gap-2">
-        <p className="rounded-2xl bg-slate-50 p-3 font-mono text-xs leading-5 text-muted">
+        <p className="rounded-2xl bg-elevated p-3 font-mono text-xs leading-5 text-muted">
           {copy.advanced.buildId}: {localBuildId}
           {remoteBuildId !== null ? ` → ${remoteBuildId}` : ''}
         </p>

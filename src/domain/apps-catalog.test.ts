@@ -13,22 +13,39 @@ const ALL_CONFIGURED: AppAddressConfiguration = {
 };
 
 describe('apps catalog', () => {
-  it('lists the four feature pages in owner order with stable routes', () => {
-    expect(APP_CATALOG.map((entry) => entry.id)).toEqual(['airdrop', 'myNft', 'swap', 'about']);
+  it('lists the five feature pages in owner order with stable routes', () => {
+    expect(APP_CATALOG.map((entry) => entry.id)).toEqual([
+      'airdrop',
+      'myNft',
+      'swap',
+      'about',
+      'theme',
+    ]);
     expect(APP_CATALOG.map((entry) => entry.route)).toEqual([
       '/airdrop',
       '/my-nft',
       '/swap',
       '/about',
+      '/theme',
     ]);
     expect(APP_CATALOG.map((entry) => entry.category)).toEqual([
       'token',
       'identity',
       'token',
       'about',
+      'settings',
     ]);
-    expect(APP_CATALOG.map((entry) => entry.icon)).toEqual(['gift', 'identity', 'swap', 'book']);
-    expect(APP_CATALOG.at(-1)?.requires).toBeNull();
+    expect(APP_CATALOG.map((entry) => entry.icon)).toEqual([
+      'gift',
+      'identity',
+      'swap',
+      'book',
+      'palette',
+    ]);
+    // 关于 (docs) and 主题 (local display preference) need no contract slot.
+    expect(APP_CATALOG.filter((entry) => entry.requires === null).map((entry) => entry.id)).toEqual(
+      ['about', 'theme'],
+    );
   });
 
   it('marks every entry available when all target contracts are configured', () => {
@@ -52,7 +69,7 @@ describe('apps catalog', () => {
     ).toBe(true);
   });
 
-  it('disables the three contract-backed rows against an empty address book, but never 关于', () => {
+  it('disables the three contract-backed rows against an empty address book, but never 关于/主题', () => {
     const apps = resolveAppsCatalog({ airdrop: false, memberNFT: false, router: false });
 
     expect(apps.map((entry) => entry.availability)).toEqual([
@@ -60,23 +77,34 @@ describe('apps catalog', () => {
       'unavailable',
       'unavailable',
       'available',
+      'available',
     ]);
     expect(apps.map((entry) => entry.unavailableReason)).toEqual([
       'airdropNotConfigured',
       'memberNftNotConfigured',
       'routerNotConfigured',
       undefined,
+      undefined,
     ]);
-    expect(apps.at(-1)?.id).toBe('about');
+    expect(apps.map((entry) => entry.id).filter((id) => id === 'about' || id === 'theme')).toEqual([
+      'about',
+      'theme',
+    ]);
   });
 
   it('groups by category when the catalog has at least two categories', () => {
     const groups = groupAppsByCategory(resolveAppsCatalog(ALL_CONFIGURED));
 
-    expect(groups?.map((group) => group.category)).toEqual(['token', 'identity', 'about']);
+    expect(groups?.map((group) => group.category)).toEqual([
+      'token',
+      'identity',
+      'about',
+      'settings',
+    ]);
     expect(groups?.[0]?.entries.map((entry) => entry.id)).toEqual(['airdrop', 'swap']);
     expect(groups?.[1]?.entries.map((entry) => entry.id)).toEqual(['myNft']);
     expect(groups?.[2]?.entries.map((entry) => entry.id)).toEqual(['about']);
+    expect(groups?.[3]?.entries.map((entry) => entry.id)).toEqual(['theme']);
   });
 
   it('returns null (single flat list) for one category or no entries', () => {
@@ -84,10 +112,12 @@ describe('apps catalog', () => {
     const tokenOnly = apps.filter((entry) => entry.category === 'token');
     const identityOnly = apps.filter((entry) => entry.category === 'identity');
     const aboutOnly = apps.filter((entry) => entry.category === 'about');
+    const settingsOnly = apps.filter((entry) => entry.category === 'settings');
 
     expect(groupAppsByCategory(tokenOnly)).toBeNull();
     expect(groupAppsByCategory(identityOnly)).toBeNull();
     expect(groupAppsByCategory(aboutOnly)).toBeNull();
+    expect(groupAppsByCategory(settingsOnly)).toBeNull();
     expect(groupAppsByCategory([])).toBeNull();
   });
 });

@@ -15,6 +15,7 @@ import {
   MyNftPage,
   NotFoundPage,
   SwapPage,
+  ThemePage,
 } from '@/app/router/lazy-routes';
 import { documentTitleFor } from '@/app/navigation/document-title';
 import { useCommunityDisplay } from '@/entities/community-token/model/use-community-display';
@@ -58,6 +59,7 @@ export function AppRouter() {
           <Route path="act" element={<ActPage />} />
           <Route path="group" element={<GroupPage />} />
           <Route path="me" element={<MePage />} />
+          <Route path="theme" element={<ThemePage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>

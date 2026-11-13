@@ -151,6 +151,50 @@ export const cache: CacheApi = {
 };
 
 /**
+ * Global UI preferences (theme, ...).
+ *
+ * These are deliberately NOT chain/wallet-scoped: a palette is a property of
+ * this browser, not of one community or one wallet. The key is explicit and
+ * stable (`love20:theme`) because the inline bootstrap script in index.html must
+ * read the exact same entry before React exists. Values are opaque strings; the
+ * owning module validates them (unknown values fall back to its default).
+ */
+const PREFERENCE_PREFIX = 'love20:';
+
+function preferenceKey(businessKey: string): string {
+  if (!BUSINESS_KEY_RE.test(businessKey)) {
+    throw new Error(`cache: invalid preference key "${businessKey}"`);
+  }
+  return `${PREFERENCE_PREFIX}${businessKey}`;
+}
+
+/** Reads a global UI preference; returns null when absent or storage is unavailable. */
+export function readPreference(businessKey: string): string | null {
+  const key = preferenceKey(businessKey);
+  const store = storage();
+  if (store === null) return null;
+  try {
+    return store.getItem(key);
+  } catch {
+    // Private mode / sandboxed iframe: the caller falls back to its default.
+    return null;
+  }
+}
+
+/** Writes a global UI preference. Returns false when storage is unavailable or full. */
+export function writePreference(businessKey: string, value: string): boolean {
+  const key = preferenceKey(businessKey);
+  const store = storage();
+  if (store === null) return false;
+  try {
+    store.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * One-shot session flags (e.g. "already reloaded after vite:preloadError").
  * They are deliberately outside the chain/wallet namespace: they describe this
  * browser tab, not a chain-scoped user preference.

@@ -24,7 +24,9 @@ describe('WrongNetworkButton', () => {
     expect(classes).toContain('border');
     expect(classes).toContain('border-danger');
     expect(classes).toContain('bg-transparent');
-    expect(classes).toContain('text-danger');
+    // text-danger-strong, not text-danger: in the dark palette #f6465d as body
+    // text on the card surface is 4.48:1, so danger text uses the lighter token.
+    expect(classes).toContain('text-danger-strong');
     // A solid fill would be the bare `bg-danger` utility; `bg-danger-soft` is
     // the hover tint and is allowed.
     expect(classes).not.toContain('bg-danger');

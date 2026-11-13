@@ -73,6 +73,7 @@ const PAGE_TITLES: Readonly<Record<string, string>> = Object.freeze({
   '/act': copy.placeholders.act.title,
   '/group': copy.placeholders.group.title,
   '/me': copy.placeholders.me.title,
+  '/theme': copy.pageTitles.theme,
 });
 
 export function pageTitleFor(pathname: string): string | null {

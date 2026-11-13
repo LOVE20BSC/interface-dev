@@ -14,11 +14,11 @@ export interface IdentityWelcomeProps {
 }
 
 const TEXT_LINK =
-  'inline-flex items-center text-sm font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40';
+  'inline-flex items-center text-sm font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
 
 function InvalidatedNotice() {
   return (
-    <p className="mb-3 rounded-xl border border-line bg-slate-50 px-3 py-2 text-xs leading-5 text-muted">
+    <p className="mb-3 rounded-xl border border-line bg-elevated px-3 py-2 text-xs leading-5 text-muted">
       {copy.home.identityInvalidated}
     </p>
   );

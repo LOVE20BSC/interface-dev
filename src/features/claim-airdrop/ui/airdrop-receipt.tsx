@@ -71,7 +71,7 @@ function ReceiptBody({ receipt, totalShare, onDismiss }: AirdropReceiptProps) {
         </p>
       </div>
 
-      <dl className="space-y-2.5 rounded-2xl border border-line bg-slate-50/70 p-3 text-sm">
+      <dl className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3 text-sm">
         {sharePercent !== null ? (
           <div className="flex items-start justify-between gap-3">
             <dt className="shrink-0 text-muted">{copy.airdrop.receipt.shareLabel}</dt>

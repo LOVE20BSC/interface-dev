@@ -68,7 +68,7 @@ function ReceiptBody({ record, onSwapAgain, onDismiss }: SwapReceiptProps) {
         </p>
       </div>
 
-      <dl className="space-y-2.5 rounded-2xl border border-line bg-slate-50/70 p-3 text-sm">
+      <dl className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3 text-sm">
         <div className="flex items-start justify-between gap-3">
           <dt className="shrink-0 text-muted">{copy.swap.receipt.pathLabel}</dt>
           <dd
@@ -90,7 +90,7 @@ function ReceiptBody({ record, onSwapAgain, onDismiss }: SwapReceiptProps) {
           role={belowMinOut ? 'alert' : undefined}
         >
           {belowMinOut ? (
-            <p className="font-medium text-danger">{copy.swap.receipt.minFailed}</p>
+            <p className="font-medium text-danger-strong">{copy.swap.receipt.minFailed}</p>
           ) : !minKnown ? (
             <p className="text-muted">{copy.swap.receipt.actualUnknown}</p>
           ) : null}

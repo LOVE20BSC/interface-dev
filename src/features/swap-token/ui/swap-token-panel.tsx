@@ -44,7 +44,7 @@ export interface SwapTokenPanelProps {
 }
 
 const TEXT_LINK =
-  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40';
+  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
 
 const CARD = 'rounded-3xl border border-line bg-surface p-5 shadow-soft';
 
@@ -473,7 +473,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     return (
       <div className="space-y-4" aria-busy="true">
         <div className={CARD}>
-          <div className="rounded-2xl bg-slate-50/70 p-3">
+          <div className="rounded-2xl bg-elevated p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-medium text-muted">{copy.swap.from}</span>
               <Skeleton className="h-10 w-28 rounded-2xl" />
@@ -501,7 +501,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
               <ArrowDownUp className="h-4 w-4" aria-hidden="true" />
             </span>
           </div>
-          <div className="rounded-2xl bg-slate-50/70 p-3">
+          <div className="rounded-2xl bg-elevated p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-medium text-muted">{copy.swap.to}</span>
               <Skeleton className="h-10 w-28 rounded-2xl" />
@@ -514,7 +514,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
             </div>
           </div>
         </div>
-        <div className="space-y-2.5 rounded-2xl border border-line bg-slate-50/70 p-3">
+        <div className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3">
           <Skeleton className="h-3.5 w-full" />
           <Skeleton className="h-3.5 w-4/5" />
           <Skeleton className="h-3.5 w-3/5" />
@@ -546,10 +546,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
 
   if (screen === 'no-route') {
     return (
-      <StateCard
-        title={copy.swap.states.noRouteTitle}
-        description={copy.swap.states.noRouteBody}
-      >
+      <StateCard title={copy.swap.states.noRouteTitle} description={copy.swap.states.noRouteBody}>
         {routeState.failingHopLabel !== undefined ? (
           <p className="w-full text-xs leading-5 text-muted">
             {copy.swap.states.noRouteHop(routeState.failingHopLabel)}
@@ -695,7 +692,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
         </div>
       ) : null}
       <div className={CARD}>
-        <div className="rounded-2xl bg-slate-50/70 p-3">
+        <div className="rounded-2xl bg-elevated p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-muted">{copy.swap.from}</span>
             <TokenSelect
@@ -746,7 +743,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
             <p
               className={cn(
                 'mt-1.5 text-xs leading-5',
-                insufficient || tooSmall ? 'text-danger' : 'text-danger',
+                insufficient || tooSmall ? 'text-danger-strong' : 'text-danger-strong',
               )}
               data-testid="swap-amount-error"
             >
@@ -774,13 +771,13 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
             aria-label={copy.swap.swapDirection}
             onClick={handleDirection}
             disabled={txBusy}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-foreground shadow-soft hover:bg-slate-50 disabled:opacity-50"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-line bg-surface text-foreground shadow-soft hover:bg-elevated disabled:opacity-50"
           >
             <ArrowDownUp className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
 
-        <div className="rounded-2xl bg-slate-50/70 p-3">
+        <div className="rounded-2xl bg-elevated p-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-muted">{copy.swap.to}</span>
             <TokenSelect
@@ -835,7 +832,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
           isLoading={routeState.status === 'loading' || quote.isLoading || isDebouncing}
         />
       ) : (
-        <div className="space-y-2.5 rounded-2xl border border-line bg-slate-50/70 p-3">
+        <div className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3">
           <Skeleton className="h-3.5 w-full" />
           <Skeleton className="h-3.5 w-4/5" />
           <Skeleton className="h-3.5 w-3/5" />
@@ -845,7 +842,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
       {highImpactBlocked ? (
         <div
           role="alert"
-          className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger"
+          className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
         >
           <p>{copy.swap.priceImpactHigh}</p>
           <Button
@@ -862,7 +859,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
       {showQuoteError ? (
         <div
           role="alert"
-          className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger"
+          className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
         >
           <p>{copy.swap.states.quoteErrorTitle}</p>
           <p className="mt-1 text-xs leading-5 text-muted">{copy.swap.states.quoteErrorBody}</p>
@@ -883,7 +880,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
       {errorMessage !== null ? (
         <div
           role="alert"
-          className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger"
+          className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
         >
           <p>{errorMessage}</p>
           {tx.error?.action === 'swap' ? (

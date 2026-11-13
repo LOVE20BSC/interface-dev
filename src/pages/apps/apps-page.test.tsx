@@ -37,18 +37,21 @@ describe('AppsPage', () => {
     renderPage();
 
     const links = screen.getAllByRole('link');
-    // Three categories today, so the DOM is grouped: 代币 (创世空投, 代币兑换),
-    // 身份 NFT, then 资料 (开源文档). Catalog order inside each group is preserved.
+    // Four categories today, so the DOM is grouped: 代币 (创世空投, 代币兑换),
+    // 身份 NFT, 资料 (开源文档), then 设置 (主题). Catalog order inside each group
+    // is preserved.
     expect(links.map((link) => link.textContent)).toEqual([
       expect.stringContaining('创世空投'),
       expect.stringContaining('代币兑换'),
       expect.stringContaining('身份 NFT'),
       expect.stringContaining('开源文档'),
+      expect.stringContaining('主题'),
     ]);
     expect(screen.getByText('按快照份额铸造创世代币')).toBeVisible();
     expect(screen.getByText('查看、切换与转让你的身份 NFT')).toBeVisible();
     expect(screen.getByText('在任意代币之间互换')).toBeVisible();
     expect(screen.getByText('文档、合约地址与链上数据')).toBeVisible();
+    expect(screen.getByText('切换浅色或深色界面配色')).toBeVisible();
     expect(links.every((link) => link.querySelector('svg') !== null)).toBe(true);
   });
 
@@ -58,8 +61,10 @@ describe('AppsPage', () => {
     expect(screen.getByRole('heading', { name: '代币' })).toBeVisible();
     expect(screen.getByRole('heading', { name: '身份 NFT' })).toBeVisible();
     expect(screen.getByRole('heading', { name: '资料' })).toBeVisible();
-    // 代币 group: 创世空投 + 代币兑换; 身份 NFT: 身份 NFT; 资料: 开源文档.
-    expect(screen.getAllByRole('list')).toHaveLength(3);
+    expect(screen.getByRole('heading', { name: '设置' })).toBeVisible();
+    // 代币 group: 创世空投 + 代币兑换; 身份 NFT: 身份 NFT; 资料: 开源文档;
+    // 设置: 主题.
+    expect(screen.getAllByRole('list')).toHaveLength(4);
   });
 
   it('keeps ?symbol= and every other query on each route', () => {
@@ -71,6 +76,7 @@ describe('AppsPage', () => {
       '/swap?symbol=LOVE20&utm=test',
       '/my-nft?symbol=LOVE20&utm=test',
       '/about?symbol=LOVE20&utm=test',
+      '/theme?symbol=LOVE20&utm=test',
     ]);
   });
 
@@ -91,11 +97,12 @@ describe('AppsPage', () => {
     expect(screen.getByRole('link', { name: /开源文档/ })).toBeVisible();
   });
 
-  it('keeps 开源文档 available even when the whole address book is empty', () => {
+  it('keeps 开源文档 and 主题 available even when the whole address book is empty', () => {
     configure([]);
     renderPage();
 
     expect(screen.getByRole('link', { name: /开源文档/ })).toBeVisible();
+    expect(screen.getByRole('link', { name: /主题/ })).toBeVisible();
     expect(screen.queryByRole('link', { name: /创世空投/ })).toBeNull();
     expect(screen.queryByRole('link', { name: /身份 NFT/ })).toBeNull();
     expect(screen.queryByRole('link', { name: /代币兑换/ })).toBeNull();

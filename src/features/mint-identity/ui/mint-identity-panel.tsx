@@ -31,13 +31,13 @@ export interface MintIdentityPanelProps {
 
 const NAME_CHECK_TONE: Record<MintNameStatus, string> = {
   empty: 'text-muted',
-  'too-long': 'text-danger',
-  invalid: 'text-danger',
-  'prefix-required': 'text-danger',
+  'too-long': 'text-danger-strong',
+  invalid: 'text-danger-strong',
+  'prefix-required': 'text-danger-strong',
   checking: 'text-muted',
-  taken: 'text-danger',
+  taken: 'text-danger-strong',
   available: 'text-success',
-  error: 'text-danger',
+  error: 'text-danger-strong',
 };
 
 function StateCard({
@@ -383,7 +383,9 @@ export function MintIdentityPanel({
           <div id="mint-name-rule" className="mt-1 space-y-0.5">
             <p className="text-xs leading-5 text-muted">{copy.mintIdentity.name.testRule}</p>
             {quote.nameStatus === 'prefix-required' ? (
-              <p className="text-xs leading-5 text-danger">{copy.mintIdentity.name.testReason}</p>
+              <p className="text-xs leading-5 text-danger-strong">
+                {copy.mintIdentity.name.testReason}
+              </p>
             ) : null}
           </div>
         ) : null}
@@ -529,7 +531,7 @@ export function MintIdentityPanel({
         {errorMessage !== null ? (
           <div
             role="alert"
-            className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger"
+            className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
           >
             <p>{errorMessage}</p>
             {recoveryAction !== null ||

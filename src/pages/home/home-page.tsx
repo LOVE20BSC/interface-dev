@@ -101,7 +101,7 @@ export function HomePage() {
           <button
             type="button"
             onClick={identity.refetch}
-            className="mt-3 inline-flex h-11 items-center justify-center rounded-2xl border border-line px-4 text-sm font-medium text-foreground transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2"
+            className="mt-3 inline-flex h-11 items-center justify-center rounded-2xl border border-line px-4 text-sm font-medium text-foreground transition-colors hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {copy.common.retry}
           </button>
@@ -134,7 +134,7 @@ export function HomePage() {
           </h2>
           <Link
             to={{ pathname: '/mint', search }}
-            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-brand px-4 text-sm font-medium text-white shadow-soft transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2"
+            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-brand px-4 text-sm font-medium text-on-brand shadow-soft transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {copy.home.mintIdentity}
           </Link>
@@ -154,7 +154,7 @@ export function HomePage() {
           </h2>
           <Link
             to={{ pathname: '/my-nft', search }}
-            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-brand px-4 text-sm font-medium text-white shadow-soft transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2"
+            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-brand px-4 text-sm font-medium text-on-brand shadow-soft transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {copy.home.chooseIdentity}
           </Link>

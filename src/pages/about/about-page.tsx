@@ -31,7 +31,7 @@ type AboutTab = 'contracts' | 'data';
 const TAB_ORDER: readonly AboutTab[] = ['contracts', 'data'];
 
 const TEXT_LINK =
-  'inline-flex items-center gap-1.5 text-sm font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40';
+  'inline-flex items-center gap-1.5 text-sm font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
 
 function Intro() {
   return (
@@ -114,7 +114,7 @@ function Tabs({
             onKeyDown={onKeyDown}
             className={cn(
               '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand',
               selected
                 ? 'border-brand text-brand-strong'
                 : 'border-transparent text-muted hover:text-foreground',
@@ -166,7 +166,7 @@ function AddressRow({
               type="button"
               onClick={() => onCopy(row)}
               aria-label={copy.about.addresses.copyAddress(label)}
-              className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-muted hover:bg-slate-100 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+              className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-muted hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               {copied ? (
                 <Check className="h-3.5 w-3.5" aria-hidden="true" />
@@ -183,7 +183,7 @@ function AddressRow({
                 target="_blank"
                 rel="noreferrer"
                 aria-label={copy.about.addresses.explorer(label)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-slate-100 hover:text-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-elevated hover:text-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 <ArrowUpLeft className="h-3.5 w-3.5" aria-hidden="true" />
               </a>
@@ -246,12 +246,7 @@ function AddressesPanel() {
           </h3>
           <ul className="mt-1 divide-y divide-line rounded-2xl border border-line bg-surface px-4">
             {group.rows.map((row) => (
-              <AddressRow
-                key={row.key}
-                row={row}
-                copied={copiedKey === row.key}
-                onCopy={onCopy}
-              />
+              <AddressRow key={row.key} row={row} copied={copiedKey === row.key} onCopy={onCopy} />
             ))}
           </ul>
         </section>
@@ -316,10 +311,7 @@ function DataPanel({ symbol }: { readonly symbol: string }) {
       <DataRow label={copy.about.data.communityToken}>
         {renderValue(data.communitySymbol, (value) => value)}
       </DataRow>
-      <DataRow
-        label={copy.about.data.communitySupply}
-        valueTestId="about-community-total-supply"
-      >
+      <DataRow label={copy.about.data.communitySupply} valueTestId="about-community-total-supply">
         {renderValue(data.communitySupply, (value) =>
           data.communityDecimals === undefined ? (
             <span className="text-muted">{copy.common.unknown}</span>
@@ -328,10 +320,7 @@ function DataPanel({ symbol }: { readonly symbol: string }) {
           ),
         )}
       </DataRow>
-      <DataRow
-        label={copy.about.data.memberNftSupply}
-        valueTestId="about-member-nft-total-supply"
-      >
+      <DataRow label={copy.about.data.memberNftSupply} valueTestId="about-member-nft-total-supply">
         {renderValue(data.memberNftSupply, (value) => formatIntegerSupply(value))}
       </DataRow>
       <DataRow label={copy.about.data.airdropPool} valueTestId="about-airdrop-pool-balance">

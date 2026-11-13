@@ -32,7 +32,7 @@ export interface SwapInfoProps {
 }
 
 const ACTIVE_PILL = 'border-brand bg-brand-soft text-brand-strong';
-const IDLE_PILL = 'border-line bg-surface text-foreground hover:bg-slate-50';
+const IDLE_PILL = 'border-line bg-surface text-foreground hover:bg-elevated';
 
 function Row({
   label,
@@ -95,7 +95,7 @@ export function SwapInfo(props: SwapInfoProps) {
   const impactHigh = priceImpactBps !== undefined && priceImpactBps > 1000;
 
   return (
-    <dl className="space-y-2.5 rounded-2xl border border-line bg-slate-50/70 p-3">
+    <dl className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3">
       <div className="text-xs leading-5 text-foreground" data-testid="swap-rate">
         {isWrap ? (
           copy.swap.rateWrap(from.symbol, to.symbol)
@@ -189,7 +189,7 @@ export function SwapInfo(props: SwapInfoProps) {
                 <span>{copy.swap.slippageCustomUnit}</span>
               </label>
               {customSlippageError !== undefined ? (
-                <p className="mt-1 text-right text-[11px] leading-4 text-danger">
+                <p className="mt-1 text-right text-[11px] leading-4 text-danger-strong">
                   {customSlippageError}
                 </p>
               ) : null}
@@ -206,7 +206,9 @@ export function SwapInfo(props: SwapInfoProps) {
         <Row
           label={copy.swap.priceImpactLabel}
           testId="swap-price-impact"
-          valueClassName={impactHigh ? 'font-medium text-danger' : 'font-medium text-warning'}
+          valueClassName={
+            impactHigh ? 'font-medium text-danger-strong' : 'font-medium text-warning'
+          }
         >
           {copy.swap.priceImpactValue(formatBpsPercent(priceImpactBps))}
         </Row>

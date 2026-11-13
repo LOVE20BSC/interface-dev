@@ -33,7 +33,7 @@ export function BottomNav() {
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'group relative flex w-full flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-medium transition-colors',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40 active:scale-95',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand active:scale-95',
                   active ? 'text-brand-strong' : 'text-muted',
                 )}
               >

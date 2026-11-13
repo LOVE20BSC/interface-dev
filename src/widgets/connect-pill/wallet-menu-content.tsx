@@ -141,7 +141,7 @@ export function WalletMenuContent({
   const rowClass = cn(
     'flex items-center gap-3 rounded-xl px-2.5 py-2.5',
     row.href !== null &&
-      'hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40',
+      'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
   );
   const rowBody = (
     <>
@@ -261,7 +261,7 @@ export function WalletMenuContent({
 
       <Button
         variant="ghost"
-        className="w-full justify-start text-danger hover:bg-danger-soft hover:text-danger"
+        className="w-full justify-start text-danger-strong hover:bg-danger-soft hover:text-danger-strong"
         leadingIcon={<LogOut className="h-4 w-4" aria-hidden="true" />}
         onClick={() => {
           onNavigate();

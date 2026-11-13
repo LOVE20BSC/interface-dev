@@ -13,7 +13,7 @@ import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 
 const TEXT_LINK =
-  'inline-flex items-center text-sm font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40';
+  'inline-flex items-center text-sm font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
 
 function Section({
   id,
@@ -25,10 +25,7 @@ function Section({
   readonly children: ReactNode;
 }) {
   return (
-    <section
-      aria-labelledby={id}
-      className="rounded-2xl border border-line bg-surface px-4 py-4"
-    >
+    <section aria-labelledby={id} className="rounded-2xl border border-line bg-surface px-4 py-4">
       <h2 id={id} className="text-sm font-semibold text-foreground">
         {title}
       </h2>
@@ -37,13 +34,7 @@ function Section({
   );
 }
 
-function Row({
-  label,
-  children,
-}: {
-  readonly label: string;
-  readonly children: ReactNode;
-}) {
+function Row({ label, children }: { readonly label: string; readonly children: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 py-2 text-sm">
       <dt className="shrink-0 text-muted">{label}</dt>

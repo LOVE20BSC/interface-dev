@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -20,6 +20,36 @@
     />
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <title>LOVE20协议</title>
+    <script>
+      /*
+       * Theme bootstrap (ADR-0005). Mirrors src/shared/lib/theme.ts and runs
+       * before the first paint: without it the light palette flashes for one
+       * frame before React applies the stored dark choice. Keep the key
+       * `love20:theme`, the attribute and the theme-color values in sync with
+       * theme.ts (guarded by src/shared/lib/theme.test.ts).
+       */
+      (function () {
+        try {
+          var storageKey = 'love20:theme';
+          var metaColors = { light: '#f6f7fb', dark: '#0b0e11' };
+          var stored = localStorage.getItem(storageKey);
+          var theme = stored === 'dark' || stored === 'light' ? stored : 'light';
+          var root = document.documentElement;
+          root.setAttribute('data-theme', theme);
+          root.classList.toggle('dark', theme === 'dark');
+          root.style.colorScheme = theme;
+          var themeColor = document.querySelector('meta[name="theme-color"]');
+          if (themeColor) themeColor.setAttribute('content', metaColors[theme]);
+          var colorScheme = document.querySelector('meta[name="color-scheme"]');
+          if (colorScheme) colorScheme.setAttribute('content', theme);
+        } catch (error) {
+          // Storage can throw (private mode / sandboxed iframe): light still applies.
+          document.documentElement.setAttribute('data-theme', 'light');
+          document.documentElement.classList.remove('dark');
+          document.documentElement.style.colorScheme = 'light';
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
