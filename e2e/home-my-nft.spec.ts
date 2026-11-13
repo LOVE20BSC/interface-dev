@@ -106,7 +106,11 @@ test('home: wrong chain shows the red outlined switch pill, not a solid fill', a
   expect(style.backgroundColor).toBe('rgba(0, 0, 0, 0)');
   expect(style.borderTopColor).toBe('rgb(220, 38, 38)');
   expect(style.borderTopWidth).toBe('1px');
-  expect(style.color).toBe('rgb(220, 38, 38)');
+  // Text uses the new --color-danger-strong token (#b91c1c in light), not the
+  // --color-danger fill (#dc2626): in the dark palette #f6465d as text on the
+  // card surface is 4.48:1, so danger TEXT has its own lighter token. The 1px
+  // border intentionally keeps --color-danger (decorative, not text).
+  expect(style.color).toBe('rgb(185, 28, 28)');
   // The md connect-pill geometry is unchanged, so the header does not jump.
   expect(style.height).toBe(44);
   expect(style.paddingLeft).toBe('16px');

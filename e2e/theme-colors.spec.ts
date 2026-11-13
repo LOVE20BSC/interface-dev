@@ -105,12 +105,22 @@ async function readTheme(page: Page): Promise<ThemeReadback> {
   }, TOKEN_KEYS as string[]);
 }
 
-/** Seeds (or clears) the persisted choice before the app boots. */
+/**
+ * Seeds (or clears) the persisted choice before the app boots.
+ *
+ * The init script runs on EVERY navigation, so it must seed only once per tab:
+ * otherwise the reload after switching to dark would be reset back to the seeded
+ * value and the persistence assertion would test the seed, not the app.
+ * sessionStorage survives reloads in the same tab, which is exactly the scope we
+ * need for this file.
+ */
 async function seedStoredTheme(page: Page, theme: Palette | null): Promise<void> {
   await page.addInitScript(
     ({ key, value }) => {
+      if (window.sessionStorage.getItem('e2e-theme-seeded') === '1') return;
       if (value === null) window.localStorage.removeItem(key);
       else window.localStorage.setItem(key, value);
+      window.sessionStorage.setItem('e2e-theme-seeded', '1');
     },
     { key: STORAGE_KEY, value: theme },
   );
