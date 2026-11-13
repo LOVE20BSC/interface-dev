@@ -23,8 +23,10 @@ const { identityState, submitMock } = vi.hoisted(() => ({
 
 vi.mock('wagmi', () => ({
   useAccount: () => ({ address: SELF }),
+  // A real RPC returns undefined/null for an EOA (wagmi surfaces null) and the
+  // deployed bytecode for a contract; both must not be mistaken for each other.
   useBytecode: ({ address }: { address?: string }) => ({
-    data: address !== undefined && address.toLowerCase() === PAIR.toLowerCase() ? '0x6080' : '0x',
+    data: address !== undefined && address.toLowerCase() === PAIR.toLowerCase() ? '0x6080' : null,
   }),
 }));
 
@@ -126,6 +128,9 @@ describe('TransferTokenPanel 按地址', () => {
 
     fillRecipient(OTHER);
     expect(submitButton()).toBeEnabled();
+    // A plain wallet must never show the contract-recipient warning.
+    expect(screen.queryByTestId('transfer-contract-warning')).toBeNull();
+    expect(screen.queryByTestId('transfer-protection')).toBeNull();
 
     fillAmount('0');
     expect(screen.getByTestId('transfer-amount-error')).toHaveTextContent('金额必须大于 0');

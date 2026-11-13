@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount, useBytecode } from 'wagmi';
 import { AlertTriangle, Check, RefreshCw } from '@/shared/ui/icons';
@@ -140,7 +140,8 @@ export function TransferTokenPanel({
     address: recipientAddress,
     query: { enabled: recipientAddress !== undefined },
   });
-  const hasBytecode = bytecode.data === undefined ? undefined : bytecode.data !== '0x';
+  // viem returns undefined/null for an address without code (wagmi may surface null).
+  const hasBytecode = bytecode.data == null ? undefined : bytecode.data !== '0x';
   const protection = decideRecipientProtection(recipientAddress ?? '', hasBytecode);
   const protectionLabel =
     protection.kind === 'known' ? knownContractLabel(protection.labelKey) : undefined;
@@ -149,18 +150,19 @@ export function TransferTokenPanel({
     balance.refetch();
   });
 
-  // A resolved custom token becomes the selection immediately (the picker closes).
+  // A resolved custom token becomes the selection exactly once per address: the
+  // user can still pick another token afterwards (the resolved token object is
+  // rebuilt every render, so the key — not the object — guards the effect).
   const customTokenKey =
     catalog.custom.token !== undefined ? transferTokenKey(catalog.custom.token) : '';
-  /* eslint-disable react-hooks/set-state-in-effect -- selection follows a resolved chain read */
+  const appliedCustomKey = useRef('');
   useEffect(() => {
     const resolved = catalog.custom.token;
     if (catalog.custom.status !== 'ok' || resolved === undefined) return;
-    setSelectedToken((previous) =>
-      previous !== undefined && transferTokenKey(previous) === customTokenKey ? previous : resolved,
-    );
+    if (appliedCustomKey.current === customTokenKey) return;
+    appliedCustomKey.current = customTokenKey;
+    setSelectedToken(resolved);
   }, [catalog.custom.status, catalog.custom.token, customTokenKey]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // A different recipient invalidates the previous contract acknowledgement.
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -186,6 +188,13 @@ export function TransferTokenPanel({
     (mode === 'address'
       ? addressCheck === 'ok' && (protection.kind !== 'known' || knownAck)
       : identityResolved && identityAck);
+
+  const addressInvalid = addressCheck !== 'ok' && addressCheck !== 'empty';
+  const identityInvalid =
+    identity.status === 'invalid' ||
+    identity.status === 'not-found' ||
+    identity.status === 'self' ||
+    identity.status === 'error';
 
   const amountError =
     parsed.kind === 'invalid'
@@ -360,6 +369,8 @@ export function TransferTokenPanel({
           </div>
         </div>
       ) : null}
+
+      <p className="px-1 text-xs leading-5 text-muted">{copy.transfer.intro}</p>
 
       <div className="rounded-3xl border border-line bg-surface p-5 shadow-soft">
         <div>
@@ -583,19 +594,11 @@ export function TransferTokenPanel({
             autoCapitalize="off"
             spellCheck={false}
             disabled={busy}
-            aria-invalid={
-              mode === 'address'
-                ? addressCheck !== 'ok' && addressCheck !== 'empty'
-                : identity.status !== 'ok' &&
-                  identity.status !== 'idle' &&
-                  identity.status !== 'reading'
-            }
+            aria-invalid={mode === 'address' ? addressInvalid : identityInvalid}
             className={cn(
               'mt-1.5 h-11 w-full rounded-2xl border bg-surface px-3 font-mono text-sm text-foreground',
               'outline-none focus:ring-2 focus:ring-brand',
-              (mode === 'address'
-                ? addressCheck !== 'ok' && addressCheck !== 'empty'
-                : identityError !== null) && addressCheck !== 'empty'
+              (mode === 'address' ? addressInvalid : identityInvalid)
                 ? 'border-danger/50'
                 : 'border-line',
             )}
