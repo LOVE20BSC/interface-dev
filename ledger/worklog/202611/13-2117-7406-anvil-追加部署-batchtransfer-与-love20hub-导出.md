@@ -1,7 +1,7 @@
 # 20261113-2117-7406-anvil-追加部署-batchtransfer-与-love20hub-导出: anvil 追加部署 BatchTransfer 与 LOVE20Hub（导出/地址簿/ABI 接入）
 
 - **Tags**: anvil, BatchTransfer, LOVE20Hub, 地址簿, ABI
-- **Status**: open · 2026-11-13 21:17:08
+- **Status**: doing · 2026-11-13 21:19:05 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 - **Created**: 2026-11-13 21:17:08 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 
 <!-- Header lines are maintained by the script, fixed order: Tags → Status → Created → Sealed.
@@ -54,3 +54,4 @@ owner 2026-11-14：新仓 `periphery`（`LOVE20Hub`，平替旧库 `UniswapV2Zap
 <!-- Maintained by the script: appended by new / claim / set / release / log / close. Do not edit.
      Backfill with: progress log --id 20261113-2117-7406-anvil-追加部署-batchtransfer-与-love20hub-导出 --note "...". -->
 - 2026-11-13 21:17:08 · new · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · created
+- 2026-11-13 21:19:05 · claim · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · claimed → doing
