@@ -10,15 +10,19 @@ const ALL_CONFIGURED: AppAddressConfiguration = {
   airdrop: true,
   memberNFT: true,
   router: true,
+  batchTransfer: true,
 };
 
 describe('apps catalog', () => {
-  it('lists the six feature pages in owner order with stable routes', () => {
+  it('lists the nine feature pages in owner order with stable routes', () => {
     expect(APP_CATALOG.map((entry) => entry.id)).toEqual([
       'airdrop',
       'myNft',
       'swap',
       'transfer',
+      'liquidity',
+      'batchTransfer',
+      'approvals',
       'about',
       'theme',
     ]);
@@ -27,12 +31,18 @@ describe('apps catalog', () => {
       '/my-nft',
       '/swap',
       '/transfer',
+      '/liquidity',
+      '/batch-transfer',
+      '/approvals',
       '/about',
       '/theme',
     ]);
     expect(APP_CATALOG.map((entry) => entry.category)).toEqual([
       'token',
       'identity',
+      'token',
+      'token',
+      'token',
       'token',
       'token',
       'about',
@@ -43,13 +53,16 @@ describe('apps catalog', () => {
       'identity',
       'swap',
       'send',
+      'liquidity',
+      'batch',
+      'shield',
       'book',
       'palette',
     ]);
     // 代币转账 needs no protocol contract (native + custom ERC20 suffice), and
     // 关于 / 主题 need no contract slot either.
     expect(APP_CATALOG.filter((entry) => entry.requires === null).map((entry) => entry.id)).toEqual(
-      ['transfer', 'about', 'theme'],
+      ['transfer', 'approvals', 'about', 'theme'],
     );
   });
 
@@ -74,11 +87,19 @@ describe('apps catalog', () => {
     ).toBe(true);
   });
 
-  it('disables the three contract-backed rows against an empty address book, but never 代币转账/关于/主题', () => {
-    const apps = resolveAppsCatalog({ airdrop: false, memberNFT: false, router: false });
+  it('disables the four contract-backed rows against an empty address book, but never 代币转账/关于/主题', () => {
+    const apps = resolveAppsCatalog({
+      airdrop: false,
+      memberNFT: false,
+      router: false,
+      batchTransfer: false,
+    });
 
     expect(apps.map((entry) => entry.availability)).toEqual([
       'unavailable',
+      'unavailable',
+      'unavailable',
+      'available',
       'unavailable',
       'unavailable',
       'available',
@@ -89,6 +110,9 @@ describe('apps catalog', () => {
       'airdropNotConfigured',
       'memberNftNotConfigured',
       'routerNotConfigured',
+      undefined,
+      'routerNotConfigured',
+      'batchTransferNotConfigured',
       undefined,
       undefined,
       undefined,
@@ -112,6 +136,9 @@ describe('apps catalog', () => {
       'airdrop',
       'swap',
       'transfer',
+      'liquidity',
+      'batchTransfer',
+      'approvals',
     ]);
     expect(groups?.[1]?.entries.map((entry) => entry.id)).toEqual(['myNft']);
     expect(groups?.[2]?.entries.map((entry) => entry.id)).toEqual(['about']);

@@ -9,7 +9,10 @@ const loadMyNftPage = () => import('@/pages/my-nft/my-nft-page');
 const loadMintPage = () => import('@/pages/mint/mint-page');
 const loadAirdropPage = () => import('@/pages/airdrop/airdrop-page');
 const loadSwapPage = () => import('@/pages/swap/swap-page');
+const loadLiquidityPage = () => import('@/pages/liquidity/liquidity-page');
 const loadTransferPage = () => import('@/pages/transfer/transfer-page');
+const loadBatchTransferPage = () => import('@/pages/batch-transfer/batch-transfer-page');
+const loadApprovalsPage = () => import('@/pages/approvals/approvals-page');
 const loadAppsPage = () => import('@/pages/apps/apps-page');
 const loadAboutPage = () => import('@/pages/about/about-page');
 const loadGovPage = () => import('@/pages/gov/gov-page');
@@ -35,9 +38,21 @@ export const SwapPage = lazy(async () => {
   const module = await loadSwapPage();
   return { default: module.SwapPage };
 });
+export const LiquidityPage = lazy(async () => {
+  const module = await loadLiquidityPage();
+  return { default: module.LiquidityPage };
+});
 export const TransferPage = lazy(async () => {
   const module = await loadTransferPage();
   return { default: module.TransferPage };
+});
+export const BatchTransferPage = lazy(async () => {
+  const module = await loadBatchTransferPage();
+  return { default: module.BatchTransferPage };
+});
+export const ApprovalsPage = lazy(async () => {
+  const module = await loadApprovalsPage();
+  return { default: module.ApprovalsPage };
 });
 export const AppsPage = lazy(async () => {
   const module = await loadAppsPage();
@@ -79,6 +94,9 @@ const ROUTE_LOADERS: Readonly<Record<string, () => Promise<unknown>>> = Object.f
   '/airdrop': loadAirdropPage,
   '/swap': loadSwapPage,
   '/transfer': loadTransferPage,
+  '/liquidity': loadLiquidityPage,
+  '/batch-transfer': loadBatchTransferPage,
+  '/approvals': loadApprovalsPage,
   '/apps': loadAppsPage,
   '/about': loadAboutPage,
   '/gov': loadGovPage,

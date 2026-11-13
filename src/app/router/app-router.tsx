@@ -7,9 +7,12 @@ import {
   AboutPage,
   ActPage,
   AirdropPage,
+  ApprovalsPage,
   AppsPage,
+  BatchTransferPage,
   GovPage,
   GroupPage,
+  LiquidityPage,
   MePage,
   MintPage,
   MyNftPage,
@@ -54,7 +57,10 @@ export function AppRouter() {
           <Route path="mint" element={<MintPage />} />
           <Route path="airdrop" element={<AirdropPage />} />
           <Route path="swap" element={<SwapPage />} />
+          <Route path="liquidity" element={<LiquidityPage />} />
           <Route path="transfer" element={<TransferPage />} />
+          <Route path="batch-transfer" element={<BatchTransferPage />} />
+          <Route path="approvals" element={<ApprovalsPage />} />
           <Route path="apps" element={<AppsPage />} />
           <Route path="about" element={<AboutPage />} />
           <Route path="gov" element={<GovPage />} />

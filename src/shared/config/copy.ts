@@ -173,6 +173,9 @@ export const copy = {
     about: '关于',
     theme: '主题',
     transfer: '代币转账',
+    batchTransfer: '批量转账',
+    approvals: '代币授权',
+    liquidity: '流动性池',
   },
   placeholders: {
     gov: {

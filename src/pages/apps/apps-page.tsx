@@ -13,9 +13,11 @@ import {
   ArrowDownUp,
   BookOpen,
   ChevronRight,
+  Droplets,
   Gift,
   Palette,
   Send,
+  ShieldCheck,
   UserRound,
 } from '@/shared/ui/icons';
 
@@ -34,6 +36,9 @@ const APP_ICONS: Readonly<Record<AppIconKey, LucideIcon>> = Object.freeze({
   identity: UserRound,
   swap: ArrowDownUp,
   send: Send,
+  liquidity: Droplets,
+  batch: Send,
+  shield: ShieldCheck,
   book: BookOpen,
   palette: Palette,
 });
@@ -44,6 +49,7 @@ function currentCatalog(): readonly AppEntry[] {
     airdrop: configuredAddress('airdropDistributor') !== undefined,
     memberNFT: configuredAddress('memberNFT') !== undefined,
     router: configuredAddress('router') !== undefined,
+    batchTransfer: configuredAddress('batchTransfer') !== undefined,
   });
 }
 

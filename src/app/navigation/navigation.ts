@@ -68,6 +68,8 @@ const PAGE_TITLES: Readonly<Record<string, string>> = Object.freeze({
   '/airdrop': copy.pageTitles.airdrop,
   '/swap': copy.pageTitles.swap,
   '/transfer': copy.pageTitles.transfer,
+  '/batch-transfer': copy.pageTitles.batchTransfer,
+  '/approvals': copy.pageTitles.approvals,
   '/apps': copy.pageTitles.apps,
   '/about': copy.pageTitles.about,
   '/gov': copy.placeholders.gov.title,

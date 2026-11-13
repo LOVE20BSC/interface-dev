@@ -14,22 +14,52 @@
  * link.
  */
 
-export type AppId = 'airdrop' | 'myNft' | 'swap' | 'transfer' | 'about' | 'theme';
+export type AppId =
+  | 'airdrop'
+  | 'myNft'
+  | 'swap'
+  | 'transfer'
+  | 'liquidity'
+  | 'batchTransfer'
+  | 'approvals'
+  | 'about'
+  | 'theme';
 
 export type AppCategoryKey = 'token' | 'identity' | 'about' | 'settings';
 
 /** Icon keys are stable data; the page maps them to lucide components. */
-export type AppIconKey = 'gift' | 'identity' | 'swap' | 'send' | 'book' | 'palette';
+export type AppIconKey =
+  | 'gift'
+  | 'identity'
+  | 'swap'
+  | 'send'
+  | 'liquidity'
+  | 'batch'
+  | 'shield'
+  | 'book'
+  | 'palette';
 
-export type AppRoute = '/airdrop' | '/my-nft' | '/swap' | '/transfer' | '/about' | '/theme';
+export type AppRoute =
+  | '/airdrop'
+  | '/my-nft'
+  | '/swap'
+  | '/transfer'
+  | '/liquidity'
+  | '/batch-transfer'
+  | '/approvals'
+  | '/about'
+  | '/theme';
 
 export type AppAvailability = 'available' | 'unavailable';
 
 /** Address-book slot an entry needs before it can navigate. */
-export type AppAddressRequirement = 'airdrop' | 'memberNFT' | 'router';
+export type AppAddressRequirement = 'airdrop' | 'memberNFT' | 'router' | 'batchTransfer';
 
 export type AppUnavailableReasonKey =
-  'airdropNotConfigured' | 'memberNftNotConfigured' | 'routerNotConfigured';
+  | 'airdropNotConfigured'
+  | 'memberNftNotConfigured'
+  | 'routerNotConfigured'
+  | 'batchTransferNotConfigured';
 
 /** One reviewed catalog row. `labelKey` / `descriptionKey` index copy.apps.items. */
 export interface AppCatalogEntry {
@@ -65,12 +95,14 @@ const UNAVAILABLE_REASONS: Readonly<Record<AppAddressRequirement, AppUnavailable
     airdrop: 'airdropNotConfigured',
     memberNFT: 'memberNftNotConfigured',
     router: 'routerNotConfigured',
+    batchTransfer: 'batchTransferNotConfigured',
   });
 
 /**
- * Owner order (2026-11-11): 创世空投, 身份 NFT, 代币兑换; 开源文档 appended last
- * (2026-11-12, documents + debugging data). Category is declared per row; the
- * page groups automatically once two or more categories exist.
+ * Owner order (2026-11-11): 创世空投, 身份 NFT, 代币兑换; 代币转账 + 批量转账
+ * followed (2026-11-14, same 代币 category); 开源文档 appended last (2026-11-12,
+ * documents + debugging data). Category is declared per row; the page groups
+ * automatically once two or more categories exist.
  */
 export const APP_CATALOG: readonly AppCatalogEntry[] = Object.freeze([
   {
@@ -108,6 +140,40 @@ export const APP_CATALOG: readonly AppCatalogEntry[] = Object.freeze([
     icon: 'send',
     category: 'token',
     // A plain transfer needs no protocol contract: any chain with a wallet works.
+    requires: null,
+  },
+  {
+    // Owner 2026-11-14: 一键单边加池走 Hub，双币按比例走 Router；两者都要路由/工厂。
+    id: 'liquidity',
+    labelKey: 'liquidity',
+    descriptionKey: 'liquidity',
+    route: '/liquidity',
+    icon: 'liquidity',
+    category: 'token',
+    requires: 'router',
+  },
+  {
+    // Owner 2026-11-14: one atomic batch through the deployed BatchTransfer
+    // contract. Unlike 代币转账 it is contract-backed, so a build without that
+    // address must disable the row instead of linking to a dead page.
+    id: 'batchTransfer',
+    labelKey: 'batchTransfer',
+    descriptionKey: 'batchTransfer',
+    route: '/batch-transfer',
+    icon: 'batch',
+    category: 'token',
+    requires: 'batchTransfer',
+  },
+  {
+    // Owner 2026-11-14: ERC20 allowance/approve exist on any token, and the
+    // spender rows come from whatever the address book configures, so no single
+    // protocol slot can disable this page.
+    id: 'approvals',
+    labelKey: 'approvals',
+    descriptionKey: 'approvals',
+    route: '/approvals',
+    icon: 'shield',
+    category: 'token',
     requires: null,
   },
   {
