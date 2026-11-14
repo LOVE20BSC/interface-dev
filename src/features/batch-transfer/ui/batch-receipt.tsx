@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Check, Copy } from '@/shared/ui/icons';
 import { NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
 import { formatTokenAmount, shortenAddress } from '@/shared/lib/format';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
-import { Button, buttonStyles } from '@/shared/ui/button';
+import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { Sheet } from '@/shared/ui/sheet';
 import type { BatchAuditRow } from '@/features/batch-transfer/lib/batch-audit';
@@ -15,7 +14,6 @@ import type { BatchReceiptRecord } from '@/features/batch-transfer/lib/batch-rec
 export interface BatchReceiptProps {
   readonly record: BatchReceiptRecord;
   readonly onDismiss: () => void;
-  readonly onAgain: () => void;
 }
 
 function deltaText(row: BatchAuditRow, decimals: number): string {
@@ -81,7 +79,7 @@ function ReceiptRow({
   );
 }
 
-function ReceiptBody({ record, onDismiss, onAgain }: BatchReceiptProps) {
+function ReceiptBody({ record, onDismiss }: BatchReceiptProps) {
   const [copied, setCopied] = useState(false);
   const explorerUrl =
     NETWORK.blockExplorerUrl !== null ? `${NETWORK.blockExplorerUrl}/tx/${record.hash}` : null;
@@ -164,17 +162,10 @@ function ReceiptBody({ record, onDismiss, onAgain }: BatchReceiptProps) {
         </div>
       </dl>
 
-      <div className="flex flex-col gap-2">
-        <Button variant="secondary" size="md" className="w-full" onClick={onDismiss}>
-          {copy.batchTransfer.stayHere}
-        </Button>
-        <Button variant="ghost" size="md" className="w-full" onClick={onAgain}>
-          {copy.batchTransfer.transferAgain}
-        </Button>
-        <Link to="/" className={buttonStyles('ghost', 'md', 'w-full')}>
-          {copy.batchTransfer.states.backHome}
-        </Link>
-      </div>
+      {/* Owner 2026-11-14: one button only — close the receipt and stay here. */}
+      <Button variant="primary" size="lg" className="w-full" onClick={onDismiss}>
+        {copy.receiptDismiss.stayHere}
+      </Button>
     </div>
   );
 }

@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Check, Copy } from '@/shared/ui/icons';
 import { NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
-import { Button, buttonStyles } from '@/shared/ui/button';
+import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { Sheet } from '@/shared/ui/sheet';
 import type { MintedIdentity } from '@/features/mint-identity/model/use-mint-transaction';
@@ -15,17 +14,10 @@ export interface MintReceiptProps {
   readonly receipt: MintedIdentity;
   readonly paymentSymbol: string | undefined;
   readonly paymentDecimals: number | undefined;
-  readonly onMintAnother: () => void;
   readonly onDismiss: () => void;
 }
 
-function ReceiptBody({
-  receipt,
-  paymentSymbol,
-  paymentDecimals,
-  onMintAnother,
-  onDismiss,
-}: MintReceiptProps) {
+function ReceiptBody({ receipt, paymentSymbol, paymentDecimals, onDismiss }: MintReceiptProps) {
   const [copied, setCopied] = useState(false);
 
   const explorerUrl =
@@ -108,20 +100,12 @@ function ReceiptBody({
 
       <p className="text-xs leading-5 text-muted">{copy.mintIdentity.receipt.notSelected}</p>
 
-      <div className="flex flex-col gap-2">
-        <Link to="/my-nft" className={buttonStyles('primary', 'lg', 'w-full')}>
-          {copy.mintIdentity.receipt.goMyNft}
-        </Link>
-        <Button variant="secondary" size="md" className="w-full" onClick={onDismiss}>
-          {copy.receiptDismiss.stayHere}
-        </Button>
-        <Link to="/" className={buttonStyles('ghost', 'md', 'w-full')}>
-          {copy.mintIdentity.receipt.backHome}
-        </Link>
-        <Button variant="ghost" size="sm" onClick={onMintAnother}>
-          {copy.mintIdentity.receipt.mintAnother}
-        </Button>
-      </div>
+      {/* Owner 2026-11-14: one button only — close the receipt and stay here.
+          The minted identity is listed on 我的 NFT; that is a nav entry, not a
+          second receipt button. */}
+      <Button variant="primary" size="lg" className="w-full" onClick={onDismiss}>
+        {copy.receiptDismiss.stayHere}
+      </Button>
     </div>
   );
 }

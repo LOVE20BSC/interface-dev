@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Check, Copy } from '@/shared/ui/icons';
 import { NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
-import { Button, buttonStyles } from '@/shared/ui/button';
+import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { Sheet } from '@/shared/ui/sheet';
 import {
@@ -16,10 +15,9 @@ import {
 export interface TransferReceiptProps {
   readonly record: TransferRecord;
   readonly onDismiss: () => void;
-  readonly onTransferAgain: () => void;
 }
 
-function ReceiptBody({ record, onDismiss, onTransferAgain }: TransferReceiptProps) {
+function ReceiptBody({ record, onDismiss }: TransferReceiptProps) {
   const [copied, setCopied] = useState(false);
   const amountText = transferAmountText(record.amount, record.tokenDecimals, record.tokenSymbol);
   const explorerUrl =
@@ -101,17 +99,10 @@ function ReceiptBody({ record, onDismiss, onTransferAgain }: TransferReceiptProp
         </div>
       </dl>
 
-      <div className="flex flex-col gap-2">
-        <Button variant="secondary" size="md" className="w-full" onClick={onDismiss}>
-          {copy.transfer.stayHere}
-        </Button>
-        <Button variant="ghost" size="md" className="w-full" onClick={onTransferAgain}>
-          {copy.transfer.transferAgain}
-        </Button>
-        <Link to="/" className={buttonStyles('ghost', 'md', 'w-full')}>
-          {copy.transfer.states.backHome}
-        </Link>
-      </div>
+      {/* Owner 2026-11-14: one button only — close the receipt and stay here. */}
+      <Button variant="primary" size="lg" className="w-full" onClick={onDismiss}>
+        {copy.receiptDismiss.stayHere}
+      </Button>
     </div>
   );
 }

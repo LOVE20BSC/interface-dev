@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
-import { ArrowDownUp, Check, RefreshCw } from '@/shared/ui/icons';
+import { ArrowDownUp, RefreshCw } from '@/shared/ui/icons';
 import { NETWORK, configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
+import { approvalKind } from '@/shared/lib/approval-kind';
 import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { StickyAction } from '@/shared/ui/sticky-action';
+import { ActionStack } from '@/shared/ui/action-stack';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import {
   applySlippage,
@@ -42,9 +43,6 @@ export interface SwapTokenPanelProps {
   readonly isWrongChain: boolean;
   readonly connectAction: ReactNode;
 }
-
-const TEXT_LINK =
-  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
 
 const CARD = 'rounded-3xl border border-line bg-surface p-5 shadow-soft';
 
@@ -399,12 +397,35 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     void handlePrimary();
   };
 
-  const approveLabel =
-    tx.approveStage === 'wallet'
-      ? copy.swap.ladder.approving
+  // 授权步骤 sits inside the swap card, right below the amount rows, so the
+  // prerequisite reads before 兑换 (owner 2026-11-14). It stays visible when the
+  // token is already approved — long-term approvals say so instead of hiding.
+  const showApproveStep =
+    from !== undefined &&
+    from.kind !== 'native' &&
+    route?.kind === 'swap' &&
+    amountIn !== undefined &&
+    amountIn > 0n;
+  const longTermApproved =
+    effectiveAllowance !== undefined && approvalKind(effectiveAllowance) === 'unlimited';
+  const approveLabel = needsApproval
+    ? tx.approveStage === 'wallet'
+      ? copy.approve.approving
       : tx.approveStage === 'pending'
-        ? copy.swap.ladder.confirming
-        : copy.swap.ladder.approve;
+        ? copy.approve.confirming
+        : copy.approve.action(from?.symbol ?? '')
+    : effectiveAllowance === undefined
+      ? copy.approve.loading
+      : longTermApproved
+        ? copy.approve.longTermActive
+        : copy.approve.approved;
+  const approveNote = needsApproval
+    ? copy.approve.note(from?.symbol ?? '')
+    : effectiveAllowance === undefined
+      ? null
+      : longTermApproved
+        ? copy.approve.longTermNote
+        : copy.approve.approvedNote;
   const swapLabel =
     tx.swapStage === 'wallet'
       ? copy.swap.ladder.swapping
@@ -458,14 +479,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
 
   if (receiptView === 'receipt' && tx.receipt !== null) {
     return (
-      <SwapReceipt
-        record={tx.receipt}
-        onDismiss={dismissReceipt}
-        onSwapAgain={() => {
-          tx.clearReceipt();
-          resetInput();
-        }}
-      />
+      <SwapReceipt record={tx.receipt} onDismiss={dismissReceipt} />
     );
   }
 
@@ -492,7 +506,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
               }}
               placeholder={copy.swap.amountPlaceholder}
               aria-label={copy.swap.from}
-              className="mt-2 h-12 w-full bg-transparent text-3xl font-semibold tracking-tight text-foreground outline-none placeholder:text-muted/40"
+              className="mt-2 h-12 w-full bg-transparent text-3xl font-semibold tracking-tight text-foreground outline-none placeholder:text-muted"
             />
             <Skeleton className="mt-2 h-3.5 w-32" />
           </div>
@@ -675,20 +689,6 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
               `${dismissedSwap.received} ${dismissedSwap.symbol}`,
             )}
           </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <Button
-              variant="secondary"
-              size="md"
-              className="w-full sm:w-auto"
-              onClick={() => {
-                tx.clearReceipt();
-                setDismissedReceiptHash(null);
-                resetInput();
-              }}
-            >
-              {copy.receiptDismiss.swapStripAgain}
-            </Button>
-          </div>
         </div>
       ) : null}
       <div className={CARD}>
@@ -718,7 +718,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
             }}
             placeholder={copy.swap.amountPlaceholder}
             aria-label={`${copy.swap.from} ${from.symbol}`}
-            className="mt-2 h-12 w-full bg-transparent text-3xl font-semibold tracking-tight text-foreground outline-none placeholder:text-muted/40"
+            className="mt-2 h-12 w-full bg-transparent text-3xl font-semibold tracking-tight text-foreground outline-none placeholder:text-muted"
           />
           <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
             <span className="flex items-center gap-1.5 text-xs leading-5 text-muted">
@@ -803,6 +803,34 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
             </span>
           </div>
         </div>
+
+        {showApproveStep ? (
+          <div className="mt-3 border-t border-line pt-3" data-testid="swap-approve-step">
+            <Button
+              variant={needsApproval ? 'primary' : 'secondary'}
+              size="lg"
+              className="w-full"
+              data-testid="swap-approve"
+              onClick={() => {
+                if (amountIn !== undefined) tx.approve(amountIn);
+              }}
+              disabled={!needsApproval || !canApprove || tx.approveStage !== 'idle'}
+              loading={tx.approveStage === 'wallet'}
+            >
+              {approveLabel}
+            </Button>
+            {approveNote !== null ? (
+              <p className="mt-1.5 text-xs leading-5 text-muted" data-testid="swap-approve-note">
+                {approveNote}
+              </p>
+            ) : null}
+            {needsApproval && tx.isApproved ? (
+              <p className="mt-1 text-xs leading-5 text-warning">
+                {copy.swap.ladder.approvalShort}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {route !== null ? (
@@ -905,68 +933,25 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
       ) : null}
 
       <section aria-label={copy.pages.swap.title} className="space-y-2">
-        {needsApproval ? (
-          <>
-            <StickyAction>
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full"
-                data-testid="swap-approve"
-                onClick={() => {
-                  if (amountIn !== undefined) tx.approve(amountIn);
-                }}
-                disabled={!canApprove || tx.approveStage !== 'idle'}
-                loading={tx.approveStage === 'wallet'}
-              >
-                {approveLabel}
-              </Button>
-            </StickyAction>
-            <div className="space-y-2">
-              <Button variant="secondary" size="md" className="w-full" disabled>
-                {copy.swap.ladder.swapStep}
-              </Button>
-              {tx.isApproved ? (
-                <p className="text-xs leading-5 text-warning">{copy.swap.ladder.approvalShort}</p>
-              ) : (
-                <p className="text-xs leading-5 text-muted">{copy.swap.ladder.approvalNote}</p>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            {tx.isApproved ? (
-              <p className="flex items-center gap-1.5 text-sm font-medium text-success">
-                <Check className="h-4 w-4" aria-hidden="true" />
-                {copy.swap.ladder.approved}
-              </p>
-            ) : null}
-            <StickyAction>
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full"
-                data-testid="swap-submit"
-                onClick={() => {
-                  void handlePrimary();
-                }}
-                disabled={!canSwap || isPreparing || tx.swapStage !== 'idle'}
-                loading={tx.swapStage === 'wallet' || isPreparing}
-              >
-                {isPreparing ? copy.swap.quoteRefreshing : swapLabel}
-              </Button>
-            </StickyAction>
-          </>
-        )}
+        <ActionStack>
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full"
+            data-testid="swap-submit"
+            onClick={() => {
+              void handlePrimary();
+            }}
+            disabled={!canSwap || needsApproval || isPreparing || tx.swapStage !== 'idle'}
+            loading={tx.swapStage === 'wallet' || isPreparing}
+          >
+            {isPreparing ? copy.swap.quoteRefreshing : swapLabel}
+          </Button>
+        </ActionStack>
 
         {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
 
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <span className="text-[11px] leading-5 text-muted">{copy.swap.ladder.note}</span>
-          <Link to="/" className={TEXT_LINK}>
-            {copy.swap.states.backHome}
-          </Link>
-        </div>
+        <p className="text-[11px] leading-5 text-muted">{copy.swap.ladder.note}</p>
       </section>
     </div>
   );

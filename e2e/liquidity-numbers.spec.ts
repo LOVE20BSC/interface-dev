@@ -106,16 +106,15 @@ async function addQuote(page: Page, tokenAmount: string): Promise<void> {
 }
 
 /**
- * 「允许使用」→ 等额度刷新 → 主按钮。
- * 额度已经足够时页面不渲染授权按钮，此时直接点主按钮（同一个 helper 两种状态都覆盖）。
+ * 授权 → 等额度刷新 → 主按钮。
+ * Owner 2026-11-14: the 授权 button is always rendered in flow (prerequisite
+ * first); it is enabled only while the allowance is short. Click it only in
+ * that state, then wait for the primary button to unlock.
  */
 async function approveThenSubmit(page: Page, approveTestId: string, submitTestId: string): Promise<void> {
   const approveButton = page.getByTestId(approveTestId);
-  const needsApprove = await approveButton
-    .waitFor({ state: 'visible', timeout: 5_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (needsApprove) {
+  await expect(approveButton).toBeVisible({ timeout: 20_000 });
+  if (await approveButton.isEnabled()) {
     await approveButton.click();
   }
   await expect(page.getByTestId(submitTestId)).toBeEnabled({ timeout: 30_000 });
@@ -281,14 +280,13 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
   }));
 
   test('边界：余额不足 / 输入 0 / 滑点非法 一律禁用主按钮', withChainSnapshot(async (page) => {
-    // 主按钮有两种形态：需要授权时是「1 允许使用 …」，否则是「确认添加」。
-    // 两种都必须被门禁挡住，所以用 or 定位当前渲染的那个。
-    const primary = page
-      .getByTestId('liquidity-add-submit')
-      .or(page.getByTestId('liquidity-add-approve'));
+    // 主按钮和授权按钮都在流内常驻；门禁必须同时挡住这两个写操作。
+    const primary = page.getByTestId('liquidity-add-submit');
+    const approve = page.getByTestId('liquidity-add-approve');
     await openLiquidity(page, NATIVE_ONLY);
     await expect(primary).toBeVisible({ timeout: 20_000 });
     await expect(primary).toBeDisabled();
+    await expect(approve).toBeDisabled();
 
     await page.getByTestId('liquidity-token-amount').fill('1');
     await expect(page.getByTestId('liquidity-amount-error')).toHaveText(

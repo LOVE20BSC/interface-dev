@@ -357,25 +357,10 @@ test('airdrop: eligible wallet sees the estimate, claims, and gets a real receip
   expect(isClaimed(claimer)).toBe(true);
   expect(tokenUint('balanceOf(address)(uint256)', claimer)).toBe(eventAmount);
 
-  // §4.3: the receipt survives a refresh instead of falling back to the CTA.
-  await page.reload();
-  await expect(page.getByRole('heading', { name: '铸造成功' })).toBeVisible({
-    timeout: 30_000,
-  });
-  expect((await page.getByTestId('airdrop-receipt-amount').innerText()).trim()).toBe(
-    receiptAmountText,
-  );
-  expect((await page.getByTestId('airdrop-receipt-hash').innerText()).trim()).toBe(hash);
-  await expect(page.getByRole('link', { name: '用这些代币铸造身份 NFT' })).toHaveAttribute(
-    'href',
-    '/mint',
-  );
-  await expect(page.getByRole('link', { name: '回首页' })).toBeVisible();
-
   await shot(page, 'airdrop-receipt.png');
 
-  // 留在此页 must land on the page's S6 已铸造 state with the real amount,
-  // never back on the claim CTA.
+  // 留在此页 is the only receipt button (owner 2026-11-14): it must land on the
+  // page's S6 已铸造 state with the real amount, never back on the claim CTA.
   await page.getByRole('button', { name: '留在此页' }).click();
   await expect(page).toHaveURL(/\/airdrop/);
   await expect(page.getByTestId('airdrop-claimed-title')).toHaveText(
@@ -383,6 +368,15 @@ test('airdrop: eligible wallet sees the estimate, claims, and gets a real receip
     { timeout: 20_000 },
   );
   await expect(page.getByRole('button', { name: '空投铸造' })).toHaveCount(0);
+
+  // §4.3 / owner 2026-11-14: the receipt is a one-time page state. After a
+  // revisit (reload included) the page stays on S6; the sheet is never replayed
+  // from the local record.
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '铸造成功' })).toHaveCount(0);
+  await expect(page.getByTestId('airdrop-claimed-title')).toHaveText(`已铸造 ${receiptAmountText}`, {
+    timeout: 30_000,
+  });
 
   console.log(
     `airdrop claim: account=${claimer} tx=${hash} amount=${receiptAmountText} isClaimed=${isClaimed(claimer)}`,

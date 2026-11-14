@@ -57,14 +57,11 @@
   --bottom-navigation-height: calc(
     var(--bottom-navigation-content-height) + 1px + var(--safe-bottom)
   );
-  /* Action dock: 48px button + 2 × 10px padding + 1px border. */
-  --sticky-action-height: 69px;
 }
 
 @media (min-width: 768px) {
   :root {
     --bottom-navigation-height: 0px;
-    --sticky-action-height: 0px;
   }
 }
 

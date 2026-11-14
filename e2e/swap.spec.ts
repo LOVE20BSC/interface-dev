@@ -362,21 +362,20 @@ test('swap: ETH → TestLOVE20 shows path/min-out and a receipt from the pair Sw
 
   await shot(page, 'swap-receipt.png');
 
-  // §4.3: the local receipt survives a refresh.
-  await page.reload();
-  await expect(page.getByRole('heading', { name: '兑换完成' })).toBeVisible({ timeout: 30_000 });
-  expect((await page.getByTestId('swap-receipt-amount').innerText()).trim()).toBe(actualText);
-  expect((await page.getByTestId('swap-receipt-hash').innerText()).trim()).toBe(hash);
-
-  // 留在此页: the receipt collapses into a success strip, the route stays /swap
-  // and the form resets to empty so the same swap cannot be submitted again.
+  // 留在此页 is the only receipt button (owner 2026-11-14): the receipt
+  // collapses into a success strip and the route stays /swap.
   await page.getByRole('button', { name: '留在此页' }).click();
   await expect(page).toHaveURL(/\/swap/);
   const strip = page.getByTestId('swap-success-strip');
   await expect(strip).toBeVisible();
   await expect(strip).toContainText(actualText);
-  await expect(page.getByTestId('swap-from-amount')).toHaveValue('');
-  await expect(page.getByRole('button', { name: '再兑换一次' })).toBeVisible();
+
+  // §4.3 / owner 2026-11-14: the receipt is a one-time page state. Revisiting
+  // (reload included) must not replay it — the form comes back instead.
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '兑换完成' })).toHaveCount(0);
+  await expect(page.getByTestId('swap-from-amount')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('swap-success-strip')).toHaveCount(0);
 
   console.log(
     `swap ETH→token: tx=${hash} quote=${quotedText} minOut=${minOutText} actual=${actualText} ` +
@@ -402,9 +401,11 @@ test('swap: TestLOVE20 → ETH requires the exact approve, then settles native o
   await page.getByTestId('swap-from-amount').fill('100');
   const quotedText = await waitForQuote(page, NATIVE);
 
+  // The 授权 step sits inside the swap card, before 兑换 (owner 2026-11-14),
+  // and uses the global label `授权 {symbol}`.
   const approve = page.getByTestId('swap-approve');
   await expect(approve).toBeVisible({ timeout: 20_000 });
-  await expect(approve).toContainText('1 授权');
+  await expect(approve).toContainText('授权 TestLOVE20');
   await approve.click();
   await expect(page.getByText('已授权', { exact: true })).toBeVisible({ timeout: 30_000 });
   // §4.1/§3.5: the approval is exactly amountIn, never infinite and never a quote.
@@ -566,7 +567,8 @@ test('swap: native ↔ wrapped is a 1:1 wrap/unwrap with its own receipt', async
     .poll(() => uintOf(WETH, 'balanceOf(address)(uint256)', BUYER), { timeout: 15_000 })
     .toBe(wethBefore + 10n ** 16n);
 
-  await page.getByRole('button', { name: '再兑换一次' }).click();
+  // 留在此页 is the only receipt button (owner 2026-11-14); the form is back.
+  await page.getByRole('button', { name: '留在此页' }).click();
   await page.getByRole('button', { name: '交换方向' }).click();
   await expect(page.getByTestId('swap-from-token')).toContainText('TestWETH');
   await expect(page.getByTestId('swap-to-token')).toContainText(NATIVE);

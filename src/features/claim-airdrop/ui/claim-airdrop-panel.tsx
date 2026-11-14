@@ -8,7 +8,7 @@ import { formatTokenAmount, shortenAddress, UNKNOWN } from '@/shared/lib/format'
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { StickyAction } from '@/shared/ui/sticky-action';
+import { ActionStack } from '@/shared/ui/action-stack';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import { airdropUnavailableCopy } from '@/features/claim-airdrop/lib/airdrop-unavailable-copy';
 import { claimedAmountView } from '@/features/claim-airdrop/lib/claimed-amount-view';
@@ -377,7 +377,7 @@ export function ClaimAirdropPanel({
       </StatusCard>
 
       <div className="space-y-2">
-        <StickyAction>
+        <ActionStack>
           <Button
             variant="primary"
             size="lg"
@@ -388,7 +388,7 @@ export function ClaimAirdropPanel({
           >
             {ctaLabel}
           </Button>
-        </StickyAction>
+        </ActionStack>
 
         {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
 
@@ -412,10 +412,6 @@ export function ClaimAirdropPanel({
       </div>
 
       <AirdropRules symbol={symbol} />
-
-      <Link to="/" className={TEXT_LINK}>
-        {copy.airdrop.states.backHome}
-      </Link>
     </div>
   );
 }

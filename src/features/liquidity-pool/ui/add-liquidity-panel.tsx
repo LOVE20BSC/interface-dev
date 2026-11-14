@@ -7,7 +7,8 @@ import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { StickyAction } from '@/shared/ui/sticky-action';
+import { ActionStack } from '@/shared/ui/action-stack';
+import { approvalKind } from '@/shared/lib/approval-kind';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import {
   applySlippageDown,
@@ -49,7 +50,7 @@ export interface AddLiquidityPanelProps {
 
 const CARD = 'rounded-3xl border border-line bg-surface p-5 shadow-soft';
 const INPUT =
-  'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated px-3 text-xl font-semibold text-foreground outline-none placeholder:text-muted/40 focus:border-brand/40 focus:ring-2 focus:ring-brand/20';
+  'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated px-3 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20';
 
 export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
   const {
@@ -593,57 +594,56 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
         </div>
       ) : null}
 
-      {needsApproval ? (
-        <>
-          <StickyAction>
-            <Button
-              variant="primary"
-              size="lg"
-              className="w-full"
-              data-testid="liquidity-add-approve"
-              onClick={() => {
-                void handleApprove();
-              }}
-              disabled={tx.approveStage !== 'idle' || amountError !== null}
-              loading={tx.approveStage === 'wallet'}
-            >
-              {copy.liquidity.add.approveToken(token.symbol)}
-            </Button>
-          </StickyAction>
-          <p className="text-xs leading-5 text-muted">{copy.liquidity.add.approveNote}</p>
-          {tx.approveWatch.hash !== null ? <TxWatchCard watch={tx.approveWatch} /> : null}
-        </>
-      ) : (
-        <>
-          <StickyAction>
-            <Button
-              variant="primary"
-              size="lg"
-              className="w-full"
-              data-testid="liquidity-add-submit"
-              onClick={() => {
-                void handleSubmit();
-              }}
-              disabled={!canSubmit}
-              loading={tx.stage === 'wallet'}
-            >
-              {tx.stage === 'pending' ? copy.liquidity.add.submitting : copy.liquidity.add.submit}
-            </Button>
-          </StickyAction>
-          {allowance.value !== undefined && requiredTokenAmount > 0n ? (
-            <p className="flex items-center gap-1.5 text-xs leading-5 text-success">
-              {copy.liquidity.add.approvedToken(token.symbol)}
-            </p>
-          ) : null}
-          {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
-        </>
-      )}
+      {/* Owner 2026-11-14: prerequisite 授权 first, primary action right after.
+          The 授权 button stays visible after a long-term approval as a read-only
+          「已长期授权」 state instead of disappearing. */}
+      <ActionStack>
+        <Button
+          variant={needsApproval ? 'primary' : 'secondary'}
+          size="lg"
+          className="w-full"
+          data-testid="liquidity-add-approve"
+          onClick={() => {
+            void handleApprove();
+          }}
+          disabled={!needsApproval || tx.approveStage !== 'idle' || amountError !== null}
+          loading={tx.approveStage === 'wallet'}
+        >
+          {needsApproval
+            ? copy.liquidity.add.approveToken(token.symbol)
+            : allowance.value === undefined
+              ? copy.approve.loading
+              : approvalKind(allowance.value) === 'unlimited'
+                ? copy.approve.longTermActive
+                : copy.liquidity.add.approvedToken(token.symbol)}
+        </Button>
+        {needsApproval || allowance.value !== undefined ? (
+          <p className="text-xs leading-5 text-muted">
+            {needsApproval
+              ? copy.liquidity.add.approveNote
+              : approvalKind(allowance.value ?? 0n) === 'unlimited'
+                ? copy.approve.longTermNote
+                : copy.approve.approvedNote}
+          </p>
+        ) : null}
+        {tx.approveWatch.hash !== null ? <TxWatchCard watch={tx.approveWatch} /> : null}
+        <Button
+          variant="primary"
+          size="lg"
+          className="w-full"
+          data-testid="liquidity-add-submit"
+          onClick={() => {
+            void handleSubmit();
+          }}
+          disabled={needsApproval || !canSubmit}
+          loading={tx.stage === 'wallet'}
+        >
+          {tx.stage === 'pending' ? copy.liquidity.add.submitting : copy.liquidity.add.submit}
+        </Button>
+        {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
+      </ActionStack>
 
-      <LiquidityReceiptSheet
-        record={tx.receipt}
-        onDismiss={tx.clearReceipt}
-        onAgain={tx.clearReceipt}
-      />
+      <LiquidityReceiptSheet record={tx.receipt} onDismiss={tx.clearReceipt} />
 
       {effectiveMode === 'single' && quote.isError ? (
         <button

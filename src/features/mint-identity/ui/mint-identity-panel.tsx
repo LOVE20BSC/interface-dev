@@ -1,16 +1,17 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useSimulateContract } from 'wagmi';
-import { Check, RefreshCw } from '@/shared/ui/icons';
+import { RefreshCw } from '@/shared/ui/icons';
 import { memberNftAbi } from '@/config/abis';
 import { DEFAULT_SYMBOL, NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
+import { approvalKind } from '@/shared/lib/approval-kind';
 import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { StickyAction } from '@/shared/ui/sticky-action';
+import { ActionStack } from '@/shared/ui/action-stack';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 import { useAirdropEligibility } from '@/entities/airdrop/model/use-airdrop-eligibility';
@@ -194,11 +195,6 @@ export function MintIdentityPanel({
         paymentSymbol={config.paymentTokenSymbol}
         paymentDecimals={config.paymentTokenDecimals}
         onDismiss={dismissReceipt}
-        onMintAnother={() => {
-          setName('');
-          setPreflightError(null);
-          tx.clearReceipt();
-        }}
       />
     );
   }
@@ -301,12 +297,25 @@ export function MintIdentityPanel({
       ? formatTokenAmount(cost - balance, config.paymentTokenDecimals)
       : undefined;
 
-  const approveLabel =
-    tx.approveStage === 'wallet'
-      ? copy.mintIdentity.ladder.approving
+  const longTermApproved =
+    effectiveAllowance !== undefined && approvalKind(effectiveAllowance) === 'unlimited';
+  const approveLabel = needsApproval
+    ? tx.approveStage === 'wallet'
+      ? copy.approve.approving
       : tx.approveStage === 'pending'
-        ? copy.mintIdentity.ladder.approvePending
-        : copy.mintIdentity.ladder.approve;
+        ? copy.approve.confirming
+        : copy.approve.action(symbol ?? '')
+    : effectiveAllowance === undefined
+      ? copy.approve.loading
+      : longTermApproved
+        ? copy.approve.longTermActive
+        : copy.approve.approved;
+  const approveNote =
+    effectiveAllowance === undefined
+      ? null
+      : longTermApproved
+        ? copy.approve.longTermNote
+        : copy.approve.note(symbol ?? '');
   const mintLabel =
     tx.mintStage === 'wallet'
       ? copy.mintIdentity.ladder.minting
@@ -338,20 +347,6 @@ export function MintIdentityPanel({
           <p className="text-sm font-semibold text-foreground">
             {copy.receiptDismiss.mintStripTitle(tx.receipt.memberId.toString(), tx.receipt.name)}
           </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <Link to="/my-nft" className={buttonStyles('secondary', 'md', 'w-full sm:w-auto')}>
-              {copy.receiptDismiss.mintStripGoMyNft}
-            </Link>
-            {/* Staying is the confirmation itself: no route change, no reset. */}
-            <Button
-              variant="ghost"
-              size="md"
-              className="w-full sm:w-auto"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            >
-              {copy.receiptDismiss.stayHere}
-            </Button>
-          </div>
         </Card>
       ) : null}
       <div>
@@ -367,7 +362,7 @@ export function MintIdentityPanel({
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
-          className="mt-2 h-12 w-full rounded-2xl border border-line bg-surface px-3 text-base text-foreground shadow-soft outline-none placeholder:text-muted/70 focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+          className="mt-2 h-12 w-full rounded-2xl border border-line bg-surface px-3 text-base text-foreground shadow-soft outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
           aria-describedby={`mint-name-bytes${quote.requiresTestPrefix ? ' mint-name-rule' : ''} mint-name-check`}
         />
         <div
@@ -462,52 +457,38 @@ export function MintIdentityPanel({
           />
         ) : (
           <>
-            {needsApproval ? (
-              // Reading order is the owner-approved grammar: `1 授权` must come
-              // before `2 铸造`. Step 2 is therefore rendered *below* step 1 in
-              // the same dock (never above it in the content flow while step 1
-              // is a fixed bottom action).
-              <StickyAction>
-                <div className="space-y-2">
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    className="w-full"
-                    onClick={handleApprove}
-                    disabled={!isNameReady || isTxBusy}
-                    loading={tx.approveStage === 'wallet'}
-                  >
-                    {approveLabel}
-                  </Button>
-                  <Button variant="secondary" size="md" className="w-full" disabled>
-                    {copy.mintIdentity.ladder.mintStep}
-                  </Button>
-                </div>
-              </StickyAction>
-            ) : (
-              <>
-                {tx.isApproved ? (
-                  <p className="flex items-center gap-1.5 text-sm font-medium text-success">
-                    <Check className="h-4 w-4" aria-hidden="true" />
-                    {copy.mintIdentity.ladder.approved}
-                  </p>
-                ) : null}
-                <StickyAction>
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    className="w-full"
-                    onClick={() => {
-                      void handleMint();
-                    }}
-                    disabled={!canAttemptMint || isPreflighting}
-                    loading={tx.mintStage === 'wallet'}
-                  >
-                    {mintLabel}
-                  </Button>
-                </StickyAction>
-              </>
-            )}
+            {/* Owner 2026-11-14: the prerequisite 授权 button always shows, in
+                flow and *above* the primary action — never a fixed dock below it.
+                A long-term approval keeps its own read-only label (已长期授权). */}
+            <ActionStack>
+              <Button
+                variant={needsApproval ? 'primary' : 'secondary'}
+                size="lg"
+                className="w-full"
+                data-testid="mint-approve"
+                onClick={handleApprove}
+                disabled={!needsApproval || !isNameReady || isTxBusy}
+                loading={tx.approveStage === 'wallet'}
+              >
+                {approveLabel}
+              </Button>
+              {approveNote !== null ? (
+                <p className="text-xs leading-5 text-muted">{approveNote}</p>
+              ) : null}
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full"
+                data-testid="mint-submit"
+                onClick={() => {
+                  void handleMint();
+                }}
+                disabled={needsApproval || !canAttemptMint || isPreflighting}
+                loading={tx.mintStage === 'wallet'}
+              >
+                {mintLabel}
+              </Button>
+            </ActionStack>
 
             {tx.isApproved && needsApproval ? (
               <p className="text-xs leading-5 text-warning">
@@ -550,11 +531,6 @@ export function MintIdentityPanel({
           </div>
         ) : null}
 
-        {/* The approve ladder dock is one subdued row taller than the reserved
-            --sticky-action-height; this keeps the last content reachable. */}
-        {needsApproval && !isInsufficient ? (
-          <div className="h-[3.25rem] md:hidden" aria-hidden="true" />
-        ) : null}
       </section>
     </div>
   );

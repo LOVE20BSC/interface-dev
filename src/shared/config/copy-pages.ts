@@ -30,7 +30,7 @@ export const copy = {
       transferAction: '转让',
       transferTitle: '转让身份 NFT',
       transferWarning:
-        '转让会改变这个身份 NFT 的控制者。身份 NFT 的历史与质押仍留在身份 NFT 上，不随钱包转走；转让不可撤销。',
+        '转让会改变这个身份 NFT 的控制者。身份 NFT 的历史与质押仍留在身份 NFT 上，不随钱包转走。',
       recipientLabel: '收款地址',
       recipientPlaceholder: '0x 开头的 40 位地址',
       invalidRecipient: '收款地址格式不对，需要 0x 开头的 40 位地址。',
@@ -47,7 +47,6 @@ export const copy = {
       emptyMint: '铸造身份 NFT',
       errorTitle: '身份 NFT 列表暂时读不到。',
       mintAnother: '铸造新身份 NFT',
-      backHome: '回首页',
     },
     mint: {
       title: '铸造身份 NFT',
@@ -105,11 +104,6 @@ export const copy = {
       checking: '正在确认你的空投资格…',
     },
     ladder: {
-      approve: '1. 授权',
-      approving: '授权中…',
-      approvePending: '确认中…',
-      approved: '已授权',
-      mintStep: '2. 铸造身份 NFT',
       mint: '铸造身份 NFT',
       minting: '铸造中…',
       mintPending: '确认中…',
@@ -126,9 +120,6 @@ export const copy = {
       explorerLink: '在区块浏览器里查看',
       copyHash: '复制交易哈希',
       notSelected: '还没有设为当前身份 NFT。',
-      goMyNft: '去我的 NFT 使用这个身份 NFT',
-      backHome: '回首页',
-      mintAnother: '再铸造一个身份 NFT',
       missingMessage: '交易已经上链，但没有读到身份 NFT 编号，请去「我的 NFT」确认。',
     },
     states: {
@@ -235,8 +226,6 @@ export const copy = {
       hashLabel: '交易哈希',
       copyHash: '复制交易哈希',
       explorer: '在区块浏览器里查看',
-      goMint: '用这些代币铸造身份 NFT',
-      backHome: '回首页',
       missingBody: '交易已经上链，但回执里没有读到铸造金额。刷新后会以链上状态为准。',
     },
     errors: {
@@ -324,15 +313,10 @@ export const copy = {
       amountTooSmall: '金额太小，换不到代币。',
     },
     ladder: {
-      approve: '1 授权',
       swap: '兑换',
-      swapStep: '2 兑换',
-      approved: '已授权',
-      approving: '授权中…',
       swapping: '兑换中…',
       confirming: '确认中…',
       note: '报价随池子变化；提交前会再读一次链上价格。',
-      approvalNote: '第一次只是允许合约最多扣这么多，不会立刻扣钱；第二次才是兑换。',
       approvalShort: '授权额度不够这次使用，需要再授权一次。',
     },
     receipt: {
@@ -347,8 +331,6 @@ export const copy = {
       hashLabel: '交易哈希',
       copyHash: '复制交易哈希',
       explorer: '在区块浏览器里查看',
-      goHome: '回首页',
-      swapAgain: '再兑换一次',
     },
     errors: {
       rejected: '你在钱包里点了取消，没有扣款。',
@@ -511,7 +493,7 @@ export const copy = {
   // raw revert. The lazy /transfer chunk is the only consumer.
   // ───────────────────────────────────────────────────────────────────────────
   transfer: {
-    intro: '把代币转给另一个地址。转出后不能撤回，请先核对收款地址与金额。',
+    intro: '把代币转给另一个地址。请先核对收款地址与金额。',
     tokenLabel: '代币',
     tokenSheetTitle: '选择代币',
     groupNative: '原生币',
@@ -581,11 +563,8 @@ export const copy = {
     receiptHash: '交易哈希',
     copyHash: '复制交易哈希',
     explorer: '在区块浏览器里查看',
-    stayHere: '留在此页',
-    transferAgain: '再转一笔',
     stripTitle: '转账完成',
     stripAmount: (amount: string) => `已转出 ${amount}`,
-    note: '转出后不能撤回；对方地址填错也收不回来。',
     states: {
       connectTitle: '连接钱包后转账。',
       connectBody: '转账需要钱包确认。连接后可以先看到余额。',
@@ -675,10 +654,10 @@ export const copy = {
     allowanceError: '批量转账额度暂时读不到',
     allowanceNeed: '这笔批量转账需要先授权一次，授权确认后再提交批量转账。',
     allowanceReady: '额度已足够，不需要再次授权。',
-    approveHint: '第一次确认只是允许合约按合计金额扣款，不会立刻扣钱；第二次确认才是转出。',
-    ctaApprove: (total: string, symbol: string) => `1 授权 ${total} ${symbol}`,
+    allowanceLongTerm: (needed: string, symbol: string) =>
+      `已长期授权，本次需要 ${needed} ${symbol}，不需要再次授权。`,
     ctaApprovePending: '等待授权完成…',
-    ctaBatch: '2 批量转账',
+    ctaBatch: '批量转账',
     ctaNative: '确认批量转账',
     submitting: '等待钱包确认…',
     pendingApprove: '授权确认中…',
@@ -704,11 +683,8 @@ export const copy = {
     copyHash: '复制交易哈希',
     explorer: '在区块浏览器里查看',
     atomicReceipt: '整批一起执行：上表每一行都已到账。',
-    stayHere: '留在此页',
-    transferAgain: '再转一批',
     stripTitle: '批量转账完成',
     stripAmount: (amount: string) => `已转出 ${amount}`,
-    note: '整批一起执行；转出后不能撤回，地址填错也收不回来。',
     states: {
       connectTitle: '连接钱包后批量转账。',
       connectBody: '批量转账需要钱包确认。连接后可以先看到余额。',
@@ -889,10 +865,27 @@ export const copy = {
   receiptDismiss: {
     stayHere: '留在此页',
     mintStripTitle: (id: string, name: string) => `已铸造 #${id} ${name}`,
-    mintStripGoMyNft: '查看我的 NFT',
     swapStripTitle: '兑换完成',
     swapStripAmount: (amount: string) => `已到账 ${amount}`,
-    swapStripAgain: '再兑换一次',
+  },
+  /**
+   * 全局授权文案 (owner 2026-11-14 09:30): every page that asks for a token
+   * allowance renders the same sentence — only the token symbol changes.
+   * 「授权 {symbol}」 is the actionable button; 「长期授权」 is what the approvals
+   * page writes; 「已长期授权」 is the read-only state every page must keep
+   * showing once the allowance is long-term (needs no action).
+   */
+  approve: {
+    action: (symbol: string) => `授权 ${symbol}`,
+    longTermAction: (symbol: string) => `长期授权 ${symbol}`,
+    longTermActive: '已长期授权',
+    loading: '读取授权额度中…',
+    approving: '授权中…',
+    confirming: '确认中…',
+    approved: '已授权',
+    note: (symbol: string) => `第一次只是允许合约扣走最多这么多的 ${symbol}，不会立刻扣钱。`,
+    approvedNote: '这次要用的额度已经够，不需要再授权。',
+    longTermNote: '这个代币已经长期授权，不需要再操作。',
   },
   // ───────────────────────────────────────────────────────────────────────────
   // END UX-child block
@@ -1056,9 +1049,9 @@ export const copy = {
       fallbackEmptyPool: '这个代币还没有池子，第一次建池只能两侧都填。',
       hubMissing: '这个环境没有配置一键加池的合约，可以用「两侧都填」的方式加池。',
       quoteFailed: '一键单边暂时算不出来，可以改用「两侧都填」。',
-      approveToken: (symbol: string) => `1 允许使用 ${symbol}`,
-      approvedToken: (symbol: string) => `已允许使用 ${symbol}`,
-      approveNote: '第一次只是允许合约最多拿这么多，不会立刻扣钱；第二次才是真正加池。',
+      approveToken: (symbol: string) => `授权 ${symbol}`,
+      approvedToken: (symbol: string) => `已授权 ${symbol}`,
+      approveNote: '第一次只是允许合约扣走最多这么多的代币，不会立刻扣钱。',
       submit: '确认添加',
       submitting: '添加中…',
       receiptTitle: '流动性添加完成',
@@ -1082,8 +1075,8 @@ export const copy = {
       invalidPercent: '撤出比例需要大于 0 且不超过 100。',
       minLabel: '最少收到',
       minNote: '少于这个数量时会取消这笔交易，不会成交。',
-      approveLp: '1 允许撤出流动性凭证',
-      approveLpNote: '第一次只是允许合约拿回这份凭证，不会立刻撤出；第二次才是撤出。',
+      approveLp: '授权 流动性凭证',
+      approveLpNote: '第一次只是允许合约拿回这份流动性凭证，不会立刻撤出。',
       withdraw: '2 确认撤出',
       withdrawing: '撤出中…',
       receiptTitle: '流动性撤出完成',
@@ -1137,7 +1130,6 @@ export const copy = {
       title: '提交成功',
       hash: '交易哈希',
       copyHash: '复制交易哈希',
-      stayHere: '留在此页',
       explorer: '在区块浏览器里查看',
       pendingNote: '交易已经提交，等上链后份额与余额会自动刷新。',
     },

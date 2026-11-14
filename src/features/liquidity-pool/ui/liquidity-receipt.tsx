@@ -10,14 +10,13 @@ import type { LiquidityReceipt } from '@/features/liquidity-pool/model/use-liqui
 export interface LiquidityReceiptSheetProps {
   readonly record: LiquidityReceipt | null;
   readonly onDismiss: () => void;
-  readonly onAgain: () => void;
 }
 
 /**
  * 可关闭的回执：留在原页，关闭后已提交状态不丢（按钮恢复、池子数据已刷新）。
  * 回执只显示这笔交易实际提交的内容与哈希，不重复展示报价。
  */
-export function LiquidityReceiptSheet({ record, onDismiss, onAgain }: LiquidityReceiptSheetProps) {
+export function LiquidityReceiptSheet({ record, onDismiss }: LiquidityReceiptSheetProps) {
   const [copied, setCopied] = useState(false);
   if (record === null) return null;
   const explorerUrl =
@@ -73,14 +72,10 @@ export function LiquidityReceiptSheet({ record, onDismiss, onAgain }: LiquidityR
           </div>
         </dl>
         <p className="text-xs leading-5 text-muted">{copy.liquidity.receipt.pendingNote}</p>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button variant="primary" size="md" className="w-full sm:flex-1" onClick={onDismiss}>
-            {copy.liquidity.receipt.stayHere}
-          </Button>
-          <Button variant="secondary" size="md" className="w-full sm:flex-1" onClick={onAgain}>
-            {copy.receiptDismiss.swapStripAgain}
-          </Button>
-        </div>
+        {/* Owner 2026-11-14: one button only — close the receipt and stay here. */}
+        <Button variant="primary" size="lg" className="w-full" onClick={onDismiss}>
+          {copy.receiptDismiss.stayHere}
+        </Button>
         {explorerUrl !== null ? (
           <a
             href={explorerUrl}

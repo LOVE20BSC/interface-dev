@@ -9,7 +9,7 @@ import { formatTokenAmount, formatUnits, shortenAddress } from '@/shared/lib/for
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { StickyAction } from '@/shared/ui/sticky-action';
+import { ActionStack } from '@/shared/ui/action-stack';
 import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shared/ui/token-picker';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import {
@@ -44,9 +44,6 @@ export interface TransferTokenPanelProps {
 }
 
 type RecipientMode = 'address' | 'identity';
-
-const TEXT_LINK =
-  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
 
 function StateCard({
   title,
@@ -325,11 +322,6 @@ export function TransferTokenPanel({
           tx.clearReceipt();
           resetInputs();
         }}
-        onTransferAgain={() => {
-          tx.clearReceipt();
-          setLastReceipt(null);
-          resetInputs();
-        }}
       />
     );
   }
@@ -357,16 +349,6 @@ export function TransferTokenPanel({
               ),
             )}
           </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <Button
-              variant="secondary"
-              size="md"
-              className="w-full sm:w-auto"
-              onClick={() => setLastReceipt(null)}
-            >
-              {copy.transfer.transferAgain}
-            </Button>
-          </div>
         </div>
       ) : null}
 
@@ -421,7 +403,7 @@ export function TransferTokenPanel({
                       aria-label={copy.transfer.customPlaceholder}
                       autoComplete="off"
                       spellCheck={false}
-                      className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-2.5 font-mono text-xs text-foreground outline-none placeholder:text-muted/70 focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+                      className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-2.5 font-mono text-xs text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
                     />
                     <Button
                       size="sm"
@@ -485,7 +467,7 @@ export function TransferTokenPanel({
             placeholder={copy.transfer.amountPlaceholder}
             aria-label={copy.transfer.amountLabel}
             disabled={busy}
-            className="mt-1 h-12 w-full bg-transparent text-3xl font-semibold tracking-tight text-foreground outline-none placeholder:text-muted/40"
+            className="mt-1 h-12 w-full bg-transparent text-3xl font-semibold tracking-tight text-foreground outline-none placeholder:text-muted"
           />
           <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
             <span className="text-[11px] leading-4 text-muted">
@@ -734,7 +716,7 @@ export function TransferTokenPanel({
       ) : null}
 
       <section aria-label={copy.transfer.tokenLabel} className="space-y-2">
-        <StickyAction>
+        <ActionStack>
           <Button
             variant="primary"
             size="lg"
@@ -746,16 +728,9 @@ export function TransferTokenPanel({
           >
             {tx.stage === 'wallet' ? copy.transfer.submitting : copy.transfer.submit}
           </Button>
-        </StickyAction>
+        </ActionStack>
 
         {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
-
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <span className="text-[11px] leading-5 text-muted">{copy.transfer.note}</span>
-          <Link to="/" className={TEXT_LINK}>
-            {copy.transfer.states.backHome}
-          </Link>
-        </div>
       </section>
     </div>
   );

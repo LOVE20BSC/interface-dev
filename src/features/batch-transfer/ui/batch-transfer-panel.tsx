@@ -9,7 +9,8 @@ import { formatAmount, formatTokenAmount } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { StickyAction } from '@/shared/ui/sticky-action';
+import { ActionStack } from '@/shared/ui/action-stack';
+import { approvalKind } from '@/shared/lib/approval-kind';
 import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shared/ui/token-picker';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import { parseBatchText } from '@/features/batch-transfer/lib/batch-parse';
@@ -43,9 +44,6 @@ export interface BatchTransferPanelProps {
   readonly isWrongChain: boolean;
   readonly connectAction: ReactNode;
 }
-
-const TEXT_LINK =
-  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
 
 function StateCard({
   title,
@@ -174,6 +172,10 @@ export function BatchTransferPanel({
     parse.total > 0n &&
     allowance.value < parse.total;
   const allowanceUnavailable = mode === 'token' && allowance.value === undefined;
+  const longTermApproved =
+    mode === 'token' &&
+    allowance.value !== undefined &&
+    approvalKind(allowance.value) === 'unlimited';
 
   const tx = useBatchTransaction({
     onApproved: () => {
@@ -302,16 +304,12 @@ export function BatchTransferPanel({
     if (tx.stage === 'wallet') return copy.batchTransfer.submitting;
     if (tx.stage === 'pending') {
       return tx.pendingKind === 'approve'
-        ? copy.batchTransfer.pendingApprove
+        ? copy.approve.confirming
         : copy.batchTransfer.pendingBatch;
     }
     if (mode === 'token') {
-      if (needsApproval) {
-        return copy.batchTransfer.ctaApprove(
-          formatTokenAmount(parse.total, decimals),
-          symbol,
-        );
-      }
+      // Global 授权 copy (owner 2026-11-14): same sentence on every page.
+      if (needsApproval) return copy.approve.action(symbol);
       return copy.batchTransfer.ctaBatch;
     }
     return copy.batchTransfer.ctaNative;
@@ -371,11 +369,6 @@ export function BatchTransferPanel({
           setReceipt(null);
           resetInputs();
         }}
-        onAgain={() => {
-          setReceipt(null);
-          setLastReceipt(null);
-          resetInputs();
-        }}
       />
     );
   }
@@ -399,16 +392,6 @@ export function BatchTransferPanel({
               `${formatTokenAmount(lastReceipt.total, lastReceipt.decimals)} ${lastReceipt.symbol}`,
             )}
           </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <Button
-              variant="secondary"
-              size="md"
-              className="w-full sm:w-auto"
-              onClick={() => setLastReceipt(null)}
-            >
-              {copy.batchTransfer.transferAgain}
-            </Button>
-          </div>
         </div>
       ) : null}
 
@@ -514,7 +497,7 @@ export function BatchTransferPanel({
             autoCapitalize="off"
             spellCheck={false}
             disabled={busy}
-            className="mt-1.5 w-full resize-y rounded-2xl border border-line bg-surface p-2.5 font-mono text-[11px] leading-4 text-foreground outline-none placeholder:text-muted/60 focus:border-brand/40 focus:ring-2 focus:ring-brand/20 disabled:opacity-60"
+            className="mt-1.5 w-full resize-y rounded-2xl border border-line bg-surface p-2.5 font-mono text-[11px] leading-4 text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20 disabled:opacity-60"
           />
           {parse.truncated ? (
             <p className="mt-1 text-[11px] leading-4 text-muted">
@@ -612,11 +595,16 @@ export function BatchTransferPanel({
               {allowance.isLoading
                 ? copy.batchTransfer.allowanceLoading
                 : allowance.value !== undefined && token !== undefined
-                  ? copy.batchTransfer.allowanceLine(
-                      formatTokenAmount(allowance.value, decimals),
-                      formatTokenAmount(parse.total, decimals),
-                      symbol,
-                    )
+                  ? longTermApproved
+                    ? copy.batchTransfer.allowanceLongTerm(
+                        formatTokenAmount(parse.total, decimals),
+                        symbol,
+                      )
+                    : copy.batchTransfer.allowanceLine(
+                        formatTokenAmount(allowance.value, decimals),
+                        formatTokenAmount(parse.total, decimals),
+                        symbol,
+                      )
                   : copy.batchTransfer.allowanceError}
             </p>
             {parse.total > 0n ? (
@@ -633,7 +621,7 @@ export function BatchTransferPanel({
             ) : null}
             {needsApproval ? (
               <p className="mt-1 text-[11px] leading-4 text-muted">
-                {copy.batchTransfer.approveHint}
+                {copy.approve.note(symbol)}
               </p>
             ) : null}
           </div>
@@ -702,7 +690,7 @@ export function BatchTransferPanel({
       ) : null}
 
       <section aria-label={copy.batchTransfer.recipientsLabel} className="space-y-2">
-        <StickyAction>
+        <ActionStack>
           <Button
             variant="primary"
             size="lg"
@@ -714,16 +702,9 @@ export function BatchTransferPanel({
           >
             {ctaLabel}
           </Button>
-        </StickyAction>
+        </ActionStack>
 
         {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
-
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <span className="text-[11px] leading-5 text-muted">{copy.batchTransfer.note}</span>
-          <Link to="/" className={TEXT_LINK}>
-            {copy.batchTransfer.states.backHome}
-          </Link>
-        </div>
       </section>
     </div>
   );

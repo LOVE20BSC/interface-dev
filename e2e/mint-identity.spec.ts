@@ -286,12 +286,13 @@ test('mint: approve → mint produces a real receipt with MemberMinted data', as
 
   await shot(page, 'mint-form.png');
 
-  // Stage 1 must be visible after the allowance reset, and collapse to ✓ 已授权
-  // without navigating away.
-  const approveButton = page.getByRole('button', { name: '1. 授权' });
+  // Stage 1 must be visible after the allowance reset (global `授权 {symbol}`
+  // label, owner 2026-11-14), then turn into the read-only 已授权 state.
+  const approveButton = page.getByTestId('mint-approve');
   await expect(approveButton).toBeVisible({ timeout: 30_000 });
+  await expect(approveButton).toContainText('授权 TestLOVE20');
   await approveButton.click();
-  await expect(page.getByText('已授权')).toBeVisible({ timeout: 30_000 });
+  await expect(approveButton).toContainText('已授权', { timeout: 30_000 });
   await expect(page).toHaveURL(/\/mint/);
 
   const mintButton = page.getByRole('button', { name: '铸造身份 NFT' });
@@ -322,6 +323,8 @@ test('mint: approve → mint produces a real receipt with MemberMinted data', as
     ),
   ).toBeNull();
 
+  await shot(page, 'mint-receipt.png');
+
   // The receipt's #id is a real on-chain token that cast agrees exists.
   // core@72a1604 stores the raw input; the chain did not add or strip a prefix.
   expect(castCall('memberName(uint256)(string)', mintedMemberId)).toBe(`"${NEW_NAME}"`);
@@ -329,18 +332,9 @@ test('mint: approve → mint produces a real receipt with MemberMinted data', as
     ACCOUNTS.funded.toLowerCase(),
   );
 
-  // §4.3: the receipt survives a refresh instead of falling back to a blank form.
-  await page.reload();
-  await expect(page.getByRole('heading', { name: '铸造成功' })).toBeVisible({
-    timeout: 30_000,
-  });
-  expect((await page.getByTestId('mint-receipt-hash').innerText()).trim()).toBe(mintedHash);
-
-  await shot(page, 'mint-receipt.png');
-
-  // 留在此页: backdrop / Esc / the explicit button dismiss the receipt without
-  // changing the route. The page lands on a compact success strip with the form
-  // reset, so the just-minted name cannot be submitted twice.
+  // 留在此页 is the only receipt button (owner 2026-11-14): it dismisses the
+  // receipt without changing the route and leaves a compact success strip with
+  // the form reset, so the just-minted name cannot be submitted twice.
   await page.getByRole('button', { name: '留在此页' }).click();
   await expect(page).toHaveURL(/\/mint/);
   await expect(page.getByRole('heading', { name: '铸造成功' })).toHaveCount(0);
@@ -350,13 +344,18 @@ test('mint: approve → mint produces a real receipt with MemberMinted data', as
   await expect(strip).toContainText(mintedName);
   await expect(page.getByRole('textbox', { name: /起个名字/ })).toHaveValue('');
   await expect(page.getByRole('button', { name: /铸造身份/ })).toBeDisabled();
-  await expect(page.getByRole('link', { name: '查看我的 NFT' })).toHaveAttribute('href', '/my-nft');
   await shot(page, 'mint-receipt-dismissed.png');
 
-  console.log(`mint receipt: #${mintedMemberId} ${mintedName} tx=${mintedHash} burned=${burned}`);
+  // §4.3 / owner 2026-11-14: the receipt is a one-time page state, never
+  // replayed when the page is revisited (reload included).
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '铸造成功' })).toHaveCount(0);
+  await expect(page.getByTestId('mint-success-strip')).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: /起个名字/ })).toBeVisible({
+    timeout: 30_000,
+  });
 
-  await page.getByRole('link', { name: '查看我的 NFT' }).click();
-  await expect(page).toHaveURL(/\/my-nft/);
+  console.log(`mint receipt: #${mintedMemberId} ${mintedName} tx=${mintedHash} burned=${burned}`);
 });
 
 test('my-nft: the freshly minted identity is listed on the next page', async ({ page }) => {

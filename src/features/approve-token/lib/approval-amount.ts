@@ -1,5 +1,12 @@
 import { copy } from '@/shared/config/copy-pages';
+import {
+  approvalKind,
+  UNLIMITED_APPROVAL_THRESHOLD,
+  type ApprovalKind,
+} from '@/shared/lib/approval-kind';
 import { TOKEN_AMOUNT_MAX_FRACTION_DIGITS, formatTokenAmount } from '@/shared/lib/format';
+
+export { approvalKind, UNLIMITED_APPROVAL_THRESHOLD, type ApprovalKind };
 
 /**
  * 代币授权三态 (owner 2026-11-14).
@@ -17,19 +24,8 @@ import { TOKEN_AMOUNT_MAX_FRACTION_DIGITS, formatTokenAmount } from '@/shared/li
  * in `approval-amount.test.ts`.
  */
 
-/** 长期授权 after this value (inclusive). `2^255 - 1` is still a concrete amount. */
-export const UNLIMITED_APPROVAL_THRESHOLD = 2n ** 255n;
-
 /** The value a 「长期授权」 button writes; 撤销 writes 0. */
 export const UNLIMITED_APPROVAL_VALUE = 2n ** 256n - 1n;
-
-export type ApprovalKind = 'unapproved' | 'unlimited' | 'limited';
-
-export function approvalKind(allowance: bigint): ApprovalKind {
-  if (allowance <= 0n) return 'unapproved';
-  if (allowance >= UNLIMITED_APPROVAL_THRESHOLD) return 'unlimited';
-  return 'limited';
-}
 
 /** Smallest amount `formatTokenAmount` can show without collapsing to `0`. */
 function smallestVisibleAmount(decimals: number): bigint {

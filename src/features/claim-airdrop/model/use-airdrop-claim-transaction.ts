@@ -13,7 +13,6 @@ import {
   createAirdropClaimScope,
   readAirdropClaimRecord,
   writeAirdropClaimPending,
-  writeAirdropClaimReceipt,
   type AirdropClaimReceipt,
   type HexHash,
 } from '@/features/claim-airdrop/lib/airdrop-claim-record';
@@ -118,8 +117,11 @@ export function useAirdropClaimTransaction(
       return;
     }
     const stored = readAirdropClaimRecord(scope);
+    // Only an unconfirmed hash is resumed. A confirmed receipt is shown once in
+    // the session that mined it; revisiting the page must not replay it (owner
+    // 2026-11-14) — the page falls back to its S6 已铸造 state from the chain.
     if (stored !== null) {
-      if (stored.amount !== undefined) setReceipt(stored);
+      if (stored.amount !== undefined) clearAirdropClaimRecord(scope);
       else setPending({ hash: stored.hash });
     }
     setIsHydrating(false);
@@ -190,7 +192,7 @@ export function useAirdropClaimTransaction(
       tokenDecimals,
       recordedAt: Date.now(),
     };
-    if (scope !== null) writeAirdropClaimReceipt(scope, nextReceipt);
+    if (scope !== null) clearAirdropClaimRecord(scope);
     setReceipt(nextReceipt);
     setPending(null);
     setError(null);

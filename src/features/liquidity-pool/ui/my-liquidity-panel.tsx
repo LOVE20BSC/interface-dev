@@ -8,7 +8,8 @@ import { formatPercent, formatTokenAmount } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { StickyAction } from '@/shared/ui/sticky-action';
+import { ActionStack } from '@/shared/ui/action-stack';
+import { approvalKind } from '@/shared/lib/approval-kind';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import {
   applySlippageDown,
@@ -187,11 +188,7 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
           </p>
         ) : null}
         {/* 撤出成功后余额归零会先进入空态，回执必须继续可见（可关闭、留在原页）。 */}
-        <LiquidityReceiptSheet
-          record={tx.receipt}
-          onDismiss={tx.clearReceipt}
-          onAgain={tx.clearReceipt}
-        />
+        <LiquidityReceiptSheet record={tx.receipt} onDismiss={tx.clearReceipt} />
       </>
     );
   }
@@ -337,52 +334,55 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
         </div>
       ) : null}
 
-      {needsApproval ? (
-        <>
-          <StickyAction>
-            <Button
-              variant="primary"
-              size="lg"
-              className="w-full"
-              data-testid="liquidity-withdraw-approve"
-              onClick={() => {
-                void handleApprove();
-              }}
-              disabled={tx.approveStage !== 'idle'}
-              loading={tx.approveStage === 'wallet'}
-            >
-              {copy.liquidity.mine.approveLp}
-            </Button>
-          </StickyAction>
-          <p className="text-xs leading-5 text-muted">{copy.liquidity.mine.approveLpNote}</p>
-          {tx.approveWatch.hash !== null ? <TxWatchCard watch={tx.approveWatch} /> : null}
-        </>
-      ) : (
-        <>
-          <StickyAction>
-            <Button
-              variant="primary"
-              size="lg"
-              className="w-full"
-              data-testid="liquidity-withdraw-submit"
-              onClick={() => {
-                void handleSubmit();
-              }}
-              disabled={!canSubmit}
-              loading={tx.stage === 'wallet'}
-            >
-              {tx.stage === 'pending' ? copy.liquidity.mine.withdrawing : copy.liquidity.mine.withdraw}
-            </Button>
-          </StickyAction>
-          {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
-        </>
-      )}
+      {/* Owner 2026-11-14: prerequisite 授权 first, primary action right after;
+          a long-term LP approval stays visible as 「已长期授权」. */}
+      <ActionStack>
+        <Button
+          variant={needsApproval ? 'primary' : 'secondary'}
+          size="lg"
+          className="w-full"
+          data-testid="liquidity-withdraw-approve"
+          onClick={() => {
+            void handleApprove();
+          }}
+          disabled={!needsApproval || tx.approveStage !== 'idle'}
+          loading={tx.approveStage === 'wallet'}
+        >
+          {needsApproval
+            ? copy.liquidity.mine.approveLp
+            : lpAllowance.value === undefined
+              ? copy.approve.loading
+              : approvalKind(lpAllowance.value) === 'unlimited'
+                ? copy.approve.longTermActive
+                : copy.approve.approved}
+        </Button>
+        {needsApproval || lpAllowance.value !== undefined ? (
+          <p className="text-xs leading-5 text-muted">
+            {needsApproval
+              ? copy.liquidity.mine.approveLpNote
+              : approvalKind(lpAllowance.value ?? 0n) === 'unlimited'
+                ? copy.approve.longTermNote
+                : copy.approve.approvedNote}
+          </p>
+        ) : null}
+        {tx.approveWatch.hash !== null ? <TxWatchCard watch={tx.approveWatch} /> : null}
+        <Button
+          variant="primary"
+          size="lg"
+          className="w-full"
+          data-testid="liquidity-withdraw-submit"
+          onClick={() => {
+            void handleSubmit();
+          }}
+          disabled={needsApproval || !canSubmit}
+          loading={tx.stage === 'wallet'}
+        >
+          {tx.stage === 'pending' ? copy.liquidity.mine.withdrawing : copy.liquidity.mine.withdraw}
+        </Button>
+        {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
+      </ActionStack>
 
-      <LiquidityReceiptSheet
-        record={tx.receipt}
-        onDismiss={tx.clearReceipt}
-        onAgain={tx.clearReceipt}
-      />
+      <LiquidityReceiptSheet record={tx.receipt} onDismiss={tx.clearReceipt} />
     </div>
   );
 }

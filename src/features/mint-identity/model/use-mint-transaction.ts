@@ -211,6 +211,9 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
       cost: event.args.cost,
       hash: onChainReceipt.transactionHash,
     });
+    // The receipt is a one-time page state (owner 2026-11-14): drop the
+    // persisted hash so revisiting /mint never replays the success sheet.
+    if (scope !== null) cache.remove(scope, MINT_TASK_KEY);
     setPending(null);
     onConfirmedRef.current?.();
   }, [onChainReceipt, pending, scope]);

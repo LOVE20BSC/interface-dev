@@ -186,9 +186,11 @@ test(
     // The name check is debounced + on-chain; the approve CTA enables after 可以用.
     await expect(page.getByText('✓ 可以用')).toBeVisible({ timeout: 20_000 });
 
-    const approve = page.getByRole('button', { name: '1. 授权' });
+    const approve = page.getByTestId('mint-approve');
     await expect(approve).toBeEnabled({ timeout: 20_000 });
-    // Evidence for the ladder reading order: `1 授权` above `2 铸造身份`.
+    await expect(approve).toContainText('授权 TestLOVE20');
+    // Evidence for the new in-flow reading order (owner 2026-11-14): the 授权
+    // step renders above the primary 铸造身份 NFT button, never in a bottom dock.
     await shot(page, 'mint-approve-needed.png');
     await approve.click();
 

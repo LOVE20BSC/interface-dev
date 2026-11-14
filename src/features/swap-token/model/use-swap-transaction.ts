@@ -178,9 +178,11 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
       return;
     }
     const stored = readSwapRecord(scope);
-    if (stored !== null) {
-      if (stored.confirmed) setReceipt(stored);
-      else setPending({ kind: 'swap', hash: stored.hash, record: stored });
+    // Only an unconfirmed (pending) hash is resumed. A confirmed receipt is a
+    // one-time page state: after the user leaves/reloads the page it must not
+    // pop up again (owner 2026-11-14), so it is never restored from the cache.
+    if (stored !== null && !stored.confirmed) {
+      setPending({ kind: 'swap', hash: stored.hash, record: stored });
     }
     setIsHydrating(false);
   }, [scope]);
@@ -241,7 +243,9 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
       confirmed: true,
       recordedAt: Date.now(),
     };
-    if (scope !== null) writeSwapRecord(scope, nextRecord);
+    // Drop the persisted record as soon as the receipt exists: the receipt is
+    // shown once in this session, never replayed when the page is revisited.
+    if (scope !== null) clearSwapRecord(scope);
     setReceipt(nextRecord);
     setPending(null);
     setError(null);

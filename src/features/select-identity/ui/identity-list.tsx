@@ -21,9 +21,6 @@ export interface IdentityListProps {
   readonly onRetry: () => void;
 }
 
-const TEXT_LINK =
-  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
-
 function SummarySkeleton() {
   return (
     <div className="space-y-2" aria-busy="true">
@@ -102,9 +99,6 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
           <div className="mt-5 flex flex-col items-stretch justify-center gap-2 sm:flex-row">
             <Link to="/mint" className={buttonStyles('primary', 'md', 'w-full sm:w-auto')}>
               {copy.pages.myNft.emptyMint}
-            </Link>
-            <Link to="/" className={buttonStyles('secondary', 'md', 'w-full sm:w-auto')}>
-              {copy.pages.myNft.backHome}
             </Link>
           </div>
         </div>
@@ -216,12 +210,11 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
           <p className="text-xs leading-5 text-muted">{copy.identity.truncated}</p>
         ) : null}
 
+        {/* Owner 2026-11-14: the page-bottom 「回首页」 link is gone — the bottom
+            tab bar and the header back button are the way home. */}
         <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center">
           <Link to="/mint" className={buttonStyles('secondary', 'md', 'w-full sm:w-auto')}>
             {copy.pages.myNft.mintAnother}
-          </Link>
-          <Link to="/" className={TEXT_LINK}>
-            {copy.pages.myNft.backHome}
           </Link>
         </div>
 

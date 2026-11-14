@@ -243,11 +243,12 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     );
 
     const submit = page.getByTestId('batch-transfer-submit');
-    await expect(submit).toHaveText(`1 授权 2.000002 ${SYMBOL}`);
+    // Global 授权 copy (owner 2026-11-14): only the token symbol changes.
+    await expect(submit).toHaveText(`授权 ${SYMBOL}`);
     await submit.click();
 
     // 授权确认后页面重读额度，同一个位置变成第二步。
-    await expect(submit).toHaveText('2 批量转账', { timeout: 30_000 });
+    await expect(submit).toHaveText('批量转账', { timeout: 30_000 });
     await expect(submit).toBeEnabled();
     await expect(page.getByTestId('batch-transfer-allowance')).toHaveText(
       `已允许批量转账合约使用 2.000002 / 本次需要 2.000002 ${SYMBOL}`,
