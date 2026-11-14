@@ -18,11 +18,11 @@
 
 | token | 用途 | 浅色 | 深色 |
 | --- | --- | --- | --- |
-| `background` | 画布 | `#f6f7fb` | `#0b0e11` |
+| `background` | 画布 | `#edf1f7` | `#0b0e11` |
 | `surface` | 卡片/弹层 | `#ffffff` | `#1e2329` |
-| `elevated` / `elevated-hover` | 内嵌面板 / 悬停 | `#f8fafc` / `#f1f5f9` | `#2b3139` / `#2b3139` |
-| `foreground` / `muted` | 正文 / 次要 | `#0f172a` / `#64748b` | `#eaecef` / `#848e9c` |
-| `line` / `line-strong` | 弱 / 强分隔 | `#e5e9f1` / `#cbd5e1` | `#2b3139` / `#474d57` |
+| `elevated` / `elevated-hover` | 内嵌面板 / 悬停 | `#f2f6fb` / `#e4ebf5` | `#2b3139` / `#2b3139` |
+| `foreground` / `muted` | 正文 / 次要 | `#0f172a` / `#55647a` | `#eaecef` / `#848e9c` |
+| `line` / `line-strong` | 弱 / 强分隔 | `#d9e1ec` / `#b7c3d4` | `#2b3139` / `#474d57` |
 | `brand` / `brand-strong` / `brand-soft` | 品牌填充 / 文字 / 浅底 | `#2563eb` / `#1d4ed8` / `#dbeafe` | `#fcd535` / `#fcd535` / `#3a331a` |
 | `on-brand` | 品牌/危险填充上的文字 | `#ffffff` | `#181a20` |
 | `danger` / `danger-strong` / `danger-soft` | 危险填充 / 文字 / 浅底 | `#dc2626` / `#b91c1c` / `#fee2e2` | `#f6465d` / `#ff6b7a` / `#3a1e24` |
@@ -31,6 +31,8 @@
 | `overlay` | sheet/弹层遮罩 | `rgb(15 23 42 / .45)` | `rgb(0 0 0 / .62)` |
 
 `danger-strong` 是必要缺口：`#f6465d` 作正文色压 `surface` 只有 4.48:1（差 0.02），所以危险**文字**统一用 `#ff6b7a`（5.75:1），`danger` 只作填充/边框。浅色主题的品牌蓝不变。
+
+浅色取值于 2026-11-14 整改（owner：「浅色主题下，很多页面感觉有点不太清楚」）：画布/抬升/悬停/次要文字/弱强分隔加深，深色值全部不动，理论线与逐页核对见 [three-line/theme.md](../product/three-line/theme.md) §1.1.1 / §1.3。禁用态与占位符改为不依赖整控件 `opacity` 的可读色阶（见同文 §1.4）。
 
 ### 2. 主题状态三处同步 + 首帧前应用
 

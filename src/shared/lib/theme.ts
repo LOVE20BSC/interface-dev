@@ -52,7 +52,7 @@ export const THEME_CHANGE_EVENT = 'love20:theme-change';
 
 /** `theme-color` meta content per palette (mobile browser chrome). */
 export const THEME_META_COLOR: Readonly<Record<ThemeId, string>> = Object.freeze({
-  light: '#f6f7fb',
+  light: '#edf1f7',
   dark: '#0b0e11',
 });
 
@@ -61,14 +61,14 @@ export const THEMES: readonly ThemeDefinition[] = Object.freeze([
     id: 'light',
     colorScheme: 'light',
     preview: {
-      canvas: '#f6f7fb',
+      canvas: '#edf1f7',
       surface: '#ffffff',
-      elevated: '#f1f5f9',
+      elevated: '#f2f6fb',
       text: '#0f172a',
-      muted: '#64748b',
+      muted: '#55647a',
       brand: '#2563eb',
       onBrand: '#ffffff',
-      line: '#e5e9f1',
+      line: '#d9e1ec',
     },
   },
   {

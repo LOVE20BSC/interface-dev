@@ -19,7 +19,7 @@ function html(): string {
 
 beforeEach(() => {
   document.head.innerHTML =
-    '<meta name="theme-color" content="#f6f7fb" /><meta name="color-scheme" content="light" />';
+    '<meta name="theme-color" content="#edf1f7" /><meta name="color-scheme" content="light" />';
   window.localStorage.clear();
   document.documentElement.removeAttribute('data-theme');
   document.documentElement.classList.remove('dark');

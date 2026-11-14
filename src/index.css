@@ -13,15 +13,21 @@
    * break the dark theme. The dark values below are the Binance-inspired
    * palette agreed with the owner (2026-11-14); contrast pairs are proven in
    * docs/product/three-line/theme.md.
+   *
+   * Light palette revised 2026-11-14 (owner: "浅色主题下，很多页面感觉有点不太
+   * 清楚"): the canvas drops one step so white cards separate from it, `line` /
+   * `line-strong` get visible, `elevated` / `elevated-hover` become a real step,
+   * and `muted` clears 4.5:1 on every light surface (it used to be 4.45 on the
+   * canvas and 4.34 on the hover surface). Dark tokens are untouched.
    */
-  --color-background: #f6f7fb;
+  --color-background: #edf1f7;
   --color-surface: #ffffff;
-  --color-elevated: #f8fafc;
-  --color-elevated-hover: #f1f5f9;
+  --color-elevated: #f2f6fb;
+  --color-elevated-hover: #e4ebf5;
   --color-foreground: #0f172a;
-  --color-muted: #64748b;
-  --color-line: #e5e9f1;
-  --color-line-strong: #cbd5e1;
+  --color-muted: #55647a;
+  --color-line: #d9e1ec;
+  --color-line-strong: #b7c3d4;
   --color-brand: #2563eb;
   --color-brand-strong: #1d4ed8;
   --color-brand-soft: #dbeafe;
@@ -37,7 +43,8 @@
   /* Sheet/dialog scrim; needs its own token because it is not a flat surface. */
   --color-overlay: rgb(15 23 42 / 0.45);
 
-  --shadow-soft: 0 18px 40px -24px rgb(15 23 42 / 0.35);
+  /* 1px contact shadow keeps the card edge visible on the light canvas. */
+  --shadow-soft: 0 1px 2px 0 rgb(15 23 42 / 0.06), 0 18px 40px -24px rgb(15 23 42 / 0.35);
 }
 
 :root {

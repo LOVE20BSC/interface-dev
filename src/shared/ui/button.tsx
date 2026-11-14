@@ -7,8 +7,7 @@ export type ButtonVariant =
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary:
-    'bg-brand text-on-brand shadow-soft hover:bg-brand-strong active:bg-brand-strong disabled:bg-brand/60',
+  primary: 'bg-brand text-on-brand shadow-soft hover:bg-brand-strong active:bg-brand-strong',
   secondary:
     'border border-line bg-surface text-foreground hover:bg-elevated active:bg-elevated-hover',
   ghost: 'text-foreground hover:bg-elevated active:bg-line-strong',
@@ -35,7 +34,10 @@ export function buttonStyles(
   return cn(
     'inline-flex select-none items-center justify-center font-medium transition-colors',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-    'disabled:pointer-events-none disabled:opacity-60',
+    // Disabled is a neutral "raised surface + secondary text" state instead of a
+    // washed-out 60% opacity: 60% white on 60% blue was 1.80:1 (light) and read as
+    // broken, not disabled. Muted on elevated is 5.54:1 light / 3.95:1 dark.
+    'disabled:pointer-events-none disabled:border-line disabled:bg-elevated disabled:text-muted disabled:opacity-100 disabled:shadow-none',
     VARIANTS[variant],
     SIZES[size],
     className,

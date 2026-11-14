@@ -42,14 +42,14 @@ const PAGES = [
 /** Line 1 values, copied verbatim from src/index.css (light @theme / dark block). */
 const EXPECTED_TOKENS = {
   light: {
-    background: '#f6f7fb',
+    background: '#edf1f7',
     surface: '#ffffff',
-    elevated: '#f8fafc',
-    'elevated-hover': '#f1f5f9',
+    elevated: '#f2f6fb',
+    'elevated-hover': '#e4ebf5',
     foreground: '#0f172a',
-    muted: '#64748b',
-    line: '#e5e9f1',
-    'line-strong': '#cbd5e1',
+    muted: '#55647a',
+    line: '#d9e1ec',
+    'line-strong': '#b7c3d4',
     brand: '#2563eb',
     'brand-strong': '#1d4ed8',
     'brand-soft': '#dbeafe',

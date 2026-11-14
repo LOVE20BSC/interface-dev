@@ -175,7 +175,7 @@ function TokenList({
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
-          className="h-10 w-full rounded-xl border border-line bg-surface pl-8 pr-2.5 text-sm text-foreground outline-none placeholder:text-muted/70 focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+          className="h-10 w-full rounded-xl border border-line bg-surface pl-8 pr-2.5 text-sm text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
         />
       </label>
       <p className="mt-1.5 px-1 text-[11px] leading-4 text-muted">{props.labels.searchHint}</p>

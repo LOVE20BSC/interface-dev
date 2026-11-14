@@ -31,7 +31,7 @@ describe('ThemePage', () => {
     const previews = screen.getAllByTestId('theme-preview');
     expect(previews).toHaveLength(2);
     // jsdom serialises inline colours as rgb(); both cards show their own literal palette.
-    expect(previews[0]?.getAttribute('style')).toContain('rgb(246, 247, 251)');
+    expect(previews[0]?.getAttribute('style')).toContain('rgb(237, 241, 247)');
     expect(previews[1]?.getAttribute('style')).toContain('rgb(11, 14, 17)');
   });
 

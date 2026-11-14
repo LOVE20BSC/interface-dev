@@ -18,14 +18,14 @@ const STORAGE_KEY = 'love20:theme';
 
 const THEORETICAL = {
   light: {
-    background: '#f6f7fb',
+    background: '#edf1f7',
     surface: '#ffffff',
-    elevated: '#f8fafc',
-    'elevated-hover': '#f1f5f9',
+    elevated: '#f2f6fb',
+    'elevated-hover': '#e4ebf5',
     foreground: '#0f172a',
-    muted: '#64748b',
-    line: '#e5e9f1',
-    'line-strong': '#cbd5e1',
+    muted: '#55647a',
+    line: '#d9e1ec',
+    'line-strong': '#b7c3d4',
     brand: '#2563eb',
     'brand-strong': '#1d4ed8',
     'brand-soft': '#dbeafe',
@@ -66,10 +66,10 @@ type TokenKey = keyof (typeof THEORETICAL)['light'];
 
 const TOKEN_KEYS = Object.keys(THEORETICAL.light) as TokenKey[];
 
-const META_COLOR: Record<Palette, string> = { light: '#f6f7fb', dark: '#0b0e11' };
+const META_COLOR: Record<Palette, string> = { light: '#edf1f7', dark: '#0b0e11' };
 
 const BODY_BACKGROUND: Record<Palette, string> = {
-  light: 'rgb(246, 247, 251)',
+  light: 'rgb(237, 241, 247)',
   dark: 'rgb(11, 14, 17)',
 };
 
