@@ -386,22 +386,11 @@ export const copy = {
     buildId: '构建 ID',
   },
   // ───────────────────────────────────────────────────────────────────────────
-  // 我的 (UX spec §3.7). Identity and balance moved here from the home page
-  // (owner 2026-11-11); the page is a settings-ish list, never a filled button.
+  // 我的 (UX spec §3.7). Balance + account/about, a settings-ish list that never
+  // spends a filled button. The identity NFT card was removed on 2026-11-14
+  // (owner) — /my-nft owns identity management, so no identity keys remain here.
   // ───────────────────────────────────────────────────────────────────────────
   me: {
-    identityTitle: '我的身份 NFT',
-    identityReading: '读取身份 NFT 中…',
-    identityDisconnected: '连接钱包后显示当前身份 NFT。',
-    identityUnconfigured: '这个环境还没有配置身份 NFT 合约。',
-    identityUnavailable: '身份 NFT 暂时读不到',
-    identityEmpty: '你还没有身份 NFT',
-    identityNeedsSelection: '还没有选择当前身份 NFT',
-    identityInvalidated: '这个身份 NFT 已不属于当前钱包，已为你清除选择。',
-    mintIdentity: '铸造身份 NFT',
-    switchIdentity: '切换身份 NFT',
-    transfer: '转让',
-    viewAll: '查看全部',
     balanceTitle: '我的余额',
     balanceUnavailable: '这个环境还没有配置社区代币，暂时看不到余额。',
     swap: '兑换',
