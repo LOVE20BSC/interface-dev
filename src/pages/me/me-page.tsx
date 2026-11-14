@@ -8,7 +8,6 @@ import { formatBuildId, formatTokenAmount, shortenAddress } from '@/shared/lib/f
 import { variantLabel } from '@/shared/lib/variant-label';
 import { useCommunityBalance } from '@/entities/community-token/model/use-community-balance';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
-import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 
@@ -44,20 +43,19 @@ function Row({ label, children }: { readonly label: string; readonly children: R
 }
 
 /**
- * 我的 (UX spec §3.7): the page that now carries identity and balance, which
- * used to be home cards (owner 2026-11-11). It is a settings-ish list; the only
- * actions are text links, so the page never spends the one-filled-button rule.
+ * 我的 (UX spec §3.7): balance + account/about, a settings-ish list. The
+ * identity NFT card moved out (owner 2026-11-14) — `/my-nft` owns identity
+ * management; only text links remain here, so the page never spends the
+ * one-filled-button rule.
  */
 export function MePage() {
   const { search } = useLocation();
   const wallet = useWalletConnection();
-  const identity = useMemberIdentity();
   const { symbol } = useCommunityContext();
   const token = useCommunityToken(symbol);
   const balance = useCommunityBalance(token.address, token.decimals);
 
   const to = (pathname: string) => ({ pathname, search }) as const;
-  const identityName = identity.selected?.name;
   const amountText =
     balance.status === 'ready' && balance.value !== undefined
       ? `${formatTokenAmount(balance.value, balance.decimals)} ${token.symbol}`
@@ -65,77 +63,6 @@ export function MePage() {
 
   return (
     <div className="space-y-4">
-      <Section id="me-identity-title" title={copy.me.identityTitle}>
-        {identity.status === 'loading' ? (
-          <p className="mt-2 text-sm text-muted">{copy.me.identityReading}</p>
-        ) : identity.status === 'disconnected' ? (
-          <p className="mt-2 text-sm leading-6 text-muted">{copy.me.identityDisconnected}</p>
-        ) : identity.status === 'unconfigured' ? (
-          <p className="mt-2 text-sm leading-6 text-muted">{copy.me.identityUnconfigured}</p>
-        ) : identity.status === 'error' ? (
-          <p className="mt-2 flex items-center gap-3 text-sm text-muted">
-            {copy.me.identityUnavailable}
-            <button
-              type="button"
-              onClick={identity.refetch}
-              className="text-sm font-medium text-brand-strong underline-offset-4 hover:underline"
-            >
-              {copy.common.retry}
-            </button>
-          </p>
-        ) : identity.status === 'empty' ? (
-          <div className="mt-2">
-            {identity.isInvalidated ? (
-              <p className="mb-2 text-xs leading-5 text-muted">{copy.me.identityInvalidated}</p>
-            ) : null}
-            <p className="text-sm leading-6 text-muted">{copy.me.identityEmpty}</p>
-            <div className="mt-2">
-              <Link to={to('/mint')} className={TEXT_LINK}>
-                {copy.me.mintIdentity}
-              </Link>
-            </div>
-          </div>
-        ) : identity.status === 'needs-selection' || identity.selected === null ? (
-          <div className="mt-2">
-            {identity.isInvalidated ? (
-              <p className="mb-2 text-xs leading-5 text-muted">{copy.me.identityInvalidated}</p>
-            ) : null}
-            <p className="text-sm leading-6 text-muted">{copy.me.identityNeedsSelection}</p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-              <Link to={to('/my-nft')} className={TEXT_LINK}>
-                {copy.me.switchIdentity}
-              </Link>
-              <Link to={to('/my-nft')} className={TEXT_LINK}>
-                {copy.me.viewAll}
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-2">
-            {identity.isInvalidated ? (
-              <p className="mb-2 text-xs leading-5 text-muted">{copy.me.identityInvalidated}</p>
-            ) : null}
-            <p className="truncate text-lg font-semibold text-foreground">
-              {identityName ?? copy.common.unknown}
-            </p>
-            <p className="mt-0.5 font-mono text-xs text-muted">
-              {copy.identity.memberId(identity.selected.tokenId.toString())}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-              <Link to={to('/my-nft')} className={TEXT_LINK}>
-                {copy.me.switchIdentity}
-              </Link>
-              <Link to={to('/my-nft')} className={TEXT_LINK}>
-                {copy.me.transfer}
-              </Link>
-              <Link to={to('/my-nft')} className={TEXT_LINK}>
-                {copy.me.viewAll}
-              </Link>
-            </div>
-          </div>
-        )}
-      </Section>
-
       <Section id="me-balance-title" title={copy.me.balanceTitle}>
         {token.address === undefined ? (
           <p className="mt-2 text-sm leading-6 text-muted">{copy.me.balanceUnavailable}</p>

@@ -4,18 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MePage } from '@/pages/me/me-page';
 import { useCommunityBalance } from '@/entities/community-token/model/use-community-balance';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
-import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
-import type { MemberIdentityState } from '@/entities/member-identity/model/use-member-identity';
 import type { CommunityToken } from '@/entities/community-token/model/use-community-token';
 import type { TokenBalance } from '@/entities/community-token/model/use-community-balance';
 
 vi.mock('@/features/switch-community/model/use-community-context', () => ({
   useCommunityContext: () => ({ symbol: 'TestLOVE20', fromUrl: true, switchSymbol: vi.fn() }),
-}));
-
-vi.mock('@/entities/member-identity/model/use-member-identity', () => ({
-  useMemberIdentity: vi.fn(),
 }));
 
 vi.mock('@/entities/community-token/model/use-community-token', () => ({
@@ -30,7 +24,6 @@ vi.mock('@/features/connect-wallet/model/use-wallet-connection', () => ({
   useWalletConnection: vi.fn(),
 }));
 
-const memberIdentity = vi.mocked(useMemberIdentity);
 const communityToken = vi.mocked(useCommunityToken);
 const communityBalance = vi.mocked(useCommunityBalance);
 const wallet = vi.mocked(useWalletConnection);
@@ -52,22 +45,6 @@ const BALANCE: TokenBalance = {
   decimals: 18,
 };
 
-function identity(overrides: Partial<MemberIdentityState> = {}): MemberIdentityState {
-  return {
-    status: 'ready',
-    identities: [{ tokenId: 1n, name: 'Testdev-member-0' }],
-    balance: 1n,
-    selected: { tokenId: 1n, name: 'Testdev-member-0' },
-    isInvalidated: false,
-    isTruncated: false,
-    memberNftAddress: TOKEN.address,
-    select: vi.fn(),
-    clear: vi.fn(),
-    refetch: vi.fn(),
-    ...overrides,
-  };
-}
-
 function renderPage(): void {
   render(
     <MemoryRouter initialEntries={['/me?symbol=TestLOVE20']}>
@@ -77,7 +54,6 @@ function renderPage(): void {
 }
 
 beforeEach(() => {
-  memberIdentity.mockReturnValue(identity());
   communityToken.mockReturnValue(TOKEN);
   communityBalance.mockReturnValue(BALANCE);
   wallet.mockReturnValue({
@@ -95,18 +71,15 @@ beforeEach(() => {
 });
 
 describe('MePage', () => {
-  it('carries the current identity with name, memberId and the three links', () => {
+  it('no longer renders the identity NFT card (owner 2026-11-14)', () => {
     renderPage();
 
-    expect(screen.getByRole('heading', { name: '我的身份 NFT' })).toBeVisible();
-    expect(screen.getByText('Testdev-member-0')).toBeVisible();
-    expect(screen.getByText('NFT #1')).toBeVisible();
-    for (const name of ['切换身份 NFT', '转让', '查看全部']) {
-      expect(screen.getByRole('link', { name })).toHaveAttribute(
-        'href',
-        '/my-nft?symbol=TestLOVE20',
-      );
-    }
+    expect(screen.queryByRole('heading', { name: '我的身份 NFT' })).toBeNull();
+    expect(document.querySelector('section[aria-labelledby="me-identity-title"]')).toBeNull();
+    expect(screen.queryByRole('link', { name: '切换身份 NFT' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '转让' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '查看全部' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '铸造身份 NFT' })).toBeNull();
   });
 
   it('carries the current community balance and an inline 兑换 link with ?symbol=', () => {
@@ -120,15 +93,14 @@ describe('MePage', () => {
     );
   });
 
-  it('offers 铸造身份 NFT when the wallet has no identity NFT', () => {
-    memberIdentity.mockReturnValue(identity({ status: 'empty', identities: [], selected: null }));
+  it('keeps the 账户 and 关于 sections after the identity card removal', () => {
     renderPage();
 
-    expect(screen.getByText('你还没有身份 NFT')).toBeVisible();
-    expect(screen.getByRole('link', { name: '铸造身份 NFT' })).toHaveAttribute(
-      'href',
-      '/mint?symbol=TestLOVE20',
-    );
+    expect(screen.getByRole('heading', { name: '账户' })).toBeVisible();
+    expect(screen.getByText('钱包地址')).toBeVisible();
+    expect(screen.getByText(/^0x1234…5678$/)).toBeVisible();
+    expect(screen.getByRole('heading', { name: '关于' })).toBeVisible();
+    expect(screen.getByRole('link', { name: '开源文档' })).toBeVisible();
   });
 
   it('shows an honest unavailable line when the community token is not configured', () => {
