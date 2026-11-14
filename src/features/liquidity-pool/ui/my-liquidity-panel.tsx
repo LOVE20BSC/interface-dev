@@ -67,6 +67,8 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
   const reserveNative = reserves?.reserveNative ?? 0n;
 
   const [lpInput, setLpInput] = useState('');
+  /** 预设按钮算出的**完整** LP 数量（18 位）；输入框只回填截断到 6 位的文本。 */
+  const [lpPresetAmount, setLpPresetAmount] = useState<bigint | null>(null);
   const [activePreset, setActivePreset] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -83,7 +85,8 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
   });
 
   const parsedLp = parseAmount(lpInput, 18);
-  const lpToWithdraw = parsedLp.kind === 'ok' ? parsedLp.value : 0n;
+  // 预设按钮走完整精度（否则 100% 会剩下 1 wei 级别的灰尘）；手输走用户输入本身。
+  const lpToWithdraw = lpPresetAmount ?? (parsedLp.kind === 'ok' ? parsedLp.value : 0n);
   const plan = planWithdraw(lpToWithdraw, totalSupply, reserveToken, reserveNative);
   const bps = percentToBps(slippagePercent);
   const minToken = applySlippageDown(plan.amountA, bps);
@@ -129,7 +132,9 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
     tx.approveStage === 'idle';
 
   const fillPreset = (percent: number) => {
-    setLpInput(formatUnits(lpForPercent(lpBalance, percent), 18));
+    const amount = lpForPercent(lpBalance, percent);
+    setLpPresetAmount(amount);
+    setLpInput(lpInputText(amount));
     setActivePreset(percent);
     setSubmitError(null);
     tx.clearError();
@@ -253,6 +258,7 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
             value={lpInput}
             onChange={(event) => {
               setLpInput(event.target.value);
+              setLpPresetAmount(null);
               setActivePreset(null);
               setSubmitError(null);
               tx.clearError();
@@ -383,6 +389,17 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
   );
 }
 
+/**
+ * LP 数量输入框的回填文本：最多 6 位小数、去掉尾零、**不加千分位**（否则用户没法再
+ * 编辑这个值）。交易本身用完整 18 位数量（见 `lpPresetAmount`），这里只截断展示。
+ */
+function lpInputText(value: bigint, maxFractionDigits = 6): string {
+  const full = formatUnits(value, 18);
+  const [whole = '0', fraction = ''] = full.split('.');
+  const trimmed = fraction.slice(0, maxFractionDigits).replace(/0+$/, '');
+  return trimmed.length > 0 ? `${whole}.${trimmed}` : whole;
+}
+
 /** 撤出面板只复用「最多可接受的价格变化」控件，不重复渲染有效期说明。 */
 function LiquiditySettingsInline(props: MyLiquidityPanelProps) {
   const {
@@ -393,35 +410,51 @@ function LiquiditySettingsInline(props: MyLiquidityPanelProps) {
     onCustomSlippageChange,
   } = props;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <span className="text-xs leading-5 text-muted">
-        {copy.liquidity.settings.slippageLabel} {formatPercent(slippagePercent)}%
-      </span>
-      <div className="flex items-center gap-1.5">
-        {[0.1, 0.5, 1.0].map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            onClick={() => onSelectSlippagePreset(preset)}
-            className={cn(
-              'rounded-full border px-2 py-1 text-[11px] font-medium',
-              slippagePercent === preset
-                ? 'border-brand bg-brand-soft text-brand-strong'
-                : 'border-line text-muted hover:bg-elevated',
-            )}
-          >
-            {formatPercent(preset, { minimumFractionDigits: 1 })}%
-          </button>
-        ))}
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs leading-5 text-muted">
+          {copy.liquidity.settings.slippageLabel} {formatPercent(slippagePercent)}%
+        </span>
+        <div className="flex items-center gap-1.5">
+          {[0.1, 0.5, 1.0].map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => onSelectSlippagePreset(preset)}
+              className={cn(
+                'rounded-full border px-2 py-1 text-[11px] font-medium',
+                slippagePercent === preset
+                  ? 'border-brand bg-brand-soft text-brand-strong'
+                  : 'border-line text-muted hover:bg-elevated',
+              )}
+            >
+              {formatPercent(preset, { minimumFractionDigits: 1 })}%
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* owner/Lead 复核：自定义输入要能和三个预设区分开，否则会被读成「又一个 0.5%」。 */}
+      <div className="flex flex-wrap items-center gap-1.5 border-t border-line pt-1.5">
+        <label
+          htmlFor="liquidity-withdraw-slippage-custom"
+          className="text-[11px] leading-4 text-muted"
+        >
+          {copy.liquidity.settings.slippageCustom}
+        </label>
         <input
+          id="liquidity-withdraw-slippage-custom"
           type="text"
           inputMode="decimal"
           autoComplete="off"
           value={customSlippage}
+          placeholder={copy.liquidity.settings.customPlaceholder}
           onChange={(event) => onCustomSlippageChange(event.target.value)}
           aria-label={copy.liquidity.settings.slippageCustom}
-          className="h-7 w-14 rounded-full border border-line bg-surface px-2 text-right text-[11px] text-foreground outline-none"
+          className="h-7 w-14 rounded-full border border-line bg-surface px-2 text-right text-[11px] text-foreground outline-none placeholder:text-muted"
         />
+        <span className="text-[11px] leading-4 text-muted">
+          {copy.liquidity.settings.customUnit}
+        </span>
         {customSlippageError !== undefined ? (
           <span className="text-[11px] text-danger-strong">{customSlippageError}</span>
         ) : null}

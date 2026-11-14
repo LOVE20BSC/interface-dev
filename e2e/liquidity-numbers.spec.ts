@@ -192,12 +192,18 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       // 撤出输入的是 LP 数量：100% 按钮只是把它填满，页面只显示「预计收到约」。
       await expect(page.getByTestId('liquidity-withdraw-receive')).toHaveCount(0);
       await page.getByTestId('liquidity-withdraw-percent-100').click();
-      await expect(page.getByTestId('liquidity-withdraw-lp')).toHaveValue(
-        '1003.579928576458381352',
-      );
+      // 输入框只回填 6 位小数（可读），但交易用的是完整 18 位 LP：
+      // 下面「预计收到约 54,983.491651」就是完整精度算出来的，截断会少 0.000031。
+      await expect(page.getByTestId('liquidity-withdraw-lp')).toHaveValue('1003.579928');
       await expect(page.getByTestId('liquidity-withdraw-receive')).toHaveText(
         '预计收到约 54,983.491651 TestLOVE20 + 18.32783 ETH',
       );
+      // 用户仍然可以手输更多小数位。
+      await page.getByTestId('liquidity-withdraw-lp').fill('1003.579928576458381352');
+      await expect(page.getByTestId('liquidity-withdraw-receive')).toHaveText(
+        '预计收到约 54,983.491651 TestLOVE20 + 18.32783 ETH',
+      );
+      await page.getByTestId('liquidity-withdraw-percent-100').click();
 
       // 撤出 100%：先允许，再确认。
       await approveThenSubmit(page, 'liquidity-withdraw-approve', 'liquidity-withdraw-submit');
