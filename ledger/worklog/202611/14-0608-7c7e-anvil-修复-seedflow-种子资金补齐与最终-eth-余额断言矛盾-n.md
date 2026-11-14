@@ -142,6 +142,14 @@ liquidity member + 付得起的 deployer」场景下低余额 bootstrap 全绿�
 遗留问题（需决策/后续）：① index 0 + 均匀低 `--balance` 结构性无法绿（补款来源=deployer 自身），
 见 §3b；② 前端 `abis:check` 的既有红只需 `pnpm sync:anvil` 提交 1 行 manifest provenance 即转绿。
 
+### Lead 独立复核（2026-11-14 15:05）
+
+- 复核 anvil `f8d6e99`：`seedEthTarget()` 纯函数 + `SEED_GAS_ALLOWANCE = 0.2 ether`（依据：该账户 seed 期间 7 笔自签交易共 1,335,352 gas ≈ 0.1322 ETH，留 ~50% 余量）；`_assertSeedState` 与 `verify.sh:350` 的断言确认未被放宽。
+- 复核「默认 profile 零影响」：本机 `git -C ../anvil show f8d6e99:export/deployments/anvil31337_dev.json` 与 HEAD 版本逐字节相同，34 个地址 / 36 个 blockNumber / deployBlock=34 未变。
+- `pnpm abis:check` 修复前红（manifest 的 anvil `head` 仍是 `cda5908`，属前任 docs-only 提交留下的 provenance 漂移，与本次修复无关）。本 Lead 执行 `pnpm sync:anvil`（只重写 manifest 的 `exportedAt` 与 anvil `head`，其余文件全部 `unchanged`），再跑 `[abis:check] ... match ../anvil/export.` 绿。
+- `../anvil/export/VERIFIED.md` 工作区脏是子代理在 8576 验证链上 `make verify` 产生的（报告头 `rpc=8576`）。已还原并对 8545 人工链重新 `make verify` → `ALL CHECKS PASSED`（`rpc=8545`，block 25055），anvil 仓 `fe30361` 提交。
+- **遗留待 owner 决策（结构性）**：默认 `SEED_LIQUIDITY_MEMBER_INDEX=0` 时，liquidity member 就是 deployer 自己，`_fundEth` 的 top-up 是**自转账**（净变化只有 gas），所以「均匀调低 `--balance`」下 index 0 不存在「红→绿」窗口——要支持它必须从其它种子账户盈余回补（或把默认 staker 改成非 deployer），属设计变更，不在 N-01「按语义修计算」范围内。
+
 ## Execution Log
 
 <!-- Maintained by the script: appended by new / claim / set / release / log / close. Do not edit.
