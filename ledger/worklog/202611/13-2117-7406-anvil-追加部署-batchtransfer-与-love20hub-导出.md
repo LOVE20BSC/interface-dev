@@ -90,6 +90,7 @@ owner 2026-11-14：新仓 `periphery`（`LOVE20Hub`，平替旧库 `UniswapV2Zap
   3. `pnpm test`/`pnpm lint` 的两处红来自并行主题任务的未提交文件（`button.tsx`、`scripts/theme-screenshots.mjs`），需由该任务修或由 Lead 复跑；与本任务改动无关。
   4. 地址簿键名沿用 org 惯例的 UPPER_SNAKE（`BATCH_TRANSFER_ADDRESS`/`HUB_ADDRESS`）导出，前端映射为 `batchTransfer`/`hub`；台账里写的 `addresses.batchTransfer` 是前端键，不是 anvil 导出键。
 
+**Lead 复核（2026-11-14 08:24）**：同一台 fresh 8566 链重跑四份合约线脚本 `transfer 26/26 · approvals 26/26 · batch-transfer 56/56 · liquidity 45/45`（共 153 项断言全绿）；权威 `pnpm e2e`（8555，合并构建）**87/87 passed**；`pnpm typecheck / lint / test(485) / build(prod 159.1 kB / dev 160.1 kB) / abis:check` 全绿；真实 8545 链（重建后）用注入钱包逐页 smoke，六个页面无 pageerror、文案齐全；已发布 `interface-dev` 与 `interface-test`（`9180f12`）。`pnpm test` 中曾出现的两处红均为并行任务中间态（`button.tsx` token 改名、`navigation.ts` 缺 `/liquidity` 标题），最终合并树已统一为绿。
 
 ## Execution Log
 
