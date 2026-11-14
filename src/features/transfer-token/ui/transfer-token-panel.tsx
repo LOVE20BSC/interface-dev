@@ -6,6 +6,7 @@ import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
 import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
+import { shouldShowPrecision } from '@/shared/lib/token-precision';
 import {
   identityInputErrorMessage,
   identityInputReadingText,
@@ -589,7 +590,7 @@ export function TransferTokenPanel({
                   balanceText
                 )}
               </p>
-              {token.decimals !== 18 ? (
+              {shouldShowPrecision(token.decimals) ? (
                 <p
                   className="mt-0.5 text-[11px] leading-4 text-muted"
                   data-testid="transfer-decimals"

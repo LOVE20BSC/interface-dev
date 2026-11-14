@@ -9,6 +9,7 @@ import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount } from '@/shared/lib/format';
+import { shouldShowPrecision } from '@/shared/lib/token-precision';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shared/ui/token-picker';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
@@ -481,8 +482,10 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
         </div>
         <div className="mt-1.5 flex items-center justify-between gap-2 text-xs leading-5 text-muted">
           <span data-testid="approvals-balance">{balanceText}</span>
-          {token !== undefined ? (
-            <span>{copy.approvals.decimalsLabel(token.decimals.toString())}</span>
+          {token !== undefined && shouldShowPrecision(token.decimals) ? (
+            <span data-testid="approvals-decimals">
+              {copy.approvals.decimalsLabel(token.decimals.toString())}
+            </span>
           ) : null}
         </div>
       </Card>

@@ -154,6 +154,16 @@ async function restoreSend(page: Page): Promise<void> {
 }
 
 test.describe('代币授权 前端线（理论线 §1）', () => {
+  test('精度字样：默认社区代币 18 位不出现「精度」', async ({ page }) => {
+    await openApprovals(page);
+
+    // 全局精度显示统一 (owner 2026-11-14: 「只有18位不显示精度，其他都要显示」):
+    // TestLOVE20 是 18 位，代币行不得再写「精度 18 位」。非 18 位显示那一半
+    // 需要链上有非 18 位代币才能断言，随「待链恢复后统一跑」补。
+    await expect(page.getByTestId('approvals-decimals')).toHaveCount(0);
+    await expect(page.getByText(/精度/)).toHaveCount(0);
+  });
+
   test('用例 A/B/D 未授权 → 长期授权 → 撤销，回执可关闭且状态不丢', async ({ page }) => {
     await openApprovals(page);
 

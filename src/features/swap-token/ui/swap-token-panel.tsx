@@ -7,6 +7,7 @@ import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { approvalKind } from '@/shared/lib/approval-kind';
 import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
+import { shouldShowPrecision } from '@/shared/lib/token-precision';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -765,6 +766,11 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
               {copy.swap.max}
             </button>
           </div>
+          {shouldShowPrecision(fromDecimals) ? (
+            <p className="mt-1 text-[11px] leading-4 text-muted" data-testid="swap-from-decimals">
+              {copy.swap.decimalsLabel(String(fromDecimals))}
+            </p>
+          ) : null}
           {amountError !== null ? (
             <p
               className={cn(
@@ -843,6 +849,11 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
               )}
             </span>
           </div>
+          {shouldShowPrecision(toDecimals) ? (
+            <p className="mt-1 text-[11px] leading-4 text-muted" data-testid="swap-to-decimals">
+              {copy.swap.decimalsLabel(String(toDecimals))}
+            </p>
+          ) : null}
         </div>
 
         {showApproveStep ? (

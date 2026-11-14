@@ -73,7 +73,7 @@ const TOKEN = {
   decimals: 18,
 };
 
-function makeCatalog(): LiquidityCatalog {
+function makeCatalog(overrides: Partial<LiquidityCatalog> = {}): LiquidityCatalog {
   return {
     nativeToken: { kind: 'native', address: undefined, symbol: 'ETH', decimals: 18 },
     wrappedToken: {
@@ -95,6 +95,7 @@ function makeCatalog(): LiquidityCatalog {
     clearCustomToken: clearCustomTokenMock,
     customInput: '',
     setCustomInput: () => {},
+    ...overrides,
   };
 }
 
@@ -193,5 +194,43 @@ describe('LiquidityPage · QA 缺陷回归', () => {
       </MemoryRouter>,
     );
     expect(clearCustomTokenMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * 全局精度显示统一 (owner 2026-11-14: 「只有18位不显示精度，其他都要显示」).
+ * 自定义代币读取成功那行此前无条件写「精度 N 位」，现在 18 位只写符号。
+ */
+describe('LiquidityPage · 精度字样', () => {
+  function customToken(decimals: number) {
+    return {
+      status: 'ok' as const,
+      token: {
+        kind: 'custom' as const,
+        address: '0x2B5AD5c4795c026514f8317c7a215E218DcCD6cF' as const,
+        symbol: 'TestCMT',
+        decimals,
+      },
+      retry: () => {},
+    };
+  }
+
+  it('18 位精度的自定义代币不渲染「精度」字样', () => {
+    reset();
+    catalogState.value = makeCatalog({ custom: customToken(18) });
+    renderPage();
+
+    fireEvent.click(screen.getByTestId('liquidity-custom-toggle'));
+    expect(screen.getByTestId('liquidity-custom-ok')).toHaveTextContent(/^TestCMT$/);
+    expect(screen.queryByText(/精度/)).toBeNull();
+  });
+
+  it('非 18 位精度照常显示「精度 N 位」', () => {
+    reset();
+    catalogState.value = makeCatalog({ custom: customToken(6) });
+    renderPage();
+
+    fireEvent.click(screen.getByTestId('liquidity-custom-toggle'));
+    expect(screen.getByTestId('liquidity-custom-ok')).toHaveTextContent('TestCMT · 精度 6 位');
   });
 });

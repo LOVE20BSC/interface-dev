@@ -9,7 +9,9 @@ import { formatTokenAmount } from '@/shared/lib/format';
  * - one 「余额 {symbol}」 label followed by the amount — the symbol is written
  *   once, never repeated after the number;
  * - six fraction digits at most (the shared `formatTokenAmount` rule);
- * - no 「精度 18 位」 tag: swap cards never render a precision label;
+ * - the 「精度 N 位」 note lives on a separate line and only for non-18 decimals
+ *   (the global `shouldShowPrecision` rule); the balance line itself never
+ *   repeats the precision;
  * - an unknown balance is `—`, never `0` (a zero balance still renders `0`).
  */
 export function swapBalanceLine(

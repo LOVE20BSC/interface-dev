@@ -251,6 +251,8 @@ export const copy = {
     amountPlaceholder: '0.0',
     balanceLabel: (symbol: string) => `余额 ${symbol}`,
     balanceLoading: '读取余额中…',
+    /** Only rendered when the token precision is not the 18-digit default. */
+    decimalsLabel: (digits: string) => `精度 ${digits} 位`,
     max: '全部',
     maxNativeNote: (reserve: string, native: string) =>
       `已为网络手续费预留约 ${reserve} ${native}。`,

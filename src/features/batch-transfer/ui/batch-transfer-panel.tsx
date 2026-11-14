@@ -6,6 +6,7 @@ import { NETWORK, configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { formatAmount, formatVisibleTokenAmount } from '@/shared/lib/format';
+import { shouldShowPrecision } from '@/shared/lib/token-precision';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -572,7 +573,11 @@ export function BatchTransferPanel({
             <span data-testid="batch-transfer-balance">
               {balance.isLoading ? <Skeleton className="h-3.5 w-28" /> : balanceText}
             </span>
-            <span className="shrink-0">{copy.batchTransfer.amountDecimals(decimals)}</span>
+            {shouldShowPrecision(decimals) ? (
+              <span className="shrink-0" data-testid="batch-transfer-decimals">
+                {copy.batchTransfer.amountDecimals(decimals)}
+              </span>
+            ) : null}
           </div>
           {balanceUnknown && !balance.isLoading ? (
             <div className="mt-1 flex flex-wrap items-center gap-2">

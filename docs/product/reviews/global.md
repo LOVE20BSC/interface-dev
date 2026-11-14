@@ -291,3 +291,11 @@ node /tmp/qa-global/01-theme-shell.mjs          # 依此类推 02..08
 | `pnpm typecheck` 全仓 | **红**，报错全在并行 agent 的在途文件（`approval-tokens.test.ts`、`liquidity-pool` 与 `batch-transfer` 的 copy key），非本任务改动 |
 | `pnpm build` / e2e | **阻塞**：owner 改 `../core` 后 periphery/anvil 未同步，bootstrap 编译失败；按 Lead 裁决由 Lead 在合约侧稳定后统一跑 |
 | 截图 | [about-addresses-390-light.png](../screenshots/about-addresses-390-light.png) / [about-addresses-390-dark.png](../screenshots/about-addresses-390-dark.png) / [me-about-docs-row-390-light.png](../screenshots/me-about-docs-row-390-light.png) / [me-about-docs-row-390-dark.png](../screenshots/me-about-docs-row-390-dark.png)（dev server 390×844，钱包未连接/RPC 不可用属环境现象，不影响地址换行与文案证据）；仓库既有 `about-contracts.png` / `about-data.png` / `me-profile.png` 待 Lead 统一 e2e 时重生成 |
+
+### 7.6 全局精度显示统一（18 位不显示，其它都显示） — 已实现，视觉证据待链恢复后补
+
+- 规则（owner 2026-11-14）：「只有18位不显示精度，其他都要显示」；收敛为 `src/shared/lib/token-precision.ts#shouldShowPrecision(decimals)` = `decimals !== undefined && decimals !== 18`（`undefined` 也不显示，绝不臆造精度）。
+- 落地页面：`/transfer`（原实现改为共享函数）、`/approvals`（原**总是**写「精度 18 位」，已修）、`/liquidity`（自定义代币读取成功行 18 位只写 symbol）、`/batch-transfer`（资产行原总是显示，已修）、`/swap`（原两侧完全没有精度字样，现为非 18 位在余额下方单独一行显示）。
+- 单测/组件测试（本机，未起链）：`token-precision.test.ts` 边界 undefined/0/6/8/18/24；approvals / batch-transfer / swap 新增组件测试各一条「18 位不渲染」+ 一条非 18 显示；liquidity 页测试补 2 条；transfer 原有 2 条保留。全仓 `pnpm test` 630 条绿，`pnpm typecheck` / `pnpm lint` 绿。
+- e2e 断言（待 Lead 统一跑）：`e2e/approvals-numbers.spec.ts` 新增「默认社区代币 18 位不出现『精度』」；`e2e/transfer-numbers.spec.ts` 原有 18 位断言保留。
+- **待补视觉验证（链恢复后）**：8545/8555 上代币全为 18 位，无法产生非 18 精度的真实截图。需在可注入非 18 位代币的链上补 4 个页面 × 390/桌面 × 浅/深：`/swap` 两侧精度行、`/approvals` 代币行、`/batch-transfer` 资产行、`/liquidity` 自定义代币成功行；18 位状态下的可视差异（approvals / batch-transfer 少一行）同样待重拍。

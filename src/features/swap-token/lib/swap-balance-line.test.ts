@@ -23,7 +23,9 @@ describe('swapBalanceLine', () => {
     expect(swapBalanceLine('TestWETH', undefined, 18)).toBe('余额 TestWETH —');
   });
 
-  it('never writes a precision label, including non-18 decimals', () => {
+  it('never writes the precision note itself, including non-18 decimals', () => {
+    // 精度 6 位 lives on the card's dedicated note line (shouldShowPrecision), never
+    // inside the balance line.
     const line = swapBalanceLine('TestUSDC', 12_345_678n, 6);
     expect(line).toBe('余额 TestUSDC 12.345678');
     expect(line).not.toContain('精度');

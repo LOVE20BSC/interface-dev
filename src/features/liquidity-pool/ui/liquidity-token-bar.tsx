@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
+import { shouldShowPrecision } from '@/shared/lib/token-precision';
 import type { LiquidityCatalog } from '@/features/liquidity-pool/model/use-liquidity-catalog';
 import type { LiquidityToken } from '@/features/liquidity-pool/lib/liquidity-types';
 import { Button } from '@/shared/ui/button';
@@ -105,8 +106,14 @@ export function LiquidityTokenBar({ catalog, selected }: LiquidityTokenBarProps)
             </p>
           ) : null}
           {custom.status === 'ok' && custom.token !== undefined ? (
-            <p className="mt-1.5 text-[11px] leading-4 text-success">
-              {custom.token.symbol} · {copy.liquidity.decimalsLabel(String(custom.token.decimals))}
+            <p
+              className="mt-1.5 text-[11px] leading-4 text-success"
+              data-testid="liquidity-custom-ok"
+            >
+              {custom.token.symbol}
+              {shouldShowPrecision(custom.token.decimals) ? (
+                <> · {copy.liquidity.decimalsLabel(String(custom.token.decimals))}</>
+              ) : null}
             </p>
           ) : null}
         </div>
