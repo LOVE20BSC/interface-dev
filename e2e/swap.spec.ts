@@ -31,6 +31,8 @@ const deployment = JSON.parse(
     pair: `0x${string}`;
     memberNFT: `0x${string}`;
     mint: `0x${string}`;
+    stake: `0x${string}`;
+    hub: `0x${string}`;
   };
 };
 
@@ -52,6 +54,8 @@ const SELLER = '0x90F79bf6EB2c4f870365E785982E1f101E93b906'; // #3: TestLOVE20
 const FIXTURE_OWNER = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'; // #1: member #1
 const OUTSIDER = '0x8b3a350Cf5C34c9194ca85829a2df0ec3153bE5d'; // 0 ETH, 0 TestLOVE20
 const MINT = deployment.addresses.mint;
+const STAKE = deployment.addresses.stake;
+const HUB = deployment.addresses.hub;
 
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
 const pairSwapEvent = parseAbiItem(
@@ -92,6 +96,22 @@ function parseUint(raw: string): bigint {
 
 function uintOf(address: string, signature: string, ...args: string[]): bigint {
   return parseUint(castCall(address, signature, ...args));
+}
+
+/**
+ * Three-line check (contract line + expected frontend line): read Stake's two
+ * 1e18-fixed-point fee ratios with `cast` and recompute the page text here, with
+ * arithmetic that is independent of the app's `swap-fee` module.
+ * docs/product/three-line/swap-fee.md §1: fee = lp + proto, truncated to two
+ * percent decimals (`1e18 - lp - proto` is the net fraction, not the fee).
+ */
+function expectedSwapFeePercent(): string {
+  const lpRatio = uintOf(STAKE, 'SWAP_FEE_FOR_LP_RATIO()(uint256)');
+  const protocolRatio = uintOf(STAKE, 'SWAP_FEE_FOR_PROTOCOL_RATIO()(uint256)');
+  const hundredths = ((lpRatio + protocolRatio) * 10_000n) / 10n ** 18n;
+  const whole = hundredths / 100n;
+  const fraction = (hundredths % 100n).toString().padStart(2, '0');
+  return `${whole.toString()}.${fraction}`;
 }
 
 function addressOf(address: string, signature: string, ...args: string[]): `0x${string}` {
@@ -329,7 +349,9 @@ test('swap: ETH → TestLOVE20 shows path/min-out and a receipt from the pair Sw
   await expect(page.getByTestId('swap-from-token')).toContainText(NATIVE, { timeout: 20_000 });
   await expect(page.getByTestId('swap-to-token')).toContainText('TestLOVE20');
   await expect(page.getByTestId('swap-path')).toContainText(`${NATIVE} → TestLOVE20`);
-  await expect(page.getByTestId('swap-fee')).toContainText('以链上费率为准');
+  await expect(page.getByTestId('swap-fee')).toHaveText(
+    `${expectedSwapFeePercent()}%（已含在报价里）`,
+  );
   await expect(page.getByRole('button', { name: '0.5%' })).toHaveAttribute('aria-pressed', 'true');
 
   await page.getByTestId('swap-from-amount').fill('0.01');
@@ -341,6 +363,11 @@ test('swap: ETH → TestLOVE20 shows path/min-out and a receipt from the pair Sw
 
   await page.getByTestId('swap-submit').click();
   await expect(page.getByRole('heading', { name: '兑换完成' })).toBeVisible({ timeout: 30_000 });
+
+  // 回执只留一个按钮「留在此页」（owner 2026-11-14）：不再有「再兑换一次」。
+  await expect(page.getByRole('button', { name: '再兑换一次' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '再兑换一次' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '留在此页' })).toHaveCount(1);
 
   const actualText = (await page.getByTestId('swap-receipt-amount').innerText()).trim();
   const hash = (await page.getByTestId('swap-receipt-hash').innerText()).trim() as `0x${string}`;
@@ -381,6 +408,77 @@ test('swap: ETH → TestLOVE20 shows path/min-out and a receipt from the pair Sw
     `swap ETH→token: tx=${hash} quote=${quotedText} minOut=${minOutText} actual=${actualText} ` +
       `balanceBefore=${before} balanceAfter=${before + ledger.amountOut} token0Is=${tokenIsToken0 ? 'TOKEN' : 'WETH'}`,
   );
+});
+
+test('swap: 手续费率来自 Stake 的两个 ratio（三线校验，页面不写死）', async ({ page }) => {
+  // 合约线交叉核对：Hub 从 Stake 复制同一份费率档案（DeployLocal 断言过）。
+  expect(uintOf(HUB, 'SWAP_FEE_FOR_LP_RATIO()(uint256)')).toBe(
+    uintOf(STAKE, 'SWAP_FEE_FOR_LP_RATIO()(uint256)'),
+  );
+  expect(uintOf(HUB, 'SWAP_FEE_FOR_PROTOCOL_RATIO()(uint256)')).toBe(
+    uintOf(STAKE, 'SWAP_FEE_FOR_PROTOCOL_RATIO()(uint256)'),
+  );
+
+  const expected = expectedSwapFeePercent();
+
+  await installWallet(page, BUYER);
+  await page.goto('/swap?symbol=TestLOVE20&from=ETH&to=TestLOVE20');
+  await connect(page);
+  await expect(page.getByTestId('swap-from-token')).toContainText(NATIVE, { timeout: 20_000 });
+
+  // 前端线：页面文字必须逐字等于「由链上两个 ratio 独立算出的费率」，且不再
+  // 退回旧的写死/中性文案。
+  const feeRow = page.getByTestId('swap-fee');
+  await expect(feeRow).toHaveText(`${expected}%（已含在报价里）`, { timeout: 20_000 });
+  await expect(feeRow).not.toContainText('以链上费率为准');
+  mkdirSync(SHOTS, { recursive: true });
+  await page.screenshot({
+    path: resolve(SHOTS, 'swap-fee.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  const feeText = (await feeRow.innerText()).trim();
+
+  // 包装/解包不经过交易对：费率行保持「无手续费」，不显示百分比。
+  await page.goto('/swap?symbol=TestLOVE20&from=ETH&to=TestWETH');
+  await connect(page);
+  await expect(page.getByTestId('swap-fee')).toHaveText('无手续费（1:1 包装/解包）', {
+    timeout: 20_000,
+  });
+
+  console.log(
+    `swap fee (three-line): lp+proto → ${expected}% page="${feeText}" stake=${STAKE} hub=${HUB}`,
+  );
+});
+
+test('swap: 手续费率行截图（390×844 / 1280×800 × 浅色 / 深色）', async ({ page }) => {
+  test.setTimeout(180_000);
+  const expected = expectedSwapFeePercent();
+  const combos = [
+    { theme: 'light', viewport: { name: 'mobile', width: 390, height: 844 } },
+    { theme: 'dark', viewport: { name: 'mobile', width: 390, height: 844 } },
+    { theme: 'light', viewport: { name: 'desktop', width: 1280, height: 800 } },
+    { theme: 'dark', viewport: { name: 'desktop', width: 1280, height: 800 } },
+  ] as const;
+
+  mkdirSync(SHOTS, { recursive: true });
+  for (const combo of combos) {
+    await page.setViewportSize({ width: combo.viewport.width, height: combo.viewport.height });
+    await page.addInitScript((theme: string) => {
+      window.localStorage.setItem('love20:theme', theme);
+    }, combo.theme);
+    await installWallet(page, BUYER);
+    await page.goto('/swap?symbol=TestLOVE20&from=ETH&to=TestLOVE20');
+    await connect(page);
+    await expect(page.getByTestId('swap-fee')).toHaveText(`${expected}%（已含在报价里）`, {
+      timeout: 20_000,
+    });
+    await page.screenshot({
+      path: resolve(SHOTS, `swap-fee-${combo.theme}-${combo.viewport.name}.png`),
+      fullPage: true,
+      animations: 'disabled',
+    });
+  }
 });
 
 test('swap: TestLOVE20 → ETH requires the exact approve, then settles native out', async ({

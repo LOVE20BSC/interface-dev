@@ -28,6 +28,7 @@ import {
 import { selectSwapScreenState } from '@/features/swap-token/lib/swap-state';
 import { useSwapBalance } from '@/features/swap-token/model/use-swap-balance';
 import { useSwapCatalog } from '@/features/swap-token/model/use-swap-catalog';
+import { useSwapFee } from '@/features/swap-token/model/use-swap-fee';
 import { useSwapPair } from '@/features/swap-token/model/use-swap-pair';
 import { useSwapQuote } from '@/features/swap-token/model/use-swap-quote';
 import { useSwapRoute } from '@/features/swap-token/model/use-swap-route';
@@ -93,6 +94,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
   const { address: account } = useAccount();
 
   const wrapped = useWrappedNative();
+  const swapFee = useSwapFee();
   const catalog = useSwapCatalog(launch);
   const pair = useSwapPair(wrapped);
   const routeState = useSwapRoute({
@@ -858,6 +860,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
           isExpired={quote.isExpired}
           isFetching={quote.isFetching}
           isLoading={routeState.status === 'loading' || quote.isLoading || isDebouncing}
+          feePercent={swapFee.percent}
         />
       ) : (
         <div className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3">

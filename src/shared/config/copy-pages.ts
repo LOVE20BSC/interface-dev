@@ -281,6 +281,8 @@ export const copy = {
     slippageRange: '自定义值需要在 0.01% 到 50% 之间。',
     feeLabel: '手续费率',
     feeChain: '以链上费率为准',
+    /** Read from Stake's 1e18 ratio getters; the quote already includes it. */
+    feeValue: (percent: string) => `${percent}%（已含在报价里）`,
     priceImpactHigh: '这笔兑换会明显改变池子价格，继续前请确认。',
     freshnessCountdown: (seconds: string) => `${seconds}s 后更新`,
     expired: '报价已过期',

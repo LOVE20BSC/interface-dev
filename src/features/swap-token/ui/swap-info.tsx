@@ -29,6 +29,11 @@ export interface SwapInfoProps {
   readonly isExpired: boolean;
   readonly isFetching: boolean;
   readonly isLoading: boolean;
+  /**
+   * Fee percent text read from Stake (`0.30`), or `undefined` when it cannot be
+   * read — the row then says 以链上费率为准 instead of inventing a number.
+   */
+  readonly feePercent: string | undefined;
 }
 
 const ACTIVE_PILL = 'border-brand bg-brand-soft text-brand-strong';
@@ -61,8 +66,9 @@ function Row({
 /**
  * The page's single information block. The path row is always present, even for
  * one pair, because the spec treats it as orientation rather than decoration.
- * The fee percentage is not invented: the pair ABI exposes no fee field, so the
- * row states 以链上费率为准.
+ * The fee row is never hardcoded: it renders Stake's two 1e18 ratio getters as a
+ * percentage (docs/product/three-line/swap-fee.md) and falls back to the neutral
+ * 以链上费率为准 copy when the profile cannot be read.
  */
 export function SwapInfo(props: SwapInfoProps) {
   const {
@@ -83,6 +89,7 @@ export function SwapInfo(props: SwapInfoProps) {
     isExpired,
     isFetching,
     isLoading,
+    feePercent,
   } = props;
 
   const isWrap = route.kind === 'wrap' || route.kind === 'unwrap';
@@ -199,7 +206,11 @@ export function SwapInfo(props: SwapInfoProps) {
       ) : null}
 
       <Row label={copy.swap.feeLabel} testId="swap-fee">
-        {isWrap ? copy.swap.feeNone : copy.swap.feeChain}
+        {isWrap
+          ? copy.swap.feeNone
+          : feePercent !== undefined
+            ? copy.swap.feeValue(feePercent)
+            : copy.swap.feeChain}
       </Row>
 
       {impactVisible && priceImpactBps !== undefined ? (
