@@ -63,6 +63,13 @@ export interface TokenPickerProps {
   readonly search: string;
   readonly onSearchChange: (value: string) => void;
   readonly selected: TokenPickerItem | undefined;
+  /**
+   * Items that must not be selectable because another control already owns them
+   * (the 兑换 page hides the opposite side's token — owner 2026-11-14). Hidden
+   * here, and `excludedNote` explains why the list is one entry shorter.
+   */
+  readonly excludedKeys?: readonly string[] | undefined;
+  readonly excludedNote?: string | undefined;
   readonly onSelect: (item: TokenPickerItem) => void;
   readonly hasMore?: boolean | undefined;
   readonly onLoadMore?: (() => void) | undefined;
@@ -141,11 +148,13 @@ function TokenList({
     isLoading = false,
     optionTestIdPrefix,
     selected,
+    excludedKeys = [],
   } = props;
   const query = search.trim().toLowerCase();
+  const excluded = new Set(excludedKeys);
   const resultKeys = new Set(searchResults.map((item) => item.key));
   const matches = (item: TokenPickerItem) =>
-    query.length === 0 || item.symbol.toLowerCase().includes(query);
+    !excluded.has(item.key) && (query.length === 0 || item.symbol.toLowerCase().includes(query));
 
   const visibleByGroup = groups.map((group) => ({
     group,
@@ -154,7 +163,9 @@ function TokenList({
   const exactVisible =
     searchResultsGroupKey === undefined
       ? []
-      : searchResults.filter((item) => matches(item) || query.length === 0);
+      : searchResults.filter(
+          (item) => !excluded.has(item.key) && (matches(item) || query.length === 0),
+        );
   const anythingVisible =
     visibleByGroup.some((entry) => entry.items.length > 0) || exactVisible.length > 0;
   const searching = query.length > 0;
@@ -179,6 +190,11 @@ function TokenList({
         />
       </label>
       <p className="mt-1.5 px-1 text-[11px] leading-4 text-muted">{props.labels.searchHint}</p>
+      {props.excludedNote !== undefined ? (
+        <p className="mt-1 px-1 text-[11px] leading-4 text-muted" data-testid="token-picker-note">
+          {props.excludedNote}
+        </p>
+      ) : null}
 
       {isLoading && groups.every((group) => group.items.length === 0) ? (
         <div className="mt-3 space-y-2">

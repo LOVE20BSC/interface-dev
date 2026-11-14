@@ -17,10 +17,13 @@ import {
   planDualAdd,
 } from '@/features/liquidity-pool/lib/liquidity-math';
 import {
+  addSideIssue,
+  approvalNeed,
   deadlineFromNow,
   NATIVE_GAS_RESERVE_WEI,
   parseAmount,
   percentToBps,
+  poolNoticeKind,
 } from '@/features/liquidity-pool/lib/liquidity-form';
 import { useHubQuote } from '@/features/liquidity-pool/model/use-hub-quote';
 import {
@@ -123,9 +126,30 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
   const hubReady = hub !== undefined && pool.hasLiquidity;
   /** 走 Hub 的唯一条件：智能模式开 + Hub 可用；否则走 Router 按比例。 */
   const hubPath = smartMode && hubReady;
-  const fallbackReason = (() => {
-    if (!smartMode || hubReady) return undefined;
-    return hub !== undefined ? copy.liquidity.add.fallbackEmptyPool : copy.liquidity.add.hubMissing;
+  /**
+   * 智能模式提示（QA D3）：池子还在读的时候只说「正在读取池子…」，绝不断言
+   * 「这个代币还没有池子」——慢 RPC 下那句会把人骗去第一次建池。
+   */
+  const poolNotice = poolNoticeKind({
+    smartMode,
+    hubConfigured: hub !== undefined,
+    hasLiquidity: pool.hasLiquidity,
+    isLoading: pool.isLoading,
+    isError: pool.isError,
+  });
+  const fallbackText = (() => {
+    switch (poolNotice) {
+      case 'hub-missing':
+        return `${copy.liquidity.add.fallbackTitle}${copy.liquidity.add.hubMissing}`;
+      case 'loading':
+        return copy.liquidity.add.poolReading;
+      case 'read-failed':
+        return `${copy.liquidity.add.fallbackTitle}${copy.liquidity.states.readFailed}`;
+      case 'empty':
+        return `${copy.liquidity.add.fallbackTitle}${copy.liquidity.add.fallbackEmptyPool}`;
+      case 'none':
+        return undefined;
+    }
   })();
 
   const parsedToken = parseAmount(tokenInput, token.decimals);
@@ -165,6 +189,21 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
         ? nativeBalance.value - NATIVE_GAS_RESERVE_WEI
         : 0n;
 
+  /** Hub 报价 / Router 计划是否已经算出一个可提交的数量（QA D7 用它区分「还在算」与「太小」）。 */
+  const quoteReady = hubPath
+    ? quote.data !== undefined && quote.data.expectedLiquidity > 0n
+    : plan.liquidity > 0n && plan.amountA > 0n && plan.amountB > 0n;
+  const quotePending = hubPath && (quote.isLoading || quote.isError);
+  const hasInput = tokenAmount > 0n || nativeAmount > 0n;
+
+  const sideIssue = addSideIssue({
+    tokenRaw: tokenInput,
+    nativeRaw: nativeInput,
+    tokenAmount,
+    nativeAmount,
+    routerPath: !hubPath,
+  });
+
   const amountError = (() => {
     if (parsedToken.kind === 'invalid' || parsedNative.kind === 'invalid') {
       return copy.liquidity.add.amountInvalid;
@@ -175,12 +214,9 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
     if (parsedNative.kind === 'too-precise') {
       return copy.liquidity.add.amountTooPrecise(parsedNative.digits);
     }
-    if (tokenAmount === 0n && nativeAmount === 0n) return null;
-    // 智能模式关 / 降级到 Router 时两侧都要有数量：比例联动会自己补另一侧，
-    // 空池（首次建池）必须由用户两个框都填。
-    if (!hubPath && (tokenAmount === 0n || nativeAmount === 0n)) {
-      return copy.liquidity.add.amountZero;
-    }
+    // QA D6/D7：分清「两侧都没填」「显式填了 0」「只填了一侧（缺另一侧）」。
+    if (sideIssue === 'zero') return copy.liquidity.add.amountZero;
+    if (sideIssue === 'missing-other-side') return copy.liquidity.add.missingOtherSide;
     if (tokenBalance.value !== undefined && tokenBalance.value < tokenAmount) {
       return copy.liquidity.add.insufficient(
         token.symbol,
@@ -193,36 +229,35 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
         formatTokenAmount(nativeAmount - nativeAvailable, native.decimals),
       );
     }
+    // QA D7：有输入、也读完了，却算不出可用的份额（例如 1 wei）→ 给原因，不静默禁用。
+    if (hasInput && !quoteReady && !quotePending) {
+      return copy.liquidity.errors.amountTooSmall;
+    }
     return null;
   })();
 
   const requiredTokenAmount = hubPath ? tokenAmount : plan.amountA;
   const spender = hubPath ? hub : router;
   const allowance = hubPath ? tokenAllowanceHub : tokenAllowanceRouter;
-  const needsApproval =
-    token.address !== undefined &&
-    spender !== undefined &&
-    requiredTokenAmount > 0n &&
-    (allowance.value === undefined || allowance.value < requiredTokenAmount);
+  // QA D8：这一笔不需要代币授权（原生币单边 / 数量为 0）时，不能显示成「已授权」。
+  const approval = approvalNeed(requiredTokenAmount, allowance.value);
+  const needsApproval = approval === 'required';
 
-  // 授权成功后把额度/余额重新读一遍，主按钮才会从「授权」切到「确认添加」。
-  const approvedKeyRef = useRef<string | null>(null);
+  // QA D1（P1）：授权每确认一次就无条件重读额度/余额。不能只监听「同一个 token+spender
+  // 的 key 变化」——第二次授权后 key 不变，主按钮会永久停在禁用。
+  const approveRevisionRef = useRef(0);
   useEffect(() => {
-    if (tx.approvedKey === null || tx.approvedKey === approvedKeyRef.current) return;
-    approvedKeyRef.current = tx.approvedKey;
+    if (tx.approveRevision === approveRevisionRef.current) return;
+    approveRevisionRef.current = tx.approveRevision;
     refetchRef.current();
-  }, [tx.approvedKey]);
+  }, [tx.approveRevision]);
 
-  const quoteReady = hubPath
-    ? quote.data !== undefined && quote.data.expectedLiquidity > 0n
-    : plan.liquidity > 0n && plan.amountA > 0n && plan.amountB > 0n;
-
-  const hasInput = tokenAmount > 0n || nativeAmount > 0n;
   const canSubmit =
     isConnected &&
     !pool.isLoading &&
     hasInput &&
     amountError === null &&
+    customSlippageError === undefined &&
     quoteReady &&
     (hubPath ? nativeAmount === 0n || nativeBalance.value !== undefined : true) &&
     !pool.isError &&
@@ -460,14 +495,12 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
           </button>
         </div>
 
-        {fallbackReason !== undefined || (hubPath && quote.isError) ? (
+        {fallbackText !== undefined || (hubPath && quote.isError) ? (
           <p
             className="mt-2 rounded-xl border border-warning/20 bg-warning-soft/50 p-2 text-[11px] leading-4 text-warning"
             data-testid="liquidity-fallback-note"
           >
-            {fallbackReason !== undefined
-              ? `${copy.liquidity.add.fallbackTitle}${fallbackReason}`
-              : copy.liquidity.add.quoteFailed}
+            {fallbackText ?? copy.liquidity.add.quoteFailed}
           </p>
         ) : null}
 
@@ -589,6 +622,15 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
             onSelectPreset={onSelectSlippagePreset}
             onCustomChange={onCustomSlippageChange}
           />
+          {/* QA D2：关掉设置弹层后，非法的自定义滑点仍要在页面上可见并挡住提交。 */}
+          {customSlippageError !== undefined ? (
+            <p
+              className="mt-1.5 text-xs leading-5 text-danger-strong"
+              data-testid="liquidity-slippage-error"
+            >
+              {customSlippageError}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -712,18 +754,25 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
           onClick={() => {
             void handleApprove();
           }}
-          disabled={!needsApproval || tx.approveStage !== 'idle' || amountError !== null}
+          disabled={
+            !needsApproval ||
+            tx.approveStage !== 'idle' ||
+            amountError !== null ||
+            customSlippageError !== undefined
+          }
           loading={tx.approveStage === 'wallet'}
         >
           {needsApproval
             ? copy.liquidity.add.approveToken(token.symbol)
-            : allowance.value === undefined
-              ? copy.approve.loading
-              : approvalKind(allowance.value) === 'unlimited'
-                ? copy.approve.longTermActive
-                : copy.liquidity.add.approvedToken(token.symbol)}
+            : approval === 'not-needed'
+              ? copy.approve.notNeeded
+              : allowance.value === undefined
+                ? copy.approve.loading
+                : approvalKind(allowance.value) === 'unlimited'
+                  ? copy.approve.longTermActive
+                  : copy.liquidity.add.approvedToken(token.symbol)}
         </Button>
-        {needsApproval || allowance.value !== undefined ? (
+        {approval !== 'not-needed' && (needsApproval || allowance.value !== undefined) ? (
           <p className="text-xs leading-5 text-muted">
             {needsApproval
               ? copy.liquidity.add.approveNote

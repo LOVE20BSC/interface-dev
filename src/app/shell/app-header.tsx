@@ -28,7 +28,7 @@ export function AppHeader() {
   const title = pageTitleFor(location.pathname);
   const wallet = useWalletConnection();
   const { symbol } = useCommunityContext();
-  const wordmark = useCommunityDisplay(symbol).symbol;
+  const community = useCommunityDisplay(symbol);
 
   const goBack = () => {
     if (canGoBack()) navigate(-1);
@@ -41,12 +41,12 @@ export function AppHeader() {
         {isHome ? (
           <div className="flex min-w-0 flex-1 items-center">
             <span className="hidden text-sm font-medium text-muted md:inline">{copy.nav.home}</span>
-            {!wallet.isConnected ? (
+            {!wallet.isConnected && !community.pending ? (
               <span
                 data-testid="home-wordmark"
                 className="min-w-0 truncate text-sm font-semibold text-foreground md:hidden"
               >
-                {wordmark}
+                {community.symbol}
               </span>
             ) : null}
           </div>

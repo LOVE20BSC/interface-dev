@@ -1,8 +1,8 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Route } from '@playwright/test';
 import { isolateChain } from './chain';
-import { connect, installWallet } from './wallet-stub';
+import { connect, installWallet, RPC_URL } from './wallet-stub';
 
 /**
  * 应用·批量转账 前端线（三线校验 §3）:
@@ -52,6 +52,62 @@ test.use({
 test.describe.configure({ mode: 'serial', timeout: 240_000 });
 
 isolateChain();
+
+/**
+ * 降级读注入（QA D1/D2）：按 JSON-RPC 请求里的 `eth_call` 选择器让指定读失败。
+ *
+ * 页面的读走 viem HTTP transport（`batch: true`），一次 POST 里可能有多条
+ * JSON-RPC；这里对命中选择器的请求把响应改写成 JSON-RPC error（其余请求原样
+ * 透传），因此目录/余额等无关读不受影响。返回的函数用于解除注入以验证自愈。
+ */
+async function failReadsWithSelector(
+  page: Page,
+  selector: string,
+): Promise<() => Promise<void>> {
+  const handler = async (route: Route): Promise<void> => {
+    const raw = route.request().postData() ?? '';
+    let payload: unknown;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      await route.continue();
+      return;
+    }
+    type RpcRequest = { id?: unknown; method?: unknown; params?: unknown };
+    const items: RpcRequest[] = Array.isArray(payload)
+      ? (payload as RpcRequest[])
+      : [payload as RpcRequest];
+    const failedIds = new Set<number>();
+    for (const item of items) {
+      if (item.method !== 'eth_call') continue;
+      const serialized = JSON.stringify(item.params ?? []).toLowerCase();
+      if (serialized.includes(selector) && typeof item.id === 'number') {
+        failedIds.add(item.id);
+      }
+    }
+    if (failedIds.size === 0) {
+      await route.continue();
+      return;
+    }
+    const response = await route.fetch();
+    const body = (await response.json()) as unknown;
+    const rewrite = (entry: unknown): unknown => {
+      const record = entry as { id?: unknown };
+      if (typeof record.id !== 'number' || !failedIds.has(record.id)) return entry;
+      return {
+        jsonrpc: '2.0',
+        id: record.id,
+        error: { code: -32000, message: 'e2e injected read failure' },
+      };
+    };
+    const next = Array.isArray(body) ? body.map(rewrite) : rewrite(body);
+    await route.fulfill({ response, json: next });
+  };
+  await page.route(RPC_URL, handler);
+  return async () => {
+    await page.unroute(RPC_URL, handler);
+  };
+}
 
 async function openBatch(page: Page, account: string): Promise<void> {
   await installWallet(page, account);
@@ -267,12 +323,185 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('batch-transfer-receipt-delta-0')).toHaveText('+1.5');
     await expect(page.getByTestId('batch-transfer-receipt-delta-1')).toHaveText('+0.5');
     await expect(page.getByTestId('batch-transfer-receipt-delta-2')).toHaveText('+0.000002');
+    // 额度恰好用完时回执不提示残留授权。
+    await expect(page.getByTestId('batch-transfer-receipt-residual-allowance')).toHaveCount(0);
 
     await page.getByRole('button', { name: '知道了' }).click();
     await expect(page.getByTestId('batch-transfer-balance')).toHaveText(
       `${SYMBOL} 余额 99,799,097.999998`,
       { timeout: 20_000 },
     );
+  });
+
+  // D3：非零但低于 6 位精度的小额，全链路必须写 `< 0.000001`，不能写成 0。
+  test('用例 H 极小金额：合计 / 行金额 / 回执差额都显示 < 0.000001', async ({ page }) => {
+    await openBatch(page, NATIVE_SENDER);
+    // 本用例在 A 之后运行，发送方余额已被 A 扣减；只要求余额读到了真实值。
+    await expect(page.getByTestId('batch-transfer-balance')).toContainText('余额', {
+      timeout: 20_000,
+    });
+
+    await fillBatch(page, [
+      '0x0000000000000000000000000000000000002001 0.0000001',
+      '0x0000000000000000000000000000000000002002 0.0000002',
+    ]);
+    await expect(page.getByTestId('batch-transfer-total')).toHaveText(
+      `合计 < 0.000001 ${NATIVE}`,
+    );
+    await expect(page.getByTestId('batch-transfer-row-amount-0')).toHaveText(
+      `< 0.000001 ${NATIVE}`,
+    );
+    // 先等预余额读完成，否则回执是「核对不完整」而不是逐行 matched。
+    await expect(page.getByTestId('batch-transfer-row-balance-0')).toHaveText('0', {
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
+
+    await page.getByTestId('batch-transfer-submit').click();
+    await expect(page.getByTestId('batch-transfer-receipt-total')).toHaveText(
+      `< 0.000001 ${NATIVE}`,
+      { timeout: 30_000 },
+    );
+    await expect(page.getByTestId('batch-transfer-receipt-delta-0')).toHaveText('< 0.000001');
+    await expect(page.getByTestId('batch-transfer-receipt-delta-1')).toHaveText('< 0.000001');
+    await expect(page.getByTestId('batch-transfer-receipt-atomic')).toHaveText(
+      '整批一起执行：上表每一行都已到账。',
+    );
+  });
+
+  // D4：千分位金额不再被逗号切碎成「这一行看不懂」。
+  test('用例 I 千分位金额：接受并按数值解析', async ({ page }) => {
+    await openBatch(page, NATIVE_SENDER);
+    await fillBatch(page, [`${R5} 1,000`, `${R7} 2,500.5`]);
+
+    await expect(page.getByTestId('batch-transfer-line-errors')).toHaveCount(0);
+    await expect(page.getByTestId('batch-transfer-total')).toHaveText(
+      `合计 3,500.5 ${NATIVE}`,
+    );
+    await expect(page.getByTestId('batch-transfer-row-amount-0')).toHaveText(`1,000 ${NATIVE}`);
+    await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
+  });
+
+  // D5：19 位小数被截断为 0 时说明原因，不只是「金额必须大于 0」。
+  test('用例 J 精度截断为 0：提示按精度截断', async ({ page }) => {
+    await openBatch(page, NATIVE_SENDER);
+    await fillBatch(page, [`${R5} 0.0000000000000000009`]);
+
+    await expect(page.getByTestId('batch-transfer-line-error-1')).toHaveText(
+      '第 1 行：小数位超过精度，按精度截断后为 0。',
+    );
+    await expect(page.getByTestId('batch-transfer-submit')).toBeDisabled();
+  });
+
+  // D7：先按合计授权、再改小清单提交，回执必须提示链上残留的授权额度。
+  test('用例 K 残留授权：授权 2.000002 后改小清单，回执提示剩余授权', async ({ page }) => {
+    await openBatch(page, ERC20_SENDER);
+    await useTokenMode(page);
+    await expect(page.getByTestId('batch-transfer-balance')).toContainText('余额', {
+      timeout: 20_000,
+    });
+
+    const submit = page.getByTestId('batch-transfer-submit');
+    await fillBatch(page, [`${R5} 1.5`, `${R2} 0.5`, `${R7} 0.000002`]);
+    await expect(page.getByTestId('batch-transfer-allowance')).toHaveText(
+      `已允许批量转账合约使用 0 / 本次需要 2.000002 ${SYMBOL}`,
+      { timeout: 20_000 },
+    );
+    await submit.click();
+    await expect(submit).toHaveText('批量转账', { timeout: 30_000 });
+    await expect(page.getByTestId('batch-transfer-allowance')).toHaveText(
+      `已允许批量转账合约使用 2.000002 / 本次需要 2.000002 ${SYMBOL}`,
+      { timeout: 20_000 },
+    );
+
+    // 删掉第三行：合计 2，链上仍留着 0.000002 的授权。
+    await fillBatch(page, [`${R5} 1.5`, `${R2} 0.5`]);
+    await expect(page.getByTestId('batch-transfer-total')).toHaveText(`合计 2 ${SYMBOL}`);
+    await submit.click();
+
+    await expect(page.getByTestId('batch-transfer-receipt-total')).toHaveText(
+      `2 ${SYMBOL}`,
+      { timeout: 30_000 },
+    );
+    await expect(page.getByTestId('batch-transfer-receipt-residual-allowance')).toHaveText(
+      `链上还保留 0.000002 ${SYMBOL} 的授权，可到「代币授权」页撤销。`,
+    );
+  });
+
+  // D11：已注入钱包但链不对时，首屏就是「网络不对」，而不是「连接钱包」。
+  test('用例 L 错误网络首屏：已注入其它链的钱包不再显示「连接钱包」', async ({ page }) => {
+    await installWallet(page, NATIVE_SENDER, '0x1');
+    await page.goto(`/batch-transfer${QUERY}`);
+
+    await expect(page.getByTestId('batch-transfer-input')).toHaveCount(0);
+    await expect(page.getByText('网络不对。', { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(
+      page.getByText('切换到这个应用使用的网络后再批量转账。', { exact: true }),
+    ).toBeVisible();
+    // 全局头部同时给切换入口，页面不再出现未连接卡。
+    await expect(page.getByRole('button', { name: '网络不对，点此切换' })).toBeVisible();
+    await expect(page.getByText('连接钱包后批量转账。', { exact: true })).toHaveCount(0);
+  });
+
+  // D1：提交前与到账后余额都读不到时，回执不得断言「上表每一行都已到账」。
+  test('用例 M 余额读失败：回执落「到账核对不完整」，— 不当 0（D1）', async ({ page }) => {
+    await installWallet(page, NATIVE_SENDER);
+    // 只让 nativeBalances(0x93bdc1ab) 的读失败，目录/发送方余额等无关读保持健康。
+    await failReadsWithSelector(page, '0x93bdc1ab');
+    await page.goto(`/batch-transfer${QUERY}`);
+    await connect(page);
+    await fillBatch(page, [`${R5} 0.01`, `${R7} 0.02`]);
+
+    // 预余额读失败：行余额是 —（不是 0）+ 表下说明 + 「重新读取」；主按钮仍可提交。
+    await expect(page.getByTestId('batch-transfer-rows-retry')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('batch-transfer-row-balance-0')).toHaveText('—');
+    await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
+
+    await page.getByTestId('batch-transfer-submit').click();
+
+    const conclusion = page.getByTestId('batch-transfer-receipt-atomic');
+    await expect(conclusion).toHaveAttribute('data-status', 'unverified', { timeout: 30_000 });
+    await expect(conclusion).toHaveText(
+      '到账核对不完整：有 2 行余额读取失败，未能核对，请到区块浏览器确认交易结果。',
+    );
+    await expect(conclusion).not.toHaveText('整批一起执行：上表每一行都已到账。');
+    await expect(page.getByTestId('batch-transfer-receipt-delta-0')).toHaveText('—');
+    await page.getByRole('button', { name: '知道了' }).click();
+  });
+
+  // D2/D6：额度读失败只给单一「读不到」结论 + 重试；不出现「额度已足够」。
+  test('用例 N 额度读失败：单一未知态 + 重新读取自愈（D2/D6）', async ({ page }) => {
+    await installWallet(page, ERC20_SENDER);
+    // 只让 allowance(0xdd62ed3e) 的读失败。
+    const restore = await failReadsWithSelector(page, '0xdd62ed3e');
+    await page.goto(`/batch-transfer${QUERY}`);
+    await connect(page);
+    await useTokenMode(page);
+    await fillBatch(page, [`${R5} 0.25`]);
+
+    const allowanceLine = page.getByTestId('batch-transfer-allowance');
+    await expect(allowanceLine).toHaveText('批量转账额度暂时读不到', { timeout: 30_000 });
+    const state = page.getByTestId('batch-transfer-allowance-state');
+    await expect(state).toHaveAttribute('data-state', 'unknown');
+    await expect(state).toHaveText('额度暂时读不到，无法判断是否需要授权，请重试读取。');
+    await expect(page.getByTestId('batch-transfer-submit')).toBeDisabled();
+    await expect(page.getByText('额度已足够，不需要再次授权。')).toHaveCount(0);
+
+    // 解除注入后点「重新读取」应自愈，不需要刷新整页。
+    // 不断言具体额度（前面用例可能留下残留授权），只要求回到「读到真实额度」的态。
+    await restore();
+    await page.getByTestId('batch-transfer-allowance-retry').click();
+    await expect(allowanceLine).toContainText(`本次需要 0.25 ${SYMBOL}`, {
+      timeout: 30_000,
+    });
+    await expect(allowanceLine).not.toHaveText('批量转账额度暂时读不到');
+    await expect(page.getByTestId('batch-transfer-allowance-state')).toHaveAttribute(
+      'data-state',
+      'need',
+    );
+    await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
   });
 });
 

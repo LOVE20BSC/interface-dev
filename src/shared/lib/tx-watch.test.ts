@@ -9,6 +9,7 @@ import {
   isTxWatchSettled,
   reduceTxWatch,
   resolveTxDeadlineMs,
+  TX_WATCH_NONCE_GAP_GRACE_MS,
   txWatchRemainingMs,
   txWatchRemainingSeconds,
   type TxWatchObservation,
@@ -89,15 +90,61 @@ describe('tx-watch state machine', () => {
     expect(unknown.status).toBe('slow');
   });
 
-  it('detects a nonce gap immediately, before the deadline', () => {
-    const state = observe(
+  it('flags a nonce gap only once it survives the grace window (one stale read is noise)', () => {
+    const first = observe(
       pendingState(),
       observation({ tx: { nonce: 68, from: WALLET }, walletNonce: 3 }),
       STARTED_AT + 1,
     );
-    expect(state.status).toBe('nonceGap');
-    expect(isTxWatchRecovery(state.status)).toBe(true);
-    expect(isTxWatchPollingStopped(state.status)).toBe(true);
+    expect(first.status).toBe('pending');
+    expect(first.gapSince).toBe(STARTED_AT + 1);
+
+    // Still inside the grace window: keep waiting, never freeze the page.
+    const inside = observe(
+      first,
+      observation({ tx: { nonce: 68, from: WALLET }, walletNonce: 3 }),
+      STARTED_AT + TX_WATCH_NONCE_GAP_GRACE_MS - 1,
+    );
+    expect(inside.status).toBe('pending');
+
+    const stuck = observe(
+      inside,
+      observation({ tx: { nonce: 68, from: WALLET }, walletNonce: 3 }),
+      STARTED_AT + TX_WATCH_NONCE_GAP_GRACE_MS + 1,
+    );
+    expect(stuck.status).toBe('nonceGap');
+    expect(isTxWatchRecovery(stuck.status)).toBe(true);
+    expect(isTxWatchPollingStopped(stuck.status)).toBe(true);
+  });
+
+  it('clears the gap clock as soon as a read no longer shows a gap', () => {
+    const gapped = observe(
+      pendingState(),
+      observation({ tx: { nonce: 68, from: WALLET }, walletNonce: 3 }),
+      STARTED_AT + 1,
+    );
+    const healed = observe(
+      gapped,
+      observation({ tx: { nonce: 3, from: WALLET }, walletNonce: 3 }),
+      STARTED_AT + 2_000,
+    );
+    expect(healed.status).toBe('pending');
+    expect(healed.gapSince).toBeNull();
+  });
+
+  it('never calls a transaction queued behind another pending transaction a nonce gap', () => {
+    // latest=4 mined, the pool already holds nonce 4 and this one at 5 (pending=6):
+    // the wallet will mine it as soon as the cheaper transaction lands.
+    const queued = observation({
+      tx: { nonce: 5, from: WALLET },
+      walletNonce: 4,
+      walletPendingNonce: 6,
+    });
+    const first = observe(pendingState(), queued, STARTED_AT + 1);
+    expect(first.status).toBe('pending');
+    const longAfter = observe(first, queued, DEADLINE_AT + 1);
+    expect(longAfter.status).toBe('slow');
+    expect(longAfter.status).not.toBe('nonceGap');
   });
 
   it('treats a receipt as terminal truth: confirmed and reverted', () => {

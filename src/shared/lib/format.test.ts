@@ -8,6 +8,8 @@ import {
   formatRate,
   formatTokenAmount,
   formatUnits,
+  formatVisibleTokenAmount,
+  smallestVisibleTokenAmount,
   UNKNOWN,
 } from '@/shared/lib/format';
 
@@ -119,6 +121,31 @@ describe('formatTokenAmount', () => {
     expect(formatTokenAmount(1_999n, 3)).toBe('1.999');
     expect(formatTokenAmount(1_999n, 3, { maxFractionDigits: 2 })).toBe('1.99');
     expect(formatTokenAmount(1_999n, 3, { maxFractionDigits: 2, locale: 'de-DE' })).toBe('1,99');
+  });
+});
+
+describe('formatVisibleTokenAmount', () => {
+  it('never renders a non-zero amount the display rule truncates as a bare 0', () => {
+    // 1 wei of an 18-decimals asset is 0.000000000000000001: below 6 digits.
+    expect(formatVisibleTokenAmount(1n, 18)).toBe('< 0.000001');
+    expect(formatVisibleTokenAmount(100000000000n, 18)).toBe('< 0.000001'); // 1e-7 ETH
+    expect(formatVisibleTokenAmount(999999999999n, 18)).toBe('< 0.000001');
+    expect(formatVisibleTokenAmount(1000000000000n, 18)).toBe('0.000001');
+  });
+
+  it('keeps the exact-zero and unknown semantics of formatTokenAmount', () => {
+    expect(formatVisibleTokenAmount(0n, 18)).toBe('0');
+    expect(formatVisibleTokenAmount(undefined, 18)).toBe(UNKNOWN);
+    expect(formatVisibleTokenAmount(null, 18)).toBe(UNKNOWN);
+    expect(formatVisibleTokenAmount(1n, undefined)).toBe(UNKNOWN);
+  });
+
+  it('derives the smallest visible amount from the decimals and the cap', () => {
+    expect(smallestVisibleTokenAmount(18)).toBe(1000000000000n);
+    expect(smallestVisibleTokenAmount(6)).toBe(1n);
+    expect(smallestVisibleTokenAmount(18, 2)).toBe(10000000000000000n);
+    expect(formatVisibleTokenAmount(1n, 6)).toBe('0.000001');
+    expect(formatVisibleTokenAmount(1n, 2)).toBe('0.01');
   });
 });
 

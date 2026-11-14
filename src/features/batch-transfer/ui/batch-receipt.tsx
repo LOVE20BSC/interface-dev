@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Check, Copy } from '@/shared/ui/icons';
+import { AlertTriangle, Check, Copy } from '@/shared/ui/icons';
 import { NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
-import { formatTokenAmount } from '@/shared/lib/format';
+import { cn } from '@/shared/lib/cn';
+import { formatVisibleTokenAmount } from '@/shared/lib/format';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { Sheet } from '@/shared/ui/sheet';
-import type { BatchAuditRow } from '@/features/batch-transfer/lib/batch-audit';
+import { summarizeBatchAudit, type BatchAuditRow } from '@/features/batch-transfer/lib/batch-audit';
 import type { BatchReceiptRecord } from '@/features/batch-transfer/lib/batch-receipt';
 
 export interface BatchReceiptProps {
@@ -20,9 +21,11 @@ export interface BatchReceiptProps {
 function deltaText(row: BatchAuditRow, decimals: number): string {
   if (row.delta === undefined) return copy.batchTransfer.deltaUnknown;
   if (row.status === 'unchanged') return copy.batchTransfer.deltaUnchanged;
-  const amount = formatTokenAmount(row.delta, decimals);
+  // D3: a non-zero delta below the 6-digit display rule renders `< 0.000001`,
+  // never `+0` — the chain did move that money.
+  const amount = formatVisibleTokenAmount(row.delta, decimals);
   if (row.status === 'anomaly') return copy.batchTransfer.deltaAnomaly(amount);
-  return copy.batchTransfer.deltaPlus(amount);
+  return amount.startsWith('<') ? amount : copy.batchTransfer.deltaPlus(amount);
 }
 
 function deltaClass(row: BatchAuditRow): string {
@@ -66,7 +69,7 @@ function ReceiptRow({
           className="block font-mono text-[10px] text-muted"
           data-testid={`batch-transfer-receipt-amount-${index}`}
         >
-          {`${formatTokenAmount(row.amount, decimals)} ${symbol}`}
+          {`${formatVisibleTokenAmount(row.amount, decimals)} ${symbol}`}
         </span>
       </span>
       <span className="shrink-0 text-right">
@@ -77,7 +80,7 @@ function ReceiptRow({
           {deltaText(row, decimals)}
         </span>
         <span className="block text-[10px] text-muted">
-          {`${formatTokenAmount(row.before, decimals)} → ${formatTokenAmount(row.after, decimals)}`}
+          {`${formatVisibleTokenAmount(row.before, decimals)} → ${formatVisibleTokenAmount(row.after, decimals)}`}
         </span>
       </span>
     </li>
@@ -88,6 +91,15 @@ function ReceiptBody({ record, onDismiss }: BatchReceiptProps) {
   const [copied, setCopied] = useState(false);
   const explorerUrl =
     NETWORK.blockExplorerUrl !== null ? `${NETWORK.blockExplorerUrl}/tx/${record.hash}` : null;
+  // D1: the conclusion is derived from the audit, never a static success claim.
+  const audit = summarizeBatchAudit(record.rows);
+  const verified = audit.outcome === 'verified';
+  const conclusion =
+    audit.outcome === 'unverified'
+      ? copy.batchTransfer.receiptUnverified(String(audit.unknownRows))
+      : audit.outcome === 'anomaly'
+        ? copy.batchTransfer.receiptMismatch(String(audit.mismatchRows))
+        : copy.batchTransfer.atomicReceipt;
 
   const handleCopy = async () => {
     const ok = await copyText(record.hash);
@@ -98,15 +110,26 @@ function ReceiptBody({ record, onDismiss }: BatchReceiptProps) {
   return (
     <div className="space-y-4">
       <div className="text-center">
-        <span className="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-success-soft text-success">
-          <Check className="h-5 w-5" aria-hidden="true" />
+        <span
+          className={cn(
+            'mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full',
+            verified ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning',
+          )}
+          data-testid="batch-transfer-receipt-status-icon"
+          data-status={audit.outcome}
+        >
+          {verified ? (
+            <Check className="h-5 w-5" aria-hidden="true" />
+          ) : (
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+          )}
         </span>
         <p className="mt-2 text-sm text-muted">{copy.batchTransfer.receiptTotal}</p>
         <p
           className="mt-0.5 break-words text-2xl font-semibold tracking-tight text-foreground"
           data-testid="batch-transfer-receipt-total"
         >
-          {`${formatTokenAmount(record.total, record.decimals)} ${record.symbol}`}
+          {`${formatVisibleTokenAmount(record.total, record.decimals)} ${record.symbol}`}
         </p>
         <p className="mt-1 text-xs text-muted" data-testid="batch-transfer-receipt-count">
           {copy.batchTransfer.receiptRecipientCount(String(record.rows.length))}
@@ -126,9 +149,29 @@ function ReceiptBody({ record, onDismiss }: BatchReceiptProps) {
             />
           ))}
         </ul>
-        <p className="mt-2 text-[11px] leading-4 text-muted" data-testid="batch-transfer-receipt-atomic">
-          {copy.batchTransfer.atomicReceipt}
+        <p
+          className={cn(
+            'mt-2 text-[11px] leading-4',
+            verified ? 'text-muted' : 'font-medium text-warning',
+          )}
+          data-testid="batch-transfer-receipt-atomic"
+          data-status={audit.outcome}
+        >
+          {conclusion}
         </p>
+        {record.mode === 'token' &&
+        record.residualAllowance !== undefined &&
+        record.residualAllowance > 0n ? (
+          <p
+            className="mt-1.5 text-[11px] leading-4 text-warning"
+            data-testid="batch-transfer-receipt-residual-allowance"
+          >
+            {copy.batchTransfer.receiptResidualAllowance(
+              formatVisibleTokenAmount(record.residualAllowance, record.decimals),
+              record.symbol,
+            )}
+          </p>
+        ) : null}
       </div>
 
       <dl className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3 text-sm">

@@ -13,8 +13,15 @@ export interface SwapBalance {
 }
 
 /**
- * One Multicall3 batch for the input token: balanceOf + allowance(wallet, router).
- * Native has no allowance; its balance comes from the wallet provider instead.
+ * One Multicall3 batch for one side of the 兑换 card: balanceOf + allowance
+ * (wallet, router). Native has no allowance; its balance comes from the wallet
+ * provider instead.
+ *
+ * `staleTime: 0` is deliberate: the app-level query client caches chain reads for
+ * 15 s, but a balance shown next to a 兑换 action must be the current one. Without
+ * it, switching the pair (or the 交换方向 button) reused a cached 0 balance from
+ * the other side's pre-swap read and left 兑换 disabled (owner 2026-11-14:
+ * 「完成一次兑换后再输入金额点兑换没反应」的同类状态残留).
  */
 export function useSwapBalance(
   token: SwapToken | undefined,
@@ -23,7 +30,7 @@ export function useSwapBalance(
   const { address: account } = useAccount();
   const nativeBalance = useBalance({
     address: account,
-    query: { enabled: account !== undefined && token?.kind === 'native' },
+    query: { enabled: account !== undefined && token?.kind === 'native', staleTime: 0 },
   });
 
   const contracts = useMemo(() => {
@@ -47,7 +54,7 @@ export function useSwapBalance(
 
   const read = useReadContracts({
     contracts,
-    query: { enabled: contracts.length > 0 },
+    query: { enabled: contracts.length > 0, staleTime: 0 },
   });
 
   if (token?.kind === 'native') {

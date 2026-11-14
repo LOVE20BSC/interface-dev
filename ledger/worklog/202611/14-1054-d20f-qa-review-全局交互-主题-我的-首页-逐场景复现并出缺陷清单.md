@@ -29,29 +29,21 @@ owner 2026-11-14：要求「派 agent 先每个页面/模块单独 review」。�
 1. `docs/product/reviews/<module>.md`：场景矩阵（正常/刷新恢复/慢 RPC/钱包延迟/错误网络/未连接/重复点击/回执关闭后再操作/切换账户或链/移动端 390×844/桌面 1280×800/浅色/深色），每条给：期望、实际、严重级别（P0 阻塞/P1 严重/P2 一般/P3 文案或体验）、证据（截图 `/tmp/qa-<module>-*.png`、console error、DOM 摘录、tx hash）。
 2. 每条缺陷给「最小复现步骤」+「建议修复方向（一句话）」，不要写补丁。
 3. 明确区分「**已验证缺陷**」与「**怀疑未复现**」。
-4. worklog `## Process`/`## Conclusion` 写：跑了哪些场景、多少条缺陷、最严重的 3 条。
-场景至少覆盖：
-- 顶部：字标（未连接时显示/连接后隐藏）、连接按钮状态、社区切换（symbol 精确/前缀/不存在/清空回到最近访问）、钱包菜单（身份行、地址复制、断开连接）；
-- 主题：浅/深切换即时生效、刷新不闪、`theme-color`、深色下各页对比度与层级、系统是否被误跟随；
-- 我的：身份 NFT 卡片已移除、余额/账户/关于三块、无空块；
-- 首页：未连接/无身份/未选身份/空投资格四种提醒、问候语、无底部多余链接；
-- 应用目录：9 个条目（含禁用态原因）、分类分组、图标；
-- 全局：按钮不再吸底、先决按钮顺序、回执只有一个「知道了」按钮、离开再回来不重弹回执、所有地址可复制、转账/转让无「不能撤回」提示；
-- 关于页：地址/数据两个 tab、地址复制、explorer 链接（无 explorer 时不显示）；
-- 深链接/刷新/404、键盘 Tab 焦点可见、移动端 390×844 与桌面 1280×800、浅色/深色。
-验证链：`make -C ../anvil bootstrap PORT=8588`，dev server `VITE_ENV=dev VITE_ANVIL_RPC=http://127.0.0.1:8588 pnpm dev --port 5188`。
+4. worklog `## Process
 
-## Next
-
-先读上述路径与 `e2e/{smoke,apps,home-reminders,theme-colors,global-actions-screens,community-switch}.spec.ts`，再按矩阵复现，写 `docs/product/reviews/global.md`。
-
-## Process
-
-<!-- Pitfalls and evidence: with revision + file:line or symbol names -->
+- 链路：`make -C ../anvil bootstrap PORT=8588`（独立链，未触碰 8545）→ `VITE_ENV=dev VITE_ANVIL_RPC=http://127.0.0.1:8588 pnpm dev --port 5188`（dev server，不 build、不产 dist）→ 8 个 `node` Playwright 脚本（`/tmp/qa-global/01..08-*.mjs`）跑 390×844 / 1280×800 × 浅/深两套。
+- 账户与 fixture：`0xf39F…2266`（持 NFT #1，已铸造）、`0x9965…A4dc`（快照内未铸造=空投资格）、`0x8b3a…3Be5d`（无身份）、`0x7099…79C8`（持 NFT #2 未选身份）；子社区 `TestCMTOK1` 用 `cast` 在 8588 上 launch（`0xe082b26c…`），用于精确/前缀/最近访问切换。
+- 覆盖：顶部字标（未连接显示/连接后隐藏）、连接按钮（含「检测钱包中…」「连接中…」中间态、双击、慢钱包 2s）、错误网络（连接后变「网络不对，点此切换」→ 切换成功）、社区菜单（精确/前缀/不存在/清空回最近访问/当前项 no-op/慢 RPC loading/父币子币 stub）、钱包菜单（身份行 ready/loading/empty/needs-selection、地址复制、断开连接、桌面 popover vs 移动 sheet、Esc 焦点）、主题（浅/深即时、bootstrap 早于首绘、meta theme-color、系统深色不跟随、键盘方向键、刷新保留、切社区不回退）、对比度（token 级 13 对 + 5 页 × 2 主题真实文本扫描，最差 4.77 深色 / 4.43 浅色小字，无 <3.0 硬失败）、我的（三块、无身份 NFT 卡、地址复制、未连接、跟随 symbol）、首页四态（未连接/无身份/未选身份/空投资格）+ 已连接问候、慢 RPC loading 卡、RPC 失败错误卡 + 重试、应用目录 9 条与 4 分类分组/图标/无填充按钮/禁用态不可复现、关于（两 tab/键盘 Home End ←→/地址复制/无 explorer/数据 tab 数值/刷新回默认 tab）、深链接（/my-nft 冷启动、/apps /theme 刷新、未知路径 404 + 回首页、未知 symbol 兜底协议名、裸 `/` 补 symbol）、键盘（Tab ring、底部导航 Enter、菜单 Esc 焦点）、按钮不吸底（swap/mint/liquidity/transfer 均 `position: static` 且授权在主体之前）、回执（一笔真实转账 `0xd3fb4bed…`：唯一「知道了」、收起成成功条、离开再从应用目录回来不重弹、地址复制）、转账/转让无「不能撤回」文案、移动/桌面骨架（底部 5 tab、桌面侧栏折叠、无横向溢出）。
+- 工具坑：菜单搜索清空时内容重挂载，`getByRole('dialog')` 会短暂为 0，改用 `[role="dialog"]` + waitFor；dev server 的 CSS 由 JS 注入，深色刷新首帧 `html/body` 背景透明是 Vite dev 特性（生产 dist 的 CSS 在 head 阻塞渲染 + inline bootstrap 早于首绘，已核实不闪）。
+- 产物：`docs/product/reviews/global.md`（矩阵 104 条 + 缺陷复现步骤）；截图 `/tmp/qa-global-*.png`；脚本 `/tmp/qa-global/*.mjs`（不入仓）。
 
 ## Conclusion
 
-<!-- What got done, what got left behind -->
+- 场景 104 条（自动 101 + 人工截图复核 3）：通过 99、已验证缺陷 4 条记录 / 3 个根因（P2 ×2 同根因、P3 ×2）、怀疑未复现 1 条；级别分布 P0 0 / P1 0 / P2 2 / P3 3。
+- 最严重 3 条：① [P2] 社区菜单与钱包菜单关闭后焦点丢到 `body`（Esc 与 ✕ 都复现，`connect-pill.tsx` 的 `activeTrigger.focus()` 被 Radix 关闭聚焦覆盖）；② [P3 怀疑] 冷启动无 `?symbol=` 时字标先「LOVE20协议」约 100–200ms 再变 `TestLOVE20`；③ [P3] 关于页 390 宽完整地址换行出现孤字行。
+- 其余 1 条 P3：我的页「关于」块 label 与链接文案同为「开源文档」。
+- 未复现：应用目录禁用态与关于页「未配置」行（本构建地址簿 24 slot 全配置，只能靠 `apps-catalog` 单测覆盖）、回执右上角 ✕（与「知道了」同义，设计确认项）、关于页 tab 不入 URL（设计选择）。
+- 收尾：未改产品代码、未 git add/commit；验证链与 dev server 已停止。
 
 ## Execution Log
 

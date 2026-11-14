@@ -318,6 +318,25 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     });
   };
 
+  /**
+   * Owner 2026-11-14: every send (including the very first one after a refresh)
+   * pins the nonce read from the chain the page is watching, exactly like the
+   * recovery card's 「重新提交」 does. Letting the wallet pick the nonce is what put
+   * the first transaction behind a stale wallet nonce: the hash existed, the
+   * transaction sat in the wallet's queue with a gap, and only a resubmission
+   * carrying the on-chain nonce could mine it.
+   *
+   * A failed read falls back to undefined: the wallet assigns the nonce and the
+   * bounded watcher still turns any gap into the recovery card.
+   */
+  const pinnedNonce = async (): Promise<number | undefined> => {
+    try {
+      return await readNextNonce();
+    } catch {
+      return undefined;
+    }
+  };
+
   const submitApprove = async (
     amount: bigint,
     tokenAddress: HexAddress,
@@ -329,12 +348,13 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     setWalletAction('approve');
     submittingRef.current = true;
     try {
+      const sendNonce = nonce ?? (await pinnedNonce());
       const hash = await writeContractAsync({
         address: tokenAddress,
         abi: love20TokenAbi,
         functionName: 'approve',
         args: [router, amount],
-        ...(nonce !== undefined ? { nonce } : {}),
+        ...(sendNonce !== undefined ? { nonce: sendNonce } : {}),
       });
       setPending({ kind: 'approve', hash, amount, tokenAddress });
     } catch (cause) {
@@ -392,7 +412,8 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
       path: route.kind === 'swap' ? [...route.pathAddresses] : [],
     };
     try {
-      const hash = await writeSwapRequest(request, nonce);
+      const sendNonce = nonce ?? (await pinnedNonce());
+      const hash = await writeSwapRequest(request, sendNonce);
       const record: SwapRecord = {
         hash,
         kind: route.kind,

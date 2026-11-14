@@ -18,6 +18,7 @@ import {
   sharePercent,
 } from '@/features/liquidity-pool/lib/liquidity-math';
 import {
+  approvalNeed,
   deadlineFromNow,
   parseAmount,
   percentToBps,
@@ -55,7 +56,8 @@ const INPUT =
  * 「最多可撤出」整行删除。
  */
 export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
-  const { token, native, pool, slippagePercent, onGoAdd, isConnected } = props;
+  const { token, native, pool, slippagePercent, customSlippageError, onGoAdd, isConnected } =
+    props;
   const { address: account } = useAccount();
   const router = configuredAddress('router');
 
@@ -98,24 +100,31 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
     if (parsedLp.kind === 'too-precise') {
       return copy.liquidity.add.amountTooPrecise(parsedLp.digits);
     }
+    // QA D7：输入 0 不能只是静默禁用主按钮。
+    if (lpInput.trim().length > 0 && lpToWithdraw === 0n) return copy.liquidity.add.amountZero;
     if (lpToWithdraw > lpBalance) {
       return copy.liquidity.mine.lpTooMuch(formatTokenAmount(lpBalance, 18));
+    }
+    // QA D7：数量太小，按比例算不出可撤出的两种代币。
+    if (lpToWithdraw > 0n && (plan.amountA === 0n || plan.amountB === 0n)) {
+      return copy.liquidity.errors.amountTooSmall;
     }
     return null;
   })();
 
-  const approvedRef = useRef<string | null>(null);
+  // QA D1（P1）：授权每确认一次就无条件重读 LP 额度/余额——第二次授权后 key 不变，
+  // 只听 key 会让「确认撤出」永久禁用。
+  const approveRevisionRef = useRef(0);
   useEffect(() => {
-    if (tx.approvedKey === null || tx.approvedKey === approvedRef.current) return;
-    approvedRef.current = tx.approvedKey;
+    if (tx.approveRevision === approveRevisionRef.current) return;
+    approveRevisionRef.current = tx.approveRevision;
     refetchRef.current();
-  }, [tx.approvedKey]);
+  }, [tx.approveRevision]);
 
+  // QA D8：数量为 0 时这一笔不需要 LP 授权，不能显示成「已授权」。
+  const approval = approvalNeed(lpToWithdraw, lpAllowance.value);
   const needsApproval =
-    snapshot !== undefined &&
-    router !== undefined &&
-    lpToWithdraw > 0n &&
-    (lpAllowance.value === undefined || lpAllowance.value < lpToWithdraw);
+    snapshot !== undefined && router !== undefined && approval === 'required';
 
   const canSubmit =
     isConnected &&
@@ -126,6 +135,7 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
     plan.amountA > 0n &&
     plan.amountB > 0n &&
     lpError === null &&
+    customSlippageError === undefined &&
     !pool.isLoading &&
     !tx.receipt &&
     tx.stage === 'idle' &&
@@ -347,18 +357,25 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
           onClick={() => {
             void handleApprove();
           }}
-          disabled={!needsApproval || tx.approveStage !== 'idle' || lpError !== null}
+          disabled={
+            !needsApproval ||
+            tx.approveStage !== 'idle' ||
+            lpError !== null ||
+            customSlippageError !== undefined
+          }
           loading={tx.approveStage === 'wallet'}
         >
           {needsApproval
             ? copy.liquidity.mine.approveLp
-            : lpAllowance.value === undefined
-              ? copy.approve.loading
-              : approvalKind(lpAllowance.value) === 'unlimited'
-                ? copy.approve.longTermActive
-                : copy.approve.approved}
+            : approval === 'not-needed'
+              ? copy.approve.notNeeded
+              : lpAllowance.value === undefined
+                ? copy.approve.loading
+                : approvalKind(lpAllowance.value) === 'unlimited'
+                  ? copy.approve.longTermActive
+                  : copy.approve.approved}
         </Button>
-        {needsApproval || lpAllowance.value !== undefined ? (
+        {approval !== 'not-needed' && (needsApproval || lpAllowance.value !== undefined) ? (
           <p className="text-xs leading-5 text-muted">
             {needsApproval
               ? copy.liquidity.mine.approveLpNote
@@ -443,6 +460,7 @@ function LiquiditySettingsInline(props: MyLiquidityPanelProps) {
         </label>
         <input
           id="liquidity-withdraw-slippage-custom"
+          data-testid="liquidity-withdraw-slippage-custom"
           type="text"
           inputMode="decimal"
           autoComplete="off"
@@ -456,7 +474,12 @@ function LiquiditySettingsInline(props: MyLiquidityPanelProps) {
           {copy.liquidity.settings.customUnit}
         </span>
         {customSlippageError !== undefined ? (
-          <span className="text-[11px] text-danger-strong">{customSlippageError}</span>
+          <span
+            className="text-[11px] text-danger-strong"
+            data-testid="liquidity-withdraw-slippage-error"
+          >
+            {customSlippageError}
+          </span>
         ) : null}
       </div>
     </div>

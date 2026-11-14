@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { buttonStyles } from '@/shared/ui/button';
+import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
@@ -36,13 +36,15 @@ function StateCard({
   title,
   description,
   children,
+  testId,
 }: {
   readonly title: string;
   readonly description: string;
   readonly children: ReactNode;
+  readonly testId?: string;
 }) {
   return (
-    <Card>
+    <Card {...(testId !== undefined ? { 'data-testid': testId } : {})}>
       <CardTitle>{title}</CardTitle>
       <CardDescription>{description}</CardDescription>
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -78,12 +80,29 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
   const [slippagePercent, setSlippagePercent] = useState(DEFAULT_SLIPPAGE_PERCENT);
   const [customSlippage, setCustomSlippage] = useState(String(DEFAULT_SLIPPAGE_PERCENT));
   const [customSlippageError, setCustomSlippageError] = useState<string | undefined>(undefined);
+  /** 切社区时要清自定义代币；两个 ref 让 effect 只依赖 symbol（回调每次渲染都会变）。 */
+  const clearCustomRef = useRef(catalog.clearCustomToken);
+  const symbolRef = useRef(symbol);
+
+  useEffect(() => {
+    clearCustomRef.current = catalog.clearCustomToken;
+  });
 
   // 自定义地址解析成功后接管选择：地址输入就是「换到另一个池子」。
   /* eslint-disable react-hooks/set-state-in-effect -- resolved custom token is external chain data */
   useEffect(() => {
     if (catalog.custom.token !== undefined) setCustomToken(catalog.custom.token);
   }, [catalog.custom.token]);
+
+  // QA D5（P2）：右上角切社区后，之前选的「自定义代币」不能继续覆盖新社区——否则
+  // URL 已经是新社区、页面还是旧代币的池子，而且页内没有清除入口。symbol 一变就
+  // 清掉自定义选择（地址输入框一起清空），页面跟随社区。
+  useEffect(() => {
+    if (symbolRef.current === symbol) return;
+    symbolRef.current = symbol;
+    setCustomToken(undefined);
+    clearCustomRef.current();
+  }, [symbol]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const communityToken = useMemo((): LiquidityToken | undefined => {
@@ -102,7 +121,14 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
     };
   }, [community.address, community.decimals, community.status, community.symbol]);
 
-  const token = customToken ?? communityToken ?? catalog.communityTokens[0];
+  /**
+   * QA D4（P2）：只有社区还在解析（首屏占位）时才用目录第一个代币当占位；社区解析
+   * 完成但读不到（unknown / error）时不能拿 TestLOVE20 顶替，要显示「读不到这个社区」。
+   */
+  const token =
+    customToken ??
+    communityToken ??
+    (community.status === 'loading' ? catalog.communityTokens[0] : undefined);
   const native = catalog.nativeToken;
 
   const pool = usePoolState({
@@ -177,83 +203,95 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
       ) : null}
 
       {token === undefined ? (
-        <StateCard
-          title={copy.liquidity.states.readFailed}
-          description={copy.liquidity.add.quoteErrorBody}
-        >
-          <button
-            type="button"
-            className={buttonStyles('secondary', 'md')}
-            onClick={() => catalog.custom.retry()}
-          >
-            {copy.liquidity.states.retry}
-          </button>
-        </StateCard>
-      ) : tab === 'add' ? (
-        !isConnected ? (
+        community.status === 'unknown' || community.status === 'error' ? (
           <StateCard
-            title={copy.liquidity.states.connectTitle}
-            description={copy.liquidity.states.connectBody}
+            testId="liquidity-community-unknown"
+            title={copy.liquidity.states.communityUnknownTitle}
+            description={copy.liquidity.states.communityUnknownBody}
           >
-            {connectAction}
-          </StateCard>
-        ) : isWrongChain ? (
-          <StateCard
-            title={copy.liquidity.states.wrongChainTitle}
-            description={copy.liquidity.states.wrongChainBody}
-          >
-            {connectAction}
+            <Button
+              variant="secondary"
+              size="md"
+              data-testid="liquidity-community-retry"
+              onClick={() => community.refetch()}
+            >
+              {copy.liquidity.states.retry}
+            </Button>
           </StateCard>
         ) : (
-          <AddLiquidityPanel
-            token={token}
-            wrapped={catalog.wrappedToken}
-            native={native}
-            pool={pool}
-            slippagePercent={slippagePercent}
-            customSlippage={customSlippage}
-            customSlippageError={customSlippageError}
-            onSelectSlippagePreset={handleSelectPreset}
-            onCustomSlippageChange={handleCustomSlippage}
-            isConnected={isConnected}
-          />
+          <StateCard
+            title={copy.liquidity.states.readFailed}
+            description={copy.liquidity.add.quoteErrorBody}
+          >
+            <button
+              type="button"
+              className={buttonStyles('secondary', 'md')}
+              onClick={() => catalog.custom.retry()}
+            >
+              {copy.liquidity.states.retry}
+            </button>
+          </StateCard>
         )
-      ) : tab === 'mine' ? (
-        !isConnected ? (
-          <StateCard
-            title={copy.liquidity.states.connectTitle}
-            description={copy.liquidity.states.connectBody}
-          >
-            {connectAction}
-          </StateCard>
-        ) : isWrongChain ? (
-          <StateCard
-            title={copy.liquidity.states.wrongChainTitle}
-            description={copy.liquidity.states.wrongChainBody}
-          >
-            {connectAction}
-          </StateCard>
+      ) : !isConnected || isWrongChain ? (
+        tab === 'query' ? (
+          <PoolQueryPanel token={token} native={native} pool={pool} onGoAdd={() => setTab('add')} />
         ) : (
-          <MyLiquidityPanel
-            token={token}
-            native={native}
-            pool={pool}
-            slippagePercent={slippagePercent}
-            customSlippage={customSlippage}
-            customSlippageError={customSlippageError}
-            onSelectSlippagePreset={handleSelectPreset}
-            onCustomSlippageChange={handleCustomSlippage}
-            onGoAdd={() => setTab('add')}
-            isConnected={isConnected}
-          />
+          <StateCard
+            title={
+              isWrongChain
+                ? copy.liquidity.states.wrongChainTitle
+                : copy.liquidity.states.connectTitle
+            }
+            description={
+              isWrongChain
+                ? copy.liquidity.states.wrongChainBody
+                : copy.liquidity.states.connectBody
+            }
+          >
+            {connectAction}
+          </StateCard>
         )
       ) : (
-        <PoolQueryPanel
-          token={token}
-          native={native}
-          pool={pool}
-          onGoAdd={() => setTab('add')}
-        />
+        /* QA D10（P3）：三个页签的面板常驻（非活动页签用 hidden 隐藏），页签来回切换
+           不再清空已填金额、展开的详情与智能模式状态；写链状态也只在面板内保留。 */
+        <>
+          <div hidden={tab !== 'add'}>
+            <AddLiquidityPanel
+              token={token}
+              wrapped={catalog.wrappedToken}
+              native={native}
+              pool={pool}
+              slippagePercent={slippagePercent}
+              customSlippage={customSlippage}
+              customSlippageError={customSlippageError}
+              onSelectSlippagePreset={handleSelectPreset}
+              onCustomSlippageChange={handleCustomSlippage}
+              isConnected={isConnected}
+            />
+          </div>
+          <div hidden={tab !== 'mine'}>
+            <MyLiquidityPanel
+              token={token}
+              native={native}
+              pool={pool}
+              slippagePercent={slippagePercent}
+              customSlippage={customSlippage}
+              customSlippageError={customSlippageError}
+              onSelectSlippagePreset={handleSelectPreset}
+              onCustomSlippageChange={handleCustomSlippage}
+              onGoAdd={() => setTab('add')}
+              isConnected={isConnected}
+            />
+          </div>
+          <div hidden={tab !== 'query'}>
+            <PoolQueryPanel
+              token={token}
+              native={native}
+              pool={pool}
+              onGoAdd={() => setTab('add')}
+            />
+          </div>
+        </>
       )}
 
       {hub === undefined ? (

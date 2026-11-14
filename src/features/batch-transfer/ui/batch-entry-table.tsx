@@ -1,6 +1,8 @@
 import { copy } from '@/shared/config/copy-pages';
-import { formatTokenAmount } from '@/shared/lib/format';
+import { formatVisibleTokenAmount } from '@/shared/lib/format';
+import { Button } from '@/shared/ui/button';
 import { CopyableAddress } from '@/shared/ui/copyable-address';
+import { RefreshCw } from '@/shared/ui/icons';
 import { Skeleton } from '@/shared/ui/skeleton';
 import type { BatchParsedRow } from '@/features/batch-transfer/lib/batch-parse';
 
@@ -14,6 +16,8 @@ export interface BatchEntryTableProps {
   readonly decimals: number;
   readonly loading: boolean;
   readonly error: boolean;
+  /** D6: read failures are recoverable — the table offers a re-read action. */
+  readonly onRetry?: (() => void) | undefined;
 }
 
 /**
@@ -32,6 +36,7 @@ export function BatchEntryTable({
   decimals,
   loading,
   error,
+  onRetry,
 }: BatchEntryTableProps) {
   if (rows.length === 0) return null;
 
@@ -75,7 +80,7 @@ export function BatchEntryTable({
                   className="truncate text-right font-mono text-[11px] text-foreground"
                   data-testid={`batch-transfer-row-amount-${index}`}
                 >
-                  {`${formatTokenAmount(row.amount, decimals)} ${symbol}`}
+                  {`${formatVisibleTokenAmount(row.amount, decimals)} ${symbol}`}
                 </span>
                 <span
                   className="truncate text-right font-mono text-[11px] text-muted"
@@ -85,7 +90,7 @@ export function BatchEntryTable({
                     ? copy.batchTransfer.deltaUnknown
                     : error && balance === undefined
                       ? copy.batchTransfer.deltaUnknown
-                      : formatTokenAmount(balance, decimals)}
+                      : formatVisibleTokenAmount(balance, decimals)}
                 </span>
               </li>
             );
@@ -93,9 +98,22 @@ export function BatchEntryTable({
         </ul>
       </div>
       {error ? (
-        <p className="mt-1.5 text-[11px] leading-4 text-muted">
-          {copy.batchTransfer.preBalanceError}
-        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <p className="min-w-0 text-[11px] leading-4 text-muted">
+            {copy.batchTransfer.preBalanceError}
+          </p>
+          {onRetry !== undefined ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              data-testid="batch-transfer-rows-retry"
+              onClick={onRetry}
+              leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
+            >
+              {copy.batchTransfer.retry}
+            </Button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

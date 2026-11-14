@@ -20,10 +20,7 @@ const SYMBOL = 'TestLOVE20';
 const QUERY = `?symbol=${SYMBOL}`;
 
 const deployment = JSON.parse(
-  readFileSync(
-    resolve(process.cwd(), 'src/config/deployments/anvil31337_dev.json'),
-    'utf8',
-  ),
+  readFileSync(resolve(process.cwd(), 'src/config/deployments/anvil31337_dev.json'), 'utf8'),
 ) as {
   brand: { docsUrl: string };
   addresses: { memberNFT: string; airdropDistributor: string; multicall3: string };
@@ -79,11 +76,34 @@ test.describe('关于页', () => {
     await expect(page.getByTestId('about-address-airdropDistributor')).toContainText(
       deployment.addresses.airdropDistributor,
     );
-    await expect(page.getByTestId('about-address-airdropDistributor')).toContainText(
-      '空投分发器',
-    );
+    await expect(page.getByTestId('about-address-airdropDistributor')).toContainText('空投分发器');
     // anvil has no block explorer, so no explorer link may be rendered.
     await expect(page.getByRole('link', { name: /在区块浏览器查看/ })).toHaveCount(0);
+
+    // QA 2026-11-14 B7: at 390 the full address must not wrap into a last line
+    // holding a single character (the old `break-all` left `8` alone on line 2).
+    const memberNftButton = page.getByTestId('about-copy-memberNFT');
+    // 0x + 40 hex chars, soft break opportunities every 4 characters.
+    await expect(memberNftButton.locator('wbr')).toHaveCount(10);
+    const lineWidths = await memberNftButton
+      .locator('span')
+      .first()
+      .evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const lines = new Map<number, number>();
+        for (const rect of range.getClientRects()) {
+          if (rect.width <= 0.5) continue;
+          const top = Math.round(rect.top);
+          lines.set(top, (lines.get(top) ?? 0) + rect.width);
+        }
+        return [...lines.values()];
+      });
+    expect(lineWidths.length).toBeGreaterThan(0);
+    // At most two lines, and each line holds at least a full 4-char group (~26px):
+    // no single-character orphan line.
+    expect(lineWidths.length).toBeLessThanOrEqual(2);
+    expect(Math.min(...lineWidths)).toBeGreaterThan(20);
 
     // Copy button gives immediate feedback in place.
     const copyButton = page.getByTestId('about-copy-memberNFT');
@@ -99,10 +119,9 @@ test.describe('关于页', () => {
     await expect(page.getByTestId('about-member-nft-total-supply')).toHaveText(/^[0-9,]+$/, {
       timeout: 15_000,
     });
-    await expect(page.getByTestId('about-community-total-supply')).toHaveText(
-      /^[0-9,]+ .+$/,
-      { timeout: 15_000 },
-    );
+    await expect(page.getByTestId('about-community-total-supply')).toHaveText(/^[0-9,]+ .+$/, {
+      timeout: 15_000,
+    });
     await expect(page.getByTestId('about-current-phase')).toHaveText(/^[0-9,]+$/, {
       timeout: 15_000,
     });

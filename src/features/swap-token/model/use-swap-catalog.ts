@@ -179,9 +179,14 @@ export function useSwapCatalog(launchAddress: HexAddress | undefined): SwapCatal
     return metadata.isLoading ? 'loading' : 'empty';
   })();
 
+  // wagmi's readContracts resolves with per-call `{status: 'failure'}` entries when
+  // the transport itself fails, so a dead RPC shows up in `data`, not `isError`.
+  // Without this check the page would mistake "network unreachable" for "no tokens"
+  // (代币授权 D3).
   const isError =
     pages.isError ||
     metadata.isError ||
+    pages.data?.some((entry) => entry.status === 'failure') === true ||
     metadata.data?.some((entry) => entry.status === 'failure') === true;
 
   return {

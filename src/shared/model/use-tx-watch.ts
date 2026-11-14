@@ -97,16 +97,23 @@ async function readTx(
   }
 }
 
-async function readWalletNonce(
+interface WalletNonces {
+  /** Mined-transaction count: drives the replacement check. */
+  readonly latest: number | undefined;
+  /** Pool-aware count: tells a real nonce gap from a transaction queued behind one. */
+  readonly pending: number | undefined;
+}
+
+async function readWalletNonces(
   client: NonNullable<ReturnType<typeof usePublicClient>>,
   wallet: HexAddress | undefined,
-): Promise<number | undefined> {
-  if (wallet === undefined) return undefined;
-  try {
-    return await client.getTransactionCount({ address: wallet, blockTag: 'latest' });
-  } catch {
-    return undefined;
-  }
+): Promise<WalletNonces> {
+  if (wallet === undefined) return { latest: undefined, pending: undefined };
+  const [latest, pending] = await Promise.all([
+    client.getTransactionCount({ address: wallet, blockTag: 'latest' }).catch(() => undefined),
+    client.getTransactionCount({ address: wallet, blockTag: 'pending' }).catch(() => undefined),
+  ]);
+  return { latest, pending };
 }
 
 /**
@@ -200,11 +207,12 @@ export function useTxWatch(options: UseTxWatchOptions): TxWatch {
     };
 
     const observe = async (): Promise<void> => {
-      const [receipt, tx, walletNonce] = await Promise.all([
+      const [receipt, tx, walletNonces] = await Promise.all([
         readReceipt(client, hash),
         readTx(client, hash),
-        readWalletNonce(client, wallet),
+        readWalletNonces(client, wallet),
       ]);
+      const walletNonce = walletNonces.latest;
       if (cancelled) return;
       if (tx !== null && tx !== undefined) knownNonce = tx.nonce;
 
@@ -226,6 +234,7 @@ export function useTxWatch(options: UseTxWatchOptions): TxWatch {
         receipt: receipt === null ? null : { status: receipt.status },
         tx,
         walletNonce,
+        walletPendingNonce: walletNonces.pending,
         replacementHash,
       };
       if (receipt !== null) setReceiptForHash({ hash, receipt });

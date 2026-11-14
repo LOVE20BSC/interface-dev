@@ -5,7 +5,7 @@ import { AlertTriangle, Check, RefreshCw } from '@/shared/ui/icons';
 import { NETWORK, configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { formatAmount, formatTokenAmount } from '@/shared/lib/format';
+import { formatAmount, formatVisibleTokenAmount } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -24,8 +24,13 @@ import {
   parseBatchGas,
 } from '@/features/batch-transfer/lib/batch-gas';
 import { buildBatchReceipt, type BatchReceiptRecord } from '@/features/batch-transfer/lib/batch-receipt';
+import {
+  allowanceReadState,
+  balanceLineState,
+  balanceReadBlocksSubmit,
+} from '@/features/batch-transfer/lib/batch-read-state';
 import type { BatchMode, BatchRequest } from '@/features/batch-transfer/lib/batch-types';
-import { useBatchAllowance } from '@/features/batch-transfer/model/use-batch-allowance';
+import { useBatchAllowance, useBatchAllowanceReader } from '@/features/batch-transfer/model/use-batch-allowance';
 import {
   useBatchAddresses,
   useBatchBalanceReader,
@@ -62,6 +67,33 @@ function StateCard({
         {children}
       </div>
     </Card>
+  );
+}
+
+/**
+ * Read failures are recoverable (D6): every degraded state offers the same
+ * 「重新读取」 action instead of forcing a full page reload.
+ */
+function RetryButton({
+  onClick,
+  testId,
+  className,
+}: {
+  readonly onClick: () => void;
+  readonly testId: string;
+  readonly className?: string;
+}) {
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      className={className}
+      data-testid={testId}
+      onClick={onClick}
+      leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
+    >
+      {copy.batchTransfer.retry}
+    </Button>
   );
 }
 
@@ -133,6 +165,7 @@ export function BatchTransferPanel({
     ready,
   );
   const readBalances = useBatchBalanceReader();
+  const readAllowance = useBatchAllowanceReader();
 
   const gasParsed = parseBatchGas(gasInput);
   const gasValue =
@@ -170,16 +203,37 @@ export function BatchTransferPanel({
     parse.total > 0n && available !== undefined && parse.total > available;
   const shortfall = insufficient && available !== undefined ? parse.total - available : undefined;
 
-  const needsApproval =
-    mode === 'token' &&
-    allowance.value !== undefined &&
-    parse.total > 0n &&
-    allowance.value < parse.total;
-  const allowanceUnavailable = mode === 'token' && allowance.value === undefined;
+  // D2: an unread allowance is its own state; only a real value may say
+  // 「已足够」 or 「需要授权」.
+  const allowanceState = allowanceReadState({
+    mode,
+    total: parse.total,
+    allowance: allowance.value,
+    isLoading: allowance.isLoading,
+  });
+  const needsApproval = allowanceState === 'need';
+  const allowanceUnavailable = allowanceState === 'unknown';
   const longTermApproved =
     mode === 'token' &&
     allowance.value !== undefined &&
     approvalKind(allowance.value) === 'unlimited';
+  /**
+   * D8: the sender balance is unknown while the batch is non-empty — the page
+   * cannot tell whether the batch is affordable, so it must not let it through.
+   */
+  const balanceUnknown = balanceReadBlocksSubmit(
+    parse.total,
+    balance.balance,
+    balance.isLoading,
+  );
+  /** D9: token mode with no resolved token must not label a native balance. */
+  const tokenUnresolved = balanceLineState({
+    mode,
+    tokenResolved: token !== undefined,
+    isLoading: balance.isLoading,
+    isError: balance.isError,
+    balance: balance.balance,
+  }) === 'unknownToken';
 
   const tx = useBatchTransaction({
     onApproved: () => {
@@ -195,7 +249,13 @@ export function BatchTransferPanel({
           batchTransfer,
           request.rows.map((row) => row.address),
         );
-        setReceipt(buildBatchReceipt(hash, request, post));
+        // D7: read the allowance again after mining so a smaller-than-approved
+        // batch shows the residual approval instead of hiding it.
+        const residualAllowance =
+          request.mode === 'token'
+            ? await readAllowance(request.tokenAddress, account, batchTransfer)
+            : undefined;
+        setReceipt(buildBatchReceipt(hash, request, post, residualAllowance));
         setFinalizing(false);
         balance.refetch();
         allowance.refetch();
@@ -211,7 +271,14 @@ export function BatchTransferPanel({
   // 重复地址不合并也不提交：解析器已排除重复行，这里把「有重复」也算进不可提交条件。
   const rowsValid =
     parse.rows.length > 0 && parse.errors.length === 0 && parse.duplicates.length === 0;
-  const baseValid = ready && !busy && rowsValid && !insufficient && gasOk;
+  const baseValid =
+    ready &&
+    !busy &&
+    rowsValid &&
+    !insufficient &&
+    !balanceUnknown &&
+    !tokenUnresolved &&
+    gasOk;
 
   const canApprove = baseValid && needsApproval && token?.address !== undefined;
   const canBatch =
@@ -252,6 +319,11 @@ export function BatchTransferPanel({
       String(next === 'native' ? BATCH_GAS_DEFAULT_NATIVE : BATCH_GAS_DEFAULT_TOKEN),
     );
     tx.clearError();
+    // D6: switching asset family re-enables the read hooks; refetch explicitly so
+    // a transient read failure recovers without a full page reload.
+    balance.refetch();
+    allowance.refetch();
+    recipientBalances.refetch();
   };
 
   const resetInputs = () => {
@@ -291,11 +363,27 @@ export function BatchTransferPanel({
     });
   }
 
-  const balanceText = balance.isLoading
-    ? copy.batchTransfer.balanceLoading
-    : balance.isError
-      ? copy.batchTransfer.balanceError
-      : `${copy.batchTransfer.balanceLabel(symbol)} ${formatTokenAmount(balance.balance, decimals)}`;
+  const balanceState = balanceLineState({
+    mode,
+    tokenResolved: token !== undefined,
+    isLoading: balance.isLoading,
+    isError: balance.isError,
+    balance: balance.balance,
+  });
+  const balanceText = (() => {
+    switch (balanceState) {
+      case 'unknownToken':
+        // D9: 「代币」模式还没解析出代币时，不能回落原生币符号写成「ETH 余额 —」。
+        return copy.batchTransfer.tokenBalanceUnreadable;
+      case 'loading':
+        return copy.batchTransfer.balanceLoading;
+      case 'error':
+        return copy.batchTransfer.balanceError;
+      default:
+        return `${copy.batchTransfer.balanceLabel(symbol)} ${formatVisibleTokenAmount(balance.balance, decimals)}`;
+    }
+  })();
+  const showBalanceRetry = balanceState === 'error';
 
   const txError = tx.error;
   const recoveryAction =
@@ -330,6 +418,21 @@ export function BatchTransferPanel({
     );
   }
 
+  // D11: an injected wallet that is already on another chain must land on the
+  // network-wrong state on first paint, not on the 「连接钱包」 card.
+  if (isWrongChain) {
+    return (
+      <StateCard
+        title={copy.batchTransfer.states.wrongChainTitle}
+        description={copy.batchTransfer.states.wrongChainBody}
+      >
+        <Link to="/" className={buttonStyles('ghost', 'md', 'w-full sm:w-auto')}>
+          {copy.batchTransfer.states.backHome}
+        </Link>
+      </StateCard>
+    );
+  }
+
   if (!isConnected) {
     return (
       <StateCard
@@ -337,16 +440,6 @@ export function BatchTransferPanel({
         description={copy.batchTransfer.states.connectBody}
       >
         <div className="[&>button]:w-full sm:[&>button]:w-auto">{connectAction}</div>
-      </StateCard>
-    );
-  }
-
-  if (isWrongChain) {
-    return (
-      <StateCard description={copy.batchTransfer.states.wrongChainBody}>
-        <Link to="/" className={buttonStyles('ghost', 'md', 'w-full sm:w-auto')}>
-          {copy.batchTransfer.states.backHome}
-        </Link>
       </StateCard>
     );
   }
@@ -394,7 +487,7 @@ export function BatchTransferPanel({
             data-testid="batch-transfer-success-strip-amount"
           >
             {copy.batchTransfer.stripAmount(
-              `${formatTokenAmount(lastReceipt.total, lastReceipt.decimals)} ${lastReceipt.symbol}`,
+              `${formatVisibleTokenAmount(lastReceipt.total, lastReceipt.decimals)} ${lastReceipt.symbol}`,
             )}
           </p>
         </div>
@@ -481,6 +574,26 @@ export function BatchTransferPanel({
             </span>
             <span className="shrink-0">{copy.batchTransfer.amountDecimals(decimals)}</span>
           </div>
+          {balanceUnknown && !balance.isLoading ? (
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p
+                className="text-[11px] leading-4 text-warning"
+                data-testid="batch-transfer-balance-unknown"
+              >
+                {copy.batchTransfer.balanceUnknown}
+              </p>
+              <RetryButton
+                testId="batch-transfer-balance-retry"
+                onClick={balance.refetch}
+              />
+            </div>
+          ) : showBalanceRetry ? (
+            <RetryButton
+              className="mt-1"
+              testId="batch-transfer-balance-retry"
+              onClick={balance.refetch}
+            />
+          ) : null}
         </div>
 
         {/* 区块 2：收款清单（逐行错误、重复提示就地显示） */}
@@ -561,7 +674,7 @@ export function BatchTransferPanel({
               className="text-sm font-semibold text-foreground"
               data-testid="batch-transfer-total"
             >
-              {`${copy.batchTransfer.totalLabel} ${formatTokenAmount(parse.total, decimals)} ${symbol}`}
+              {`${copy.batchTransfer.totalLabel} ${formatVisibleTokenAmount(parse.total, decimals)} ${symbol}`}
             </span>
           </div>
           <p className="mt-1 text-[11px] leading-4 text-muted">{copy.batchTransfer.atomicNote}</p>
@@ -570,7 +683,7 @@ export function BatchTransferPanel({
               className="mt-1.5 text-xs leading-5 text-danger-strong"
               data-testid="batch-transfer-insufficient"
             >
-              {copy.batchTransfer.insufficient(symbol, formatTokenAmount(shortfall, decimals))}
+              {copy.batchTransfer.insufficient(symbol, formatVisibleTokenAmount(shortfall, decimals))}
             </p>
           ) : null}
           {mode === 'native' && insufficient ? (
@@ -597,23 +710,44 @@ export function BatchTransferPanel({
         {mode === 'token' ? (
           <div className="rounded-2xl border border-line bg-elevated/60 p-3 text-xs leading-5">
             <p className="text-muted" data-testid="batch-transfer-allowance">
-              {allowance.isLoading
+              {allowanceState === 'loading'
                 ? copy.batchTransfer.allowanceLoading
                 : allowance.value !== undefined && token !== undefined
                   ? longTermApproved
                     ? copy.batchTransfer.allowanceLongTerm(
-                        formatTokenAmount(parse.total, decimals),
+                        formatVisibleTokenAmount(parse.total, decimals),
                         symbol,
                       )
                     : copy.batchTransfer.allowanceLine(
-                        formatTokenAmount(allowance.value, decimals),
-                        formatTokenAmount(parse.total, decimals),
+                        formatVisibleTokenAmount(allowance.value, decimals),
+                        formatVisibleTokenAmount(parse.total, decimals),
                         symbol,
                       )
-                  : copy.batchTransfer.allowanceError}
+                  : tokenUnresolved
+                    ? copy.batchTransfer.tokenBalanceUnreadable
+                    : copy.batchTransfer.allowanceError}
             </p>
-            {parse.total > 0n ? (
-              <p className={cn('mt-1', needsApproval ? 'text-warning' : 'text-muted')}>
+            {allowanceState === 'unknown' && !tokenUnresolved ? (
+              // D2: unknown allowance is its own state — never 「已足够」/「需要授权」.
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <p
+                  className="min-w-0 text-warning"
+                  data-testid="batch-transfer-allowance-state"
+                  data-state="unknown"
+                >
+                  {copy.batchTransfer.allowanceUnknown}
+                </p>
+                <RetryButton
+                  testId="batch-transfer-allowance-retry"
+                  onClick={allowance.refetch}
+                />
+              </div>
+            ) : parse.total > 0n && allowance.value !== undefined ? (
+              <p
+                className={cn('mt-1', needsApproval ? 'text-warning' : 'text-muted')}
+                data-testid="batch-transfer-allowance-state"
+                data-state={needsApproval ? 'need' : 'ready'}
+              >
                 {needsApproval
                   ? copy.batchTransfer.allowanceNeed
                   : copy.batchTransfer.allowanceReady}
@@ -718,6 +852,7 @@ export function BatchTransferPanel({
         decimals={decimals}
         loading={recipientBalances.isLoading}
         error={recipientBalances.isError}
+        onRetry={recipientBalances.refetch}
       />
     </div>
   );

@@ -52,7 +52,12 @@ export interface LiquidityTransactionState {
   readonly stage: LiquidityStage;
   readonly approveStage: LiquidityStage;
   readonly approveHash: `0x${string}` | null;
-  readonly approvedKey: string | null;
+  /**
+   * 每成功确认一次授权就 +1。调用方据此**无条件重读 allowance**：
+   * 同一个 token+spender 的第二次授权不会再改变任何 key，只听 key 变化会让页面
+   * 停在「授权…」、主按钮永久禁用（QA D1/P1）。
+   */
+  readonly approveRevision: number;
   readonly receipt: LiquidityReceipt | null;
   readonly error: LiquidityTxError | null;
   readonly watch: TxWatch;
@@ -62,10 +67,6 @@ export interface LiquidityTransactionState {
   readonly resubmit: () => void;
   readonly clearReceipt: () => void;
   readonly clearError: () => void;
-}
-
-export function approveKey(request: Pick<ApproveRequest, 'tokenAddress' | 'spender'>): string {
-  return `${request.tokenAddress.toLowerCase()}:${request.spender.toLowerCase()}`;
 }
 
 type PendingApprove = {
@@ -88,7 +89,7 @@ export function useLiquidityTransaction(onConfirmed: () => void): LiquidityTrans
   const [pendingMain, setPendingMain] = useState<PendingMain | null>(null);
   const [approveWalletAction, setApproveWalletAction] = useState(false);
   const [mainWalletAction, setMainWalletAction] = useState(false);
-  const [approvedKeyValue, setApprovedKeyValue] = useState<string | null>(null);
+  const [approveRevision, setApproveRevision] = useState(0);
   const [receipt, setReceipt] = useState<LiquidityReceipt | null>(null);
   const [error, setError] = useState<LiquidityTxError | null>(null);
   const submittingRef = useRef(false);
@@ -123,7 +124,7 @@ export function useLiquidityTransaction(onConfirmed: () => void): LiquidityTrans
       setError({ message: copy.liquidity.errors.reverted });
       return;
     }
-    setApprovedKeyValue(approveKey(pendingApprove.request));
+    setApproveRevision((current) => current + 1);
     setPendingApprove(null);
     setError(null);
   }, [approveReceipt, pendingApprove]);
@@ -240,7 +241,7 @@ export function useLiquidityTransaction(onConfirmed: () => void): LiquidityTrans
     stage: mainStage,
     approveStage,
     approveHash: pendingApprove?.hash ?? null,
-    approvedKey: approvedKeyValue,
+    approveRevision,
     receipt,
     error,
     watch,

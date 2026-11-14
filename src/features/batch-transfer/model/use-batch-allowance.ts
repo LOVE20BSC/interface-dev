@@ -1,4 +1,5 @@
-import { useReadContract } from 'wagmi';
+import { useCallback } from 'react';
+import { usePublicClient, useReadContract } from 'wagmi';
 import { love20TokenAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 
@@ -45,4 +46,39 @@ export function useBatchAllowance(
       void read.refetch();
     },
   };
+}
+
+export type BatchAllowanceReader = (
+  tokenAddress: HexAddress | undefined,
+  owner: HexAddress | undefined,
+  spender: HexAddress | undefined,
+) => Promise<bigint | undefined>;
+
+/**
+ * Imperative allowance read used once a batch is mined: the receipt needs to
+ * know whether the on-chain allowance still has a remainder (D7 — approving the
+ * original total then submitting a smaller list leaves a residual approval).
+ * `undefined` means "could not read", never 0.
+ */
+export function useBatchAllowanceReader(): BatchAllowanceReader {
+  const client = usePublicClient();
+  return useCallback<BatchAllowanceReader>(
+    async (tokenAddress, owner, spender) => {
+      if (client === undefined || tokenAddress === undefined || owner === undefined) {
+        return undefined;
+      }
+      if (spender === undefined) return undefined;
+      try {
+        return await client.readContract({
+          address: tokenAddress,
+          abi: love20TokenAbi,
+          functionName: 'allowance',
+          args: [owner, spender],
+        });
+      } catch {
+        return undefined;
+      }
+    },
+    [client],
+  );
 }

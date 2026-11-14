@@ -21,6 +21,7 @@ import {
   percentToBps,
   priceImpactBps,
 } from '@/features/swap-token/lib/swap-amount';
+import { swapBalanceLine } from '@/features/swap-token/lib/swap-balance-line';
 import {
   selectSwapReceiptView,
   swapPostDismiss,
@@ -37,6 +38,7 @@ import { useWrappedNative } from '@/features/swap-token/model/use-wrapped-native
 import { SwapInfo } from '@/features/swap-token/ui/swap-info';
 import { SwapReceipt } from '@/features/swap-token/ui/swap-receipt';
 import { TokenSelect } from '@/features/swap-token/ui/token-select';
+import type { SwapRecord } from '@/features/swap-token/lib/swap-receipt-record';
 import type { SwapToken } from '@/features/swap-token/lib/swap-types';
 
 export interface SwapTokenPanelProps {
@@ -168,6 +170,12 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     configured && isConnected && !isWrongChain ? from : undefined,
     router,
   );
+  // Owner 2026-11-14: 「到：这个代币，也应该显示余额」 — same read as the 从 side,
+  // same balance line rules (see swap-balance-line.ts).
+  const toBalance = useSwapBalance(
+    configured && isConnected && !isWrongChain ? to : undefined,
+    router,
+  );
   const tx = useSwapTransaction({
     router,
     wrappedAddress: wrapped.address,
@@ -176,7 +184,9 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     route,
     nativeSymbol: NETWORK.nativeCurrency.symbol,
     onConfirmed: () => {
+      // Both sides move: the input leaves and the output arrives.
       balance.refetch();
+      toBalance.refetch();
       routeState.retry();
     },
   });
@@ -261,6 +271,10 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
 
   const [dismissedReceiptHash, setDismissedReceiptHash] = useState<string | null>(null);
   const receiptView = selectSwapReceiptView(tx.receipt, from, to, dismissedReceiptHash);
+  // The collapsed receipt keeps only what the success strip renders. The hook's
+  // `receipt` must be cleared: it is also the submit guard, so keeping it was the
+  // 「完成一次兑换后再点兑换没反应」 bug (owner 2026-11-14).
+  const [dismissedRecord, setDismissedRecord] = useState<SwapRecord | null>(null);
 
   const resetInput = () => {
     setAmountInput('');
@@ -270,11 +284,16 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     setUsedNativeMax(false);
   };
 
-  // 知道了: collapse the receipt into the success strip, keep the form reset.
+  // 知道了: collapse the receipt into the success strip, keep the form reset, and
+  // release every send guard (pending / receipt / approval) so the very next 兑换
+  // really submits a second transaction.
   const dismissReceipt = () => {
-    if (tx.receipt === null) return;
-    setDismissedReceiptHash(tx.receipt.hash);
+    const record = tx.receipt;
+    if (record === null) return;
+    setDismissedRecord(record);
+    setDismissedReceiptHash(record.hash);
     resetInput();
+    tx.clearReceipt();
   };
 
   const handleSelect = (side: 'from' | 'to', token: SwapToken) => {
@@ -480,9 +499,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
   }
 
   if (receiptView === 'receipt' && tx.receipt !== null) {
-    return (
-      <SwapReceipt record={tx.receipt} onDismiss={dismissReceipt} />
-    );
+    return <SwapReceipt record={tx.receipt} onDismiss={dismissReceipt} />;
   }
 
   if (screen === 'resolving' || tx.isHydrating || pair.status === 'loading') {
@@ -547,6 +564,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
         <TokenSelect
           side={side}
           selected={side === 'from' ? from : to}
+          otherSelected={side === 'from' ? to : from}
           {...selectorProps}
           onSelect={(token) => handleSelect(side, token)}
           triggerLabel={copy.swap.states.chooseToken}
@@ -571,6 +589,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
         <TokenSelect
           side="to"
           selected={to}
+          otherSelected={from}
           {...selectorProps}
           onSelect={(token) => handleSelect('to', token)}
           triggerLabel={copy.swap.states.changeToken}
@@ -599,6 +618,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
         <TokenSelect
           side="to"
           selected={to}
+          otherSelected={from}
           {...selectorProps}
           onSelect={(token) => handleSelect('to', token)}
           triggerLabel={copy.swap.states.changeToken}
@@ -642,7 +662,11 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
   const balanceText =
     balance.balance === undefined
       ? copy.swap.balanceLoading
-      : `${copy.swap.balanceLabel(from.symbol)} ${formatTokenAmount(balance.balance, fromDecimals)}`;
+      : swapBalanceLine(from.symbol, balance.balance, fromDecimals);
+  const toBalanceText =
+    toBalance.balance === undefined
+      ? copy.swap.balanceLoading
+      : swapBalanceLine(to.symbol, toBalance.balance, toDecimals);
   const outText =
     quoteOut !== undefined && toDecimals !== undefined
       ? `${formatTokenAmount(quoteOut, toDecimals)} ${to.symbol}`
@@ -676,8 +700,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     setSubmitError(null);
   };
 
-  const dismissedSwap =
-    receiptView === 'dismissed' && tx.receipt !== null ? swapPostDismiss(tx.receipt) : null;
+  const dismissedSwap = dismissedRecord !== null ? swapPostDismiss(dismissedRecord) : null;
 
   return (
     <div className="space-y-4">
@@ -700,6 +723,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
             <TokenSelect
               side="from"
               selected={from}
+              otherSelected={to}
               {...selectorProps}
               onSelect={(token) => handleSelect('from', token)}
             />
@@ -785,6 +809,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
             <TokenSelect
               side="to"
               selected={to}
+              otherSelected={from}
               {...selectorProps}
               onSelect={(token) => handleSelect('to', token)}
             />
@@ -801,6 +826,20 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
                 <Skeleton className="ml-auto h-7 w-32" />
               ) : (
                 outText
+              )}
+            </span>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+            <span
+              className="flex items-center gap-1.5 text-xs leading-5 text-muted"
+              data-testid="swap-to-balance"
+            >
+              {toBalance.isLoading ? (
+                <Skeleton className="h-3.5 w-28" />
+              ) : toBalance.isError ? (
+                copy.home.balanceError
+              ) : (
+                toBalanceText
               )}
             </span>
           </div>

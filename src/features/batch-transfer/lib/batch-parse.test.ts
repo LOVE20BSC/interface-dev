@@ -135,4 +135,46 @@ describe('parseBatchText', () => {
     expect(result.duplicates).toEqual([{ line: 3, firstLine: 1 }]);
     expect(result.rows).toHaveLength(1);
   });
+
+  // D4: 千分位金额是常见粘贴格式，逗号同时是分隔符，不能只报「这一行看不懂」。
+  it('accepts thousands-separated amounts instead of splitting them into junk tokens', () => {
+    const result = parseBatchText(`${A} 1,000\n${B} 2,500.5\n${C} 1,000,000.25`, OPTIONS);
+
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => row.amount)).toEqual([
+      1000000000000000000000n,
+      2500500000000000000000n,
+      1000000250000000000000000n,
+    ]);
+  });
+
+  it('still rejects a line whose extra tokens are not a thousands group', () => {
+    const result = parseBatchText(`${A} 0.1 0.2`, OPTIONS);
+
+    expect(result.errors).toEqual([{ line: 1, reason: 'invalidLine' }]);
+    expect(result.rows).toEqual([]);
+  });
+
+  // D5: 非零金额被精度截断成 0 时说明原因，而不是笼统的「金额必须大于 0」。
+  it('explains a non-zero amount truncated to zero by the token precision', () => {
+    const result = parseBatchText(`${A} 0.0000000000000000009\n${B} 0`, OPTIONS);
+
+    expect(result.errors).toEqual([
+      { line: 1, reason: 'truncatedToZero' },
+      { line: 2, reason: 'zeroAmount' },
+    ]);
+  });
+
+  // D10: 解析器对 CRLF / LF / 纯 CR 三种换行都按行切分（纯 CR 在浏览器里不可达，防御性修复）。
+  it('splits CRLF, LF and lone CR line endings alike', () => {
+    const lf = parseBatchText(`${A} 0.1\n${B} 0.2`, OPTIONS);
+    const crlf = parseBatchText(`${A} 0.1\r\n${B} 0.2`, OPTIONS);
+    const cr = parseBatchText(`${A} 0.1\r${B} 0.2`, OPTIONS);
+
+    for (const result of [lf, crlf, cr]) {
+      expect(result.errors).toEqual([]);
+      expect(result.lineCount).toBe(2);
+      expect(result.rows.map((row) => row.address)).toEqual([A, B]);
+    }
+  });
 });

@@ -256,6 +256,9 @@ export const copy = {
       `已为网络手续费预留约 ${reserve} ${native}。`,
     swapDirection: '交换方向',
     selectToken: (side: string) => `选择${side}代币`,
+    /** Owner 2026-11-14: the opposite side's token cannot be picked twice. */
+    excludeOtherSide: (symbol: string) =>
+      `另一侧已选 ${symbol}，这里不能再选；想换过来请用中间的交换方向。`,
     tokenSheetTitle: '选择代币',
     groupNative: '原生币',
     groupWrapped: '包装原生币',
@@ -403,6 +406,8 @@ export const copy = {
     versionLabel: '版本',
     versionValue: (buildId: string, variant: string) => `${buildId} · ${variant}`,
     docs: '开源文档',
+    /** The link action must not repeat the row label (QA 2026-11-14, M7). */
+    docsAction: '前往文档',
   },
   // ───────────────────────────────────────────────────────────────────────────
   // 应用目录 (UX spec §3.6). Appended as its own block: the lazy /apps page is
@@ -560,6 +565,14 @@ export const copy = {
     explorer: '在区块浏览器里查看',
     stripTitle: '转账完成',
     stripAmount: (amount: string) => `已转出 ${amount}`,
+    /** The CTA explanation while a submitted transfer is still in flight (D1/D2). */
+    pendingNote: '这笔转账还在确认中，确认后可以再转下一笔。',
+    pendingStuckNote: '上面这笔还没有结果，请先用上面的「重新提交」或「重新查询」处理。',
+    /** The CTA explanation while the balance could not be read (D3). */
+    balanceUnreadableNote: '余额暂时读不到，稍后重试。',
+    balanceRetry: '重新读取余额',
+    /** D7: the identity confirmation gate waits for `memberName` before it can tick. */
+    identityNameReading: '正在读取身份名字…',
     states: {
       connectTitle: '连接钱包后转账。',
       connectBody: '转账需要钱包确认。连接后可以先看到余额。',
@@ -582,10 +595,8 @@ export const copy = {
   // consumer.
   // ───────────────────────────────────────────────────────────────────────────
   batchTransfer: {
-    intro:
-      '一次把一种资产转给多个收款方。先粘贴收款名单，逐行核对后再提交。',
-    notConfigured:
-      '这个环境还没有部署批量转账合约，暂时不能批量转账。你的资产没有变化。',
+    intro: '一次把一种资产转给多个收款方。先粘贴收款名单，逐行核对后再提交。',
+    notConfigured: '这个环境还没有部署批量转账合约，暂时不能批量转账。你的资产没有变化。',
     modeLabel: '转出资产',
     modeNative: '原生币',
     modeToken: '代币',
@@ -599,6 +610,11 @@ export const copy = {
     balanceLabel: (symbol: string) => `${symbol} 余额`,
     balanceLoading: '读取余额中…',
     balanceError: '余额暂时读不到',
+    /** Token mode before the catalog resolves: never fall back to the native symbol (D9). */
+    tokenBalanceUnreadable: '代币余额暂时读不到，换个代币或重试读取。',
+    /** Balance unknown while the batch total is non-zero: submission is blocked (D8). */
+    balanceUnknown: '余额暂时读不到，还不能判断够不够转，请先重试读取。',
+    retry: '重新读取',
     amountDecimals: (digits: number) => `精度 ${digits} 位`,
     recipientsLabel: '收款方与金额',
     recipientsHint: '每行一个收款方：地址在前、金额在后，空格或逗号分隔。',
@@ -612,6 +628,7 @@ export const copy = {
       invalidAddress: '地址格式不对，需要 0x 开头的 40 位地址。',
       invalidAmount: '金额格式不对。',
       zeroAmount: '金额必须大于 0。',
+      truncatedToZero: '小数位超过精度，按精度截断后为 0。',
       zeroAddress: '收款地址不能是零地址。',
       selfAddress: '不能转给自己。',
       batchContract: '不能转给批量转账合约本身。',
@@ -631,7 +648,8 @@ export const copy = {
     preBalanceHeaderAmount: '金额',
     preBalanceHeaderBalance: '当前余额',
     contractWarningTitle: '有收款方是合约地址',
-    contractWarningBody: '转进合约的资产可能取不回来。合约地址不一定能收下这笔转账，失败时整批都会回滚。',
+    contractWarningBody:
+      '转进合约的资产可能取不回来。合约地址不一定能收下这笔转账，失败时整批都会回滚。',
     rowContractBadge: '合约',
     atomicNote: '整批一起执行：有一笔失败，全部都不会到账。',
     actionsLabel: '批量转账操作',
@@ -648,6 +666,8 @@ export const copy = {
       `已允许批量转账合约使用 ${allowed} / 本次需要 ${needed} ${symbol}`,
     allowanceLoading: '读取批量转账额度中…',
     allowanceError: '批量转账额度暂时读不到',
+    /** Allowance unknown: a third state, never 「已足够」 or 「需要授权」 (D2). */
+    allowanceUnknown: '额度暂时读不到，无法判断是否需要授权，请重试读取。',
     allowanceNeed: '这笔批量转账需要先授权一次，授权确认后再提交批量转账。',
     allowanceReady: '额度已足够，不需要再次授权。',
     allowanceLongTerm: (needed: string, symbol: string) =>
@@ -679,11 +699,21 @@ export const copy = {
     copyHash: '复制交易哈希',
     explorer: '在区块浏览器里查看',
     atomicReceipt: '整批一起执行：上表每一行都已到账。',
+    /** D1: the audit is incomplete (a balance re-read failed) — never claim 已到账. */
+    receiptUnverified: (count: string) =>
+      `到账核对不完整：有 ${count} 行余额读取失败，未能核对，请到区块浏览器确认交易结果。`,
+    /** D1: the audit completed but a row's delta disagreed with the promised amount. */
+    receiptMismatch: (count: string) =>
+      `到账核对发现异常：有 ${count} 行的差额与应到账额对不上，请到区块浏览器确认。`,
+    /** D7: approving the original total then submitting a smaller list leaves an approval. */
+    receiptResidualAllowance: (amount: string, symbol: string) =>
+      `链上还保留 ${amount} ${symbol} 的授权，可到「代币授权」页撤销。`,
     stripTitle: '批量转账完成',
     stripAmount: (amount: string) => `已转出 ${amount}`,
     states: {
       connectTitle: '连接钱包后批量转账。',
       connectBody: '批量转账需要钱包确认。连接后可以先看到余额。',
+      wrongChainTitle: '网络不对。',
       wrongChainBody: '切换到这个应用使用的网络后再批量转账。',
       backHome: '回首页',
     },
@@ -691,8 +721,7 @@ export const copy = {
       rejected: '你在钱包里点了取消，这一批没有转出。',
       insufficientFunds: (native: string) => `${native} 不够付手续费。请先转一点 ${native} 进来。`,
       balanceShort: (symbol: string) => `${symbol} 不够，整批没有转出。`,
-      allowanceShort: (symbol: string) =>
-        `批量转账额度还不够 ${symbol}，请先完成授权再提交。`,
+      allowanceShort: (symbol: string) => `批量转账额度还不够 ${symbol}，请先完成授权再提交。`,
       gasRow: (line: number) =>
         `第 ${line} 行的执行预算不够，这一批没有转出。可以在高级选项里调高每行执行预算。`,
       recipientRejected: (line: number, symbol: string) =>
@@ -730,11 +759,20 @@ export const copy = {
     noCommunityTokens: '还没有发现社区代币。',
     noTokenTitle: '还没有可以查看的代币',
     noTokenBody: '先在代币选择里添加一个 ERC20 代币地址。',
+    catalogLoading: '正在读取代币列表…',
+    // D3: the chain could not be read at all. Say so instead of reporting "no
+    // tokens", and give one actionable way back.
+    networkErrorTitle: '暂时读不到网络数据',
+    networkErrorBody:
+      '网络连接不稳，代币和授权额度都还没读出来。这不是没有代币，请检查网络后重新读取。',
+    networkRetry: '重新读取',
     customBadge: '自定义',
     customTitle: '添加自定义代币',
     customPlaceholder: '0x 开头的 40 位代币地址',
     customAdd: '添加代币',
     customChecking: '正在读取这个代币…',
+    customAlreadyListed: (symbol: string, group: string) =>
+      `${symbol} 已经在「${group}」里，不用重复添加。`,
     customInvalid: '这不是一个有效的代币地址，需要 0x 开头的 40 位地址。',
     customNoCode: '这个地址上没有合约，不能作为代币。',
     customUnreadable: '读不到这个代币的名称或精度，暂时不能查看授权。',
@@ -792,6 +830,9 @@ export const copy = {
     confirmRevokeSubmit: '确认撤销',
     confirmCancel: '取消',
     confirmSubmitting: '等待钱包确认…',
+    // D2: a failed send (wallet rejection, revert, …) is shown inside the open
+    // confirmation sheet, not only under the page where the mask hides it.
+    confirmErrorHint: '这次没有产生交易。可以再点一次上面的按钮重试，或点「取消」先关掉这个窗口。',
     stripUnlimited: (label: string) => `已把「${label}」设为长期授权，可随时撤销。`,
     stripRevoked: (label: string) => `已撤销「${label}」的授权。`,
     stripClose: '知道了',
@@ -881,6 +922,8 @@ export const copy = {
     longTermAction: (symbol: string) => `长期授权 ${symbol}`,
     longTermActive: '已长期授权',
     loading: '读取授权额度中…',
+    /** 这一笔根本用不到代币（原生币单边 / 数量为 0）：不能写成「已授权」（QA D8）。 */
+    notNeeded: '这一笔不需要代币授权',
     approving: '授权中…',
     confirming: '确认中…',
     approved: '已授权',
@@ -1018,6 +1061,8 @@ export const copy = {
         `已为网络手续费预留约 ${reserve} ${symbol}。`,
       amountInvalid: '请输入有效的金额。',
       amountZero: '金额必须大于 0。',
+      /** QA D6：已经填了一侧，缺的是另一侧——不能说成「金额必须大于 0」。 */
+      missingOtherSide: '另一侧的数量还需要填写。',
       amountTooPrecise: (digits: number) => `小数位不能超过 ${digits} 位。`,
       insufficient: (symbol: string, shortfall: string) => `${symbol} 不够，还差 ${shortfall}`,
       quoteLiquidity: (amount: string) => `预计获得 ${amount} 流动性凭证`,
@@ -1038,6 +1083,8 @@ export const copy = {
       quoteErrorBody: '池子可能刚被别的交易改动，或者网络不稳。你的资产没有变化。',
       quoteErrorRetry: '重新计算',
       fallbackTitle: '智能模式暂时用不了：',
+      /** QA D3：池子还没读回来时只说读取中，不断言「还没有池子」。 */
+      poolReading: '正在读取池子…',
       fallbackEmptyPool: '这个代币还没有池子，第一次建池只能两侧都填。',
       hubMissing: '这个环境没有配置智能加池的合约，可以用两侧都填的方式加池。',
       quoteFailed: '智能模式的报价暂时算不出来，可以关掉智能模式自己填两侧。',
@@ -1081,8 +1128,7 @@ export const copy = {
     query: {
       title: '池子总览',
       emptyTitle: '这个代币还没有流动性池。',
-      emptyBody:
-        '发射时只创建了交易对，还没有人注资。你可以先添加流动性，价格由第一次注资决定。',
+      emptyBody: '发射时只创建了交易对，还没有人注资。你可以先添加流动性，价格由第一次注资决定。',
       emptyAdd: '为这个代币添加流动性',
       pairLabel: '交易对地址',
       reserveLabel: (symbol: string) => `${symbol} 储备`,
@@ -1102,6 +1148,10 @@ export const copy = {
       backHome: '回首页',
       retry: '重试',
       readFailed: '池子暂时读不到。',
+      /** QA D4：URL 里的社区 symbol 在链上解析不到时，不能拿别的社区代币顶替。 */
+      communityUnknownTitle: '读不到这个社区。',
+      communityUnknownBody:
+        '链接里的社区 symbol 在这个环境里找不到对应的代币。核对链接，或从右上角切换社区。',
     },
     errors: {
       rejected: '你在钱包里点了取消，没有扣款。',

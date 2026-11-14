@@ -65,6 +65,19 @@ export type TxWatchSettledStatus = 'confirmed' | 'reverted';
 /** The hash will not produce a receipt by itself; the page must offer a way out. */
 export type TxWatchRecoveryStatus = 'slow' | 'dropped' | 'replaced' | 'nonceGap';
 
+/**
+ * How long the same nonce gap must persist before it becomes the 「卡在钱包里」
+ * recovery card.
+ *
+ * The submitter now pins the nonce read from the same chain the watcher polls, so
+ * a mined-and-consecutive transaction never looks gapped. The remaining risk is a
+ * read race: `eth_getTransactionByHash` (pool, fresh) can disagree with
+ * `eth_getTransactionCount` (latest block) for a beat, and a single disagreeing
+ * read used to freeze the page on a card that told the user to clear the wallet's
+ * activity records. A 10 s sustained gap is a fact; a one-poll residue is noise.
+ */
+export const TX_WATCH_NONCE_GAP_GRACE_MS = 10_000;
+
 export interface TxWatchTxObservation {
   readonly nonce: number;
   readonly from: string;
@@ -85,7 +98,15 @@ export interface TxWatchReceiptObservation {
 export interface TxWatchObservation {
   readonly receipt: TxWatchReceiptObservation | null;
   readonly tx: TxWatchTxObservation | null | undefined;
+  /** Mined-transaction count for the wallet (`latest` block). */
   readonly walletNonce: number | undefined;
+  /**
+   * Pool-aware count for the wallet (`pending` block): it already includes this
+   * transaction and every cheaper nonce queued ahead of it. A transaction that is
+   * merely waiting behind another pending transaction of the same wallet is NOT a
+   * nonce gap — only a nonce the pool cannot reach is.
+   */
+  readonly walletPendingNonce?: number | undefined;
   /** Hash of a different, mined transaction sharing this wallet+nonce. */
   readonly replacementHash: HexHash | null | undefined;
 }
@@ -94,6 +115,7 @@ export const EMPTY_TX_WATCH_OBSERVATION: TxWatchObservation = Object.freeze({
   receipt: null,
   tx: undefined,
   walletNonce: undefined,
+  walletPendingNonce: undefined,
   replacementHash: undefined,
 });
 
@@ -106,6 +128,8 @@ export interface TxWatchState {
   readonly observation: TxWatchObservation;
   /** When the observation above was read; the countdown renders against it. */
   readonly observedAt: number;
+  /** First time this nonce gap was observed; null whenever the last read had none. */
+  readonly gapSince: number | null;
 }
 
 export interface CreateTxWatchStateInput {
@@ -122,6 +146,7 @@ export function idleTxWatchState(deadlineMs: number = DEFAULT_TX_DEADLINE_MS): T
     deadlineMs,
     observation: EMPTY_TX_WATCH_OBSERVATION,
     observedAt: 0,
+    gapSince: null,
   };
 }
 
@@ -135,6 +160,7 @@ export function createTxWatchState(input: CreateTxWatchStateInput): TxWatchState
     deadlineMs: input.deadlineMs ?? DEFAULT_TX_DEADLINE_MS,
     observation: EMPTY_TX_WATCH_OBSERVATION,
     observedAt: startedAt,
+    gapSince: null,
   };
 }
 
@@ -178,7 +204,20 @@ export function txWatchRemainingSeconds(state: TxWatchState, now: number): numbe
   return Math.ceil(txWatchRemainingMs(state, now) / 1000);
 }
 
-function classify(observation: TxWatchObservation, deadlineAt: number, now: number): TxWatchStatus {
+/** True when the submitted nonce cannot be reached by the wallet's pool. */
+function isNonceGapped(observation: TxWatchObservation): boolean {
+  if (observation.tx === null || observation.tx === undefined) return false;
+  const poolAware = observation.walletPendingNonce ?? observation.walletNonce;
+  if (poolAware === undefined) return false;
+  return observation.tx.nonce > poolAware;
+}
+
+function classify(
+  observation: TxWatchObservation,
+  deadlineAt: number,
+  now: number,
+  gapSince: number | null,
+): TxWatchStatus {
   // A receipt is the only terminal truth, and it wins over every heuristic.
   if (observation.receipt !== null) {
     return observation.receipt.status === 'reverted' ? 'reverted' : 'confirmed';
@@ -186,15 +225,13 @@ function classify(observation: TxWatchObservation, deadlineAt: number, now: numb
   if (observation.replacementHash !== null && observation.replacementHash !== undefined) {
     return 'replaced';
   }
-  // Fastest signal that the wallet is out of sync: a queued transaction whose
-  // nonce is ahead of the chain can never mine until the gap is filled.
-  if (
-    observation.tx !== null &&
-    observation.tx !== undefined &&
-    observation.walletNonce !== undefined &&
-    observation.tx.nonce > observation.walletNonce
-  ) {
-    return 'nonceGap';
+  // A transaction queued behind another pending transaction is not stuck; only a
+  // gap the pool cannot reach is. It has to survive the grace window first, so a
+  // single read race can never freeze the page on a recovery card.
+  if (isNonceGapped(observation)) {
+    const since = gapSince ?? now;
+    if (now - since >= TX_WATCH_NONCE_GAP_GRACE_MS) return 'nonceGap';
+    return 'pending';
   }
   if (now >= deadlineAt) {
     // Unknown (failed read) stays `slow`: we cannot prove the hash is gone.
@@ -209,11 +246,18 @@ export function reduceTxWatch(state: TxWatchState, event: TxWatchEvent): TxWatch
   if (state.hash === null) return state;
   if (isTxWatchPollingStopped(state.status)) return state;
 
-  const nextStatus = classify(event.observation, state.startedAt + state.deadlineMs, event.now);
+  const gapped = isNonceGapped(event.observation);
+  const nextStatus = classify(
+    event.observation,
+    state.startedAt + state.deadlineMs,
+    event.now,
+    state.gapSince,
+  );
   return {
     ...state,
     status: nextStatus,
     observation: event.observation,
     observedAt: event.now,
+    gapSince: gapped ? (state.gapSince ?? event.now) : null,
   };
 }

@@ -25,12 +25,17 @@ const { idCalls, nameCalls, idState, nameState, readContract } = vi.hoisted(() =
       retry: () => {},
     },
   };
+  // The canonical-name read: `{ data }` plus a controllable loading flag (D7).
+  const readContract = vi.fn((..._args: unknown[]) => ({
+    data: undefined as string | undefined,
+    isLoading: false,
+  }));
   return {
     idCalls,
     nameCalls,
     idState,
     nameState,
-    readContract: vi.fn((..._args: unknown[]) => ({ data: undefined })),
+    readContract,
   };
 });
 
@@ -72,6 +77,8 @@ beforeEach(() => {
     address: null,
     retry: () => {},
   };
+  readContract.mockReset();
+  readContract.mockImplementation(() => ({ data: undefined, isLoading: false }));
 });
 
 describe('useIdentityRecipient 收款方模式', () => {
@@ -118,5 +125,51 @@ describe('useIdentityRecipient 收款方模式', () => {
     expect(result.current.status).toBe('idle');
     expect(result.current.memberId).toBeNull();
     expect(result.current.address).toBeNull();
+  });
+
+  it('flags the canonical name as pending while memberName is still loading (D7)', () => {
+    idState.value = {
+      status: 'ok',
+      memberId: 2n,
+      address: OTHER,
+      retry: () => {},
+    };
+    readContract.mockImplementation(() => ({ data: undefined, isLoading: true }));
+
+    const { result } = renderHook(() =>
+      useIdentityRecipient(MEMBER_NFT, '#2', true, undefined, 'id'),
+    );
+
+    expect(result.current.status).toBe('ok');
+    expect(result.current.memberId).toBe(2n);
+    expect(result.current.name).toBeNull();
+    // The confirmation gate reads this flag and stays closed.
+    expect(result.current.namePending).toBe(true);
+  });
+
+  it('settles once memberName arrives, and never pends in name mode', () => {
+    idState.value = {
+      status: 'ok',
+      memberId: 2n,
+      address: OTHER,
+      retry: () => {},
+    };
+    readContract.mockImplementation(() => ({ data: 'Testdev-member-1', isLoading: false }));
+
+    const byId = renderHook(() => useIdentityRecipient(MEMBER_NFT, '#2', true, undefined, 'id'));
+    expect(byId.result.current.name).toBe('Testdev-member-1');
+    expect(byId.result.current.namePending).toBe(false);
+
+    nameState.value = {
+      status: 'ok',
+      memberId: 2n,
+      name: 'Testdev-member-1',
+      address: OTHER,
+      retry: () => {},
+    };
+    const byName = renderHook(() =>
+      useIdentityRecipient(MEMBER_NFT, 'Testdev-member-1', true, undefined, 'name'),
+    );
+    expect(byName.result.current.namePending).toBe(false);
   });
 });

@@ -24,7 +24,10 @@ export interface DesktopSidebarProps {
 export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
   const location = useLocation();
   const { symbol } = useCommunityContext();
-  const wordmark = useCommunityDisplay(symbol).symbol;
+  const community = useCommunityDisplay(symbol);
+  // QA 2026-11-14 G8: hold the name back until the on-chain symbol() is in, so
+  // the sidebar never flashes 协议名 and then swaps to the community name.
+  const wordmark = community.symbol;
   return (
     <aside
       aria-label={copy.nav.desktopLabel}
@@ -50,7 +53,7 @@ export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
           >
             L20
           </span>
-          {!collapsed ? (
+          {!collapsed && !community.pending ? (
             <span className="truncate text-base font-semibold tracking-tight">{wordmark}</span>
           ) : null}
         </Link>

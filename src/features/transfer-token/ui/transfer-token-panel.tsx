@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount, useBytecode } from 'wagmi';
 import { AlertTriangle, Check, RefreshCw } from '@/shared/ui/icons';
-import { configuredAddress, type HexAddress } from '@/config/networks';
+import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
+import { copyText } from '@/shared/lib/clipboard';
 import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
 import {
   identityInputErrorMessage,
@@ -106,17 +107,24 @@ export function TransferTokenPanel({
   const [amountInput, setAmountInput] = useState('');
   const [mode, setMode] = useState<IdentityInputMode>(initialMode);
   const [addressInput, setAddressInput] = useState('');
-  const [identityInput, setIdentityInput] = useState('');
+  // D6: 按身份 NFT ID 与按名字是两种语义，各存一份输入；切换模式不把 `#2`
+  // 当成名字去查（也不丢用户已经输入的另一种），只清空解析结果与勾选。
+  const [identityInputs, setIdentityInputs] = useState<Record<'member' | 'name', string>>({
+    member: '',
+    name: '',
+  });
   const [knownAck, setKnownAck] = useState(false);
   const [identityAck, setIdentityAck] = useState(false);
   const [usedNativeMax, setUsedNativeMax] = useState(false);
   const [customInput, setCustomInput] = useState('');
   const [lastReceipt, setLastReceipt] = useState<TransferRecord | null>(null);
+  const [stripCopied, setStripCopied] = useState(false);
 
   const token = selectedToken ?? catalog.nativeToken;
   const native = token.kind === 'native';
   const catalogReady = isConnected && !isWrongChain;
   const identityMode = isIdentityInputMode(mode);
+  const identityInput = mode === 'address' ? '' : identityInputs[mode];
 
   const balance = useTransferBalance(token, account, catalogReady);
   const identity = useIdentityRecipient(
@@ -130,6 +138,11 @@ export function TransferTokenPanel({
   const addressCheck = checkTransferRecipient(addressInput, account);
   const identityResolved =
     identity.status === 'ok' && identity.address !== null && identity.memberId !== null;
+  // D7: id mode resolves ownerOf first and memberName right after; the
+  // confirmation gate waits for the name instead of letting the user confirm an
+  // id they cannot disambiguate.
+  const identityNamePending = identityMode && identityResolved && identity.namePending;
+  const identityReady = identityResolved && !identityNamePending;
   const recipientAddress: HexAddress | undefined =
     mode === 'address'
       ? addressCheck === 'ok'
@@ -182,15 +195,23 @@ export function TransferTokenPanel({
       ? parsed.value - spendable
       : undefined;
 
-  const busy = tx.stage !== 'idle' || tx.receipt !== null;
+  // D1/D2: an in-flight (even stuck) or restored transfer owns the CTA — the
+  // only way forward is the recovery card's 「重新提交」/「重新查询」.
+  const hasPending = tx.pendingHash !== null;
+  const pendingStuck = hasPending && tx.watch.isStuck;
+  const busy = tx.stage !== 'idle' || tx.receipt !== null || tx.isHydrating || hasPending;
+  // D3: an unreadable balance cannot be validated, so it blocks submission.
+  const balanceKnown = balance.balance !== undefined;
+  const balanceUnreadable = !balanceKnown && (balance.isError || !balance.isLoading);
   const canSubmit =
     catalogReady &&
     !busy &&
+    balanceKnown &&
     parsed.kind === 'ok' &&
     !insufficient &&
     (mode === 'address'
       ? addressCheck === 'ok' && (protection.kind !== 'known' || knownAck)
-      : identityResolved && identityAck);
+      : identityReady && identityAck);
 
   const addressInvalid = addressCheck !== 'ok' && addressCheck !== 'empty';
   const identityInvalid =
@@ -271,7 +292,7 @@ export function TransferTokenPanel({
     setAmountInput('');
     setUsedNativeMax(false);
     setAddressInput('');
-    setIdentityInput('');
+    setIdentityInputs({ member: '', name: '' });
     setKnownAck(false);
     setIdentityAck(false);
   };
@@ -297,6 +318,14 @@ export function TransferTokenPanel({
     : balance.isError
       ? copy.transfer.balanceError
       : formatTokenAmount(balance.balance, token.decimals);
+
+  // D4: the dismissed receipt of this page wins; otherwise the confirmed task
+  // restored from the cache keeps the hash visible after a refresh.
+  const stripRecord = lastReceipt ?? tx.restoredRecord;
+  const stripExplorerUrl =
+    stripRecord !== null && NETWORK.blockExplorerUrl !== null
+      ? `${NETWORK.blockExplorerUrl}/tx/${stripRecord.hash}`
+      : null;
 
   const txError = tx.error;
   const recoveryAction =
@@ -342,7 +371,7 @@ export function TransferTokenPanel({
 
   return (
     <div className="space-y-4">
-      {lastReceipt !== null ? (
+      {stripRecord !== null ? (
         <div
           className="rounded-3xl border border-line bg-surface p-5 shadow-soft"
           data-testid="transfer-success-strip"
@@ -357,12 +386,44 @@ export function TransferTokenPanel({
           >
             {copy.transfer.stripAmount(
               transferAmountText(
-                lastReceipt.amount,
-                lastReceipt.tokenDecimals,
-                lastReceipt.tokenSymbol,
+                stripRecord.amount,
+                stripRecord.tokenDecimals,
+                stripRecord.tokenSymbol,
               ),
             )}
           </p>
+          {/* D4: restoring the receipt context means the hash stays checkable —
+              copyable, with the explorer link, after the receipt sheet is gone. */}
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line pt-2">
+            <span className="text-[11px] leading-4 text-muted">{copy.transfer.receiptHash}</span>
+            <span
+              className="break-all font-mono text-[11px] leading-4 text-foreground"
+              data-testid="transfer-success-strip-hash"
+            >
+              {stripRecord.hash}
+            </span>
+            <button
+              type="button"
+              data-testid="transfer-success-strip-copy"
+              aria-label={copy.transfer.copyHash}
+              onClick={() => {
+                void copyText(stripRecord.hash).then((ok) => setStripCopied(ok));
+              }}
+              className="font-medium text-brand-strong underline underline-offset-4"
+            >
+              {stripCopied ? copy.common.copied : copy.common.copy}
+            </button>
+            {stripExplorerUrl !== null ? (
+              <a
+                href={stripExplorerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[11px] font-medium text-brand-strong underline-offset-4 hover:underline"
+              >
+                {copy.transfer.explorer}
+              </a>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -387,7 +448,9 @@ export function TransferTokenPanel({
               if (mode === 'address') {
                 setAddressInput(next);
               } else {
-                setIdentityInput(next);
+                // D6: each identity mode keeps its own text; switching can
+                // never reinterpret the other mode's input.
+                setIdentityInputs((previous) => ({ ...previous, [mode]: next }));
                 setIdentityAck(false);
               }
               tx.clearError();
@@ -438,7 +501,17 @@ export function TransferTokenPanel({
             <p className="mt-1.5 text-xs text-muted">{copy.transfer.identityUnavailable}</p>
           ) : null}
 
-          {identityMode && identityResolved && identity.memberId !== null ? (
+          {identityNamePending ? (
+            <p
+              className="mt-1.5 text-xs text-muted"
+              role="status"
+              data-testid="transfer-identity-name-reading"
+            >
+              {copy.transfer.identityNameReading}
+            </p>
+          ) : null}
+
+          {identityMode && identityReady && identity.memberId !== null ? (
             <IdentityRecipientCard
               title={copy.transfer.identityTitle(
                 identity.memberId.toString(),
@@ -637,15 +710,19 @@ export function TransferTokenPanel({
               </span>
               <button
                 type="button"
+                data-testid="transfer-max"
                 onClick={() => {
-                  if (balance.balance === undefined) return;
+                  // D5: a zero spendable balance would only produce the invalid
+                  // 「金额必须大于 0。」 state, so 全部 does nothing there.
+                  if (balance.balance === undefined || spendable === undefined || spendable === 0n)
+                    return;
                   setAmountInput(
                     formatUnits(maxTransferAmount(balance.balance, native), token.decimals),
                   );
                   setUsedNativeMax(native);
                   tx.clearError();
                 }}
-                disabled={busy || balance.balance === undefined}
+                disabled={busy || spendable === undefined || spendable === 0n}
                 className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft disabled:opacity-50"
               >
                 {copy.transfer.max}
@@ -711,6 +788,28 @@ export function TransferTokenPanel({
             {tx.stage === 'wallet' ? copy.transfer.submitting : copy.transfer.submit}
           </Button>
         </ActionStack>
+
+        {/* D2/D3: a disabled CTA always says why — never a dead, silent button. */}
+        {!tx.isHydrating && pendingStuck ? (
+          <p className="px-1 text-xs leading-5 text-muted" data-testid="transfer-submit-note">
+            {copy.transfer.pendingStuckNote}
+          </p>
+        ) : !tx.isHydrating && hasPending ? (
+          <p className="px-1 text-xs leading-5 text-muted" data-testid="transfer-submit-note">
+            {copy.transfer.pendingNote}
+          </p>
+        ) : !tx.isHydrating && balanceUnreadable ? (
+          <p className="px-1 text-xs leading-5 text-muted" data-testid="transfer-submit-note">
+            {copy.transfer.balanceUnreadableNote}
+            <button
+              type="button"
+              onClick={balance.refetch}
+              className="ml-2 font-medium text-brand-strong underline underline-offset-4"
+            >
+              {copy.transfer.balanceRetry}
+            </button>
+          </p>
+        ) : null}
 
         {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
       </section>

@@ -21,6 +21,12 @@ export interface IdentityRecipientState {
   readonly memberId: bigint | null;
   readonly name: string | null;
   readonly address: HexAddress | null;
+  /**
+   * D7: id mode resolves `ownerOf` before `memberName`; the confirmation gate
+   * must not become tickable/submittable while the canonical name is pending
+   * (slow RPC would let a user confirm an id they cannot disambiguate).
+   */
+  readonly namePending: boolean;
   readonly retry: () => void;
 }
 
@@ -29,6 +35,7 @@ const IDLE: IdentityRecipientState = {
   memberId: null,
   name: null,
   address: null,
+  namePending: false,
   retry: () => {},
 };
 
@@ -67,16 +74,26 @@ export function useIdentityRecipient(
 
   if (!active || trimmed.length === 0) return IDLE;
   if (memberNftAddress === undefined) {
-    return { status: 'error', memberId: null, name: null, address: null, retry: () => {} };
+    return {
+      status: 'error',
+      memberId: null,
+      name: null,
+      address: null,
+      namePending: false,
+      retry: () => {},
+    };
   }
 
   if (idMode) {
     const name = typeof canonicalName.data === 'string' ? canonicalName.data : null;
+    const namePending =
+      byId.status === 'ok' && byId.memberId !== null && canonicalName.isLoading === true;
     return {
       status: byId.status,
       memberId: byId.memberId,
       name,
       address: byId.address,
+      namePending,
       retry: byId.retry,
     };
   }
@@ -86,6 +103,8 @@ export function useIdentityRecipient(
     memberId: byName.memberId,
     name: byName.name,
     address: byName.address,
+    // The name IS the lookup key in this mode: nothing else to wait for.
+    namePending: false,
     retry: byName.retry,
   };
 }

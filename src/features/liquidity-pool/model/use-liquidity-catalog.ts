@@ -1,12 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useBytecode, useReadContracts } from 'wagmi';
 import { love20TokenAbi } from '@/config/abis';
-import {
-  NETWORK,
-  configuredAddress,
-  isConfiguredAddress,
-  type HexAddress,
-} from '@/config/networks';
+import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
 import { useSwapCatalog, type SwapTokenSearchStatus } from '@/features/swap-token/model/use-swap-catalog';
 import { useWrappedNative } from '@/features/swap-token/model/use-wrapped-native';
 import type { LiquidityToken } from '@/features/liquidity-pool/lib/liquidity-types';
@@ -44,6 +39,7 @@ export interface LiquidityCatalog {
 }
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 function toLiquidityToken(token: {
   readonly address: HexAddress | undefined;
@@ -72,8 +68,37 @@ function mapTokens(tokens: readonly {
   });
 }
 
+/**
+ * 自定义代币的状态判定（纯函数，QA D9 回归）：零地址不必等 RPC 就是 `no-code`
+ * （「这个地址上没有合约，不能作为代币。」）；格式不对仍是 `idle`（由地址输入框
+ * 的格式错误提示接管）；合法地址按 bytecode → symbol/decimals 依次判定。
+ */
+export function customTokenStatus(input: {
+  readonly candidate: string | undefined;
+  readonly codeLoading: boolean;
+  readonly codeError: boolean;
+  readonly codeData: string | undefined;
+  readonly symbol: string | undefined;
+  readonly decimals: number | undefined;
+  readonly metadataLoading: boolean;
+}): CustomTokenStatus {
+  if (input.candidate === undefined) return 'idle';
+  if (input.candidate.toLowerCase() === ZERO_ADDRESS) return 'no-code';
+  if (!ADDRESS_RE.test(input.candidate)) return 'idle';
+  if (input.codeLoading) return 'checking';
+  if (input.codeError) return 'unreadable';
+  if (input.codeData === undefined || input.codeData === '0x') return 'no-code';
+  if (input.symbol !== undefined && input.decimals !== undefined) return 'ok';
+  if (input.metadataLoading) return 'checking';
+  return 'unreadable';
+}
+
 function useCustomToken(candidate: string | undefined): CustomTokenState {
-  const address = candidate !== undefined && isConfiguredAddress(candidate) ? candidate : undefined;
+  // QA D9（P3）：零地址 / 没有合约的地址也要走「读 bytecode」这条路，落 `no-code`
+  // 分支给出「这个地址上没有合约，不能作为代币。」；这里不能再按 `isConfiguredAddress`
+  // 过滤成「未配置」，否则点击「读取这个代币」就是静默 no-op。
+  const address =
+    candidate !== undefined && ADDRESS_RE.test(candidate) ? (candidate as HexAddress) : undefined;
 
   const code = useBytecode({ address, query: { enabled: address !== undefined } });
   const contracts = useMemo(
@@ -101,16 +126,15 @@ function useCustomToken(candidate: string | undefined): CustomTokenState {
       ? decimalsResult.result
       : undefined;
 
-  const status: CustomTokenStatus = (() => {
-    if (address === undefined) return 'idle';
-    if (code.isLoading) return 'checking';
-    if (code.isError) return 'unreadable';
-    if (code.data === undefined || code.data === '0x') return 'no-code';
-    if (symbol !== undefined && decimals !== undefined) return 'ok';
-    if (metadata.isLoading) return 'checking';
-    if (metadata.isError) return 'unreadable';
-    return 'unreadable';
-  })();
+  const status = customTokenStatus({
+    candidate,
+    codeLoading: address !== undefined && code.isLoading,
+    codeError: address !== undefined && code.isError,
+    codeData: address !== undefined ? (code.data ?? undefined) : undefined,
+    symbol,
+    decimals,
+    metadataLoading: metadata.isLoading,
+  });
 
   // 自定义代币对象必须稳定：页面把它当 effect 依赖，每次渲染新建对象会让
   // setState 触发下一次渲染，形成无限循环（选自定义代币后页面卡死）。

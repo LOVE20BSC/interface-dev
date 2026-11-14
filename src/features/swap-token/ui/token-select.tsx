@@ -6,6 +6,11 @@ import type { SwapTokenSearchStatus } from '@/features/swap-token/model/use-swap
 export interface TokenSelectProps {
   readonly side: 'from' | 'to';
   readonly selected: SwapToken | undefined;
+  /**
+   * The token already chosen on the other side. Owner 2026-11-14: the picker must
+   * not offer it, so a duplicate pair cannot even be selected.
+   */
+  readonly otherSelected: SwapToken | undefined;
   readonly nativeToken: SwapToken;
   readonly wrappedToken: SwapToken | undefined;
   readonly communityTokens: readonly SwapToken[];
@@ -30,8 +35,20 @@ export interface TokenSelectProps {
  * same picker with a different universe).
  */
 export function TokenSelect(props: TokenSelectProps) {
-  const { side, selected, nativeToken, wrappedToken, communityTokens, searchResults } = props;
+  const {
+    side,
+    selected,
+    otherSelected,
+    nativeToken,
+    wrappedToken,
+    communityTokens,
+    searchResults,
+  } = props;
   const label = side === 'from' ? copy.swap.from : copy.swap.to;
+  // Hide the opposite side's token; the one-line note says why it is missing.
+  const excludedKeys = otherSelected === undefined ? [] : [swapTokenKey(otherSelected)];
+  const excludedNote =
+    otherSelected === undefined ? undefined : copy.swap.excludeOtherSide(otherSelected.symbol);
 
   const tokensByKey = new Map<string, SwapToken>();
   const toItem = (token: SwapToken): TokenPickerItem => {
@@ -83,6 +100,8 @@ export function TokenSelect(props: TokenSelectProps) {
       search={props.search}
       onSearchChange={props.onSearchChange}
       selected={selectedItem}
+      excludedKeys={excludedKeys}
+      excludedNote={excludedNote}
       onSelect={pick}
       hasMore={props.hasMore}
       onLoadMore={props.onLoadMore}

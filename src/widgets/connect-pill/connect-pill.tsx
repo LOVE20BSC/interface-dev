@@ -42,10 +42,12 @@ export function ConnectPill() {
   const [communityAnchor, setCommunityAnchor] = useState<HTMLButtonElement | null>(null);
   const [walletAnchor, setWalletAnchor] = useState<HTMLButtonElement | null>(null);
 
+  // D11: the injected wallet's own chain answers before the dapp is connected,
+  // so an installed wallet on another chain gets the switch pill, not 「连接钱包」.
+  if (wallet.isWrongChain) return <WrongNetworkButton />;
   if (!wallet.isConnected) {
     return <ConnectWalletButton variant="secondary" className="rounded-full" />;
   }
-  if (wallet.isWrongChain) return <WrongNetworkButton />;
   if (wallet.address === undefined) return null;
   const address = wallet.address;
 
@@ -62,11 +64,10 @@ export function ConnectPill() {
               ? copy.wallet.noIdentity
               : copy.wallet.noIdentitySelected;
 
-  const closeMenu = () => {
-    const activeTrigger = openMenu === 'wallet' ? walletAnchor : communityAnchor;
-    setOpenMenu(null);
-    activeTrigger?.focus();
-  };
+  // Focus restore is owned by MenuLayer's onCloseAutoFocus: focusing here runs
+  // while the Radix focus scope is still mounted, so the trap would take focus
+  // back and the user would end up on <body> when the layer unmounts.
+  const closeMenu = () => setOpenMenu(null);
 
   const toggleMenu = (menu: ConnectPillMenu) => {
     preloadMenus();

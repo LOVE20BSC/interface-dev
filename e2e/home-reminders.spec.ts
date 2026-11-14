@@ -186,6 +186,13 @@ test.describe('我的', () => {
     await expect(page.getByRole('heading', { name: '账户' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '关于' })).toBeVisible();
 
+    // QA 2026-11-14 M7: the 关于 block's row label and link must not repeat 开源文档.
+    await expect(page.getByText('开源文档', { exact: true })).toBeVisible();
+    const docsLink = page.getByRole('link', { name: '前往文档' });
+    await expect(docsLink).toBeVisible();
+    await expect(docsLink).toHaveAttribute('target', '_blank');
+    await expect(page.getByRole('link', { name: '开源文档' })).toHaveCount(0);
+
     // Settings-ish: no filled action on the page.
     expect(await countSolidButtons(page)).toBe(0);
 

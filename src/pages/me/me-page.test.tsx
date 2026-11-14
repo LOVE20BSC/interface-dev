@@ -100,7 +100,10 @@ describe('MePage', () => {
     expect(screen.getByText('钱包地址')).toBeVisible();
     expect(screen.getByText(/^0x1234…5678$/)).toBeVisible();
     expect(screen.getByRole('heading', { name: '关于' })).toBeVisible();
-    expect(screen.getByRole('link', { name: '开源文档' })).toBeVisible();
+    // QA 2026-11-14 M7: the row label and the link action must not both read 开源文档.
+    expect(screen.getByText('开源文档')).toBeVisible();
+    expect(screen.getByRole('link', { name: '前往文档' })).toBeVisible();
+    expect(screen.queryByRole('link', { name: '开源文档' })).toBeNull();
   });
 
   it('shows an honest unavailable line when the community token is not configured', () => {

@@ -20,3 +20,9 @@ export interface ApprovalRecord {
   readonly tokenSymbol: string;
   readonly mode: ApprovalMode;
 }
+
+/** Send-time failure of one 授权/撤销 write, shown in the sheet and under the page. */
+export interface ApprovalTxError {
+  readonly message: string;
+  readonly kind?: 'nonce' | 'staleBlock';
+}

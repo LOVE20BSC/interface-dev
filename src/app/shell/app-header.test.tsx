@@ -11,8 +11,14 @@ vi.mock('@/features/switch-community/model/use-community-context', () => ({
   useCommunityContext: () => ({ symbol: 'TestLOVE20', fromUrl: true, switchSymbol: vi.fn() }),
 }));
 
+const display = vi.hoisted(() => ({ pending: false }));
+
 vi.mock('@/entities/community-token/model/use-community-display', () => ({
-  useCommunityDisplay: () => ({ symbol: 'TestLOVE20', resolved: true }),
+  useCommunityDisplay: () => ({
+    symbol: display.pending ? 'LOVE20协议' : 'TestLOVE20',
+    resolved: !display.pending,
+    pending: display.pending,
+  }),
 }));
 
 const wallet = vi.hoisted(() => ({
@@ -46,6 +52,7 @@ function renderHeader(path: string) {
 beforeEach(() => {
   wallet.isConnected = false;
   wallet.isWrongChain = false;
+  display.pending = false;
 });
 
 describe('AppHeader', () => {
@@ -58,6 +65,15 @@ describe('AppHeader', () => {
     expect(screen.getByTestId('connect-pill')).toBeVisible();
     // The wordmark is a label, not a second home link.
     expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('home holds the wordmark back until the community symbol resolves (QA G8)', () => {
+    display.pending = true;
+    renderHeader('/');
+
+    // Cold start: no protocol-label flash before the on-chain symbol lands.
+    expect(screen.queryByTestId('home-wordmark')).toBeNull();
+    expect(screen.queryByText('LOVE20协议')).toBeNull();
   });
 
   it('home hides the wordmark once connected: the top-right chip is the only community name', () => {

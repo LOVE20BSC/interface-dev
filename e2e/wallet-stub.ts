@@ -49,6 +49,41 @@ export function identityCacheKey(account: string): string {
 }
 
 /**
+ * A slow / out-of-sync wallet (owner 2026-11-14: the first 兑换 after a refresh
+ * sat in the wallet as 「卡在钱包里」 until 「重新提交」).
+ *
+ * A real wallet answers the user's confirmation after 3–8 s and picks the nonce
+ * from its own (possibly stale) tracker; the injected stub normally answers in
+ * milliseconds with the app's RPC-selected nonce. These knobs reproduce the real
+ * wallet's timing and nonce ownership, so the 兑换 suite can prove the fix.
+ */
+export interface WalletStubOptions {
+  /** Delay before `eth_sendTransaction` returns the hash (wallet sheet). */
+  readonly sendDelayMs?: number | undefined;
+  /**
+   * Emulate a wallet whose own nonce tracker is ahead of the chain by this many
+   * transactions. The offset is only injected when the dapp did not pin a nonce
+   * (pre-fix behaviour), unless `ignorePinnedNonce` is set.
+   */
+  readonly staleNonceOffset?: number | undefined;
+  /**
+   * Ignore a dapp-pinned nonce on the FIRST send only — reproduces the pre-fix
+   * delegation exactly (the wallet owned the nonce). Later sends honour the
+   * pinned nonce, exactly like MetaMask does when 「重新提交」 carries one.
+   */
+  readonly ignorePinnedNonce?: boolean | undefined;
+}
+
+export interface WalletStubSend {
+  readonly at: number;
+  /** Nonce the dapp pinned (`null` when it let the wallet choose). */
+  readonly pinnedNonce: number | null;
+  /** Nonce actually submitted, if the stub overrode/injected one. */
+  readonly usedNonce: number | null;
+  readonly hash: string;
+}
+
+/**
  * Installs window.ethereum before any app code runs. Methods the wallet spec
  * owns (accounts / chain / switching) are answered locally; everything else is
  * forwarded verbatim to the anvil RPC.
@@ -57,9 +92,10 @@ export async function installWallet(
   page: Page,
   account: string,
   chainHex: string = CHAIN_HEX,
+  options: WalletStubOptions = {},
 ): Promise<void> {
   await page.addInitScript(
-    ({ accountAddress, chainHex, rpcUrl }) => {
+    ({ accountAddress, chainHex, rpcUrl, sendDelayMs, staleNonceOffset, ignorePinnedNonce }) => {
       const listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
       const rpc = async (method: string, params: unknown): Promise<unknown> => {
         const response = await fetch(rpcUrl, {
@@ -83,6 +119,16 @@ export async function installWallet(
         return body.result;
       };
 
+      const sends: WalletStubSend[] = [];
+      const stubState = {
+        rpcUrl,
+        chainHex,
+        account: accountAddress,
+        // Lets specs assert wallet endpoint/chain and inspect what was submitted.
+        sends,
+      };
+      Object.defineProperty(window, '__walletStub', { configurable: true, value: stubState });
+
       const provider = {
         isMetaMask: true,
         isConnected: () => true,
@@ -94,6 +140,32 @@ export async function installWallet(
           if (method === 'net_version') return String(parseInt(chainHex, 16));
           if (method === 'wallet_switchEthereumChain') return null;
           if (method === 'wallet_addEthereumChain') return null;
+          if (method === 'eth_sendTransaction') {
+            const raw = ((params as unknown[] | undefined)?.[0] ?? {}) as Record<string, unknown>;
+            const tx: Record<string, unknown> = { ...raw };
+            const pinned = typeof tx.nonce === 'string' ? parseInt(tx.nonce, 16) : undefined;
+            const latest = await rpc('eth_getTransactionCount', [accountAddress, 'latest']);
+            const chainCount = typeof latest === 'string' ? parseInt(latest, 16) : 0;
+            if (sendDelayMs > 0) {
+              await new Promise((resolve) => setTimeout(resolve, sendDelayMs));
+            }
+            let used: number | undefined;
+            const ignorePinned = ignorePinnedNonce && sends.length === 0;
+            if (pinned === undefined || ignorePinned) {
+              if (staleNonceOffset > 0) {
+                used = chainCount + staleNonceOffset;
+                tx.nonce = `0x${used.toString(16)}`;
+              }
+            }
+            const hash = await rpc('eth_sendTransaction', [tx]);
+            sends.push({
+              at: Date.now(),
+              pinnedNonce: pinned ?? null,
+              usedNonce: used ?? null,
+              hash: typeof hash === 'string' ? hash : '',
+            });
+            return hash;
+          }
           return rpc(method, params);
         },
         on: (event: string, handler: (...args: unknown[]) => void) => {
@@ -115,7 +187,14 @@ export async function installWallet(
         value: provider,
       });
     },
-    { accountAddress: account, chainHex, rpcUrl: RPC_URL },
+    {
+      accountAddress: account,
+      chainHex,
+      rpcUrl: RPC_URL,
+      sendDelayMs: options.sendDelayMs ?? 0,
+      staleNonceOffset: options.staleNonceOffset ?? 0,
+      ignorePinnedNonce: options.ignorePinnedNonce ?? false,
+    },
   );
 }
 

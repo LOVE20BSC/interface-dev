@@ -9,16 +9,14 @@ import type {
   ApprovalMode,
   ApprovalRecord,
   ApprovalRequest,
+  ApprovalTxError,
 } from '@/features/approve-token/lib/approval-types';
 import { useNextNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
 import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 
 export type ApprovalStage = 'idle' | 'wallet' | 'pending';
 
-export interface ApprovalTxError {
-  readonly message: string;
-  readonly kind?: 'nonce' | 'staleBlock';
-}
+export type { ApprovalTxError };
 
 export interface ApprovalTransactionState {
   readonly stage: ApprovalStage;

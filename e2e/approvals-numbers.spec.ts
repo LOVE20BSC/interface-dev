@@ -107,6 +107,52 @@ async function openApprovals(page: Page): Promise<void> {
   });
 }
 
+
+/** Built-in TestWETH from the committed dev address book (D4 uses its address). */
+const WETH = '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9';
+
+const RPC_ABORT_PATTERN = new RegExp(
+  `^${ANVIL_RPC.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+);
+
+/**
+ * D2: the shared wallet stub has no "user rejects" knob, so the spec patches the
+ * injected provider at runtime and rejects the next `eth_sendTransaction` with the
+ * EIP-1193 code 4001 the app maps to 「你在钱包里点了取消，这次授权没有改动。」.
+ * `restoreSend` puts the real provider back so the retry can really mine.
+ */
+async function rejectNextSend(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const holder = window as unknown as {
+      ethereum: { request: (args: unknown) => Promise<unknown> };
+      __approvalsOriginalRequest?: (args: unknown) => Promise<unknown>;
+    };
+    const provider = holder.ethereum;
+    holder.__approvalsOriginalRequest = provider.request.bind(provider);
+    provider.request = async (args: unknown) => {
+      if ((args as { method?: string }).method === 'eth_sendTransaction') {
+        const error = new Error('User rejected the request.') as Error & { code?: number };
+        error.code = 4001;
+        throw error;
+      }
+      return holder.__approvalsOriginalRequest?.(args);
+    };
+  });
+}
+
+async function restoreSend(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const holder = window as unknown as {
+      ethereum: { request: (args: unknown) => Promise<unknown> };
+      __approvalsOriginalRequest?: (args: unknown) => Promise<unknown>;
+    };
+    if (holder.__approvalsOriginalRequest !== undefined) {
+      holder.ethereum.request = holder.__approvalsOriginalRequest;
+      delete holder.__approvalsOriginalRequest;
+    }
+  });
+}
+
 test.describe('代币授权 前端线（理论线 §1）', () => {
   test('用例 A/B/D 未授权 → 长期授权 → 撤销，回执可关闭且状态不丢', async ({ page }) => {
     await openApprovals(page);
@@ -284,6 +330,115 @@ test.describe('代币授权 前端线（理论线 §1）', () => {
 
     // owner: 不要显示「推荐」两个字。
     await expect(page.locator('body')).not.toContainText('推荐');
+  });
+
+  test('D1 默认代币：首次进入与刷新后都默认选中社区代币 TestLOVE20', async ({ page }) => {
+    // 不手动选代币：社区目录首次加载结束后必须自己选中社区代币，而不是余额 0 的包装原生币。
+    await installWallet(page, WALLET);
+    await page.goto('/approvals');
+    await connect(page);
+
+    const trigger = page.getByTestId('approvals-token');
+    await expect(trigger).toContainText(SYMBOL, { timeout: 20_000 });
+    await expect(trigger).not.toContainText('TestWETH');
+    await expect(page.getByTestId('approvals-balance')).toHaveText(`${SYMBOL} 余额 99,799,100`, {
+      timeout: 20_000,
+    });
+
+    // F5 刷新后同样默认社区代币（不残留 TestWETH）。
+    await page.reload();
+    await connect(page);
+    await expect(page.getByTestId('approvals-token')).toContainText(SYMBOL, { timeout: 20_000 });
+    await expect(page.getByTestId('approvals-token')).not.toContainText('TestWETH');
+    await expect(page.getByTestId('approvals-balance')).toHaveText(`${SYMBOL} 余额 99,799,100`, {
+      timeout: 20_000,
+    });
+  });
+
+  test('D2 取消签名：确认弹层内可见取消反馈，关闭后错误条仍在，重试可成功', async ({ page }) => {
+    await openApprovals(page);
+    await rejectNextSend(page);
+
+    const amount = page.getByTestId('approvals-amount-router');
+    const unlimitedButton = page.getByTestId('approvals-unlimited-router');
+    await unlimitedButton.click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toContainText('把「兑换路由」设为长期授权？');
+    await page.getByTestId('approvals-confirm-submit').click();
+
+    // 反馈必须在弹层内可见（旧实现只有被遮罩挡住的页面底部错误条）。
+    const sheetError = page.getByTestId('approvals-confirm-error');
+    await expect(sheetError).toBeVisible({ timeout: 20_000 });
+    await expect(sheetError).toContainText('你在钱包里点了取消，这次授权没有改动。');
+    await expect(sheetError).toContainText('这次没有产生交易');
+    // 弹层不消失、额度没被改动、按钮恢复可点（可重试）。
+    await expect(dialog).toBeVisible();
+    await expect(amount).toHaveText('未授权');
+    await expect(page.getByTestId('approvals-confirm-submit')).toBeEnabled();
+
+    // 关闭弹层后页面底部错误条仍可见。
+    await page.getByTestId('approvals-confirm-cancel').click();
+    await expect(page.getByTestId('approvals-confirm')).toHaveCount(0);
+    await expect(page.getByTestId('approvals-error')).toContainText(
+      '你在钱包里点了取消，这次授权没有改动。',
+    );
+
+    // 恢复钱包后重试真的能落链。
+    await restoreSend(page);
+    await unlimitedButton.click();
+    await page.getByTestId('approvals-confirm-submit').click();
+    await expect(amount).toHaveText('长期授权', { timeout: 30_000 });
+  });
+
+  test('D3 RPC 不可用：网络读不到态 + 重新读取，不误报「没有代币」', async ({ page }) => {
+    await page.route(RPC_ABORT_PATTERN, (route) => route.abort());
+    await installWallet(page, WALLET);
+    await page.goto('/approvals');
+    await connect(page);
+
+    const networkError = page.getByTestId('approvals-block-network-error');
+    await expect(networkError).toBeVisible({ timeout: 40_000 });
+    await expect(networkError).toContainText('暂时读不到网络数据');
+    await expect(page.getByTestId('approvals-balance')).toHaveText('余额暂时读不到');
+    await expect(page.getByTestId('approvals-network-retry')).toBeEnabled();
+    // 网络故障不得被写成「没有代币」并引导用户去添加代币。
+    await expect(page.locator('body')).not.toContainText('还没有可以查看的代币');
+    await expect(page.locator('body')).not.toContainText('先在代币选择里添加一个 ERC20 代币地址');
+
+    // 网络恢复后点「重新读取」自愈，不需要刷新页面。
+    await page.unroute(RPC_ABORT_PATTERN);
+    await page.getByTestId('approvals-network-retry').click();
+    await expect(page.getByTestId('approvals-block-network-error')).toHaveCount(0, {
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId('approvals-token')).toContainText(SYMBOL, { timeout: 30_000 });
+    await expect(page.getByTestId('approvals-balance')).toHaveText(`${SYMBOL} 余额 99,799,100`, {
+      timeout: 30_000,
+    });
+    // 授权额度块也真的读出来了（D2 用例可能已把 router 设为长期授权，这里只要求行可见）。
+    await expect(page.getByTestId('approvals-amount-router')).toBeVisible({ timeout: 30_000 });
+  });
+
+  test('D4 自定义代币按地址去重：添加内置 TestWETH 不再出现第二个同名项', async ({ page }) => {
+    await openApprovals(page);
+    const trigger = page.getByTestId('approvals-token');
+
+    await trigger.click();
+    await page.getByTestId('approvals-token-custom-address').fill(WETH);
+    await page.getByRole('button', { name: '添加代币' }).click();
+
+    // 已在目录里 → 直接选中内置项（包装原生币），余额按该代币读。
+    await expect(trigger).toContainText('TestWETH', { timeout: 20_000 });
+    await expect(page.getByTestId('approvals-balance')).toHaveText('TestWETH 余额 0', {
+      timeout: 20_000,
+    });
+
+    // 选择器里 TestWETH 只有一个（旧实现是两个同名项），并说明已在包装原生币分组。
+    await trigger.click();
+    await expect(page.getByTestId('approvals-token-option-TestWETH')).toHaveCount(1);
+    await expect(page.getByTestId('approvals-token-custom-duplicate')).toContainText(
+      'TestWETH 已经在「包装原生币」里，不用重复添加。',
+    );
   });
 });
 

@@ -1,6 +1,9 @@
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import type { ApprovalMode } from '@/features/approve-token/lib/approval-types';
+import type {
+  ApprovalMode,
+  ApprovalTxError,
+} from '@/features/approve-token/lib/approval-types';
 import { Button } from '@/shared/ui/button';
 import { Sheet } from '@/shared/ui/sheet';
 
@@ -16,6 +19,11 @@ export interface ApprovalConfirmSheetProps {
   readonly action: PendingApprovalAction | null;
   readonly tokenSymbol: string;
   readonly busy: boolean;
+  /**
+   * Last send-time failure. Rendered inside the sheet because the page-level
+   * alert sits under the modal mask and the user would see nothing at all.
+   */
+  readonly error?: ApprovalTxError | null;
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
 }
@@ -29,6 +37,7 @@ export function ApprovalConfirmSheet({
   action,
   tokenSymbol,
   busy,
+  error,
   onCancel,
   onConfirm,
 }: ApprovalConfirmSheetProps) {
@@ -79,6 +88,16 @@ export function ApprovalConfirmSheet({
               </dd>
             </div>
           </dl>
+        ) : null}
+        {error !== null && error !== undefined ? (
+          <div
+            role="alert"
+            data-testid="approvals-confirm-error"
+            className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
+          >
+            <p>{error.message}</p>
+            <p className="mt-1 text-xs leading-5">{copy.approvals.confirmErrorHint}</p>
+          </div>
         ) : null}
         <div className="flex flex-col gap-2">
           <Button

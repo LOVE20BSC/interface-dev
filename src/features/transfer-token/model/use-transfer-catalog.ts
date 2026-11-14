@@ -45,6 +45,12 @@ export interface TransferCatalog {
   readonly hasMore: boolean;
   readonly loadMore: () => void;
   readonly isLoading: boolean;
+  /** Community directory (Launch registry) is still reading its first page. */
+  readonly communityLoading: boolean;
+  /** Community directory read failed — the chain itself is unreachable. */
+  readonly communityError: boolean;
+  /** Re-read the community directory and the wrapped/LP metadata. */
+  readonly refetch: () => void;
   readonly custom: CustomTokenState;
   readonly addCustomToken: (address: string) => void;
   readonly clearCustomToken: () => void;
@@ -218,6 +224,12 @@ export function useTransferCatalog(): TransferCatalog {
     hasMore: swapCatalog.hasMore,
     loadMore: swapCatalog.loadMore,
     isLoading: swapCatalog.isLoading || metadata.isLoading,
+    communityLoading: swapCatalog.isLoading,
+    communityError: swapCatalog.isError,
+    refetch: () => {
+      swapCatalog.refetch();
+      void metadata.refetch();
+    },
     custom,
     addCustomToken: (address) => {
       setCustomAddress(address.trim());

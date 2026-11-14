@@ -151,6 +151,52 @@ export function formatTokenAmount(
 }
 
 /**
+ * Smallest non-zero amount the amount rule can display, in base units. With the
+ * default six fraction digits an 18-decimals asset resolves to 10^12 wei
+ * (`0.000001`); a lower-decimals asset resolves to its smallest unit.
+ */
+export function smallestVisibleTokenAmount(
+  decimals: number,
+  maxFractionDigits = TOKEN_AMOUNT_MAX_FRACTION_DIGITS,
+): bigint {
+  const digits = normalizedDigits(maxFractionDigits, TOKEN_AMOUNT_MAX_FRACTION_DIGITS);
+  if (decimals <= digits) return 1n;
+  return 10n ** BigInt(decimals - digits);
+}
+
+/**
+ * `formatTokenAmount` with one extra guarantee for money that actually moves:
+ * a **non-zero** amount the display rule would collapse to `0` renders as
+ * `< 0.000001` (the smallest visible amount) instead of a literal `0`.
+ *
+ * A bare `0` therefore always means exactly zero. 批量转账 uses this for the
+ * batch total, per-row amounts, receipt totals and the before → after balances,
+ * so a 0.0000001 ETH transfer can never look like 「什么都没转」.
+ */
+export function formatVisibleTokenAmount(
+  value: bigint | undefined | null,
+  decimals: number | undefined | null,
+  options: AmountFormatOptions = {},
+): string {
+  const formatted = formatTokenAmount(value, decimals, options);
+  if (
+    formatted !== '0' ||
+    value === undefined ||
+    value === null ||
+    value === 0n ||
+    decimals === undefined ||
+    decimals === null
+  ) {
+    return formatted;
+  }
+  const smallest = smallestVisibleTokenAmount(
+    decimals,
+    options.maxFractionDigits ?? TOKEN_AMOUNT_MAX_FRACTION_DIGITS,
+  );
+  return `< ${formatUnits(smallest, decimals)}`;
+}
+
+/**
  * Percent value (e.g. `0.5` → `0.5%` text sans the sign) with at most two
  * fraction digits. Values are truncated, never rounded up. `minimumFractionDigits`
  * exists for fixed preset labels such as `1.0`.

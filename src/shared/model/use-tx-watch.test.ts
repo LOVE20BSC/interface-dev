@@ -39,7 +39,7 @@ interface FakeClient {
 interface FakeClientOverrides {
   readonly receipt?: () => Promise<unknown>;
   readonly tx?: () => Promise<unknown>;
-  readonly nonce?: () => Promise<number>;
+  readonly nonce?: (args?: { blockTag?: string }) => Promise<number>;
   readonly blockNumber?: () => Promise<bigint>;
   readonly block?: () => Promise<unknown>;
 }
@@ -132,15 +132,32 @@ describe('useTxWatch', () => {
     expect(result.current.isStuck).toBe(true);
   });
 
-  it('detects a nonce gap immediately, without waiting for the deadline', async () => {
+  it('detects a nonce gap after it survives the grace window', async () => {
     const fake = makeClient({
       tx: () => Promise.resolve({ nonce: 68, from: WALLET }),
       nonce: () => Promise.resolve(3),
     });
     const { result } = renderWatch(fake);
     await flush();
+    // One disagreeing read is noise, not a recovery card.
+    expect(result.current.status).toBe('pending');
+    await flush(11_000);
     expect(result.current.status).toBe('nonceGap');
     expect(result.current.isStuck).toBe(true);
+  });
+
+  it('does not call a transaction waiting behind another pending transaction a nonce gap', async () => {
+    const fake = makeClient({
+      tx: () => Promise.resolve({ nonce: 5, from: WALLET }),
+      nonce: (args) => Promise.resolve(args?.blockTag === 'pending' ? 6 : 4),
+    });
+    const { result } = renderWatch(fake);
+    await flush();
+    await flush(11_000);
+    // The pool can still reach nonce 5, so this must never become 「卡在钱包里」
+    // (a passed deadline may still surface the plain slow card).
+    expect(result.current.status).not.toBe('nonceGap');
+    expect(result.current.status).toBe('slow');
   });
 
   it('reports a reverted receipt and stops polling', async () => {
@@ -174,6 +191,7 @@ describe('useTxWatch', () => {
     });
     const { result } = renderWatch(fake);
     await flush();
+    await flush(11_000);
     expect(result.current.status).toBe('nonceGap');
     const callsAfterSettle = fake.calls.tx.mock.calls.length;
     await flush(5_000);

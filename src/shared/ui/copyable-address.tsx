@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { copy } from '@/shared/config/copy';
 import { cn } from '@/shared/lib/cn';
 import { copyText } from '@/shared/lib/clipboard';
@@ -9,6 +9,34 @@ export type AddressCopyStatus = 'idle' | 'copied' | 'failed';
 
 /** How long the 已复制 / 复制失败 feedback stays on screen. */
 export const ADDRESS_COPY_FEEDBACK_MS = 2000;
+
+/**
+ * Break opportunity every N hex characters when a full address has to wrap
+ * (QA 2026-11-14: `break-all` filled the line greedily and left a single
+ * character on the last line at 390px). `0x` stays attached to the first group,
+ * and each group is short enough that the last line is never one character.
+ */
+const FULL_ADDRESS_WRAP_GROUP = 4;
+
+function fullAddressSegments(address: string): readonly string[] {
+  const body = address.startsWith('0x') ? address.slice(2) : '';
+  if (body.length === 0) return [address];
+  const segments = ['0x'];
+  for (let index = 0; index < body.length; index += FULL_ADDRESS_WRAP_GROUP) {
+    segments.push(body.slice(index, index + FULL_ADDRESS_WRAP_GROUP));
+  }
+  return segments;
+}
+
+/** Full address with `<wbr>` soft break points; the text content stays the address. */
+function WrappableAddress({ address }: { readonly address: string }): ReactNode {
+  return fullAddressSegments(address).map((segment, index) => (
+    <Fragment key={`${index}-${segment}`}>
+      {index > 0 ? <wbr /> : null}
+      {segment}
+    </Fragment>
+  ));
+}
 
 export interface CopyableAddressProps {
   /** Full address; this exact string is copied and exposed as `title`. */
@@ -80,10 +108,10 @@ export function CopyableAddress({
       <span
         className={cn(
           'font-mono text-[11px] leading-5',
-          display === 'full' ? 'break-all' : 'shrink-0',
+          display === 'full' ? 'text-balance [overflow-wrap:anywhere]' : 'shrink-0',
         )}
       >
-        {text}
+        {display === 'full' ? <WrappableAddress address={address} /> : text}
       </span>
       <span className="flex shrink-0 items-center gap-0.5 text-[10px]" aria-live="polite">
         {status === 'copied' ? (

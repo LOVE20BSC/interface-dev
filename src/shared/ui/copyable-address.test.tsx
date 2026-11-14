@@ -77,4 +77,14 @@ describe('CopyableAddress 全局地址组件', () => {
     expect(button).toHaveTextContent(ROUTER);
     expect(button).toHaveAttribute('title', ROUTER);
   });
+
+  it('adds <wbr> break points every 4 hex chars so the last line is never 1 char', () => {
+    renderAddress('full');
+    const button = screen.getByTestId('copy-address');
+    // 0x + 40 hex characters, 4 characters per soft-break group.
+    expect(button.querySelectorAll('wbr')).toHaveLength(10);
+    // Break points are markup only: the copyable text and the title are unchanged.
+    expect(button).toHaveTextContent(ROUTER);
+    expect(button).toHaveAttribute('title', ROUTER);
+  });
 });

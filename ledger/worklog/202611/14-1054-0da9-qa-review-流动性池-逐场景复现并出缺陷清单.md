@@ -44,11 +44,26 @@ owner 2026-11-14：要求「派 agent 先每个页面/模块单独 review」。�
 
 ## Process
 
-<!-- Pitfalls and evidence: with revision + file:line or symbol names -->
+环境：`make -C ../anvil bootstrap PORT=8586`（31337、interval 1s、Hub 已包含）+ `VITE_ENV=dev VITE_ANVIL_RPC=http://127.0.0.1:8586 vite --port 5186`；Playwright node 直跑（脚本 `/tmp/qa-liquidity/`），截图 `/tmp/qa-liquidity-*.png`；8545 全程未碰。
+
+踩坑 1（重要，影响结论可信度）：并行 agent 保存 `src/**` 会触发 Vite 全量热重载，把表单状态清空。首轮因此在「回执关闭后」看到输入框被清空、授权后主按钮不解锁，差点误判成产品缺陷。做法：把工作区 `rsync` 成冻结快照 `/tmp/qa-liquidity/repo/`（`node_modules` 软链）再起 dev server；冻结后同一操作可稳定复现，假象消失。**其它 QA 若共用 dev server 也要注意这一点。**
+
+踩坑 2：页面所有链读都经 Multicall3 `aggregate3` 批处理（`0xcA11…CA11`，selector `0x82ad56cb`），所以 `page.route` 按单条 `eth_call` 的 `to/data` 匹配不到 Hub 报价；改为在 8586 前挂 RPC 代理（`/tmp/qa-liquidity/rpc-proxy.mjs`），解码 `aggregate3` 后只把 `quoteLpWithNative` 子调用改写成 `allowFailure` 的失败调用，才复现出「Hub 报价失败降级」。慢 RPC 同样走该代理。
+
+关键代码定位：D1 根因在 `use-liquidity-transaction.ts:126`（`setApprovedKeyValue(approveKey(...))` 对同一 token+spender 第二次不再变化）+ `add-liquidity-panel.tsx:209-214` / `my-liquidity-panel.tsx:107-112`（只监听 `approvedKey` 变化才 refetch）；D2 在 `add-liquidity-panel.tsx:221-231` 与 `my-liquidity-panel.tsx:120-132` 的 `canSubmit` 未包含 `customSlippageError`；D3 在 `add-liquidity-panel.tsx:123-129`（`hubReady` 用 `pool.hasLiquidity`，加载中也是 false）；D4/D5 在 `liquidity-page.tsx:105`（`customToken ?? communityToken ?? communityTokens[0]`，自定义代币没有在 symbol 变化时清空）。
+
+复现矩阵 30 条，其中 4 组「移动端 390×844 / 桌面 1280×800 × 浅色/深色」共 12 张验收截图；原始输出在 `/tmp/qa-liquidity/scenario-*.log`。
 
 ## Conclusion
 
-<!-- What got done, what got left behind -->
+产出 `docs/product/reviews/liquidity.md`：30 条场景矩阵（PASS 20 / FAIL 10）→ **10 条已验证缺陷：P1 1 条、P2 4 条、P3 5 条**；另有 2 条「怀疑未复现/未覆盖」（Hub 缺失降级、错误网络），原因写在报告第三节。
+
+最严重 3 条：
+1. **P1 D1 授权额度用尽后再次授权，主按钮永久禁用**（加池/撤出都中；链上 allowance 已够、页面仍显示「授权」；只能刷新页面）。连续两笔场景直接不可用。
+2. **P2 D2 自定义「最多可接受的价格变化」非法时不阻断提交**，弹层外无错误、标签回旧值 0.5%，交易按 0.5% 最少额提交（与三线 §3 用例 F「主按钮全程 disabled」相反）。
+3. **P2 D5 选过「换个代币地址」后社区切换不跟随**（URL 已切、页面仍是自定义代币池），且没有清除入口。
+
+未修产品代码、未 `git add`/`commit`；`docs/product/reviews/liquidity.md` 是唯一新增文件（另写入本 worklog）。验证链与 dev server 已停。
 
 ## Execution Log
 

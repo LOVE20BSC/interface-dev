@@ -63,4 +63,12 @@ describe('DesktopSidebar wordmark', () => {
     renderSidebar();
     expect(screen.getByRole('link', { name: 'LOVE20协议 首页' })).toHaveTextContent('LOVE20协议');
   });
+
+  it('holds the wordmark back while the symbol is still loading (QA G8)', () => {
+    token.mockReturnValue({ ...FIXTURE, isMetadataLoading: true });
+    renderSidebar();
+    // No 协议名 flash on a cold start: the name only appears once symbol() is in.
+    expect(screen.queryByText('LOVE20协议')).toBeNull();
+    expect(screen.queryByText('TestLOVE20')).toBeNull();
+  });
 });

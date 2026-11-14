@@ -23,6 +23,7 @@ export type BatchParseErrorReason =
   | 'invalidAddress'
   | 'invalidAmount'
   | 'zeroAmount'
+  | 'truncatedToZero'
   | 'zeroAddress'
   | 'selfAddress'
   | 'batchContract';
@@ -68,6 +69,27 @@ export interface BatchParseResult {
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const SEPARATOR_RE = /[\s,]+/;
+/**
+ * `1,000` / `2,500.5`: a grouped number pasted as the amount. The comma is also
+ * a field separator, so such a line arrives as 3+ tokens; recover it explicitly
+ * (D4) instead of telling the user 「这一行看不懂」.
+ */
+const GROUPED_AMOUNT_RE = /^\d{1,3}(?:,\d{3})+(?:\.\d+)?$/;
+
+/**
+ * `0x… 1,000` → `1000` when the only extra tokens are thousands groups. Returns
+ * `undefined` for any other multi-token tail (`0x… 0.1 0.2`), which stays
+ * `invalidLine`.
+ */
+function recoverGroupedAmount(raw: string, addressToken: string): string | undefined {
+  const at = raw.indexOf(addressToken);
+  if (at < 0) return undefined;
+  const rest = raw
+    .slice(at + addressToken.length)
+    .replace(/^[\s,]+/, '')
+    .trim();
+  return GROUPED_AMOUNT_RE.test(rest) ? rest.replace(/,/g, '') : undefined;
+}
 
 export interface ParseBatchOptions {
   readonly decimals: number;
@@ -86,7 +108,8 @@ export function parseBatchText(text: string, options: ParseBatchOptions): BatchP
   let lineCount = 0;
   let truncated = false;
 
-  const lines = text.split(/\r?\n/);
+  // D10: CRLF, LF and lone CR (old-Mac line endings) all split into lines.
+  const lines = text.split(/\r\n|\r|\n/);
   for (let index = 0; index < lines.length; index += 1) {
     const lineNumber = index + 1;
     const raw = (lines[index] ?? '').trim();
@@ -94,7 +117,17 @@ export function parseBatchText(text: string, options: ParseBatchOptions): BatchP
     lineCount += 1;
 
     const tokens = raw.split(SEPARATOR_RE).filter((token) => token.length > 0);
-    if (tokens.length !== 2) {
+    const addressToken = tokens[0];
+    let amountToken = tokens.length === 2 ? tokens[1] : undefined;
+    if (
+      tokens.length > 2 &&
+      addressToken !== undefined &&
+      ADDRESS_RE.test(addressToken)
+    ) {
+      // D4: accept `地址 1,000` / `地址 2,500.5` (thousands separators).
+      amountToken = recoverGroupedAmount(raw, addressToken);
+    }
+    if (addressToken === undefined || amountToken === undefined) {
       errors.push({
         line: lineNumber,
         reason: tokens.length === 1 ? 'missingAmount' : 'invalidLine',
@@ -102,7 +135,8 @@ export function parseBatchText(text: string, options: ParseBatchOptions): BatchP
       continue;
     }
 
-    const [rawAddress = '', rawAmount = ''] = tokens;
+    const rawAddress = addressToken;
+    const rawAmount = amountToken;
     if (!ADDRESS_RE.test(rawAddress)) {
       errors.push({ line: lineNumber, reason: 'invalidAddress' });
       continue;
@@ -134,7 +168,11 @@ export function parseBatchText(text: string, options: ParseBatchOptions): BatchP
       continue;
     }
     if (parsed.kind === 'zero') {
-      errors.push({ line: lineNumber, reason: 'zeroAmount' });
+      // D5: tell the user when the precision truncated a non-zero amount to 0.
+      errors.push({
+        line: lineNumber,
+        reason: parsed.truncated === true ? 'truncatedToZero' : 'zeroAmount',
+      });
       continue;
     }
     if (parsed.truncated) truncated = true;

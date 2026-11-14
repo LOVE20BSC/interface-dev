@@ -48,7 +48,16 @@ describe('parseTransferAmount', () => {
   });
 
   it('truncating a sub-unit amount to nothing is zero, not a tiny send', () => {
-    expect(parseTransferAmount('0.0001', 2)).toEqual({ kind: 'zero' });
+    expect(parseTransferAmount('0.0001', 2)).toEqual({ kind: 'zero', truncated: true });
+    // A genuine zero stays a plain zero: no truncation hint to show.
+    expect(parseTransferAmount('0.000', 18)).toEqual({ kind: 'zero' });
+  });
+
+  it('flags a non-zero input whose every digit is below the token precision', () => {
+    expect(parseTransferAmount('0.0000000000000000009', 18)).toEqual({
+      kind: 'zero',
+      truncated: true,
+    });
   });
 });
 

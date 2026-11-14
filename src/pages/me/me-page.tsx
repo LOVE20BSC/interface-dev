@@ -112,7 +112,7 @@ export function MePage() {
                 rel="noreferrer"
                 className="text-sm font-medium text-brand-strong underline-offset-4 hover:underline"
               >
-                {copy.home.docs}
+                {copy.me.docsAction}
               </a>
             </dd>
           </div>

@@ -10,6 +10,7 @@ import {
 } from '@/config/networks';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
+import { resolvePairSelection, type SwapSide } from '@/features/swap-token/lib/swap-pair-selection';
 import { swapTokenKey, type SwapToken } from '@/features/swap-token/lib/swap-types';
 import type { WrappedNative } from './use-wrapped-native';
 
@@ -266,12 +267,23 @@ export function useSwapPair(wrapped: WrappedNative): SwapPairState {
     );
   }, [from, rawFrom, rawTo, setSearchParams, status, to]);
 
-  const setSide = (side: 'from' | 'to', token: SwapToken): void => {
+  /**
+   * Owner 2026-11-14: picking the token already on the other side is a direction
+   * swap, not a duplicate pair — the URL always keeps two distinct symbols, so
+   * this path can never produce the 「这个兑换对不可用」 state.
+   */
+  const applySelection = (side: SwapSide, token: SwapToken): void => {
+    const next = resolvePairSelection({ from, to }, side, token);
     setSearchParams(
       (previous) => {
-        const next = new URLSearchParams(previous);
-        next.set(side, token.symbol);
-        return next;
+        const params = new URLSearchParams(previous);
+        if (next === null) {
+          params.set(side, token.symbol);
+          return params;
+        }
+        params.set('from', next.from.symbol);
+        params.set('to', next.to.symbol);
+        return params;
       },
       { replace: true },
     );
@@ -294,10 +306,10 @@ export function useSwapPair(wrapped: WrappedNative): SwapPairState {
     rawFrom,
     rawTo,
     selectFrom: (token) => {
-      setSide('from', token);
+      applySelection('from', token);
     },
     selectTo: (token) => {
-      setSide('to', token);
+      applySelection('to', token);
     },
     swapDirection: () => {
       if (from === undefined || to === undefined) return;

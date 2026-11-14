@@ -30,6 +30,10 @@ import {
   writeUnlimitedApprovalPreference,
 } from '@/features/approve-token/lib/approval-preference';
 import type { ApprovalMode } from '@/features/approve-token/lib/approval-types';
+import {
+  findTokenByAddress,
+  pickDefaultApprovalToken,
+} from '@/features/approve-token/lib/approval-tokens';
 import { useApprovalAllowances } from '@/features/approve-token/model/use-approval-allowances';
 import {
   approvalActionLabel,
@@ -92,7 +96,35 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
   const [submitBusy, setSubmitBusy] = useState(false);
 
   const ready = isConnected && !isWrongChain;
-  const token = selectedToken;
+  // D4 — every built-in token; a custom address that matches one of them must not
+  // appear as a second same-name option.
+  const builtinTokens = useMemo(
+    () =>
+      [...catalog.communityTokens, catalog.wrappedToken, catalog.lpToken].filter(
+        (entry): entry is TransferToken => entry !== undefined,
+      ),
+    [catalog.communityTokens, catalog.lpToken, catalog.wrappedToken],
+  );
+  const customToken = catalog.custom.token;
+  const duplicateBuiltin = useMemo(
+    () =>
+      customToken?.address === undefined
+        ? undefined
+        : findTokenByAddress(builtinTokens, customToken.address),
+    [builtinTokens, customToken],
+  );
+
+  // D4: a custom address that is a built-in token renders the built-in entry,
+  // even when the built-in metadata resolved after the custom token did.
+  const token = useMemo(
+    () =>
+      selectedToken?.kind === 'custom' &&
+      duplicateBuiltin !== undefined &&
+      selectedToken.address?.toLowerCase() === duplicateBuiltin.address?.toLowerCase()
+        ? duplicateBuiltin
+        : selectedToken,
+    [duplicateBuiltin, selectedToken],
+  );
   const tokenAddress = token?.address;
 
   const balance = useTransferBalance(token, account, ready);
@@ -113,7 +145,9 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // A resolved custom token becomes the selection exactly once per address, the
-  // same pattern the 代币转账 page uses.
+  // same pattern the 代币转账 page uses. D4: when that address is already a
+  // built-in token (e.g. TestWETH), keep the built-in entry and never render a
+  // second same-name option.
   const appliedCustomKey = useRef('');
   useEffect(() => {
     const resolved = catalog.custom.token;
@@ -124,18 +158,17 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
     setSelectedToken(resolved);
   }, [catalog.custom.status, catalog.custom.token]);
 
-  // First usable token: community → wrapped → LP. Native coins cannot be
-  // approved, so they are deliberately absent from this page's universe.
+  // D1: first usable token, decided only after the community directory's first
+  // load settles — otherwise 包装原生币 (usually balance 0) wins the race.
+  const defaultToken = pickDefaultApprovalToken(catalog);
   const appliedDefaultKey = useRef('');
   useEffect(() => {
-    if (selectedToken !== undefined) return;
-    const fallback = catalog.communityTokens[0] ?? catalog.wrappedToken ?? catalog.lpToken;
-    if (fallback === undefined) return;
-    const key = transferTokenKey(fallback);
+    if (selectedToken !== undefined || defaultToken === undefined) return;
+    const key = transferTokenKey(defaultToken);
     if (appliedDefaultKey.current === key) return;
     appliedDefaultKey.current = key;
-    setSelectedToken(fallback);
-  }, [catalog.communityTokens, catalog.lpToken, catalog.wrappedToken, selectedToken]);
+    setSelectedToken(defaultToken);
+  }, [defaultToken, selectedToken]);
 
   const busy = tx.stage !== 'idle' || submitBusy;
 
@@ -150,35 +183,61 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
     };
   };
 
-  const groups: TokenPickerGroup[] = [
-    {
-      key: 'community',
-      label: copy.approvals.groupCommunity,
-      items: catalog.communityTokens.map(toItem),
-      emptyLabel: copy.approvals.noCommunityTokens,
-    },
-  ];
-  if (catalog.wrappedToken !== undefined) {
-    groups.push({
-      key: 'wrapped',
-      label: copy.approvals.groupWrapped,
-      items: [toItem(catalog.wrappedToken)],
-    });
+  // D4: one row per address, in the caller's priority order (community wins over
+  // wrapped/LP/custom). An address that lives in more than one bucket therefore
+  // renders exactly once instead of as two same-name options.
+  const groups: TokenPickerGroup[] = [];
+  {
+    const seenAddresses = new Set<string>();
+    const pushGroup = (
+      key: string,
+      label: string,
+      entries: readonly TransferToken[],
+      emptyLabel?: string,
+    ) => {
+      const items: TokenPickerItem[] = [];
+      for (const entry of entries) {
+        const address = entry.address?.toLowerCase();
+        if (address !== undefined) {
+          if (seenAddresses.has(address)) continue;
+          seenAddresses.add(address);
+        }
+        items.push(toItem(entry));
+      }
+      groups.push({
+        key,
+        label,
+        items,
+        ...(emptyLabel !== undefined ? { emptyLabel } : {}),
+      });
+    };
+    pushGroup(
+      'community',
+      copy.approvals.groupCommunity,
+      catalog.communityTokens,
+      copy.approvals.noCommunityTokens,
+    );
+    if (catalog.wrappedToken !== undefined) {
+      pushGroup('wrapped', copy.approvals.groupWrapped, [catalog.wrappedToken]);
+    }
+    if (catalog.lpToken !== undefined) {
+      pushGroup('lp', copy.approvals.groupLp, [catalog.lpToken]);
+    }
+    if (catalog.custom.token !== undefined) {
+      pushGroup('custom', copy.approvals.groupCustom, [catalog.custom.token]);
+    }
   }
-  if (catalog.lpToken !== undefined) {
-    groups.push({
-      key: 'lp',
-      label: copy.approvals.groupLp,
-      items: [toItem(catalog.lpToken)],
-    });
-  }
-  if (catalog.custom.token !== undefined) {
-    groups.push({
-      key: 'custom',
-      label: copy.approvals.groupCustom,
-      items: [toItem(catalog.custom.token)],
-    });
-  }
+
+  const duplicateGroupLabel =
+    duplicateBuiltin === undefined
+      ? undefined
+      : copy.approvals[
+          duplicateBuiltin.kind === 'community'
+            ? 'groupCommunity'
+            : duplicateBuiltin.kind === 'wrapped'
+              ? 'groupWrapped'
+              : 'groupLp'
+        ];
 
   const customTokenError = (() => {
     switch (catalog.custom.status) {
@@ -261,12 +320,25 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
     if (ok) setPendingAction(null);
   };
 
-  const balanceText =
-    token === undefined || balance.isLoading
-      ? copy.approvals.balanceLoading
-      : balance.isError
-        ? copy.approvals.balanceError
-        : `${copy.approvals.balanceLabel(token.symbol)} ${formatTokenAmount(balance.balance, token.decimals)}`;
+  // D3: with no token selected yet the balance line must distinguish 「还在读」 /
+  // 「网络读不到」 / 「确实没有可用代币」 instead of sitting on 读取余额中… forever.
+  const balanceText = (() => {
+    if (token === undefined) {
+      if (catalog.communityError) return copy.approvals.balanceError;
+      if (catalog.isLoading) return copy.approvals.balanceLoading;
+      return copy.approvals.noTokenTitle;
+    }
+    if (balance.isLoading) return copy.approvals.balanceLoading;
+    if (balance.isError) return copy.approvals.balanceError;
+    return `${copy.approvals.balanceLabel(token.symbol)} ${formatTokenAmount(balance.balance, token.decimals)}`;
+  })();
+
+  // D3: one actionable way back after the chain could not be read at all.
+  const retryCatalog = () => {
+    catalog.refetch();
+    balance.refetch();
+    allowances.refetch();
+  };
 
   if (!isConnected) {
     return (
@@ -390,6 +462,17 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
                     >
                       {copy.approvals.customRetry}
                     </button>
+                  </p>
+                ) : null}
+                {duplicateBuiltin !== undefined && duplicateGroupLabel !== undefined ? (
+                  <p
+                    className="px-1 text-[11px] leading-4 text-muted"
+                    data-testid="approvals-token-custom-duplicate"
+                  >
+                    {copy.approvals.customAlreadyListed(
+                      duplicateBuiltin.symbol,
+                      duplicateGroupLabel,
+                    )}
                   </p>
                 ) : null}
               </div>
@@ -578,10 +661,33 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
 
       {/* ④ 常用合约列表 (owner 2026-11-14: 全部展开，地址可点击复制) */}
       {token === undefined ? (
-        <Card data-testid="approvals-block-known">
-          <CardTitle>{copy.approvals.noTokenTitle}</CardTitle>
-          <CardDescription>{copy.approvals.noTokenBody}</CardDescription>
-        </Card>
+        catalog.communityError ? (
+          <Card data-testid="approvals-block-network-error">
+            <CardTitle>{copy.approvals.networkErrorTitle}</CardTitle>
+            <CardDescription>{copy.approvals.networkErrorBody}</CardDescription>
+            <div className="mt-4 flex">
+              <Button
+                variant="secondary"
+                size="sm"
+                data-testid="approvals-network-retry"
+                onClick={retryCatalog}
+                leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
+              >
+                {copy.approvals.networkRetry}
+              </Button>
+            </div>
+          </Card>
+        ) : catalog.isLoading ? (
+          <Card data-testid="approvals-block-known-loading">
+            <CardDescription>{copy.approvals.catalogLoading}</CardDescription>
+            <Skeleton className="mt-3 h-24 w-full" />
+          </Card>
+        ) : (
+          <Card data-testid="approvals-block-known">
+            <CardTitle>{copy.approvals.noTokenTitle}</CardTitle>
+            <CardDescription>{copy.approvals.noTokenBody}</CardDescription>
+          </Card>
+        )
       ) : (
         <Card className="overflow-hidden p-0" data-testid="approvals-block-known">
           <div className="px-4 pb-2 pt-4">
@@ -702,6 +808,7 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
         action={pendingAction}
         tokenSymbol={token?.symbol ?? ''}
         busy={busy}
+        error={tx.error}
         onCancel={() => {
           if (!busy) setPendingAction(null);
         }}

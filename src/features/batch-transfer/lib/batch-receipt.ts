@@ -14,6 +14,12 @@ export interface BatchReceiptRecord {
   readonly total: bigint;
   readonly gasLimit: number;
   readonly rows: readonly BatchAuditRow[];
+  /**
+   * ERC20 mode only: allowance still left on the token after the batch mined
+   * (D7 — approving the original total, then submitting a smaller list, leaves
+   * a residual allowance). `undefined` when the read failed or in native mode.
+   */
+  readonly residualAllowance: bigint | undefined;
   readonly recordedAt: number;
 }
 
@@ -21,6 +27,7 @@ export function buildBatchReceipt(
   hash: `0x${string}`,
   request: BatchRequest,
   postBalances: readonly (bigint | undefined)[],
+  residualAllowance?: bigint | undefined,
 ): BatchReceiptRecord {
   return {
     hash,
@@ -30,6 +37,7 @@ export function buildBatchReceipt(
     total: request.total,
     gasLimit: request.gasLimit,
     rows: buildBatchAudit(request.rows, request.preBalances, postBalances),
+    residualAllowance,
     recordedAt: Date.now(),
   };
 }

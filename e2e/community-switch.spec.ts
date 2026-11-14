@@ -19,10 +19,7 @@ import { ACCOUNTS, connect, installWallet } from './wallet-stub';
  */
 
 const deployment = JSON.parse(
-  readFileSync(
-    resolve(process.cwd(), 'src/config/deployments/anvil31337_dev.json'),
-    'utf8',
-  ),
+  readFileSync(resolve(process.cwd(), 'src/config/deployments/anvil31337_dev.json'), 'utf8'),
 ) as {
   chainId: number;
   addresses: {
@@ -96,14 +93,11 @@ function ensureChildCommunity(): string {
     [deployment.addresses.tokenAddress, '1', '1'],
     deployment.addresses.mint,
   );
-  castSend(deployment.addresses.launch, 'launchToken(string,address,uint256,address,uint8,bytes[])', [
-    CHILD_INPUT_SYMBOL,
-    deployment.addresses.tokenAddress,
-    '1',
-    ACCOUNTS.withIdentity,
-    '0',
-    '[]',
-  ]);
+  castSend(
+    deployment.addresses.launch,
+    'launchToken(string,address,uint256,address,uint8,bytes[])',
+    [CHILD_INPUT_SYMBOL, deployment.addresses.tokenAddress, '1', ACCOUNTS.withIdentity, '0', '[]'],
+  );
   const child = addressOf(
     deployment.addresses.launch,
     'tokenAddressBySymbol(string)(address)',
@@ -116,9 +110,7 @@ function ensureChildCommunity(): string {
 }
 
 async function openCommunityMenu(page: Page): Promise<void> {
-  await page
-    .getByRole('button', { name: new RegExp(`当前代币社区 ${GENESIS_SYMBOL}`) })
-    .click();
+  await page.getByRole('button', { name: new RegExp(`当前代币社区 ${GENESIS_SYMBOL}`) }).click();
   await expect(page.getByTestId('community-search')).toBeVisible();
 }
 
@@ -160,9 +152,7 @@ test('社区菜单：输入 symbol 精确匹配并切换社区，保留最近访
   await expect(page).toHaveTitle(new RegExp(CHILD_SYMBOL));
 
   // 再次打开：前缀候选包含首币社区；点回去后，最近访问里应该留下刚访问过的子币。
-  await page
-    .getByRole('button', { name: new RegExp(`当前代币社区 ${CHILD_SYMBOL}`) })
-    .click();
+  await page.getByRole('button', { name: new RegExp(`当前代币社区 ${CHILD_SYMBOL}`) }).click();
   const searchAgain = page.getByTestId('community-search');
   await searchAgain.fill('Test');
   const genesisResult = page.getByTestId(`community-search-result-${GENESIS_SYMBOL}`);
@@ -172,9 +162,7 @@ test('社区菜单：输入 symbol 精确匹配并切换社区，保留最近访
     timeout: 15_000,
   });
 
-  await page
-    .getByRole('button', { name: new RegExp(`当前代币社区 ${GENESIS_SYMBOL}`) })
-    .click();
+  await page.getByRole('button', { name: new RegExp(`当前代币社区 ${GENESIS_SYMBOL}`) }).click();
   const reopened = page.getByRole('dialog');
   await expect(reopened.getByText('最近访问')).toBeVisible();
   await expect(reopened.getByText(CHILD_SYMBOL, { exact: true })).toBeVisible();
@@ -216,4 +204,137 @@ test('钱包菜单：完整钱包地址点击复制，剪贴板拿到完整地�
     path: resolve(SHOTS, 'wallet-menu-address-copied.png'),
     animations: 'disabled',
   });
+});
+
+/**
+ * D-1 (P2, QA 2026-11-14 C15/C15b): closing either top-right menu must give
+ * keyboard focus back to the button that opened it, on both dismiss paths
+ * (Esc and the sheet's ✕) and on both layer shapes (mobile bottom sheet and
+ * desktop anchored popover). Before the fix document.activeElement was <body>,
+ * so the next Tab restarted from the top of the page.
+ */
+test.describe('菜单关闭后的焦点回归', () => {
+  async function expectFocusOn(page: Page, label: RegExp | string): Promise<void> {
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? null))
+      .toMatch(label instanceof RegExp ? label : new RegExp(label));
+  }
+
+  test('社区菜单：Esc 关闭后焦点回到社区药丸按钮', async ({ page }) => {
+    await installWallet(page, ACCOUNTS.withIdentity);
+    await page.goto(`/?symbol=${GENESIS_SYMBOL}`);
+    await connect(page);
+
+    const trigger = page.getByRole('button', {
+      name: new RegExp(`当前代币社区 ${GENESIS_SYMBOL}`),
+    });
+    await trigger.click();
+    await expect(page.getByTestId('community-search')).toBeVisible({ timeout: 15_000 });
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('community-search')).toHaveCount(0);
+    await expectFocusOn(page, `当前代币社区 ${GENESIS_SYMBOL}，打开社区菜单`);
+  });
+
+  test('社区菜单：点 ✕ 关闭后焦点回到社区药丸按钮', async ({ page }) => {
+    await installWallet(page, ACCOUNTS.withIdentity);
+    await page.goto(`/?symbol=${GENESIS_SYMBOL}`);
+    await connect(page);
+
+    const trigger = page.getByRole('button', {
+      name: new RegExp(`当前代币社区 ${GENESIS_SYMBOL}`),
+    });
+    await trigger.click();
+    const menu = page.getByRole('dialog');
+    await expect(menu).toBeVisible({ timeout: 15_000 });
+
+    await menu.getByRole('button', { name: '关闭' }).click();
+    await expect(page.getByTestId('community-search')).toHaveCount(0);
+    await expectFocusOn(page, `当前代币社区 ${GENESIS_SYMBOL}，打开社区菜单`);
+  });
+
+  test('钱包菜单：Esc 与 ✕ 关闭后焦点都回到钱包药丸按钮', async ({ page }) => {
+    await installWallet(page, ACCOUNTS.withIdentity);
+    await page.goto(`/?symbol=${GENESIS_SYMBOL}`);
+    await connect(page);
+
+    const trigger = page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' });
+    const label = '打开钱包与身份 NFT 菜单';
+
+    await trigger.click();
+    await expect(page.getByTestId('wallet-menu-address')).toBeVisible({ timeout: 15_000 });
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('wallet-menu-address')).toHaveCount(0);
+    await expectFocusOn(page, label);
+
+    await trigger.click();
+    const menu = page.getByRole('dialog');
+    await expect(menu).toBeVisible({ timeout: 15_000 });
+    await menu.getByRole('button', { name: '关闭' }).click();
+    await expect(page.getByTestId('wallet-menu-address')).toHaveCount(0);
+    await expectFocusOn(page, label);
+  });
+});
+
+test.describe('桌面 popover 关闭后的焦点回归', () => {
+  test.use({ viewport: { width: 1280, height: 900 }, isMobile: false, hasTouch: false });
+
+  test('桌面：社区菜单 Esc 关闭后焦点回到触发按钮', async ({ page }) => {
+    await installWallet(page, ACCOUNTS.withIdentity);
+    await page.goto(`/?symbol=${GENESIS_SYMBOL}`);
+    await connect(page);
+
+    const trigger = page.getByRole('button', {
+      name: new RegExp(`当前代币社区 ${GENESIS_SYMBOL}`),
+    });
+    await trigger.click();
+    await expect(page.getByTestId('community-search')).toBeVisible({ timeout: 15_000 });
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('community-search')).toHaveCount(0);
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? null))
+      .toBe(`当前代币社区 ${GENESIS_SYMBOL}，打开社区菜单`);
+  });
+});
+
+/**
+ * G8 (P3, QA 2026-11-14): on a cold start without `?symbol=` the wordmark used to
+ * render 协议名 first and then swap to the on-chain symbol ~100ms later. The
+ * product semantics are unchanged (协议名 is still the fallback for an unknown
+ * community); the eager chrome just holds the name back while the symbol is in
+ * flight, so the first thing the user sees is the community name itself.
+ */
+test('冷启动（无 ?symbol）字标不闪协议名：首次出现即社区名', async ({ page }) => {
+  await page.addInitScript(() => {
+    const seen: string[] = [];
+    (window as unknown as { __wordmarkSeen: string[] }).__wordmarkSeen = seen;
+    const record = () => {
+      const element = document.querySelector('[data-testid="home-wordmark"]');
+      if (element === null) return;
+      const text = (element.textContent ?? '').trim();
+      if (text.length > 0 && seen[seen.length - 1] !== text) seen.push(text);
+    };
+    new MutationObserver(record).observe(document, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    record();
+  });
+
+  await page.goto('/');
+
+  // Cold start with no ?symbol= is still seeded to the default community.
+  await expect(page).toHaveURL(new RegExp(`[?&]symbol=${GENESIS_SYMBOL}(&|$)`), {
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId('home-wordmark')).toHaveText(GENESIS_SYMBOL, {
+    timeout: 20_000,
+  });
+
+  const seen = await page.evaluate(
+    () => (window as unknown as { __wordmarkSeen: string[] }).__wordmarkSeen,
+  );
+  expect(seen).toEqual([GENESIS_SYMBOL]);
 });

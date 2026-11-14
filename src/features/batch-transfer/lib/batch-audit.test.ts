@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildBatchAudit, countAuditMismatches } from './batch-audit';
+import { buildBatchAudit, countAuditMismatches, summarizeBatchAudit } from './batch-audit';
 
 const A = '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc' as const;
 const B = '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955' as const;
@@ -42,5 +42,51 @@ describe('buildBatchAudit', () => {
     expect(audit[0]?.delta).toBeUndefined();
     expect(audit[0]?.status).toBe('unknown');
     expect(countAuditMismatches(audit)).toBe(0);
+  });
+});
+
+describe('summarizeBatchAudit', () => {
+  it('is verified only when every row arrived exactly', () => {
+    const audit = buildBatchAudit(
+      [{ address: A, amount: 5n }, { address: B, amount: 7n }],
+      [0n, 0n],
+      [5n, 7n],
+    );
+
+    expect(summarizeBatchAudit(audit)).toEqual({
+      outcome: 'verified',
+      unknownRows: 0,
+      mismatchRows: 0,
+    });
+  });
+
+  it('is unverified as soon as one row could not be read (D1: never claim 每一行都已到账)', () => {
+    const audit = buildBatchAudit(
+      [{ address: A, amount: 5n }, { address: B, amount: 7n }],
+      [0n, 0n],
+      [5n, undefined],
+    );
+
+    expect(summarizeBatchAudit(audit)).toEqual({
+      outcome: 'unverified',
+      unknownRows: 1,
+      mismatchRows: 0,
+    });
+  });
+
+  it('is unverified when the pre-balance read failed too', () => {
+    const audit = buildBatchAudit([{ address: A, amount: 5n }], [undefined], [5n]);
+
+    expect(summarizeBatchAudit(audit).outcome).toBe('unverified');
+  });
+
+  it('reports a mismatching row as anomaly', () => {
+    const audit = buildBatchAudit([{ address: A, amount: 5n }], [0n], [4n]);
+
+    expect(summarizeBatchAudit(audit)).toEqual({
+      outcome: 'anomaly',
+      unknownRows: 0,
+      mismatchRows: 1,
+    });
   });
 });

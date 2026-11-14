@@ -3,8 +3,12 @@ import { documentTitleFor } from '@/app/navigation/document-title';
 import { copy } from '@/shared/config/copy';
 import type { CommunityDisplay } from '@/entities/community-token/model/use-community-display';
 
-const RESOLVED: CommunityDisplay = { symbol: 'TestLOVE20', resolved: true };
-const UNRESOLVED: CommunityDisplay = { symbol: copy.brand.protocolLabel, resolved: false };
+const RESOLVED: CommunityDisplay = { symbol: 'TestLOVE20', resolved: true, pending: false };
+const UNRESOLVED: CommunityDisplay = {
+  symbol: copy.brand.protocolLabel,
+  resolved: false,
+  pending: true,
+};
 
 describe('documentTitleFor', () => {
   it('uses only the community symbol on home', () => {

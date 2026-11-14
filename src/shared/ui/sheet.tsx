@@ -13,6 +13,12 @@ export interface SheetProps {
   /** Build-version mismatch and other blocking states set this to false. */
   readonly dismissible?: boolean;
   readonly className?: string;
+  /**
+   * Radix close auto-focus hook. Popovers/dialogs opened without a Radix trigger
+   * (e.g. the connect-pill menus) must take focus restore over themselves, or
+   * Radix hands focus to <body> and keyboard users restart from the page top.
+   */
+  readonly onCloseAutoFocus?: (event: Event) => void;
 }
 
 /**
@@ -28,6 +34,7 @@ export function Sheet({
   children,
   dismissible = true,
   className,
+  onCloseAutoFocus,
 }: SheetProps) {
   return (
     <DialogPrimitive.Root
@@ -51,6 +58,7 @@ export function Sheet({
           onPointerDownOutside={(event) => {
             if (!dismissible) event.preventDefault();
           }}
+          {...(onCloseAutoFocus !== undefined ? { onCloseAutoFocus } : {})}
         >
           <div
             className="mx-auto mb-3 h-1 w-10 rounded-full bg-line-strong md:hidden"

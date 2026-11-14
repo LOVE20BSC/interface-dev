@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
@@ -30,6 +31,21 @@ const SYMBOL = 'TestLOVE20';
 const QUERY = `?symbol=${SYMBOL}`;
 const TEST_X = 'TestX';
 
+const deployment = JSON.parse(
+  readFileSync(resolve(process.cwd(), 'src/config/deployments/anvil31337_dev.json'), 'utf8'),
+) as {
+  addresses: {
+    tokenAddress: `0x${string}`;
+    launch: `0x${string}`;
+    mint: `0x${string}`;
+  };
+};
+
+const RPC_URL = process.env.E2E_ANVIL_RPC ?? 'http://127.0.0.1:8555';
+/** launchToken takes a 6-byte uppercase symbol; the dev chain prefixes `Test`. */
+const CHILD_INPUT_SYMBOL = 'CMTOK1';
+const CHILD_SYMBOL = 'TestCMTOK1';
+
 // anvil 固定账户：#4 / #1 有 TestLOVE20，#5 只有原生币，#8 用于首次建池。
 const TOKEN_HOLDER = ACCOUNTS.withIdentity; // #1 0xf39F…2266
 const TOKEN_HOLDER_4 = '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65'; // #4
@@ -46,6 +62,75 @@ test.use({
 
 test.describe.configure({ mode: 'serial', timeout: 240_000 });
 isolateChain();
+
+/**
+ * QA D5 需要在**不刷新页面**的前提下切到另一个社区：菜单只认 Launch 里存在的
+ * symbol，所以照 community-switch.spec 的做法在快照里 launch 一个子社区。
+ */
+function cast(args: string[]): string {
+  return execFileSync('cast', [...args, '--rpc-url', RPC_URL], { encoding: 'utf8' }).trim();
+}
+
+function castCall(address: string, signature: string, ...args: string[]): string {
+  return cast(['call', address, signature, ...args]);
+}
+
+function castSend(
+  address: string,
+  signature: string,
+  args: readonly string[],
+  from: string = ACCOUNTS.withIdentity,
+): void {
+  execFileSync(
+    'cast',
+    ['send', address, signature, ...args, '--from', from, '--unlocked', '--rpc-url', RPC_URL],
+    { encoding: 'utf8' },
+  );
+}
+
+function addressOf(address: string, signature: string, ...args: string[]): `0x${string}` {
+  const raw = castCall(address, signature, ...args);
+  const match = /0x[0-9a-fA-F]{40}/.exec(raw);
+  if (match === null) throw new Error(`expected an address from ${signature}, got ${raw}`);
+  return match[0] as `0x${string}`;
+}
+
+function ensureChildCommunity(): void {
+  const existing = addressOf(
+    deployment.addresses.launch,
+    'tokenAddressBySymbol(string)(address)',
+    CHILD_SYMBOL,
+  );
+  if (existing !== '0x0000000000000000000000000000000000000000') return;
+  cast(['rpc', 'anvil_impersonateAccount', deployment.addresses.mint]);
+  cast(['rpc', 'anvil_setBalance', deployment.addresses.mint, '0xde0b6b3a7640000']);
+  castSend(
+    deployment.addresses.launch,
+    'addLaunchCount(address,uint256,uint256)',
+    [deployment.addresses.tokenAddress, '1', '1'],
+    deployment.addresses.mint,
+  );
+  castSend(deployment.addresses.launch, 'launchToken(string,address,uint256,address,uint8,bytes[])', [
+    CHILD_INPUT_SYMBOL,
+    deployment.addresses.tokenAddress,
+    '1',
+    ACCOUNTS.withIdentity,
+    '0',
+    '[]',
+  ]);
+  const child = addressOf(
+    deployment.addresses.launch,
+    'tokenAddressBySymbol(string)(address)',
+    CHILD_SYMBOL,
+  );
+  if (child === '0x0000000000000000000000000000000000000000') {
+    throw new Error('launchToken did not register the child community symbol');
+  }
+}
+
+test.beforeAll(() => {
+  ensureChildCommunity();
+});
 
 async function openLiquidity(page: Page, account: string): Promise<void> {
   await installWallet(page, account);
@@ -106,6 +191,14 @@ async function deployTestToken(): Promise<string> {
     await new Promise((done) => setTimeout(done, 250));
   }
   throw new Error('deployTestToken: 部署没有返回合约地址');
+}
+
+/** 「换个代币地址」→ 输入地址 → 读取；等当前代币行换成该 symbol。 */
+async function selectCustomToken(page: Page, address: string, symbol: string): Promise<void> {
+  await page.getByTestId('liquidity-custom-toggle').click();
+  await page.getByTestId('liquidity-custom-address').fill(address);
+  await page.getByTestId('liquidity-custom-add').click();
+  await expect(page.getByTestId('liquidity-token')).toContainText(symbol, { timeout: 20_000 });
 }
 
 async function addQuote(page: Page, tokenAmount: string): Promise<void> {
@@ -406,7 +499,211 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       await page.getByTestId('liquidity-slippage-custom').fill('60');
       await expect(page.getByText(/自定义值需要在 0\.01% 到 50% 之间/)).toBeVisible();
       await page.getByRole('button', { name: '完成' }).click();
+      // QA D2：关掉设置弹层后错误仍要可见，并且授权与提交两个写操作都被挡住。
+      await expect(page.getByTestId('liquidity-slippage-error')).toHaveText(
+        '自定义值需要在 0.01% 到 50% 之间。（0.01%–50%）',
+      );
       await expect(primary).toBeDisabled();
+      await expect(approve).toBeDisabled();
+    }),
+  );
+});
+
+test.describe('流动性池 QA 缺陷回归（D1/D2/D4/D5/D6/D7/D8/D9/D10）', () => {
+  test(
+    '用例 G/H（P1/D1）：连续两笔加池 / 撤出——第二笔重新授权后可继续提交',
+    withChainSnapshot(async (page) => {
+      await openLiquidity(page, TOKEN_HOLDER_4);
+      await expect(page.getByTestId('liquidity-token')).toContainText(SYMBOL, { timeout: 20_000 });
+
+      // 第一笔加池。
+      await addQuote(page, '100000');
+      await approveThenSubmit(page, 'liquidity-add-approve', 'liquidity-add-submit');
+      await expect(page.getByTestId('liquidity-receipt-title')).toHaveText('流动性添加完成', {
+        timeout: 30_000,
+      });
+      await page.getByRole('button', { name: '知道了' }).click();
+
+      // 第二笔：上一笔把额度用光了，授权按钮重新可点；授权后主按钮必须解锁（旧 bug 永久禁用）。
+      await expect(page.getByTestId('liquidity-add-approve')).toBeEnabled({ timeout: 20_000 });
+      await approveThenSubmit(page, 'liquidity-add-approve', 'liquidity-add-submit');
+      await expect(page.getByTestId('liquidity-receipt-title')).toHaveText('流动性添加完成', {
+        timeout: 30_000,
+      });
+      await page.getByRole('button', { name: '知道了' }).click();
+
+      await page.getByTestId('liquidity-tab-mine').click();
+      await expect(page.getByTestId('liquidity-withdraw-lp')).toBeVisible({ timeout: 20_000 });
+      const lpBeforeWithdraw = (await page.getByTestId('liquidity-my-lp').innerText()).trim();
+
+      // QA D2：撤出侧滑点非法时，错误在页面上可见，并挡住授权与提交。
+      await page.getByTestId('liquidity-withdraw-percent-25').click();
+      await page.getByTestId('liquidity-withdraw-slippage-custom').fill('60');
+      await expect(page.getByTestId('liquidity-withdraw-slippage-error')).toHaveText(
+        '自定义值需要在 0.01% 到 50% 之间。（0.01%–50%）',
+      );
+      await expect(page.getByTestId('liquidity-withdraw-approve')).toBeDisabled();
+      await expect(page.getByTestId('liquidity-withdraw-submit')).toBeDisabled();
+      await page.getByRole('button', { name: '0.5%' }).click();
+      await expect(page.getByTestId('liquidity-withdraw-slippage-error')).toHaveCount(0);
+
+      // QA D7：撤出输入 0 要有可见原因。
+      await page.getByTestId('liquidity-withdraw-lp').fill('0');
+      await expect(page.getByTestId('liquidity-withdraw-error-input')).toHaveText(
+        '金额必须大于 0。',
+      );
+
+      // 第一笔撤出（50%）。
+      await page.getByTestId('liquidity-withdraw-percent-50').click();
+      await approveThenSubmit(page, 'liquidity-withdraw-approve', 'liquidity-withdraw-submit');
+      await expect(page.getByTestId('liquidity-receipt-detail')).toContainText('已撤出', {
+        timeout: 30_000,
+      });
+      await page.getByRole('button', { name: '知道了' }).click();
+
+      // 第二笔撤出：LP 额度同样被用光 → 再授权 → 能继续提交。先等「我的凭证」刷新，
+      // 否则预设按钮会按旧余额填出超过持仓的数量。
+      await expect(page.getByTestId('liquidity-my-lp')).not.toHaveText(lpBeforeWithdraw, {
+        timeout: 20_000,
+      });
+      await page.getByTestId('liquidity-withdraw-percent-50').click();
+      await expect(page.getByTestId('liquidity-withdraw-approve')).toBeEnabled({
+        timeout: 20_000,
+      });
+      await approveThenSubmit(page, 'liquidity-withdraw-approve', 'liquidity-withdraw-submit');
+      await expect(page.getByTestId('liquidity-receipt-detail')).toContainText('已撤出', {
+        timeout: 30_000,
+      });
+      await page.getByRole('button', { name: '知道了' }).click();
+    }),
+  );
+
+  test(
+    '用例 M（D8）：原生币单边不显示「已授权」',
+    withChainSnapshot(async (page) => {
+      await openLiquidity(page, NATIVE_ONLY);
+      await expect(page.getByTestId('liquidity-token')).toContainText(SYMBOL, { timeout: 20_000 });
+      await page.getByTestId('liquidity-native-amount').fill('10');
+      await expect(page.getByTestId('liquidity-quote-liquidity')).toBeVisible({ timeout: 20_000 });
+
+      const approve = page.getByTestId('liquidity-add-approve');
+      await expect(approve).toBeDisabled();
+      await expect(approve).toHaveText('这一笔不需要代币授权');
+      await expect(page.getByText('这次要用的额度已经够，不需要再授权。')).toHaveCount(0);
+    }),
+  );
+
+  test(
+    '用例 I（D4）：未知社区 symbol 不顶替成 TestLOVE20',
+    withChainSnapshot(async (page) => {
+      await installWallet(page, NATIVE_ONLY);
+      await page.goto('/liquidity?symbol=NoSuchCommunity99');
+      await connect(page);
+      await expect(page.getByTestId('liquidity-community-unknown')).toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(page.getByText('读不到这个社区。')).toBeVisible();
+      // 不能拿目录第一个代币顶上：抬头行与加池面板都不应出现。
+      await expect(page.getByTestId('liquidity-token')).toHaveCount(0);
+      await expect(page.getByTestId('liquidity-token-amount')).toHaveCount(0);
+    }),
+  );
+
+  test(
+    '用例 J（D5）：切社区后自定义代币不再覆盖社区代币',
+    withChainSnapshot(async (page) => {
+      await openLiquidity(page, TOKEN_HOLDER_4);
+      await expect(page.getByTestId('liquidity-token')).toContainText(SYMBOL, { timeout: 20_000 });
+
+      // 先选一个自定义代币（用 TestLOVE20 本身即可触发「自定义」标记）。
+      await selectCustomToken(page, deployment.addresses.tokenAddress, SYMBOL);
+      await expect(page.getByTestId('liquidity-token')).toContainText('自定义');
+
+      // 右上角社区切换 → TestCMTOK1（不刷新页面）。
+      await page
+        .getByRole('button', { name: new RegExp(`当前代币社区 ${SYMBOL}`) })
+        .click();
+      await page.getByTestId('community-search').fill(CHILD_SYMBOL);
+      await page.getByTestId(`community-search-result-${CHILD_SYMBOL}`).click();
+      await expect(page).toHaveURL(new RegExp(`[?&]symbol=${CHILD_SYMBOL}(&|$)`), {
+        timeout: 15_000,
+      });
+
+      // QA D5：抬头必须跟随新社区，且不再挂「自定义」。
+      await expect(page.getByTestId('liquidity-token')).toContainText(CHILD_SYMBOL, {
+        timeout: 20_000,
+      });
+      await expect(page.getByTestId('liquidity-token')).not.toContainText('自定义');
+      await page.getByTestId('liquidity-tab-query').click();
+      await expect(page.getByTestId('liquidity-query-empty')).toContainText('还没有流动性池', {
+        timeout: 20_000,
+      });
+    }),
+  );
+
+  test(
+    '用例 K（D9）：零地址自定义代币给出可见原因',
+    withChainSnapshot(async (page) => {
+      await openLiquidity(page, NATIVE_ONLY);
+      await expect(page.getByTestId('liquidity-token')).toContainText(SYMBOL, { timeout: 20_000 });
+      await page.getByTestId('liquidity-custom-toggle').click();
+      await page
+        .getByTestId('liquidity-custom-address')
+        .fill('0x0000000000000000000000000000000000000000');
+      await page.getByTestId('liquidity-custom-add').click();
+      await expect(page.getByTestId('liquidity-custom-error')).toHaveText(
+        '这个地址上没有合约，不能作为代币。',
+        { timeout: 20_000 },
+      );
+      // 合法地址仍能正常读取（证明不是按钮被禁用）。
+      await expect(page.getByTestId('liquidity-custom-address')).toBeEditable();
+    }),
+  );
+
+  test(
+    '用例 L（D10）：页签往返保留已填金额与展开的详情',
+    withChainSnapshot(async (page) => {
+      await openLiquidity(page, TOKEN_HOLDER_4);
+      await expect(page.getByTestId('liquidity-token')).toContainText(SYMBOL, { timeout: 20_000 });
+      await addQuote(page, '123');
+      await openDetails(page);
+
+      await page.getByTestId('liquidity-tab-query').click();
+      await expect(page.getByTestId('liquidity-query-supply')).toBeVisible({ timeout: 20_000 });
+      await page.getByTestId('liquidity-tab-add').click();
+
+      await expect(page.getByTestId('liquidity-token-amount')).toHaveValue('123');
+      await expect(page.getByTestId('liquidity-details')).toBeVisible();
+      await expect(page.getByTestId('liquidity-smart-mode')).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+    }),
+  );
+
+  test(
+    '边界（D6/D7）：只填一侧、显式 0、1 wei 各有原因',
+    withChainSnapshot(async (page) => {
+      const testToken = await deployTestToken();
+      await openLiquidity(page, FIRST_MINT);
+      await selectCustomToken(page, testToken, TEST_X);
+
+      // D6：空池只填一侧 → 说缺另一侧，而不是「金额必须大于 0」。
+      await page.getByTestId('liquidity-token-amount').fill('100');
+      await expect(page.getByTestId('liquidity-amount-error')).toHaveText(
+        '另一侧的数量还需要填写。',
+        { timeout: 20_000 },
+      );
+      // D7：显式 0。
+      await page.getByTestId('liquidity-native-amount').fill('0');
+      await expect(page.getByTestId('liquidity-amount-error')).toHaveText('金额必须大于 0。');
+      // D7：两侧都只有 1 wei → 算不出份额，给原因。
+      await page.getByTestId('liquidity-token-amount').fill('0.000000000000000001');
+      await page.getByTestId('liquidity-native-amount').fill('0.000000000000000001');
+      await expect(page.getByTestId('liquidity-amount-error')).toHaveText(
+        '这笔数量太小，池子配平后没有可用的份额。',
+        { timeout: 20_000 },
+      );
     }),
   );
 });

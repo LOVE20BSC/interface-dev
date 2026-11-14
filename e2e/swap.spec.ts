@@ -686,6 +686,65 @@ test('swap: native ↔ wrapped is a 1:1 wrap/unwrap with its own receipt', async
   console.log(`swap wrap: tx=${wrapHash} unwrap: tx=${unwrapHash} wethBefore=${wethBefore}`);
 });
 
+test('swap: 代币选择器不提供另一侧已选中的代币，并给出一行说明', async ({ page }) => {
+  await installWallet(page, BUYER);
+  await page.goto('/swap?from=ETH&to=TestLOVE20&symbol=TestLOVE20');
+  await connect(page);
+  await expect(page.getByTestId('swap-from-token')).toContainText(NATIVE, { timeout: 20_000 });
+  await expect(page.getByTestId('swap-to-token')).toContainText('TestLOVE20');
+
+  // 从 侧：另一侧（到）已选 TestLOVE20 → 列表里没有它，并说明原因。
+  await page.getByTestId('swap-from-token').click();
+  const note = page.getByTestId('token-picker-note');
+  await expect(note).toContainText('另一侧已选 TestLOVE20', { timeout: 10_000 });
+  await expect(page.getByTestId('swap-token-option-TestLOVE20')).toHaveCount(0);
+  await expect(page.getByTestId('swap-token-option-ETH')).toHaveCount(1);
+  // 搜索也不能把这个被排除的 symbol 找回来（选择时就排除，不是提交才报错）。
+  await page.getByPlaceholder('搜索代币符号').fill('TestLOVE20');
+  await expect(page.getByTestId('swap-token-option-TestLOVE20')).toHaveCount(0);
+  await shot(page, 'swap-token-excluded.png');
+
+  // 关掉抽屉（选中当前项即关闭），再开 到 侧。
+  await page.getByPlaceholder('搜索代币符号').fill('');
+  await page.getByTestId('swap-token-option-ETH').click();
+  await expect(page.getByPlaceholder('搜索代币符号')).toHaveCount(0, { timeout: 10_000 });
+
+  // 到 侧：另一侧（从）已选 ETH → 列表里没有 ETH。
+  await page.getByTestId('swap-to-token').click();
+  await expect(page.getByTestId('token-picker-note')).toContainText('另一侧已选 ETH', {
+    timeout: 10_000,
+  });
+  await expect(page.getByTestId('swap-token-option-ETH')).toHaveCount(0);
+  // 兑换对始终是两个不同代币，URL 没有被写成重复值。
+  const url = new URL(page.url());
+  expect(url.searchParams.get('from')).toBe('ETH');
+  expect(url.searchParams.get('to')).toBe('TestLOVE20');
+});
+
+test('swap: 「到」侧也显示到账代币余额（同「从」侧规则：6 位小数、不重复 symbol、不写精度标签）', async ({
+  page,
+}) => {
+  const buyerBalance = uintOf(TOKEN, 'balanceOf(address)(uint256)', BUYER);
+  await installWallet(page, BUYER);
+  await page.goto('/swap?from=ETH&to=TestLOVE20&symbol=TestLOVE20');
+  await connect(page);
+  await expect(page.getByTestId('swap-to-token')).toContainText('TestLOVE20', { timeout: 20_000 });
+
+  const toBalance = page.getByTestId('swap-to-balance');
+  await expect(toBalance).toHaveText(`余额 TestLOVE20 ${displayAmount(buyerBalance)}`, {
+    timeout: 20_000,
+  });
+  const text = (await toBalance.innerText()).trim();
+  // 6 位小数规则：最多 6 位小数（这里余额是整枚代币，验证没有多余小数位）。
+  const fraction = text.split('.')[1] ?? '';
+  expect(fraction.replace(/[^0-9]/g, '').length).toBeLessThanOrEqual(6);
+  // 18 位精度不显示精度标签。
+  expect(text).not.toContain('精度');
+  // 不重复 symbol：余额行上下文中 symbol 只出现一次。
+  expect(text.match(/TestLOVE20/g) ?? []).toHaveLength(1);
+  await shot(page, 'swap-to-balance.png');
+});
+
 test.describe('desktop selector', () => {
   test.use({ viewport: { width: 1100, height: 900 }, isMobile: false, hasTouch: false });
 

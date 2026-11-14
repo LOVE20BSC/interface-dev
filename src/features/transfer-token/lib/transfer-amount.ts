@@ -12,7 +12,15 @@ import { NATIVE_FEE_RESERVE_WEI } from './transfer-types';
 export type ParsedTransferAmount =
   | { readonly kind: 'empty' }
   | { readonly kind: 'invalid' }
-  | { readonly kind: 'zero' }
+  | {
+      readonly kind: 'zero';
+      /**
+       * True when the input was non-zero but every fraction digit fell below the
+       * token precision (e.g. `0.0000000000000000009` at 18 decimals). Callers
+       * use it to say "按精度截断后为 0" instead of the generic "必须大于 0".
+       */
+      readonly truncated?: boolean;
+    }
   | { readonly kind: 'ok'; readonly value: bigint; readonly truncated: boolean };
 
 const AMOUNT_RE = /^(?:\d+\.?\d*|\.\d+)$/;
@@ -34,7 +42,7 @@ export function parseTransferAmount(raw: string, decimals: number): ParsedTransf
   } catch {
     return { kind: 'invalid' };
   }
-  if (value === 0n) return { kind: 'zero' };
+  if (value === 0n) return truncated ? { kind: 'zero', truncated: true } : { kind: 'zero' };
   return { kind: 'ok', value, truncated };
 }
 

@@ -25,18 +25,24 @@ describe('useCommunityDisplay', () => {
   it('shows the chain symbol once the community is resolved', () => {
     token.mockReturnValue(FIXTURE);
     const { result } = renderHook(() => useCommunityDisplay('TestLOVE20'));
-    expect(result.current).toEqual({ symbol: 'TestLOVE20', resolved: true });
+    expect(result.current).toEqual({ symbol: 'TestLOVE20', resolved: true, pending: false });
   });
 
-  it('shows the protocol label while metadata is loading', () => {
+  it('shows the protocol label while metadata is loading, and flags it as pending', () => {
     token.mockReturnValue({ ...FIXTURE, isMetadataLoading: true });
     const { result } = renderHook(() => useCommunityDisplay('TestLOVE20'));
-    expect(result.current).toEqual({ symbol: 'LOVE20协议', resolved: false });
+    expect(result.current).toEqual({ symbol: 'LOVE20协议', resolved: false, pending: true });
   });
 
-  it('shows the protocol label when no community is resolved', () => {
+  it('shows the protocol label when no community is resolved (settled, not pending)', () => {
     token.mockReturnValue({ ...FIXTURE, status: 'unknown', address: undefined });
     const { result } = renderHook(() => useCommunityDisplay('FOO'));
-    expect(result.current).toEqual({ symbol: 'LOVE20协议', resolved: false });
+    expect(result.current).toEqual({ symbol: 'LOVE20协议', resolved: false, pending: false });
+  });
+
+  it('flags the cold-start lookup as pending before the token address is known', () => {
+    token.mockReturnValue({ ...FIXTURE, status: 'loading', address: undefined });
+    const { result } = renderHook(() => useCommunityDisplay('TestLOVE20'));
+    expect(result.current).toEqual({ symbol: 'LOVE20协议', resolved: false, pending: true });
   });
 });

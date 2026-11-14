@@ -30,6 +30,15 @@ export function MenuLayer({
   children,
 }: MenuLayerProps) {
   const isDesktop = useMediaQuery('(min-width: 768px)');
+  // Both layers open without a Radix trigger (the eager buttons live outside the
+  // lazy overlay graph), so Radix has no element to restore focus to and would
+  // drop it on <body> after Esc / ✕. Take the restore over: preventDefault and
+  // focus the anchor button that opened the menu (WAI-ARIA dialog convention).
+  const restoreAnchorFocus = (event: Event) => {
+    event.preventDefault();
+    if (anchor !== null && anchor.isConnected) anchor.focus();
+  };
+
   const virtualRef = useMemo<RefObject<{ getBoundingClientRect(): DOMRect } | null>>(
     () => ({
       current:
@@ -40,7 +49,13 @@ export function MenuLayer({
 
   if (!isDesktop) {
     return (
-      <Sheet open={open} onOpenChange={onOpenChange} title={title} description={description}>
+      <Sheet
+        open={open}
+        onOpenChange={onOpenChange}
+        title={title}
+        description={description}
+        onCloseAutoFocus={restoreAnchorFocus}
+      >
         {children}
       </Sheet>
     );
@@ -49,7 +64,7 @@ export function MenuLayer({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor virtualRef={virtualRef} />
-      <PopoverContent align={align} sideOffset={8}>
+      <PopoverContent align={align} sideOffset={8} onCloseAutoFocus={restoreAnchorFocus}>
         {children}
       </PopoverContent>
     </Popover>
