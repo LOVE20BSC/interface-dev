@@ -74,13 +74,44 @@ async function fillTransfer(page: Page, amount: string, recipient: string): Prom
   await page.getByTestId('transfer-recipient').fill(recipient);
 }
 
+const MODE_LABELS = {
+  address: '按地址',
+  member: '按身份 NFT ID',
+  name: '按身份 NFT 名字',
+} as const;
+
+/** 收款方左侧下拉：owner 2026-11-14 的三模式（地址 / 身份 NFT ID / 身份 NFT 名字）。 */
+async function selectRecipientMode(page: Page, mode: keyof typeof MODE_LABELS): Promise<void> {
+  const trigger = page.getByTestId('transfer-recipient-mode');
+  if ((await trigger.innerText()).includes(MODE_LABELS[mode])) return;
+  await trigger.click();
+  const option = page.getByTestId(`transfer-mode-${mode}`);
+  await expect(option).toBeVisible();
+  await option.click();
+  await expect(trigger).toContainText(MODE_LABELS[mode]);
+}
+
 test.describe('代币转账 前端线（理论线 §1）', () => {
   test('用例 A 原生转账：余额 10,000 → 回执 0.1 ETH', async ({ page }) => {
     await openTransfer(page, NATIVE_SENDER);
     await expect(page.getByTestId('transfer-token')).toContainText(NATIVE, { timeout: 20_000 });
-    await expect(page.getByTestId('transfer-balance')).toHaveText(`${NATIVE} 余额 10,000`, {
-      timeout: 20_000,
-    });
+    // owner 2026-11-14: 第一行直接是余额数字，不带 symbol、不带「余额」；18 位精度不显示。
+    const balance = page.getByTestId('transfer-balance');
+    await expect(balance).toHaveText('10,000', { timeout: 20_000 });
+    await expect(balance).not.toContainText(NATIVE);
+    await expect(balance).not.toContainText('余额');
+    await expect(page.getByTestId('transfer-decimals')).toHaveCount(0);
+    await expect(page.getByText('代币', { exact: true })).toHaveCount(0);
+
+    // 区块顺序：先收款方，再代币数量（余额行 + 金额行）。
+    const recipientBox = await page.getByTestId('transfer-recipient').boundingBox();
+    const balanceBox = await balance.boundingBox();
+    const amountBox = await page.getByTestId('transfer-amount').boundingBox();
+    expect(recipientBox).not.toBeNull();
+    expect(balanceBox).not.toBeNull();
+    expect(amountBox).not.toBeNull();
+    expect(recipientBox!.y).toBeLessThan(balanceBox!.y);
+    expect(balanceBox!.y).toBeLessThan(amountBox!.y);
 
     await fillTransfer(page, '0.1', NATIVE_RECIPIENT);
     await expect(page.getByTestId('transfer-submit')).toBeEnabled();
@@ -104,10 +135,12 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
   test('用例 B 非整数 ERC20 转账：99,799,100 → 99,799,098.5 TestLOVE20', async ({ page }) => {
     await openTransfer(page, ERC20_SENDER);
     await selectToken(page, SYMBOL);
-    await expect(page.getByTestId('transfer-balance')).toHaveText(`${SYMBOL} 余额 99,799,100`, {
+    await expect(page.getByTestId('transfer-balance')).toHaveText('99,799,100', {
       timeout: 20_000,
     });
-    await expect(page.getByText('精度 18 位')).toBeVisible();
+    // 精度只在 ≠18 时显示；ETH/TestLOVE20 都是 18 位，默认不写。
+    await expect(page.getByTestId('transfer-decimals')).toHaveCount(0);
+    await expect(page.getByText(/精度/)).toHaveCount(0);
 
     await fillTransfer(page, '1.5', RECIPIENT);
     await page.getByTestId('transfer-submit').click();
@@ -118,7 +151,7 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
 
     await page.getByRole('button', { name: '留在此页' }).click();
     // 余额刷新后与理论线 §1 用例 B 的 S_after 逐字相等。
-    await expect(page.getByTestId('transfer-balance')).toHaveText(`${SYMBOL} 余额 99,799,098.5`, {
+    await expect(page.getByTestId('transfer-balance')).toHaveText('99,799,098.5', {
       timeout: 20_000,
     });
   });
@@ -126,18 +159,14 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
   test('用例 C 余额不足：ERC20 差 1，原生币差 0.001', async ({ page }) => {
     await openTransfer(page, OUTSIDER);
     await selectToken(page, SYMBOL);
-    await expect(page.getByTestId('transfer-balance')).toHaveText(`${SYMBOL} 余额 0`, {
-      timeout: 20_000,
-    });
+    await expect(page.getByTestId('transfer-balance')).toHaveText('0', { timeout: 20_000 });
     await fillTransfer(page, '1', RECIPIENT);
     await expect(page.getByTestId('transfer-amount-error')).toHaveText(`${SYMBOL} 不够，还差 1`);
     await expect(page.getByTestId('transfer-submit')).toBeDisabled();
 
     // 原生币：10,000 − 0.001 预留 = 9,999.999 可花，输入 10,000 差 0.001。
     await selectToken(page, NATIVE);
-    await expect(page.getByTestId('transfer-balance')).toHaveText(`${NATIVE} 余额 10,000`, {
-      timeout: 20_000,
-    });
+    await expect(page.getByTestId('transfer-balance')).toHaveText('10,000', { timeout: 20_000 });
     await page.getByTestId('transfer-amount').fill('10000');
     await expect(page.getByTestId('transfer-amount-error')).toHaveText(
       `${NATIVE} 不够，还差 0.001`,
@@ -168,12 +197,11 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
   test('用例 E 按身份 NFT 收款：#2 → Testdev-member-1 的 owner', async ({ page }) => {
     await openTransfer(page, IDENTITY_SENDER);
     await selectToken(page, SYMBOL);
-    await expect(page.getByTestId('transfer-balance')).toHaveText(
-      `${SYMBOL} 余额 99,999,099.999639`,
-      { timeout: 20_000 },
-    );
+    await expect(page.getByTestId('transfer-balance')).toHaveText('99,999,099.999639', {
+      timeout: 20_000,
+    });
 
-    await page.getByTestId('transfer-mode-identity').click();
+    await selectRecipientMode(page, 'member');
     await page.getByTestId('transfer-recipient').fill('#2');
     const summary = page.getByTestId('transfer-identity-summary');
     await expect(summary).toBeVisible({ timeout: 20_000 });
@@ -195,10 +223,42 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('transfer-receipt-recipient')).toHaveText(IDENTITY_2_OWNER);
 
     await page.getByRole('button', { name: '留在此页' }).click();
-    await expect(page.getByTestId('transfer-balance')).toHaveText(
-      `${SYMBOL} 余额 99,999,097.499639`,
-      { timeout: 20_000 },
+    await expect(page.getByTestId('transfer-balance')).toHaveText('99,999,097.499639', {
+      timeout: 20_000,
+    });
+  });
+
+  test('用例 F 收款方模式按模式校验：ID 只收编号，名字模式按名字解析', async ({ page }) => {
+    await openTransfer(page, IDENTITY_SENDER);
+    await selectToken(page, SYMBOL);
+
+    // ID 模式：名字不是编号，直接给人话错误，不发任何 ownerOf 读。
+    await selectRecipientMode(page, 'member');
+    const input = page.getByTestId('transfer-recipient');
+    await input.fill('Testdev-member-1');
+    await expect(page.getByText('请输入身份 NFT 编号，例如 #12。')).toBeVisible();
+    await expect(page.getByTestId('transfer-identity-summary')).toHaveCount(0);
+    await expect(page.getByTestId('transfer-submit')).toBeDisabled();
+
+    // 名字模式：同一个字符串按名字解析到 #2 的当前持有人（纯数字名字不会被当成 ID）。
+    await selectRecipientMode(page, 'name');
+    await input.fill('Testdev-member-1');
+    const summary = page.getByTestId('transfer-identity-summary');
+    await expect(summary).toBeVisible({ timeout: 20_000 });
+    await expect(summary).toContainText('身份 NFT #2 Testdev-member-1');
+    await expect(page.getByTestId('transfer-identity-recipient')).toHaveText('收款人 0x7099…79C8');
+    await expect(page.getByTestId('transfer-submit')).toBeDisabled();
+    await page.getByTestId('transfer-identity-ack').check();
+    await page.getByTestId('transfer-amount').fill('1');
+    await expect(page.getByTestId('transfer-submit')).toBeEnabled();
+
+    // 切回地址模式：输入框换成地址占位符，身份确认不再出现（本用例不发交易）。
+    await selectRecipientMode(page, 'address');
+    await expect(page.getByTestId('transfer-recipient')).toHaveAttribute(
+      'placeholder',
+      '0x 开头的 40 位地址',
     );
+    await expect(page.getByTestId('transfer-identity-summary')).toHaveCount(0);
   });
 
   test('自定义 ERC20：读 symbol/decimals 后可选中；非合约地址给人话错误', async ({ page }) => {
@@ -209,9 +269,7 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await page.getByRole('button', { name: '添加代币' }).click();
     // A resolved custom token replaces the selection and closes the picker.
     await expect(page.getByTestId('transfer-token')).toContainText('TestWETH', { timeout: 20_000 });
-    await expect(page.getByTestId('transfer-balance')).toHaveText('TestWETH 余额 0', {
-      timeout: 20_000,
-    });
+    await expect(page.getByTestId('transfer-balance')).toHaveText('0', { timeout: 20_000 });
 
     // An EOA has no bytecode: honest failure, never a broken token entry.
     await page.getByTestId('transfer-token').click();
@@ -283,7 +341,7 @@ test.describe('代币转账 验收截图', () => {
       for (const theme of THEMES) {
         await prepare(page, theme, viewport.width, viewport.height);
         await selectToken(page, SYMBOL);
-        await expect(page.getByTestId('transfer-balance')).toContainText('余额', {
+        await expect(page.getByTestId('transfer-balance')).toHaveText(/^[\d,]+(\.\d+)?$/, {
           timeout: 20_000,
         });
         await fillTransfer(page, '1.5', RECIPIENT);
@@ -312,7 +370,7 @@ test.describe('代币转账 验收截图', () => {
       for (const theme of THEMES) {
         await prepare(page, theme, viewport.width, viewport.height);
         await selectToken(page, SYMBOL);
-        await expect(page.getByTestId('transfer-balance')).toContainText('余额', {
+        await expect(page.getByTestId('transfer-balance')).toHaveText(/^[\d,]+(\.\d+)?$/, {
           timeout: 20_000,
         });
         await fillTransfer(page, '0.5', RECIPIENT);

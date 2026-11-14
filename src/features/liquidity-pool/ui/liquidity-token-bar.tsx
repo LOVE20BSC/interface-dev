@@ -107,7 +107,7 @@ export function LiquidityTokenBar({ catalog, selected, onSelect }: LiquidityToke
             value={catalog.customInput}
             onChange={(event) => catalog.setCustomInput(event.target.value)}
             placeholder={copy.liquidity.customPlaceholder}
-            className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-2.5 font-mono text-xs text-foreground outline-none placeholder:font-sans placeholder:text-muted/70 focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+            className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-2.5 font-mono text-xs text-foreground outline-none placeholder:font-sans placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
           />
           <Button
             variant="secondary"

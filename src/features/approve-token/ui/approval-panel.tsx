@@ -428,7 +428,7 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
                     aria-label={copy.approvals.customPlaceholder}
                     autoComplete="off"
                     spellCheck={false}
-                    className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-2.5 font-mono text-xs text-foreground outline-none placeholder:text-muted/70 focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+                    className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-2.5 font-mono text-xs text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
                   />
                   <Button
                     size="sm"

@@ -1,7 +1,6 @@
 import { useReadContract } from 'wagmi';
 import { memberNftAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
-import { parseMemberId } from '@/features/transfer-identity/lib/member-recipient';
 import {
   useMemberRecipient,
   type MemberRecipientStatus,
@@ -9,6 +8,13 @@ import {
 import { useMemberNameRecipient } from '@/features/transfer-identity/model/use-member-name-recipient';
 
 export type IdentityRecipientStatus = MemberRecipientStatus;
+
+/**
+ * Which identity NFT input the user picked in the 收款方 dropdown. The mode is
+ * explicit, never inferred from the text: a pure-digit name that someone
+ * registered must not be read as an id (owner 2026-11-14).
+ */
+export type IdentityRecipientMode = 'id' | 'name';
 
 export interface IdentityRecipientState {
   readonly status: IdentityRecipientStatus;
@@ -27,21 +33,23 @@ const IDLE: IdentityRecipientState = {
 };
 
 /**
- * 按身份 NFT recipient for a token transfer. Accepts either a member id
- * (`#12`) or a member name; both resolve to the current `ownerOf(id)` address,
- * and the confirmation gate shows id + canonical name + address before the CTA
- * can be pressed (same rule as 转让身份 NFT). Resolution itself is shared with
- * the identity-transfer feature — this hook only composes it.
+ * 按身份 NFT recipient for a token transfer. `mode: 'id'` resolves the typed
+ * `#id` / digits through `ownerOf(id)`; `mode: 'name'` resolves the typed name
+ * through `memberId(name)` and never falls back to id parsing. Both resolve to
+ * the current `ownerOf(id)` address, and the confirmation gate shows id +
+ * canonical name + address before the CTA can be pressed (same rule as
+ * 转让身份 NFT). Resolution itself is shared with the identity-transfer feature —
+ * this hook only composes it.
  */
 export function useIdentityRecipient(
   memberNftAddress: HexAddress | undefined,
   input: string,
   active: boolean,
   selfAddress: string | undefined,
+  mode: IdentityRecipientMode,
 ): IdentityRecipientState {
   const trimmed = input.trim();
-  const memberId = parseMemberId(trimmed);
-  const idMode = memberId !== null;
+  const idMode = mode === 'id';
 
   const byId = useMemberRecipient(memberNftAddress, input, active && idMode, selfAddress);
   const byName = useMemberNameRecipient(memberNftAddress, input, active && !idMode, selfAddress);
@@ -59,7 +67,7 @@ export function useIdentityRecipient(
 
   if (!active || trimmed.length === 0) return IDLE;
   if (memberNftAddress === undefined) {
-    return { status: 'error', memberId, name: null, address: null, retry: () => {} };
+    return { status: 'error', memberId: null, name: null, address: null, retry: () => {} };
   }
 
   if (idMode) {

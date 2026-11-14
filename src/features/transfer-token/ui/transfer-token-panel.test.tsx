@@ -8,7 +8,7 @@ const SELF = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 const OTHER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
 const PAIR = ADDRESSES.pair;
 
-const { identityState, submitMock } = vi.hoisted(() => ({
+const { identityState, catalogState, submitMock } = vi.hoisted(() => ({
   identityState: {
     value: {
       status: 'idle' as string,
@@ -18,6 +18,7 @@ const { identityState, submitMock } = vi.hoisted(() => ({
       retry: () => {},
     },
   },
+  catalogState: { decimals: 18 },
   submitMock: vi.fn(),
 }));
 
@@ -32,7 +33,12 @@ vi.mock('wagmi', () => ({
 
 vi.mock('@/features/transfer-token/model/use-transfer-catalog', () => ({
   useTransferCatalog: () => ({
-    nativeToken: { kind: 'native', address: undefined, symbol: 'ETH', decimals: 18 },
+    nativeToken: {
+      kind: 'native',
+      address: undefined,
+      symbol: 'ETH',
+      decimals: catalogState.decimals,
+    },
     communityTokens: [
       {
         kind: 'community',
@@ -84,13 +90,14 @@ vi.mock('@/features/transfer-token/model/use-transfer-transaction', () => ({
   }),
 }));
 
-function renderPanel(): void {
+function renderPanel(initialMode?: 'address' | 'member' | 'name'): void {
   render(
     <MemoryRouter>
       <TransferTokenPanel
         isConnected
         isWrongChain={false}
         connectAction={<button type="button">连接钱包</button>}
+        initialMode={initialMode}
       />
     </MemoryRouter>,
   );
@@ -116,6 +123,37 @@ beforeEach(() => {
     address: null,
     retry: () => {},
   };
+  catalogState.decimals = 18;
+});
+
+describe('TransferTokenPanel 布局与余额', () => {
+  it('renders the bare balance first, with no symbol, no 「余额」 and no precision at 18', () => {
+    renderPanel();
+    // Owner 2026-11-14: 左上角不写「代币」，第一行直接是余额数字。
+    expect(screen.queryByText('代币')).toBeNull();
+    expect(screen.getByTestId('transfer-balance')).toHaveTextContent(/^10,000$/);
+    expect(screen.queryByText(/余额/)).toBeNull();
+    expect(screen.queryByText(/精度/)).toBeNull();
+  });
+
+  it('writes the precision only when it is not the 18-digit default', () => {
+    catalogState.decimals = 20;
+    renderPanel();
+    expect(screen.getByTestId('transfer-balance')).toHaveTextContent(/^100$/);
+    expect(screen.getByTestId('transfer-decimals')).toHaveTextContent('精度 20 位');
+  });
+
+  it('puts the recipient before the token amount in the card', () => {
+    renderPanel();
+    const recipient = screen.getByTestId('transfer-recipient');
+    const amount = screen.getByTestId('transfer-amount');
+    expect(
+      recipient.compareDocumentPosition(amount) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // The selected token trigger sits on the right of the balance line.
+    expect(screen.getByTestId('transfer-token')).toBeVisible();
+    expect(screen.getByTestId('transfer-recipient-mode')).toHaveTextContent('按地址');
+  });
 });
 
 describe('TransferTokenPanel 按地址', () => {
@@ -182,7 +220,7 @@ describe('TransferTokenPanel 按地址', () => {
 });
 
 describe('TransferTokenPanel 按身份 NFT', () => {
-  it('shows the resolved identity and requires the confirmation checkbox', () => {
+  it('resolves the id, shows the identity and requires the confirmation checkbox', () => {
     identityState.value = {
       status: 'ok',
       memberId: 2n,
@@ -190,9 +228,14 @@ describe('TransferTokenPanel 按身份 NFT', () => {
       address: OTHER,
       retry: () => {},
     };
-    renderPanel();
+    renderPanel('member');
 
-    fireEvent.click(screen.getByTestId('transfer-mode-identity'));
+    expect(screen.getByTestId('transfer-recipient-mode')).toHaveTextContent('按身份 NFT ID');
+    expect(screen.getByTestId('transfer-recipient')).toHaveAttribute(
+      'placeholder',
+      '#身份 NFT 编号',
+    );
+
     fillAmount('2.5');
     fillRecipient('#2');
 
@@ -212,5 +255,45 @@ describe('TransferTokenPanel 按身份 NFT', () => {
         recipientLabel: '身份 NFT #2 Testdev-member-1',
       }),
     );
+  });
+
+  it('keeps the name mode distinct from the id mode', () => {
+    identityState.value = {
+      status: 'ok',
+      memberId: 2n,
+      name: 'Testdev-member-1',
+      address: OTHER,
+      retry: () => {},
+    };
+    renderPanel('name');
+
+    expect(screen.getByTestId('transfer-recipient-mode')).toHaveTextContent('按身份 NFT 名字');
+    expect(screen.getByTestId('transfer-recipient')).toHaveAttribute(
+      'placeholder',
+      '身份 NFT 名字',
+    );
+
+    // A pure-digit string is looked up as a NAME in this mode, never as an id:
+    // the resolver is called with name mode and the summary still shows the
+    // canonical name + id it resolved to.
+    fillRecipient('123456');
+    expect(screen.getByTestId('transfer-identity-summary')).toBeVisible();
+    expect(screen.getByText('身份 NFT #2 Testdev-member-1')).toBeVisible();
+    expect(submitButton()).toBeDisabled();
+  });
+
+  it('shows the mode-specific not-found message', () => {
+    identityState.value = {
+      status: 'not-found',
+      memberId: null,
+      name: null,
+      address: null,
+      retry: () => {},
+    };
+    renderPanel('member');
+    fillRecipient('#999');
+
+    expect(screen.getByText('这个身份 NFT 不存在。')).toBeVisible();
+    expect(submitButton()).toBeDisabled();
   });
 });
