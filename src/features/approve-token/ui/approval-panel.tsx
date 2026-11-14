@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
-import { AlertTriangle, Check, RefreshCw, ShieldCheck } from '@/shared/ui/icons';
+import { AlertTriangle, Check, Copy, RefreshCw, ShieldCheck } from '@/shared/ui/icons';
 import { ADDRESSES, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { buttonStyles, Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { cn } from '@/shared/lib/cn';
+import { copyText } from '@/shared/lib/clipboard';
 import { formatTokenAmount, shortenAddress } from '@/shared/lib/format';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shared/ui/token-picker';
@@ -67,21 +68,61 @@ function StateCard({
   );
 }
 
-function riskLines(): readonly string[] {
-  return [
-    copy.approvals.riskWhat,
-    copy.approvals.riskWhy,
-    copy.approvals.riskDanger,
-    copy.approvals.riskAdvice,
-  ];
+/**
+ * Local address-copy affordance (owner 2026-11-14: 合约列表地址要能点击复制).
+ * TODO(shared/ui, e293): replace with the shared address component once the
+ * global 地址复制 task lands — same 缩略 + 点击复制 + 「已复制」 + aria contract.
+ */
+function CopyableAddress({
+  address,
+  label,
+  status,
+  onCopy,
+  testId,
+}: {
+  readonly address: HexAddress;
+  readonly label: string;
+  readonly status: AddressCopyStatus;
+  readonly onCopy: (address: HexAddress) => void;
+  readonly testId: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      title={address}
+      onClick={() => onCopy(address)}
+      aria-label={copy.approvals.copyAddress(label)}
+      className="mt-1.5 inline-flex max-w-full flex-wrap items-center gap-1 rounded-lg text-left text-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+    >
+      <span className="font-mono text-[11px] leading-4">{shortenAddress(address, 6, 4)}</span>
+      <span className="flex shrink-0 items-center gap-0.5 text-[10px]" aria-live="polite">
+        {status === 'copied' ? (
+          <Check className="h-3 w-3 text-success" aria-hidden="true" />
+        ) : (
+          <Copy className="h-3 w-3" aria-hidden="true" />
+        )}
+        {status === 'copied' ? (
+          <span className="text-success">{copy.approvals.addressCopied}</span>
+        ) : status === 'failed' ? (
+          <span className="text-danger-strong">{copy.approvals.copyFailed}</span>
+        ) : null}
+      </span>
+    </button>
+  );
 }
 
+function riskLines(): readonly string[] {
+  return [copy.approvals.riskWhy, copy.approvals.riskDanger, copy.approvals.riskAdvice];
+}
+
+type AddressCopyStatus = 'idle' | 'copied' | 'failed';
+
 /**
- * 代币授权 (owner 2026-11-14). One token at a time: pick a token, see the
- * current allowance of the address-book contracts, then 长期授权 / 撤销 through
- * a confirmation sheet. A custom spender query sits below the list for anything
- * not in the address book. The page never prints allowance/approve; a
- * collapsible details block owns the raw addresses.
+ * 代币授权 (owner 2026-11-14). One token at a time: pick a token, then read the
+ * page top-to-bottom in the owner's order — ① 默认使用长期授权 → ② 授权说明 →
+ * ③ 自定义地址 → ④ 常用合约列表. The list is never collapsed: every address is
+ * visible and copies on tap. The page never prints allowance/approve.
  */
 export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: ApprovalsPanelProps) {
   const { address: account } = useAccount();
@@ -94,6 +135,11 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
   const [preference, setPreference] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingApprovalAction | null>(null);
   const [submitBusy, setSubmitBusy] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState<{
+    address: string;
+    status: AddressCopyStatus;
+  } | null>(null);
+  const copiedTimer = useRef<number | undefined>(undefined);
 
   const ready = isConnected && !isWrongChain;
   const token = selectedToken;
@@ -115,6 +161,32 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
     setPreference(readUnlimitedApprovalPreference());
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimer.current !== undefined) window.clearTimeout(copiedTimer.current);
+    };
+  }, []);
+
+  /**
+   * Copy a spender address. `copyText` already falls back to a hidden textarea +
+   * execCommand when `navigator.clipboard` is unavailable (http, old webviews);
+   * if that also fails the row says so instead of going silently dead.
+   */
+  const onCopyAddress = (target: HexAddress) => {
+    const key = target.toLowerCase();
+    const settle = (status: AddressCopyStatus) => {
+      setCopiedAddress({ address: key, status });
+      if (copiedTimer.current !== undefined) window.clearTimeout(copiedTimer.current);
+      copiedTimer.current = window.setTimeout(() => setCopiedAddress(null), 2000);
+    };
+    void copyText(target).then((ok) => settle(ok ? 'copied' : 'failed'));
+  };
+
+  const copyStatus = (target: HexAddress): AddressCopyStatus =>
+    copiedAddress !== null && copiedAddress.address === target.toLowerCase()
+      ? copiedAddress.status
+      : 'idle';
 
   // A resolved custom token becomes the selection exactly once per address, the
   // same pattern the 代币转账 page uses.
@@ -309,8 +381,6 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
         </div>
       ) : null}
 
-      <p className="px-1 text-xs leading-5 text-muted">{copy.approvals.intro}</p>
-
       <Card>
         <div className="flex items-center justify-between gap-2">
           <span className="text-xs font-medium text-muted">{copy.approvals.tokenLabel}</span>
@@ -401,99 +471,52 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
         </div>
       </Card>
 
-      {token === undefined ? (
-        <Card>
-          <CardTitle>{copy.approvals.noTokenTitle}</CardTitle>
-          <CardDescription>{copy.approvals.noTokenBody}</CardDescription>
-        </Card>
-      ) : (
-        <Card className="overflow-hidden p-0">
-          <div className="px-4 pb-2 pt-4">
-            <h2 className="text-base font-semibold text-foreground">{copy.approvals.knownTitle}</h2>
-            <p className="mt-1 text-xs leading-5 text-muted">{copy.approvals.knownBody}</p>
-            {allowances.isError ? (
-              <p className="mt-2 text-xs leading-5 text-danger-strong">
-                {copy.approvals.knownError}{' '}
-                <button
-                  type="button"
-                  onClick={() => allowances.refetch()}
-                  className="font-medium underline underline-offset-4"
-                >
-                  {copy.approvals.knownRetry}
-                </button>
-              </p>
-            ) : null}
-          </div>
-          {spenders.length === 0 ? (
-            <p className="border-t border-line px-4 py-4 text-sm text-muted">
-              {copy.approvals.knownEmpty}
-            </p>
-          ) : (
-            <ul className="divide-y divide-line border-t border-line">
-              {visibleSpenders.map((spender) => {
-                const item = copy.approvals.spenders[spender.id];
-                const allowance = rowCurrentAllowance(spender.address);
-                const suggestHere = suggestUnlimited && canRaiseAllowance(allowance);
-                return (
-                  <li
-                    key={spender.id}
-                    className="px-4 py-3"
-                    data-testid={`approvals-row-${spender.id}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                        <p className="mt-0.5 text-xs leading-5 text-muted">{item.purpose}</p>
-                      </div>
-                      <span
-                        className="shrink-0 text-right text-sm font-semibold text-foreground"
-                        data-testid={`approvals-amount-${spender.id}`}
-                      >
-                        {rowAmountText(spender.address)}
-                      </span>
-                    </div>
-                    <details className="mt-1">
-                      <summary className="cursor-pointer text-[11px] leading-5 text-muted">
-                        {copy.approvals.rowAddress}
-                      </summary>
-                      <p className="mt-0.5 break-all font-mono text-[11px] leading-4 text-muted">
-                        {spender.address}
-                      </p>
-                    </details>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        data-testid={`approvals-revoke-${spender.id}`}
-                        disabled={busy || !canRevokeAllowance(allowance)}
-                        onClick={() => openAction(spender.address, item.label, 'revoke')}
-                      >
-                        {copy.approvals.revoke}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={suggestHere ? 'outline' : 'secondary'}
-                        data-testid={`approvals-unlimited-${spender.id}`}
-                        disabled={busy || !canRaiseAllowance(allowance)}
-                        onClick={() => openAction(spender.address, item.label, 'unlimited')}
-                      >
-                        {copy.approvals.unlimitedAction}
-                        {suggestHere ? (
-                          <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-medium text-brand-strong">
-                            {copy.approvals.recommended}
-                          </span>
-                        ) : null}
-                      </Button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
-      )}
+      {/* ① 默认使用长期授权 (owner 2026-11-14: 放在四块里的最上面) */}
+      <Card data-testid="approvals-block-preference">
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            data-testid="approvals-preference"
+            checked={preference}
+            onChange={(event) => {
+              const next = event.target.checked;
+              setPreference(next);
+              writeUnlimitedApprovalPreference(next);
+            }}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-line accent-brand"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-foreground">
+              {copy.approvals.preferenceLabel}
+            </span>
+            <span className="mt-0.5 block text-xs leading-5 text-muted">
+              {copy.approvals.preferenceBody}
+            </span>
+          </span>
+        </label>
+      </Card>
 
-      <Card>
+      {/* ② 授权说明段落 */}
+      <Card data-testid="approvals-block-guide">
+        <h2 className="flex items-center gap-1.5 text-base font-semibold text-foreground">
+          <ShieldCheck className="h-4 w-4 text-brand-strong" aria-hidden="true" />
+          {copy.approvals.riskTitle}
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-muted">{copy.approvals.intro}</p>
+        <ul className="mt-2 space-y-1.5 text-xs leading-5 text-muted">
+          {riskLines().map((line) => (
+            <li key={line} className="flex gap-1.5">
+              <span aria-hidden="true" className="text-brand-strong">
+                ·
+              </span>
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      {/* ③ 自定义地址 (owner 2026-11-14: 排在常用合约列表之前) */}
+      <Card data-testid="approvals-block-custom">
         <CardTitle>{copy.approvals.customSpenderTitle}</CardTitle>
         <CardDescription>{copy.approvals.customSpenderBody}</CardDescription>
         <input
@@ -546,9 +569,13 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
 
         {customSpender !== undefined ? (
           <div className="mt-3 rounded-2xl border border-line bg-elevated/40 p-3">
-            <p className="break-all font-mono text-[11px] leading-4 text-muted">
-              {shortenAddress(customSpender, 10, 8)}
-            </p>
+            <CopyableAddress
+              address={customSpender}
+              label={customSpenderLabel}
+              status={copyStatus(customSpender)}
+              onCopy={onCopyAddress}
+              testId="approvals-custom-address"
+            />
             {customAllowance === undefined ? (
               <p className="mt-1.5 text-xs leading-5 text-muted">
                 {allowances.isLoading ? (
@@ -569,7 +596,16 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
             ) : (
               <>
                 <p
-                  className="mt-1.5 text-sm font-semibold text-foreground"
+                  className="mt-1.5 max-w-full truncate text-sm font-semibold text-foreground"
+                  title={
+                    customAllowance === 0n
+                      ? copy.approvals.customNoAllowance
+                      : approvalDisplayText(
+                          customAllowance,
+                          token?.symbol ?? '',
+                          token?.decimals ?? 18,
+                        )
+                  }
                   data-testid="approvals-custom-amount"
                 >
                   {customAllowance === 0n
@@ -598,11 +634,6 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
                     onClick={() => openAction(customSpender, customSpenderLabel, 'unlimited')}
                   >
                     {copy.approvals.unlimitedAction}
-                    {suggestUnlimited && canRaiseAllowance(customAllowance) ? (
-                      <span className="rounded-full bg-brand-soft px-1.5 py-0.5 text-[10px] font-medium text-brand-strong">
-                        {copy.approvals.recommended}
-                      </span>
-                    ) : null}
                   </Button>
                 </div>
               </>
@@ -611,46 +642,93 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
         ) : null}
       </Card>
 
-      <Card>
-        <label className="flex items-start gap-3">
-          <input
-            type="checkbox"
-            data-testid="approvals-preference"
-            checked={preference}
-            onChange={(event) => {
-              const next = event.target.checked;
-              setPreference(next);
-              writeUnlimitedApprovalPreference(next);
-            }}
-            className="mt-0.5 h-4 w-4 shrink-0 rounded border-line accent-brand"
-          />
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold text-foreground">
-              {copy.approvals.preferenceLabel}
-            </span>
-            <span className="mt-0.5 block text-xs leading-5 text-muted">
-              {copy.approvals.preferenceBody}
-            </span>
-          </span>
-        </label>
-      </Card>
-
-      <Card>
-        <h2 className="flex items-center gap-1.5 text-base font-semibold text-foreground">
-          <ShieldCheck className="h-4 w-4 text-brand-strong" aria-hidden="true" />
-          {copy.approvals.riskTitle}
-        </h2>
-        <ul className="mt-2 space-y-1.5 text-xs leading-5 text-muted">
-          {riskLines().map((line) => (
-            <li key={line} className="flex gap-1.5">
-              <span aria-hidden="true" className="text-brand-strong">
-                ·
-              </span>
-              <span>{line}</span>
-            </li>
-          ))}
-        </ul>
-      </Card>
+      {/* ④ 常用合约列表 (owner 2026-11-14: 全部展开，地址可点击复制) */}
+      {token === undefined ? (
+        <Card data-testid="approvals-block-known">
+          <CardTitle>{copy.approvals.noTokenTitle}</CardTitle>
+          <CardDescription>{copy.approvals.noTokenBody}</CardDescription>
+        </Card>
+      ) : (
+        <Card className="overflow-hidden p-0" data-testid="approvals-block-known">
+          <div className="px-4 pb-2 pt-4">
+            <h2 className="text-base font-semibold text-foreground">{copy.approvals.knownTitle}</h2>
+            <p className="mt-1 text-xs leading-5 text-muted">{copy.approvals.knownBody}</p>
+            {allowances.isError ? (
+              <p className="mt-2 text-xs leading-5 text-danger-strong">
+                {copy.approvals.knownError}{' '}
+                <button
+                  type="button"
+                  onClick={() => allowances.refetch()}
+                  className="font-medium underline underline-offset-4"
+                >
+                  {copy.approvals.knownRetry}
+                </button>
+              </p>
+            ) : null}
+          </div>
+          {spenders.length === 0 ? (
+            <p className="border-t border-line px-4 py-4 text-sm text-muted">
+              {copy.approvals.knownEmpty}
+            </p>
+          ) : (
+            <ul className="divide-y divide-line border-t border-line">
+              {visibleSpenders.map((spender) => {
+                const item = copy.approvals.spenders[spender.id];
+                const allowance = rowCurrentAllowance(spender.address);
+                const suggestHere = suggestUnlimited && canRaiseAllowance(allowance);
+                return (
+                  <li
+                    key={spender.id}
+                    className="px-4 py-3"
+                    data-testid={`approvals-row-${spender.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                        <p className="mt-0.5 text-xs leading-5 text-muted">{item.purpose}</p>
+                      </div>
+                      <span
+                        className="max-w-[52%] shrink-0 truncate text-right text-sm font-semibold text-foreground"
+                        title={spenderAmountText(spender.address)}
+                        data-testid={`approvals-amount-${spender.id}`}
+                      >
+                        {rowAmountText(spender.address)}
+                      </span>
+                    </div>
+                    <CopyableAddress
+                      address={spender.address}
+                      label={item.label}
+                      status={copyStatus(spender.address)}
+                      onCopy={onCopyAddress}
+                      testId={`approvals-address-${spender.id}`}
+                    />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        data-testid={`approvals-revoke-${spender.id}`}
+                        disabled={busy || !canRevokeAllowance(allowance)}
+                        onClick={() => openAction(spender.address, item.label, 'revoke')}
+                      >
+                        {copy.approvals.revoke}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={suggestHere ? 'outline' : 'secondary'}
+                        data-testid={`approvals-unlimited-${spender.id}`}
+                        disabled={busy || !canRaiseAllowance(allowance)}
+                        onClick={() => openAction(spender.address, item.label, 'unlimited')}
+                      >
+                        {copy.approvals.unlimitedAction}
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      )}
 
       {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
 

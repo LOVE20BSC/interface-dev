@@ -53,6 +53,14 @@ const BELOW_MINIMUM_TEXT = `< 0.000001 ${SYMBOL}`;
 const ERC20 = parseAbi(['function approve(address spender, uint256 amount) returns (bool)']);
 const rpcClient = createPublicClient({ transport: http(ANVIL_RPC) });
 
+/** Same rule as `shared/lib/format.ts#shortenAddress(a, 6, 4)`, re-typed here. */
+function shortAddress(address: string): string {
+  return `${address.slice(0, 8)}…${address.slice(-4)}`;
+}
+
+/** 10 address-book spenders render on a clean bootstrap (one row each). */
+const KNOWN_SPENDER_COUNT = 10;
+
 test.use({
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 1,
@@ -215,11 +223,66 @@ test.describe('代币授权 前端线（理论线 §1）', () => {
     await selectTestToken(page);
     await expect(page.getByTestId('approvals-preference')).toBeChecked();
   });
+
+  test('页面顺序 ①→④、列表全展开、地址点击复制、无「推荐」字样', async ({ page }) => {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await openApprovals(page);
+
+    // 页面上下文（代币选择 + 余额）在四块之上，四块严格按 owner 2026-11-14 的顺序向下。
+    const blockIds = [
+      'approvals-block-preference',
+      'approvals-block-guide',
+      'approvals-block-custom',
+      'approvals-block-known',
+    ] as const;
+    /** Document-relative top of a test id (immune to the scroll changes of later clicks). */
+    const docTop = (testId: string): Promise<number> =>
+      page.getByTestId(testId).evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.top + window.scrollY;
+      });
+
+    const blocks: Record<string, number> = {};
+    for (const id of blockIds) {
+      await page.getByTestId(id).scrollIntoViewIfNeeded();
+      blocks[id] = await docTop(id);
+    }
+    expect(await docTop('approvals-token')).toBeLessThan(
+      blocks['approvals-block-preference'] ?? NaN,
+    );
+    expect(blocks['approvals-block-preference']).toBeLessThan(
+      blocks['approvals-block-guide'] ?? NaN,
+    );
+    expect(blocks['approvals-block-guide']).toBeLessThan(blocks['approvals-block-custom'] ?? NaN);
+    expect(blocks['approvals-block-custom']).toBeLessThan(blocks['approvals-block-known'] ?? NaN);
+
+    // ④ 常用合约列表全部展开：10 行都在、没有折叠容器、每行地址直接可见。
+    const rows = page.locator('[data-testid^="approvals-row-"]');
+    await expect(rows).toHaveCount(KNOWN_SPENDER_COUNT);
+    await expect(page.locator('[data-testid^="approvals-row-"] details')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="approvals-address-"]')).toHaveCount(
+      KNOWN_SPENDER_COUNT,
+    );
+    const routerAddress = page.getByTestId('approvals-address-router');
+    await expect(routerAddress).toBeVisible();
+    await expect(routerAddress).toContainText(shortAddress(ROUTER));
+    await expect(routerAddress).toHaveAttribute('title', ROUTER);
+
+    // 地址点击复制：按钮给「已复制」反馈，剪贴板里是完整地址。
+    await routerAddress.click();
+    await expect(routerAddress).toContainText('已复制');
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(ROUTER);
+
+    // owner: 不要显示「推荐」两个字。
+    await expect(page.locator('body')).not.toContainText('推荐');
+  });
 });
 
 /**
- * 验收截图：390×844 与 1280×800、浅色与深色，覆盖 列表态 / 撤销确认 / 自定义地址。
- * 主题通过 `love20:theme`（bootstrap 在首帧前读取）切换，每个组合都是一次真实加载。
+ * 验收截图：390×844 与 1280×800、浅色与深色，覆盖 列表态（全部展开 + 地址可复制）/
+ * 撤销确认 / 自定义地址。主题通过 `love20:theme`（bootstrap 在首帧前读取）切换，每个
+ * 组合都是一次真实加载。列表态滚到「常用合约」块，因为这一块现在是页尾的第 ④ 块，
+ * 首屏只看到 ①/②。
  */
 test.describe('代币授权 验收截图', () => {
   const VIEWPORTS = [
@@ -262,6 +325,13 @@ test.describe('代币授权 验收截图', () => {
     for (const viewport of VIEWPORTS) {
       for (const theme of THEMES) {
         await prepare(page, theme, viewport.width, viewport.height);
+
+        // ④ 常用合约列表：全部展开、每行地址直接可见、点击复制。
+        // 用固定偏移滚（而不是 scrollIntoView start），避免块标题被吸顶页头盖住。
+        await page.getByTestId('approvals-block-known').evaluate((element) => {
+          const top = element.getBoundingClientRect().top + window.scrollY;
+          window.scrollTo({ top: Math.max(0, top - 88) });
+        });
         await shoot(page, `list-${theme}-${viewport.key}`);
 
         await page.getByTestId('approvals-revoke-router').click();
