@@ -153,13 +153,14 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
   });
 
-  test('用例 A 原生 5 行（重复地址合并）：合计 0.500001，4 行逐行到账', async ({ page }) => {
+  test('用例 A 原生：重复地址先标行号并阻止提交，删掉重复行后 4 行逐行到账', async ({ page }) => {
     await openBatch(page, NATIVE_SENDER);
     await expect(page.getByTestId('batch-transfer-balance')).toHaveText(
       `${NATIVE} 余额 10,000`,
       { timeout: 20_000 },
     );
 
+    // 第 4 行与第 1 行同地址：不再静默合并，标出「与第 1 行重复」并阻止提交。
     await fillBatch(page, [
       `${R5} 0.1`,
       `${R7}, 0.2`,
@@ -167,41 +168,44 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
       `${R5} 0.05`,
       `${R9} 0.000001`,
     ]);
-
-    await expect(page.getByTestId('batch-transfer-summary')).toHaveText(
-      '5 行，合并为 4 个收款方',
-    );
+    await expect(page.getByTestId('batch-transfer-summary')).toHaveText('5 行，4 个收款方');
     await expect(page.getByTestId('batch-transfer-total')).toHaveText(
-      `合计 0.500001 ${NATIVE}`,
+      `合计 0.450001 ${NATIVE}`,
     );
-    await expect(page.getByTestId('batch-transfer-duplicate')).toHaveText(
-      '第 4 行是同一个收款方，金额已合并。',
+    await expect(page.getByTestId('batch-transfer-duplicate-4')).toHaveText(
+      '第 4 行：与第 1 行重复，这一行先不计入，请删掉其中一行。',
     );
-    // 提交前预余额（理论线 §0 快照）。
+    await expect(page.getByTestId('batch-transfer-submit')).toBeDisabled();
+
+    // 提交前预余额（理论线 §0 快照）：重复行不是收款方，只有 4 行。
     for (const index of [0, 1, 2, 3]) {
       await expect(page.getByTestId(`batch-transfer-row-balance-${index}`)).toHaveText(
         '10,000',
         { timeout: 20_000 },
       );
     }
-    await expect(page.getByTestId('batch-transfer-row-amount-0')).toHaveText(`0.15 ${NATIVE}`);
+    await expect(page.getByTestId('batch-transfer-row-amount-0')).toHaveText(`0.1 ${NATIVE}`);
+
+    // 用户自己处理：删掉第 4 行后，同一批恢复可提交。
+    await fillBatch(page, [`${R5} 0.1`, `${R7}, 0.2`, `${R8} 0.15`, `${R9} 0.000001`]);
+    await expect(page.getByTestId('batch-transfer-duplicates')).toHaveCount(0);
+    await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
 
     await page.getByTestId('batch-transfer-submit').click();
 
     await expect(page.getByTestId('batch-transfer-receipt-total')).toHaveText(
-      `0.500001 ${NATIVE}`,
+      `0.450001 ${NATIVE}`,
       { timeout: 30_000 },
     );
     await expect(page.getByTestId('batch-transfer-receipt-count')).toHaveText('4 个收款方');
-    await expect(page.getByTestId('batch-transfer-receipt-delta-0')).toHaveText('+0.15');
+    await expect(page.getByTestId('batch-transfer-receipt-delta-0')).toHaveText('+0.1');
     await expect(page.getByTestId('batch-transfer-receipt-delta-1')).toHaveText('+0.2');
     await expect(page.getByTestId('batch-transfer-receipt-delta-2')).toHaveText('+0.15');
     await expect(page.getByTestId('batch-transfer-receipt-delta-3')).toHaveText('+0.000001');
-    await expect(page.getByTestId('batch-transfer-receipt-atomic')).toBeVisible();
 
     await page.getByRole('button', { name: '留在此页' }).click();
     await expect(page.getByTestId('batch-transfer-success-strip-amount')).toHaveText(
-      `已转出 0.500001 ${NATIVE}`,
+      `已转出 0.450001 ${NATIVE}`,
     );
     await expect(page).toHaveURL(new RegExp(`/batch-transfer\\${QUERY}$`));
   });
@@ -302,7 +306,7 @@ test.describe('批量转账 验收截图', () => {
     });
   }
 
-  test('录入态（含逐行报错）截图', async ({ page }) => {
+  test('录入态（逐行报错 + 重复地址提示）截图', async ({ page }) => {
     await installWallet(page, ERC20_SENDER);
     for (const viewport of VIEWPORTS) {
       for (const theme of THEMES) {
@@ -310,9 +314,13 @@ test.describe('批量转账 验收截图', () => {
         await expect(page.getByTestId('batch-transfer-balance')).toContainText('余额', {
           timeout: 20_000,
         });
-        await fillBatch(page, [`${R5} 0.1`, R7, `${R8} abc`, `${BATCH} 0.2`]);
+        // 第 2 行缺金额、第 3 行金额非法、第 4 行重复地址：三种问题都在文本域下方就地标出。
+        await fillBatch(page, [`${R5} 0.1`, R7, `${R8} abc`, `${R5} 0.05`]);
         await expect(page.getByTestId('batch-transfer-line-error-2')).toBeVisible();
         await expect(page.getByTestId('batch-transfer-line-error-3')).toBeVisible();
+        await expect(page.getByTestId('batch-transfer-duplicate-4')).toBeVisible();
+        await expect(page.getByTestId('batch-transfer-submit')).toBeDisabled();
+        await page.getByTestId('batch-transfer-input').scrollIntoViewIfNeeded();
         await shoot(page, `entry-errors-${theme}-${viewport.key}`);
       }
     }
@@ -323,13 +331,7 @@ test.describe('批量转账 验收截图', () => {
     for (const viewport of VIEWPORTS) {
       for (const theme of THEMES) {
         await prepare(page, theme, viewport.width, viewport.height);
-        await fillBatch(page, [
-          `${R5} 0.1`,
-          `${R7}, 0.2`,
-          `${R8} 0.15`,
-          `${R5} 0.05`,
-          `${R9} 0.000001`,
-        ]);
+        await fillBatch(page, [`${R5} 0.1`, `${R7}, 0.2`, `${R8} 0.15`, `${R9} 0.000001`]);
         // The pre-submit balance read settles asynchronously; only its presence is
         // asserted here (this screenshot block may run after the functional tests
         // already credited some recipients).
@@ -337,8 +339,9 @@ test.describe('批量转账 验收截图', () => {
           timeout: 20_000,
         });
         await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
-        // Scroll the page so the whole 核对 table sits above the sticky CTA.
-        await page.evaluate(() => window.scrollTo({ top: document.body.scrollHeight }));
+        // 主按钮之后是预余额核对表：把两者一起放进画面（区块顺序：… → 主按钮 → 核对表）。
+        await page.getByTestId('batch-transfer-submit').scrollIntoViewIfNeeded();
+        await page.evaluate(() => window.scrollBy(0, -88));
         await shoot(page, `review-${theme}-${viewport.key}`);
       }
     }

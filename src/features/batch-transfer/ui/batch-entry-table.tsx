@@ -16,9 +16,11 @@ export interface BatchEntryTableProps {
 }
 
 /**
- * The pre-submit 核对 table: one row per *merged* recipient with the amount and
- * the recipient's current balance (read through the batch contract, so the number
+ * The pre-submit 核对 table: one row per unique recipient with the amount and the
+ * recipient's current balance (read through the batch contract, so the number
  * shown is exactly the number the audit will compare against after mining).
+ * Repeated addresses are not rows at all — the panel lists them under the input
+ * as 「与第 N 行重复」 and blocks submission until the user deletes one line.
  * Read failures render 「—」; nothing here is ever invented.
  */
 export function BatchEntryTable({
@@ -49,7 +51,7 @@ export function BatchEntryTable({
             const balance = balances[index];
             return (
               <li
-                key={row.address}
+                key={row.line}
                 data-testid={`batch-transfer-row-${index}`}
                 className="grid grid-cols-[minmax(0,1fr)_5.5rem_6rem] items-center gap-2 px-3 py-2 text-xs"
               >

@@ -590,7 +590,7 @@ export const copy = {
   // ───────────────────────────────────────────────────────────────────────────
   batchTransfer: {
     intro:
-      '一次把一种资产转给多个收款方。整批一起执行：只要有一个收款方失败，这一批都不会到账，请先核对每一行。',
+      '一次把一种资产转给多个收款方。先粘贴收款名单，逐行核对后再提交。',
     notConfigured:
       '这个环境还没有部署批量转账合约，暂时不能批量转账。你的资产没有变化。',
     modeLabel: '转出资产',
@@ -608,8 +608,7 @@ export const copy = {
     balanceError: '余额暂时读不到',
     amountDecimals: (digits: number) => `精度 ${digits} 位`,
     recipientsLabel: '收款方与金额',
-    recipientsHint:
-      '每行一个收款方：先写 0x 开头的地址，再写金额，中间用空格或逗号分隔。可以直接粘贴多行。',
+    recipientsHint: '每行一个收款方：地址在前、金额在后，空格或逗号分隔。',
     recipientsPlaceholder: '0x… 0.1\n0x… 0.2',
     emptyRows: '还没有可用的收款方。按上面的格式每行填一个。',
     lineError: (line: number, reason: string) => `第 ${line} 行：${reason}`,
@@ -625,8 +624,9 @@ export const copy = {
       batchContract: '不能转给批量转账合约本身。',
     },
     amountTruncated: (digits: number) => `金额已按精度截断到 ${digits} 位小数。`,
-    duplicateNote: (lines: string) => `第 ${lines} 行是同一个收款方，金额已合并。`,
-    summary: (lines: string, recipients: string) => `${lines} 行，合并为 ${recipients} 个收款方`,
+    duplicateLine: (line: number, firstLine: number) =>
+      `第 ${line} 行：与第 ${firstLine} 行重复，这一行先不计入，请删掉其中一行。`,
+    summary: (lines: string, recipients: string) => `${lines} 行，${recipients} 个收款方`,
     totalLabel: '合计',
     receivedLabel: '合计到账',
     insufficient: (symbol: string, shortfall: string) => `${symbol} 不够，还差 ${shortfall}`,
@@ -635,6 +635,7 @@ export const copy = {
     preBalanceLoading: '读取收款方余额中…',
     preBalanceError: '收款方余额暂时读不到，提交后仍会逐行核对到账差额。',
     preBalanceHeaderRecipient: '收款方',
+    actionsLabel: '批量转账操作',
     preBalanceHeaderAmount: '金额',
     preBalanceHeaderBalance: '当前余额',
     contractWarningTitle: '有收款方是合约地址',

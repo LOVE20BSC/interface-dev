@@ -11,7 +11,7 @@ const D = '0xa0Ee7A142d267C1f36714E4a8F75612F20a79720';
 const OPTIONS = { decimals: 18, self: SELF, batchContract: BATCH as `0x${string}` };
 
 describe('parseBatchText', () => {
-  it('parses the five-line native fixture and merges the duplicate address', () => {
+  it('parses the five-line native fixture and flags the duplicate line instead of merging', () => {
     const result = parseBatchText(
       [
         `${A} 0.1`,
@@ -25,15 +25,17 @@ describe('parseBatchText', () => {
 
     expect(result.errors).toEqual([]);
     expect(result.lineCount).toBe(5);
+    // 每行一个地址：重复行不再合并金额，也不生成第二行。
     expect(result.rows.map((row) => row.address)).toEqual([A, B, C, D]);
     expect(result.rows.map((row) => row.amount)).toEqual([
-      150000000000000000n,
+      100000000000000000n,
       200000000000000000n,
       150000000000000000n,
       1000000000000n,
     ]);
-    expect(result.rows[0]?.lines).toEqual([1, 4]);
-    expect(result.total).toBe(500001000000000000n);
+    expect(result.rows.map((row) => row.line)).toEqual([1, 2, 3, 5]);
+    expect(result.duplicates).toEqual([{ line: 4, firstLine: 1 }]);
+    expect(result.total).toBe(450001000000000000n);
     expect(result.truncated).toBe(false);
   });
 
@@ -42,7 +44,9 @@ describe('parseBatchText', () => {
 
     expect(result.lineCount).toBe(2);
     expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]?.line).toBe(2);
     expect(result.errors).toEqual([{ line: 4, reason: 'missingAmount' }]);
+    expect(result.duplicates).toEqual([]);
   });
 
   it('reports every invalid line with its own reason', () => {
@@ -67,6 +71,7 @@ describe('parseBatchText', () => {
       { line: 6, reason: 'invalidLine' },
     ]);
     expect(result.rows).toEqual([]);
+    expect(result.duplicates).toEqual([]);
     expect(result.total).toBe(0n);
   });
 
@@ -100,12 +105,34 @@ describe('parseBatchText', () => {
     ]);
   });
 
-  it('keeps only the case-insensitive duplicate merged once', () => {
+  it('treats the duplicate comparison as case-insensitive and keeps only the first row', () => {
     const lower = A.toLowerCase();
     const result = parseBatchText(`${A} 1\n${lower} 2`, OPTIONS);
 
     expect(result.rows).toHaveLength(1);
-    expect(result.rows[0]?.amount).toBe(3000000000000000000n);
-    expect(result.rows[0]?.lines).toEqual([1, 2]);
+    expect(result.rows[0]?.amount).toBe(1000000000000000000n);
+    expect(result.rows[0]?.line).toBe(1);
+    expect(result.duplicates).toEqual([{ line: 2, firstLine: 1 }]);
+    expect(result.total).toBe(1000000000000000000n);
+  });
+
+  it('points every later repeat at the first appearance, not at the previous repeat', () => {
+    const result = parseBatchText(`${A} 0.1\n${A} 0.2\n${A} 0.3`, OPTIONS);
+
+    expect(result.rows).toHaveLength(1);
+    expect(result.total).toBe(100000000000000000n);
+    expect(result.duplicates).toEqual([
+      { line: 2, firstLine: 1 },
+      { line: 3, firstLine: 1 },
+    ]);
+  });
+
+  it('reports a malformed line as its own error, not as a duplicate', () => {
+    const result = parseBatchText(`${A} 0.1\n${A} abc\n${A} 0.2`, OPTIONS);
+
+    expect(result.errors).toEqual([{ line: 2, reason: 'invalidAmount' }]);
+    // 第 3 行的地址第一次出现是第 1 行（第 2 行不是合法行）。
+    expect(result.duplicates).toEqual([{ line: 3, firstLine: 1 }]);
+    expect(result.rows).toHaveLength(1);
   });
 });

@@ -8,11 +8,13 @@ import { parseTransferAmount } from '@/features/transfer-token/lib/transfer-amou
  * as the separator (both `0x…,0.2` and `0x… , 0.2` work). Blank lines are
  * skipped but keep their original 1-based line number for error messages.
  *
- * Duplicate addresses are merged in first-appearance order (amounts summed), so
- * the contract never receives the same recipient twice and the user pays one
- * transfer per recipient. Every invalid line is reported with its line number;
- * valid lines are still parsed so the page can show a partial total, but the
- * page keeps 提交 disabled while any line is invalid.
+ * owner 2026-11-14: a repeated address is **not** merged silently anymore. The
+ * later line is reported as `duplicates` with its own line number and the line
+ * the address first appeared on (`与第 N 行重复`), it contributes neither a row
+ * nor to the total, and the page keeps 提交 disabled until the user deletes one
+ * of the two lines themselves. Every invalid line is still reported with its
+ * line number; valid lines are still parsed so the page can show a partial
+ * total, but the page keeps 提交 disabled while any line is invalid or repeated.
  */
 
 export type BatchParseErrorReason =
@@ -34,14 +36,29 @@ export interface BatchParseError {
 export interface BatchParsedRow {
   readonly address: HexAddress;
   readonly amount: bigint;
-  /** Every input line that contributed to this row, primary (first) first. */
-  readonly lines: readonly number[];
+  /**
+   * 1-based input line that produced this row. For an address that repeats, the
+   * row always belongs to its *first* occurrence; every later line is a
+   * `BatchDuplicate`, never a row.
+   */
+  readonly line: number;
+}
+
+/** A later line whose address already appeared on `firstLine`. */
+export interface BatchDuplicate {
+  /** 1-based line of the repeated entry. */
+  readonly line: number;
+  /** 1-based line where the same address first appeared. */
+  readonly firstLine: number;
 }
 
 export interface BatchParseResult {
+  /** One row per unique address, in first-appearance order; repeats excluded. */
   readonly rows: readonly BatchParsedRow[];
   readonly errors: readonly BatchParseError[];
-  /** Sum of every valid row; invalid lines do not contribute. */
+  /** Repeated addresses (later lines only); non-empty blocks submission. */
+  readonly duplicates: readonly BatchDuplicate[];
+  /** Sum of the rows above; a repeated line never contributes. */
   readonly total: bigint;
   /** Non-empty input lines. */
   readonly lineCount: number;
@@ -62,8 +79,9 @@ export interface ParseBatchOptions {
 
 export function parseBatchText(text: string, options: ParseBatchOptions): BatchParseResult {
   const errors: BatchParseError[] = [];
+  const duplicates: BatchDuplicate[] = [];
   const rows: BatchParsedRow[] = [];
-  const indexByAddress = new Map<string, number>();
+  const firstLineByAddress = new Map<string, number>();
   let total = 0n;
   let lineCount = 0;
   let truncated = false;
@@ -122,22 +140,16 @@ export function parseBatchText(text: string, options: ParseBatchOptions): BatchP
     if (parsed.truncated) truncated = true;
 
     const key = address.toLowerCase();
-    const existingIndex = indexByAddress.get(key);
-    if (existingIndex !== undefined) {
-      const existing = rows[existingIndex];
-      if (existing !== undefined) {
-        rows[existingIndex] = {
-          address: existing.address,
-          amount: existing.amount + parsed.value,
-          lines: [...existing.lines, lineNumber],
-        };
-      }
-    } else {
-      indexByAddress.set(key, rows.length);
-      rows.push({ address, amount: parsed.value, lines: [lineNumber] });
+    const firstLine = firstLineByAddress.get(key);
+    if (firstLine !== undefined) {
+      // 重复地址：标出「与第 N 行重复」，不合并、不计入合计，由用户自己删行。
+      duplicates.push({ line: lineNumber, firstLine });
+      continue;
     }
+    firstLineByAddress.set(key, lineNumber);
+    rows.push({ address, amount: parsed.value, line: lineNumber });
     total += parsed.value;
   }
 
-  return { rows, errors, total, lineCount, truncated };
+  return { rows, errors, duplicates, total, lineCount, truncated };
 }

@@ -8,9 +8,13 @@
 // snapshot/revert，跑完链上状态与跑前完全一致；绝不使用前端的计算结果，也绝不触碰
 // 8545（人工链）。
 //
-// 用例顺序：A 原生 5 行（重复地址合并）→ B ERC20 批量 + approve → C 一行非法
+// 用例顺序：A 原生 4 个唯一收款方（重复地址由前端标行并拦截，链上不再合并）→ B ERC20 批量 + approve → C 一行非法
 // （纯 eth_call）→ D 合计超余额（纯 eth_call / 被节点拒绝）→ E 整批 revert 后状态
 // 不变。A 与 E 都从 #6 出金，但每条用例都在自己的「before」读数上断言，互不影响。
+//
+// 2026-11-14 修订：owner 要求重复地址不再静默合并。用例 A 的链上入参因此是
+// 「用户删掉重复行后的 4 个唯一收款方」，金额为 #5 0.1 + #7 0.2 + #8 0.15 +
+// #9 0.000001 = 0.450001 ETH；重复行拦截由前端线证明，链上不出现重复地址。
 //
 // 退出码非 0 = 失败。
 
@@ -224,16 +228,16 @@ async function main() {
     check('§0 #6 ETH 初始余额', 10000000000000000000000n, await ethBalance(ACCOUNT_6));
     check('§0 #9 ETH 初始余额', 10000000000000000000000n, await ethBalance(ACCOUNT_9));
 
-    // ── 用例 A：原生 5 行，重复地址合并 ─────────────────────────────────────
+    // ── 用例 A：原生 4 个唯一收款方（重复行由前端拦截）────────────────────────
     const aRecipients = [ACCOUNT_5, ACCOUNT_7, ACCOUNT_8, ACCOUNT_9];
     const aAmounts = [
-      150000000000000000n, // #5 第 1 行 0.1 + 第 4 行 0.05 合并
+      100000000000000000n, // #5 0.1（第 4 行 0.05 与第 1 行重复，前端已让用户删掉）
       200000000000000000n, // #7
       150000000000000000n, // #8
       1000000000000n, // #9 0.000001
     ];
-    const aTotal = 500001000000000000n;
-    check('A 合计 = Σ amounts', 500001000000000000n, aAmounts.reduce((sum, value) => sum + value, 0n));
+    const aTotal = 450001000000000000n;
+    check('A 合计 = Σ amounts', 450001000000000000n, aAmounts.reduce((sum, value) => sum + value, 0n));
     const aBefore = await nativeBalances(aRecipients);
     check('A §0 #5 预余额', 10000000000000000000000n, aBefore[0]);
     check('A §0 #6 发送前 ETH', 10000000000000000000000n, await ethBalance(ACCOUNT_6));
@@ -250,7 +254,7 @@ async function main() {
 
     const aAfter = await nativeBalances(aRecipients);
     check('A #5 到账额', aAmounts[0], aAfter[0] - aBefore[0]);
-    check('A #5 终态', 10000150000000000000000n, aAfter[0]);
+    check('A #5 终态', 10000100000000000000000n, aAfter[0]);
     check('A #7 到账额', aAmounts[1], aAfter[1] - aBefore[1]);
     check('A #7 终态', 10000200000000000000000n, aAfter[1]);
     check('A #8 到账额', aAmounts[2], aAfter[2] - aBefore[2]);

@@ -70,9 +70,13 @@ function StateCard({
  * either the native coin or one ERC20, an optional `approve` of the exact total,
  * and a per-recipient gas budget. The contract is atomic, so the page never
  * implies a partial success: every copy path either says 「整批一起执行」 or
- * 「全部都不会到账」. Recipients are pasted as lines, parsed with per-line
- * errors, merged by address, then checked against `nativeBalances` /
- * `erc20Balances` before and after the batch.
+ * 「全部都不会到账」.
+ *
+ * owner 2026-11-14 09:30 (页面整理): block order follows the legacy page —
+ * 资产/币种 → 收款清单 → 逐行错误就地 → 合计与余额对比 → 主按钮 →
+ * 预余额核对 → 高级选项（默认折叠）. Recipients are pasted as lines, parsed with
+ * per-line errors; a repeated address is reported in place (行号 + 与第 N 行重复)
+ * and blocks submission instead of being merged silently.
  */
 export function BatchTransferPanel({
   isConnected,
@@ -204,7 +208,9 @@ export function BatchTransferPanel({
   // After an approve confirmation the allowance is re-read; keep the CTA disabled
   // until that read lands so the same total cannot be approved twice in a row.
   const approvalRefreshing = mode === 'token' && allowance.isFetching;
-  const rowsValid = parse.rows.length > 0 && parse.errors.length === 0;
+  // 重复地址不合并也不提交：解析器已排除重复行，这里把「有重复」也算进不可提交条件。
+  const rowsValid =
+    parse.rows.length > 0 && parse.errors.length === 0 && parse.duplicates.length === 0;
   const baseValid = ready && !busy && rowsValid && !insufficient && gasOk;
 
   const canApprove = baseValid && needsApproval && token?.address !== undefined;
@@ -254,7 +260,6 @@ export function BatchTransferPanel({
     tx.clearError();
   };
 
-  const duplicates = parse.rows.filter((row) => row.lines.length > 1);
   const contractRows = parse.rows.filter((_, index) => hasCode[index] === true);
 
   const itemTokens = new Map<string, TransferToken>();
@@ -397,85 +402,89 @@ export function BatchTransferPanel({
 
       <p className="px-1 text-xs leading-5 text-muted">{copy.batchTransfer.intro}</p>
 
-      <div className="rounded-3xl border border-line bg-surface p-5 shadow-soft">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-medium text-muted">{copy.batchTransfer.modeLabel}</span>
-          <div
-            role="radiogroup"
-            aria-label={copy.batchTransfer.modeLabel}
-            className="flex gap-1 rounded-xl bg-elevated p-0.5"
-          >
-            {(
-              [
-                { key: 'native', label: copy.batchTransfer.modeNative },
-                { key: 'token', label: copy.batchTransfer.modeToken },
-              ] as const
-            ).map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                role="radio"
-                aria-checked={mode === option.key}
-                data-testid={`batch-transfer-mode-${option.key}`}
+      <Card className="space-y-3 p-4 sm:p-5">
+        {/* 区块 1：转出资产（币种 + 余额） */}
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-muted">{copy.batchTransfer.modeLabel}</span>
+            <div
+              role="radiogroup"
+              aria-label={copy.batchTransfer.modeLabel}
+              className="flex gap-1 rounded-xl bg-elevated p-0.5"
+            >
+              {(
+                [
+                  { key: 'native', label: copy.batchTransfer.modeNative },
+                  { key: 'token', label: copy.batchTransfer.modeToken },
+                ] as const
+              ).map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === option.key}
+                  data-testid={`batch-transfer-mode-${option.key}`}
+                  disabled={busy}
+                  onClick={() => switchMode(option.key)}
+                  className={cn(
+                    'rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors',
+                    mode === option.key
+                      ? 'bg-surface text-foreground shadow-soft'
+                      : 'text-muted hover:text-foreground',
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {mode === 'token' ? (
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted">{copy.batchTransfer.tokenLabel}</span>
+              <TokenPicker
+                optionTestIdPrefix="batch-transfer"
+                triggerTestId="batch-transfer-token"
+                triggerAriaLabel={copy.batchTransfer.tokenLabel}
+                labels={{
+                  title: copy.batchTransfer.tokenSheetTitle,
+                  searchPlaceholder: copy.transfer.searchPlaceholder,
+                  searchHint: copy.transfer.searchHint,
+                  searchEmpty: copy.transfer.searchEmpty,
+                  searchLoading: copy.transfer.searchLoading,
+                  loadMore: copy.transfer.loadMore,
+                }}
+                groups={groups}
+                searchResults={catalog.searchResults.map(toItem)}
+                searchResultsGroupKey="community"
+                searchStatus={catalog.searchStatus}
+                search={catalog.search}
+                onSearchChange={catalog.setSearch}
+                selected={token !== undefined ? toItem(token) : undefined}
+                onSelect={(item) => {
+                  const next = itemTokens.get(item.key);
+                  if (next === undefined) return;
+                  setSelectedToken(next);
+                  tx.clearError();
+                }}
+                hasMore={catalog.hasMore}
+                onLoadMore={catalog.loadMore}
+                isLoading={catalog.isLoading}
                 disabled={busy}
-                onClick={() => switchMode(option.key)}
-                className={cn(
-                  'rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors',
-                  mode === option.key
-                    ? 'bg-surface text-foreground shadow-soft'
-                    : 'text-muted hover:text-foreground',
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
+              />
+            </div>
+          ) : null}
+
+          <div className="mt-2 flex items-baseline justify-between gap-2 text-xs leading-5 text-muted">
+            <span data-testid="batch-transfer-balance">
+              {balance.isLoading ? <Skeleton className="h-3.5 w-28" /> : balanceText}
+            </span>
+            <span className="shrink-0">{copy.batchTransfer.amountDecimals(decimals)}</span>
           </div>
         </div>
 
-        {mode === 'token' ? (
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-muted">{copy.batchTransfer.tokenLabel}</span>
-            <TokenPicker
-              optionTestIdPrefix="batch-transfer"
-              triggerTestId="batch-transfer-token"
-              triggerAriaLabel={copy.batchTransfer.tokenLabel}
-              labels={{
-                title: copy.batchTransfer.tokenSheetTitle,
-                searchPlaceholder: copy.transfer.searchPlaceholder,
-                searchHint: copy.transfer.searchHint,
-                searchEmpty: copy.transfer.searchEmpty,
-                searchLoading: copy.transfer.searchLoading,
-                loadMore: copy.transfer.loadMore,
-              }}
-              groups={groups}
-              searchResults={catalog.searchResults.map(toItem)}
-              searchResultsGroupKey="community"
-              searchStatus={catalog.searchStatus}
-              search={catalog.search}
-              onSearchChange={catalog.setSearch}
-              selected={token !== undefined ? toItem(token) : undefined}
-              onSelect={(item) => {
-                const next = itemTokens.get(item.key);
-                if (next === undefined) return;
-                setSelectedToken(next);
-                tx.clearError();
-              }}
-              hasMore={catalog.hasMore}
-              onLoadMore={catalog.loadMore}
-              isLoading={catalog.isLoading}
-              disabled={busy}
-            />
-          </div>
-        ) : null}
-
-        <div className="mt-2 flex items-center justify-between gap-2 text-xs leading-5 text-muted">
-          <span data-testid="batch-transfer-balance">
-            {balance.isLoading ? <Skeleton className="h-3.5 w-28" /> : balanceText}
-          </span>
-          <span>{copy.batchTransfer.amountDecimals(decimals)}</span>
-        </div>
-
-        <div className="mt-4">
+        {/* 区块 2：收款清单（逐行错误、重复提示就地显示） */}
+        <div className="border-t border-line pt-3">
           <label htmlFor="batch-recipients" className="text-xs font-medium text-muted">
             {copy.batchTransfer.recipientsLabel}
           </label>
@@ -492,7 +501,7 @@ export function BatchTransferPanel({
             }}
             placeholder={copy.batchTransfer.recipientsPlaceholder}
             aria-label={copy.batchTransfer.recipientsLabel}
-            rows={5}
+            rows={4}
             autoComplete="off"
             autoCapitalize="off"
             spellCheck={false}
@@ -521,15 +530,20 @@ export function BatchTransferPanel({
               ))}
             </ul>
           ) : null}
-          {duplicates.map((row) => (
-            <p
-              key={`duplicate-${row.address}`}
-              data-testid="batch-transfer-duplicate"
-              className="mt-1 text-[11px] leading-4 text-warning"
-            >
-              {copy.batchTransfer.duplicateNote(row.lines.slice(1).join('、'))}
-            </p>
-          ))}
+          {parse.duplicates.length > 0 ? (
+            <ul className="mt-2 space-y-1" data-testid="batch-transfer-duplicates">
+              {parse.duplicates.map((duplicate) => (
+                <li
+                  key={`duplicate-${duplicate.line}`}
+                  data-testid={`batch-transfer-duplicate-${duplicate.line}`}
+                  role="alert"
+                  className="text-xs leading-5 text-warning"
+                >
+                  {copy.batchTransfer.duplicateLine(duplicate.line, duplicate.firstLine)}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           {parse.lineCount === 0 ? (
             <p className="mt-2 text-xs text-muted" data-testid="batch-transfer-empty">
               {copy.batchTransfer.emptyRows}
@@ -537,7 +551,8 @@ export function BatchTransferPanel({
           ) : null}
         </div>
 
-        <div className="mt-4 border-t border-line pt-3">
+        {/* 区块 3：合计与余额对比 */}
+        <div className="border-t border-line pt-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <span className="text-[11px] text-muted" data-testid="batch-transfer-summary">
               {copy.batchTransfer.summary(String(parse.lineCount), String(parse.rows.length))}
@@ -565,21 +580,11 @@ export function BatchTransferPanel({
           ) : null}
         </div>
 
-        <BatchEntryTable
-          rows={parse.rows}
-          balances={recipientBalances.values}
-          hasCode={hasCode}
-          symbol={symbol}
-          decimals={decimals}
-          loading={recipientBalances.isLoading}
-          error={recipientBalances.isError}
-        />
-
         {contractRows.length > 0 ? (
           <div
             role="status"
             data-testid="batch-transfer-contract-warning"
-            className="mt-3 rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
+            className="rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
           >
             <p className="flex items-start gap-1.5 font-semibold text-warning">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -590,7 +595,7 @@ export function BatchTransferPanel({
         ) : null}
 
         {mode === 'token' ? (
-          <div className="mt-3 rounded-2xl border border-line bg-elevated/60 p-3 text-xs leading-5">
+          <div className="rounded-2xl border border-line bg-elevated/60 p-3 text-xs leading-5">
             <p className="text-muted" data-testid="batch-transfer-allowance">
               {allowance.isLoading
                 ? copy.batchTransfer.allowanceLoading
@@ -608,12 +613,7 @@ export function BatchTransferPanel({
                   : copy.batchTransfer.allowanceError}
             </p>
             {parse.total > 0n ? (
-              <p
-                className={cn(
-                  'mt-1',
-                  needsApproval ? 'text-warning' : 'text-muted',
-                )}
-              >
+              <p className={cn('mt-1', needsApproval ? 'text-warning' : 'text-muted')}>
                 {needsApproval
                   ? copy.batchTransfer.allowanceNeed
                   : copy.batchTransfer.allowanceReady}
@@ -627,7 +627,48 @@ export function BatchTransferPanel({
           </div>
         ) : null}
 
-        <details className="mt-3 rounded-2xl border border-line bg-elevated/60 px-3 py-2">
+        {/* 区块 4：主按钮（先决的授权仍由同一个位置承担） */}
+        <section aria-label={copy.batchTransfer.actionsLabel} className="space-y-2 pt-1">
+          <ActionStack>
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full"
+              data-testid="batch-transfer-submit"
+              onClick={submit}
+              disabled={!actionEnabled}
+              loading={tx.stage === 'wallet'}
+            >
+              {ctaLabel}
+            </Button>
+          </ActionStack>
+
+          {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
+
+          {txError !== null ? (
+            <div
+              role="alert"
+              data-testid="batch-transfer-error"
+              className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
+            >
+              <p>{txError.message}</p>
+              {recoveryAction !== null ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mt-2"
+                  onClick={recoveryAction.run}
+                  leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
+                >
+                  {recoveryAction.label}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+
+        {/* 区块 5：高级选项（默认折叠） */}
+        <details className="rounded-2xl border border-line bg-elevated/60 px-3 py-2">
           <summary className="cursor-pointer text-xs font-medium text-muted">
             {copy.batchTransfer.gasTitle}
           </summary>
@@ -666,46 +707,18 @@ export function BatchTransferPanel({
             </p>
           ) : null}
         </details>
-      </div>
+      </Card>
 
-      {txError !== null ? (
-        <div
-          role="alert"
-          data-testid="batch-transfer-error"
-          className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
-        >
-          <p>{txError.message}</p>
-          {recoveryAction !== null ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-2"
-              onClick={recoveryAction.run}
-              leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
-            >
-              {recoveryAction.label}
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-
-      <section aria-label={copy.batchTransfer.recipientsLabel} className="space-y-2">
-        <ActionStack>
-          <Button
-            variant="primary"
-            size="lg"
-            className="w-full"
-            data-testid="batch-transfer-submit"
-            onClick={submit}
-            disabled={!actionEnabled}
-            loading={tx.stage === 'wallet'}
-          >
-            {ctaLabel}
-          </Button>
-        </ActionStack>
-
-        {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
-      </section>
+      {/* 区块 6：预余额核对（主按钮之后，提交前逐行核对用） */}
+      <BatchEntryTable
+        rows={parse.rows}
+        balances={recipientBalances.values}
+        hasCode={hasCode}
+        symbol={symbol}
+        decimals={decimals}
+        loading={recipientBalances.isLoading}
+        error={recipientBalances.isError}
+      />
     </div>
   );
 }
