@@ -43,6 +43,7 @@ const RECIPIENT = ACCOUNTS.eligible; // #5, 0 token, 10,000 ETH
 const IDENTITY_2_OWNER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
 
 test.use({
+  permissions: ['clipboard-read', 'clipboard-write'],
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 1,
   isMobile: true,
@@ -120,12 +121,19 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('transfer-receipt-amount')).toHaveText(`0.1 ${NATIVE}`, {
       timeout: 30_000,
     });
-    await expect(page.getByTestId('transfer-receipt-recipient')).toHaveText(NATIVE_RECIPIENT);
+    const receiptRecipient = page.getByTestId('transfer-receipt-recipient');
+    await expect(receiptRecipient).toHaveText(NATIVE_RECIPIENT);
+    // 回执里的收款地址同样可点击复制。
+    await receiptRecipient.click();
+    await expect(receiptRecipient).toContainText('已复制');
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe(NATIVE_RECIPIENT);
     const hash = (await page.getByTestId('transfer-receipt-hash').innerText()).trim();
     expect(hash).toMatch(/^0x[0-9a-fA-F]{64}$/);
 
     // 回执可关闭且留在原页：收成成功条，不跳转。
-    await page.getByRole('button', { name: '留在此页' }).click();
+    await page.getByRole('button', { name: '知道了' }).click();
     await expect(page.getByTestId('transfer-success-strip-amount')).toHaveText(
       `已转出 0.1 ${NATIVE}`,
     );
@@ -149,7 +157,7 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     });
     await expect(page.getByTestId('transfer-receipt-recipient')).toHaveText(RECIPIENT);
 
-    await page.getByRole('button', { name: '留在此页' }).click();
+    await page.getByRole('button', { name: '知道了' }).click();
     // 余额刷新后与理论线 §1 用例 B 的 S_after 逐字相等。
     await expect(page.getByTestId('transfer-balance')).toHaveText('99,799,098.5', {
       timeout: 20_000,
@@ -206,7 +214,16 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     const summary = page.getByTestId('transfer-identity-summary');
     await expect(summary).toBeVisible({ timeout: 20_000 });
     await expect(summary).toContainText('身份 NFT #2 Testdev-member-1');
-    await expect(page.getByTestId('transfer-identity-recipient')).toHaveText(`收款人 0x7099…79C8`);
+    const identityRecipient = page.getByTestId('transfer-identity-recipient');
+    await expect(identityRecipient).toHaveText(`收款人 0x7099…79C8`);
+
+    // owner 2026-11-14: 身份解析出来的 owner 地址也是地址，点击复制完整地址。
+    await identityRecipient.getByRole('button').click();
+    await expect(identityRecipient).toContainText('已复制');
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe(IDENTITY_2_OWNER);
+
     await expect(page.getByTestId('transfer-submit')).toBeDisabled();
 
     await page.getByTestId('transfer-identity-ack').check();
@@ -222,7 +239,7 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     );
     await expect(page.getByTestId('transfer-receipt-recipient')).toHaveText(IDENTITY_2_OWNER);
 
-    await page.getByRole('button', { name: '留在此页' }).click();
+    await page.getByRole('button', { name: '知道了' }).click();
     await expect(page.getByTestId('transfer-balance')).toHaveText('99,999,097.499639', {
       timeout: 20_000,
     });

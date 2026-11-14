@@ -43,6 +43,17 @@ export const copy = {
     parenthesized: (text: string) => `（${text}）`,
     cancel: '取消',
   },
+  /**
+   * 全局地址复制 (owner 2026-11-14 09:30): every contract/wallet address in the
+   * app copies through one shared component, so the wording lives here too —
+   * one label for 关于/授权/转账/回执/钱包菜单 alike.
+   */
+  address: {
+    copyAria: (label: string) => `复制地址：${label}`,
+    copiedAria: (label: string) => `地址已复制：${label}`,
+    copied: '已复制',
+    copyFailed: '复制失败，请手动选中地址',
+  },
   nav: {
     home: '首页',
     gov: '治理',
@@ -111,6 +122,15 @@ export const copy = {
     switchHint: '切换社区不会切换网络，也不会刷新页面。',
     menuTitle: '代币社区',
     chipAria: (symbol: string) => `当前代币社区 ${symbol}，打开社区菜单`,
+    searchLabel: '按 symbol 搜索代币社区',
+    searchPlaceholder: '输入代币 symbol',
+    searchResults: '搜索结果',
+    searchEmpty: '没有找到这个 symbol 的社区。',
+    searchHint: '输入完整 symbol 可直接切换；前缀相同的社区也会列出来。',
+    searchLoading: '正在查找…',
+    searchError: '社区列表暂时读不到。',
+    searchExact: '精确匹配',
+    searchCurrent: '当前',
   },
   identity: {
     memberId: (id: string) => `NFT #${id}`,

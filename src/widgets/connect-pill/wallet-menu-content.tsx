@@ -1,13 +1,12 @@
-import { Check, Copy, LogOut } from '@/shared/ui/icons';
-import { useState } from 'react';
+import { LogOut } from '@/shared/ui/icons';
 import { Link } from 'react-router-dom';
 import { NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy';
-import { copyText } from '@/shared/lib/clipboard';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
+import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { Separator } from '@/shared/ui/separator';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
@@ -126,16 +125,9 @@ export function WalletMenuContent({
   onDisconnect,
   onNavigate,
 }: WalletMenuContentProps) {
-  const [copied, setCopied] = useState(false);
   const token = useCommunityToken(symbol);
   const tokenBalance = useCommunityBalance(token.address, token.decimals);
   const nativeBalance = useNativeBalance(NETWORK.nativeCurrency.symbol);
-
-  const handleCopy = async () => {
-    const ok = await copyText(address);
-    setCopied(ok);
-    if (ok) window.setTimeout(() => setCopied(false), 2000);
-  };
 
   const row = identityRow(identity);
   const rowClass = cn(
@@ -174,28 +166,16 @@ export function WalletMenuContent({
 
   return (
     <div>
-      <div className="flex items-start justify-between gap-3 px-2.5 pt-1">
+      <div className="px-2.5 pt-1">
         <span className="text-xs font-medium text-muted">{copy.wallet.addressLabel}</span>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="-my-1 -mr-1 h-8 px-2 text-xs"
-          onClick={() => {
-            void handleCopy();
-          }}
-          leadingIcon={
-            copied ? (
-              <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />
-            ) : (
-              <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-            )
-          }
-          aria-label={copied ? copy.wallet.copiedAddressAria : copy.wallet.copyAddressAria}
-        >
-          {copied ? copy.common.copied : copy.common.copy}
-        </Button>
+        <CopyableAddress
+          address={address}
+          label={copy.wallet.addressLabel}
+          display="full"
+          testId="wallet-menu-address"
+          className="mt-1 text-foreground"
+        />
       </div>
-      <p className="mt-1 break-all px-2.5 font-mono text-xs leading-5 text-foreground">{address}</p>
 
       <Separator className="my-2" />
 

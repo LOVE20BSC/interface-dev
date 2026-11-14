@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAccount } from 'wagmi';
 import { uniswapV2Router02Abi } from '@/config/abis';
 import { configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { formatPercent, formatTokenAmount } from '@/shared/lib/format';
+import { formatPercent, formatTokenAmount, formatUnits } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -19,7 +19,7 @@ import {
 } from '@/features/liquidity-pool/lib/liquidity-math';
 import {
   deadlineFromNow,
-  parseWithdrawPercent,
+  parseAmount,
   percentToBps,
   WITHDRAW_PERCENTS,
 } from '@/features/liquidity-pool/lib/liquidity-form';
@@ -43,16 +43,19 @@ export interface MyLiquidityPanelProps {
 }
 
 const CARD = 'rounded-3xl border border-line bg-surface p-5 shadow-soft';
+const INPUT =
+  'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated px-3 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20';
 
+/**
+ * 我的流动性：读 pair 的 `balanceOf` / `totalSupply`，**按 LP 数量**撤出（owner
+ * 2026-11-14）。
+ *
+ * 25 / 50 / 75 / 100% 只是快捷按钮：点一下把对应比例的 LP 数量填进输入框，用户仍
+ * 可以改这个数量。页面只显示「预计收到约 X + Y」；最少收到只用于交易参数，不展示，
+ * 「最多可撤出」整行删除。
+ */
 export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
-  const {
-    token,
-    native,
-    pool,
-    slippagePercent,
-    onGoAdd,
-    isConnected,
-  } = props;
+  const { token, native, pool, slippagePercent, onGoAdd, isConnected } = props;
   const { address: account } = useAccount();
   const router = configuredAddress('router');
 
@@ -63,9 +66,8 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
   const reserveToken = reserves?.reserveToken ?? 0n;
   const reserveNative = reserves?.reserveNative ?? 0n;
 
-  const [percent, setPercent] = useState(100);
-  const [percentInput, setPercentInput] = useState('100');
-  const [customMode, setCustomMode] = useState(false);
+  const [lpInput, setLpInput] = useState('');
+  const [activePreset, setActivePreset] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const lpAllowance = useLpAllowance(snapshot?.pairAddress, account, router);
@@ -80,25 +82,24 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
     refetchRef.current = refetchAll;
   });
 
-  const lpToWithdraw = lpForPercent(lpBalance, percent);
-  const plan = useMemo(
-    () => planWithdraw(lpToWithdraw, totalSupply, reserveToken, reserveNative),
-    [lpToWithdraw, reserveNative, reserveToken, totalSupply],
-  );
+  const parsedLp = parseAmount(lpInput, 18);
+  const lpToWithdraw = parsedLp.kind === 'ok' ? parsedLp.value : 0n;
+  const plan = planWithdraw(lpToWithdraw, totalSupply, reserveToken, reserveNative);
   const bps = percentToBps(slippagePercent);
   const minToken = applySlippageDown(plan.amountA, bps);
   const minNative = applySlippageDown(plan.amountB, bps);
   const share = sharePercent(lpBalance, totalSupply);
-  const maxPlan = useMemo(
-    () => planWithdraw(lpBalance, totalSupply, reserveToken, reserveNative),
-    [lpBalance, reserveNative, reserveToken, totalSupply],
-  );
 
-  const customPercent = parseWithdrawPercent(percentInput);
-  const percentError =
-    customMode && percentInput.trim().length > 0 && customPercent === undefined
-      ? copy.liquidity.mine.invalidPercent
-      : null;
+  const lpError = (() => {
+    if (parsedLp.kind === 'invalid') return copy.liquidity.mine.lpInvalid;
+    if (parsedLp.kind === 'too-precise') {
+      return copy.liquidity.add.amountTooPrecise(parsedLp.digits);
+    }
+    if (lpToWithdraw > lpBalance) {
+      return copy.liquidity.mine.lpTooMuch(formatTokenAmount(lpBalance, 18));
+    }
+    return null;
+  })();
 
   const approvedRef = useRef<string | null>(null);
   useEffect(() => {
@@ -121,11 +122,18 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
     lpToWithdraw > 0n &&
     plan.amountA > 0n &&
     plan.amountB > 0n &&
-    percentError === null &&
+    lpError === null &&
     !pool.isLoading &&
     !tx.receipt &&
     tx.stage === 'idle' &&
     tx.approveStage === 'idle';
+
+  const fillPreset = (percent: number) => {
+    setLpInput(formatUnits(lpForPercent(lpBalance, percent), 18));
+    setActivePreset(percent);
+    setSubmitError(null);
+    tx.clearError();
+  };
 
   const handleApprove = async () => {
     if (snapshot === undefined || router === undefined) return;
@@ -217,46 +225,58 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
               {share === undefined ? copy.liquidity.query.none : `${formatPercent(share)}%`}
             </dd>
           </div>
-          <div className="flex items-start justify-between gap-3">
-            <dt className="shrink-0 text-muted">{copy.liquidity.mine.withdrawableLabel}</dt>
-            <dd
-              className="text-right font-medium text-foreground"
-              data-testid="liquidity-my-withdrawable"
-            >
-              {copy.liquidity.mine.withdrawableValue(
-                formatTokenAmount(maxPlan.amountA, token.decimals),
-                token.symbol,
-                formatTokenAmount(maxPlan.amountB, native.decimals),
-                native.symbol,
-              )}
-            </dd>
-          </div>
         </dl>
       </div>
 
       <div className={CARD}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-medium text-muted">{copy.liquidity.mine.withdrawLabel}</span>
-          <span className="text-[11px] leading-4 text-muted">
-            {copy.liquidity.settings.slippageLabel} {formatPercent(slippagePercent)}%
-          </span>
+        <span className="text-xs font-medium text-muted">{copy.liquidity.mine.withdrawLabel}</span>
+
+        <div className="mt-2">
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="liquidity-withdraw-lp" className="text-xs font-medium text-muted">
+              {copy.liquidity.mine.withdrawLpLabel}
+            </label>
+            <span
+              className="text-[11px] leading-4 text-muted"
+              data-testid="liquidity-withdraw-available"
+            >
+              {copy.liquidity.mine.lpAvailable(formatTokenAmount(lpBalance, 18))}
+            </span>
+          </div>
+          <input
+            id="liquidity-withdraw-lp"
+            data-testid="liquidity-withdraw-lp"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            spellCheck={false}
+            value={lpInput}
+            onChange={(event) => {
+              setLpInput(event.target.value);
+              setActivePreset(null);
+              setSubmitError(null);
+              tx.clearError();
+            }}
+            placeholder={copy.liquidity.mine.withdrawLpPlaceholder}
+            className={INPUT}
+            aria-describedby="liquidity-withdraw-preset-hint"
+          />
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+
+        <p id="liquidity-withdraw-preset-hint" className="mt-2 text-[11px] leading-4 text-muted">
+          {copy.liquidity.mine.presetHint}
+        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
           {WITHDRAW_PERCENTS.map((preset) => (
             <button
               key={preset}
               type="button"
               data-testid={`liquidity-withdraw-percent-${preset}`}
-              aria-pressed={!customMode && percent === preset}
-              onClick={() => {
-                setCustomMode(false);
-                setPercent(preset);
-                setPercentInput(String(preset));
-                setSubmitError(null);
-              }}
+              aria-pressed={activePreset === preset}
+              onClick={() => fillPreset(preset)}
               className={cn(
-                'rounded-full border px-3 py-1.5 text-xs font-medium',
-                !customMode && percent === preset
+                'rounded-full border px-3 py-1 text-xs font-medium',
+                activePreset === preset
                   ? 'border-brand bg-brand-soft text-brand-strong'
                   : 'border-line text-foreground hover:bg-elevated',
               )}
@@ -264,55 +284,31 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
               {preset}%
             </button>
           ))}
-          <label className="flex items-center gap-1 rounded-full border border-line px-3 py-1.5 text-xs text-foreground">
-            <input
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              data-testid="liquidity-withdraw-custom"
-              value={percentInput}
-              onChange={(event) => {
-                setCustomMode(true);
-                setPercentInput(event.target.value);
-                const parsed = parseWithdrawPercent(event.target.value);
-                if (parsed !== undefined) setPercent(parsed);
-                setSubmitError(null);
-              }}
-              aria-label={copy.liquidity.mine.customPercent}
-              className="w-12 bg-transparent text-right outline-none"
-            />
-            <span className="text-muted">{copy.liquidity.mine.percentUnit}</span>
-          </label>
         </div>
-        {percentError !== null ? (
-          <p className="mt-1.5 text-xs leading-5 text-danger-strong">{percentError}</p>
+
+        {lpError !== null ? (
+          <p
+            className="mt-1.5 text-xs leading-5 text-danger-strong"
+            data-testid="liquidity-withdraw-error-input"
+          >
+            {lpError}
+          </p>
         ) : null}
 
-        <dl className="mt-3 space-y-2 rounded-2xl border border-line bg-elevated p-3 text-sm">
-          <div className="flex items-start justify-between gap-3">
-            <dt className="shrink-0 text-muted">{copy.liquidity.mine.withdrawableLabel}</dt>
-            <dd className="text-right font-medium text-foreground" data-testid="liquidity-withdraw-amount">
-              {copy.liquidity.mine.withdrawableValue(
-                formatTokenAmount(plan.amountA, token.decimals),
-                token.symbol,
-                formatTokenAmount(plan.amountB, native.decimals),
-                native.symbol,
-              )}
-            </dd>
-          </div>
-          <div className="flex items-start justify-between gap-3">
-            <dt className="shrink-0 text-muted">{copy.liquidity.mine.minLabel}</dt>
-            <dd className="text-right font-medium text-foreground" data-testid="liquidity-withdraw-min">
-              {copy.liquidity.mine.withdrawableValue(
-                formatTokenAmount(minToken, token.decimals),
-                token.symbol,
-                formatTokenAmount(minNative, native.decimals),
-                native.symbol,
-              )}
-            </dd>
-          </div>
-        </dl>
-        <p className="mt-2 text-[11px] leading-4 text-muted">{copy.liquidity.mine.minNote}</p>
+        {lpToWithdraw > 0n && plan.amountA > 0n && plan.amountB > 0n ? (
+          <p
+            className="mt-3 rounded-2xl border border-line bg-elevated p-3 text-sm font-medium text-foreground"
+            data-testid="liquidity-withdraw-receive"
+          >
+            {copy.liquidity.mine.receiveLabel}{' '}
+            {copy.liquidity.mine.receiveValue(
+              formatTokenAmount(plan.amountA, token.decimals),
+              token.symbol,
+              formatTokenAmount(plan.amountB, native.decimals),
+              native.symbol,
+            )}
+          </p>
+        ) : null}
 
         <div className="mt-3 border-t border-line pt-3">
           <LiquiditySettingsInline {...props} />
@@ -345,7 +341,7 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
           onClick={() => {
             void handleApprove();
           }}
-          disabled={!needsApproval || tx.approveStage !== 'idle'}
+          disabled={!needsApproval || tx.approveStage !== 'idle' || lpError !== null}
           loading={tx.approveStage === 'wallet'}
         >
           {needsApproval

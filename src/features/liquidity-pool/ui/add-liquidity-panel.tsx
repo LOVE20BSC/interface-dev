@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, Zap } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { love20HubAbi, uniswapV2Router02Abi } from '@/config/abis';
 import { configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
+import { formatRate, formatTokenAmount, formatUnits } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { ActionStack } from '@/shared/ui/action-stack';
@@ -12,6 +13,7 @@ import { approvalKind } from '@/shared/lib/approval-kind';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import {
   applySlippageDown,
+  mirrorAmount,
   planDualAdd,
 } from '@/features/liquidity-pool/lib/liquidity-math';
 import {
@@ -20,7 +22,6 @@ import {
   parseAmount,
   percentToBps,
 } from '@/features/liquidity-pool/lib/liquidity-form';
-import { formatRate } from '@/shared/lib/format';
 import { useHubQuote } from '@/features/liquidity-pool/model/use-hub-quote';
 import {
   useNativeBalance,
@@ -32,8 +33,6 @@ import type { PoolStateResult } from '@/features/liquidity-pool/model/use-pool-s
 import type { LiquidityToken } from '@/features/liquidity-pool/lib/liquidity-types';
 import { LiquidityReceiptSheet } from '@/features/liquidity-pool/ui/liquidity-receipt';
 import { LiquiditySettings } from '@/features/liquidity-pool/ui/liquidity-settings';
-
-type AddMode = 'single' | 'dual';
 
 export interface AddLiquidityPanelProps {
   readonly token: LiquidityToken;
@@ -48,9 +47,26 @@ export interface AddLiquidityPanelProps {
   readonly isConnected: boolean;
 }
 
+/**
+ * 添加流动性的两种交互（owner 2026-11-14）：
+ *
+ * - **智能模式开（默认）**：两侧都可自由填写，只填一侧也行；Hub 报价把这一笔自动
+ *   配平（先用一部分换成另一侧再一起进池），页面只显示「预计获得 X 流动性凭证」，
+ *   swap 段 / 实进池 / 最少进池收在默认折叠的「详情」里。
+ * - **智能模式关**：用户在哪一侧输入，另一侧就按池子比例自动填好并变成只读，用户
+ *   不用自己算比例；这一笔由 Router `addLiquidityETH` 按比例进场。
+ *   池子还没有储备（首次建池）时没有比例可依，两侧都必须填、决定初始价格。
+ *
+ * Hub 缺失或空池时智能模式不可用，自动降级到 Router 两侧都填，并在页面上写清原因。
+ */
+
 const CARD = 'rounded-3xl border border-line bg-surface p-5 shadow-soft';
 const INPUT =
   'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated px-3 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20';
+const INPUT_LINKED =
+  'cursor-default border-dashed bg-elevated/60 pr-3 text-muted focus:border-line focus:ring-0';
+
+type Side = 'token' | 'native';
 
 export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
   const {
@@ -69,9 +85,14 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
   const hub = configuredAddress('hub');
   const router = configuredAddress('router');
 
-  const [mode, setMode] = useState<AddMode>('single');
+  const [smartMode, setSmartMode] = useState(true);
   const [tokenInput, setTokenInput] = useState('');
   const [nativeInput, setNativeInput] = useState('');
+  /** 智能模式关时被自动填出来的一侧（只读）。 */
+  const [linkedSide, setLinkedSide] = useState<Side | null>(null);
+  /** 只有用户点过「全部」原生币，才提「已为网络手续费预留」。 */
+  const [nativeMaxPicked, setNativeMaxPicked] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const tokenBalance = useTokenBalance(token, account);
@@ -92,12 +113,19 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
     refetchRef.current = refetchAll;
   });
 
-  const singleConfigured = hub !== undefined;
-  const singleAvailable = singleConfigured && pool.hasLiquidity;
-  const effectiveMode: AddMode = mode === 'single' && !singleAvailable ? 'dual' : mode;
+  const reserves = pool.reserves;
+  const reserveToken = reserves?.reserveToken ?? 0n;
+  const reserveNative = reserves?.reserveNative ?? 0n;
+  const totalSupply = pool.snapshot?.totalSupply ?? 0n;
+  /** 有储备才有比例可依：空池 / 首币建池前不联动。 */
+  const ratioAvailable = reserveToken > 0n && reserveNative > 0n;
+
+  const hubReady = hub !== undefined && pool.hasLiquidity;
+  /** 走 Hub 的唯一条件：智能模式开 + Hub 可用；否则走 Router 按比例。 */
+  const hubPath = smartMode && hubReady;
   const fallbackReason = (() => {
-    if (mode !== 'single' || singleAvailable) return undefined;
-    return singleConfigured ? copy.liquidity.add.fallbackEmptyPool : copy.liquidity.add.hubMissing;
+    if (!smartMode || hubReady) return undefined;
+    return hub !== undefined ? copy.liquidity.add.fallbackEmptyPool : copy.liquidity.add.hubMissing;
   })();
 
   const parsedToken = parseAmount(tokenInput, token.decimals);
@@ -105,36 +133,26 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
   const tokenAmount = parsedToken.kind === 'ok' ? parsedToken.value : 0n;
   const nativeAmount = parsedNative.kind === 'ok' ? parsedNative.value : 0n;
 
-  const reserves = pool.reserves;
-  const reserveToken = reserves?.reserveToken ?? 0n;
-  const reserveNative = reserves?.reserveNative ?? 0n;
-  const totalSupply = pool.snapshot?.totalSupply ?? 0n;
-
   const quote = useHubQuote({
     hub,
     tokenAddress: token.address,
-    amountTokenDesired: effectiveMode === 'single' ? tokenAmount : 0n,
-    amountNativeDesired: effectiveMode === 'single' ? nativeAmount : 0n,
-    enabled:
-      effectiveMode === 'single' &&
-      singleAvailable &&
-      token.address !== undefined &&
-      (tokenAmount > 0n || nativeAmount > 0n),
+    amountTokenDesired: hubPath ? tokenAmount : 0n,
+    amountNativeDesired: hubPath ? nativeAmount : 0n,
+    enabled: hubPath && token.address !== undefined && (tokenAmount > 0n || nativeAmount > 0n),
   });
 
   const plan = planDualAdd(reserveToken, reserveNative, totalSupply, tokenAmount, nativeAmount);
 
   const bps = percentToBps(slippagePercent);
-  const minToken =
-    effectiveMode === 'single' && quote.data !== undefined
-      ? applySlippageDown(quote.data.usableAmountA, bps)
-      : applySlippageDown(plan.amountA, bps);
-  const minNative =
-    effectiveMode === 'single' && quote.data !== undefined
-      ? applySlippageDown(quote.data.usableAmountB, bps)
-      : applySlippageDown(plan.amountB, bps);
+  const usableToken = hubPath && quote.data !== undefined ? quote.data.usableAmountA : plan.amountA;
+  const usableNative =
+    hubPath && quote.data !== undefined ? quote.data.usableAmountB : plan.amountB;
+  const minToken = applySlippageDown(usableToken, bps);
+  const minNative = applySlippageDown(usableNative, bps);
+  const expectedLiquidity =
+    hubPath && quote.data !== undefined ? quote.data.expectedLiquidity : plan.liquidity;
 
-  const firstMint = effectiveMode === 'dual' && plan.firstMint;
+  const firstMint = !hubPath && plan.firstMint;
   const firstMintPrice =
     firstMint && tokenAmount > 0n && nativeAmount > 0n
       ? formatRate(tokenAmount, nativeAmount, native.decimals, token.decimals)
@@ -157,11 +175,13 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
     if (parsedNative.kind === 'too-precise') {
       return copy.liquidity.add.amountTooPrecise(parsedNative.digits);
     }
-    if (effectiveMode === 'dual' && tokenAmount === 0n && nativeAmount === 0n) return null;
-    if (
-      tokenBalance.value !== undefined &&
-      tokenBalance.value < tokenAmount
-    ) {
+    if (tokenAmount === 0n && nativeAmount === 0n) return null;
+    // 智能模式关 / 降级到 Router 时两侧都要有数量：比例联动会自己补另一侧，
+    // 空池（首次建池）必须由用户两个框都填。
+    if (!hubPath && (tokenAmount === 0n || nativeAmount === 0n)) {
+      return copy.liquidity.add.amountZero;
+    }
+    if (tokenBalance.value !== undefined && tokenBalance.value < tokenAmount) {
       return copy.liquidity.add.insufficient(
         token.symbol,
         formatTokenAmount(tokenAmount - tokenBalance.value, token.decimals),
@@ -176,17 +196,16 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
     return null;
   })();
 
-  const requiredTokenAmount = effectiveMode === 'single' ? tokenAmount : plan.amountA;
-  const spender =
-    effectiveMode === 'single' ? hub : router;
-  const allowance = effectiveMode === 'single' ? tokenAllowanceHub : tokenAllowanceRouter;
+  const requiredTokenAmount = hubPath ? tokenAmount : plan.amountA;
+  const spender = hubPath ? hub : router;
+  const allowance = hubPath ? tokenAllowanceHub : tokenAllowanceRouter;
   const needsApproval =
     token.address !== undefined &&
     spender !== undefined &&
     requiredTokenAmount > 0n &&
     (allowance.value === undefined || allowance.value < requiredTokenAmount);
 
-  // 授权成功后把额度/余额重新读一遍，主按钮才会从「允许使用」切到「确认添加」。
+  // 授权成功后把额度/余额重新读一遍，主按钮才会从「授权」切到「确认添加」。
   const approvedKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (tx.approvedKey === null || tx.approvedKey === approvedKeyRef.current) return;
@@ -194,12 +213,10 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
     refetchRef.current();
   }, [tx.approvedKey]);
 
-  const quoteReady =
-    effectiveMode === 'single'
-      ? quote.data !== undefined && quote.data.expectedLiquidity > 0n
-      : plan.liquidity > 0n && plan.amountA > 0n && plan.amountB > 0n;
+  const quoteReady = hubPath
+    ? quote.data !== undefined && quote.data.expectedLiquidity > 0n
+    : plan.liquidity > 0n && plan.amountA > 0n && plan.amountB > 0n;
 
-  const bothSidesRequired = effectiveMode === 'dual';
   const hasInput = tokenAmount > 0n || nativeAmount > 0n;
   const canSubmit =
     isConnected &&
@@ -207,23 +224,100 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
     hasInput &&
     amountError === null &&
     quoteReady &&
-    (!bothSidesRequired || (tokenAmount > 0n && nativeAmount > 0n)) &&
-    (effectiveMode === 'single' ? token.address !== undefined && (tokenAmount > 0n || nativeAmount > 0n) : true) &&
-    (effectiveMode === 'single' ? nativeAmount === 0n || nativeBalance.value !== undefined : true) &&
+    (hubPath ? nativeAmount === 0n || nativeBalance.value !== undefined : true) &&
     !pool.isError &&
     tx.stage === 'idle' &&
     tx.approveStage === 'idle' &&
     tx.receipt === null;
 
+  /** 智能模式关：改一侧就把另一侧按池子比例填好，并把它变成只读。 */
+  const mirrorOtherSide = (side: Side, raw: string) => {
+    if (smartMode || !ratioAvailable) {
+      setLinkedSide(null);
+      return;
+    }
+    if (side === 'token') {
+      const parsed = parseAmount(raw, token.decimals);
+      if (parsed.kind === 'empty') {
+        setNativeInput('');
+        setLinkedSide(null);
+        return;
+      }
+      if (parsed.kind !== 'ok') {
+        setLinkedSide(null);
+        return;
+      }
+      setNativeInput(
+        formatUnits(mirrorAmount(parsed.value, reserveToken, reserveNative), native.decimals),
+      );
+      setLinkedSide('native');
+      return;
+    }
+    const parsed = parseAmount(raw, native.decimals);
+    if (parsed.kind === 'empty') {
+      setTokenInput('');
+      setLinkedSide(null);
+      return;
+    }
+    if (parsed.kind !== 'ok') {
+      setLinkedSide(null);
+      return;
+    }
+    setTokenInput(
+      formatUnits(mirrorAmount(parsed.value, reserveNative, reserveToken), token.decimals),
+    );
+    setLinkedSide('token');
+  };
+
+  /**
+   * 只读联动的「切换输入侧」：点一下被自动填好的那一侧，就改成由它来驱动另一侧。
+   * 否则用户第一下点在哪一侧，另一侧就永远只能看不能改（只剩「全部」按钮）。
+   */
+  const switchDriverTo = (side: Side) => {
+    if (smartMode || !ratioAvailable) return;
+    if (side === 'token' && linkedSide === 'token') setLinkedSide('native');
+    if (side === 'native' && linkedSide === 'native') setLinkedSide('token');
+  };
+
+  const handleTokenChange = (value: string) => {
+    setTokenInput(value);
+    setSubmitError(null);
+    tx.clearError();
+    mirrorOtherSide('token', value);
+  };
+
+  const handleNativeChange = (value: string) => {
+    setNativeInput(value);
+    setNativeMaxPicked(false);
+    setSubmitError(null);
+    tx.clearError();
+    mirrorOtherSide('native', value);
+  };
+
   const setTokenMax = () => {
     if (tokenBalance.value === undefined) return;
-    setTokenInput(formatUnits(tokenBalance.value, token.decimals));
+    const value = formatUnits(tokenBalance.value, token.decimals);
+    setTokenInput(value);
     setSubmitError(null);
+    tx.clearError();
+    mirrorOtherSide('token', value);
   };
+
   const setNativeMax = () => {
     if (nativeAvailable === undefined) return;
-    setNativeInput(formatUnits(nativeAvailable, native.decimals));
+    const value = formatUnits(nativeAvailable, native.decimals);
+    setNativeInput(value);
+    setNativeMaxPicked(true);
     setSubmitError(null);
+    tx.clearError();
+    mirrorOtherSide('native', value);
+  };
+
+  const toggleSmartMode = () => {
+    setSmartMode((current) => !current);
+    setLinkedSide(null);
+    setSubmitError(null);
+    tx.clearError();
   };
 
   const handleApprove = async () => {
@@ -241,7 +335,8 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
     if (account === undefined) return;
     setSubmitError(null);
     const deadline = deadlineFromNow();
-    if (effectiveMode === 'single' && hub !== undefined) {
+
+    if (hubPath && hub !== undefined) {
       if (nativeAmount > 0n) {
         await tx.run(
           {
@@ -278,7 +373,7 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
                 tokenA: token.address,
                 tokenB: wrapped.address,
                 amountADesired: tokenAmount,
-                amountBDesired: 0n,
+                amountBDesired: nativeAmount,
                 amountAMin: minToken,
                 amountBMin: minNative,
                 to: account,
@@ -313,41 +408,59 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
   };
 
   const errorMessage = submitError ?? tx.error?.message ?? null;
+  const tokenLinked = !smartMode && ratioAvailable && linkedSide === 'token';
+  const nativeLinked = !smartMode && ratioAvailable && linkedSide === 'native';
+
+  const swapLeg = (() => {
+    if (quote.data === undefined || !quote.data.willSwap) return undefined;
+    const tokenIsIn = quote.data.swapTokenIn.toLowerCase() === token.address?.toLowerCase();
+    return copy.liquidity.add.quoteSwap(
+      formatTokenAmount(quote.data.amountToSwap, tokenIsIn ? token.decimals : native.decimals),
+      tokenIsIn ? token.symbol : native.symbol,
+      formatTokenAmount(quote.data.amountOutFromSwap, tokenIsIn ? native.decimals : token.decimals),
+      tokenIsIn ? native.symbol : token.symbol,
+    );
+  })();
 
   return (
     <div className="space-y-4">
       <div className={CARD}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs font-medium text-muted">{copy.liquidity.add.modeLabel}</span>
-          <div className="flex rounded-full border border-line bg-elevated p-0.5 text-xs">
-            {(['single', 'dual'] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                data-testid={`liquidity-mode-${value}`}
-                onClick={() => {
-                  setMode(value);
-                  setSubmitError(null);
-                }}
-                disabled={value === 'single' && !singleConfigured}
-                aria-pressed={effectiveMode === value}
-                className={cn(
-                  'rounded-full px-3 py-1.5 font-medium transition-colors disabled:opacity-50',
-                  effectiveMode === value
-                    ? 'bg-surface text-brand-strong shadow-soft'
-                    : 'text-muted hover:text-foreground',
-                )}
-              >
-                {value === 'single' ? copy.liquidity.add.modeSingle : copy.liquidity.add.modeDual}
-              </button>
-            ))}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">
+              {copy.liquidity.add.smartModeLabel}
+            </p>
+            <p className="mt-0.5 text-[11px] leading-4 text-muted">
+              {smartMode
+                ? copy.liquidity.add.smartOnHint
+                : ratioAvailable
+                  ? copy.liquidity.add.smartOffHint
+                  : copy.liquidity.add.smartOffEmptyHint}
+            </p>
           </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={smartMode}
+            aria-label={copy.liquidity.add.smartModeLabel}
+            data-testid="liquidity-smart-mode"
+            onClick={toggleSmartMode}
+            className={cn(
+              'relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+              smartMode ? 'border-brand bg-brand' : 'border-line bg-elevated',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute top-0.5 h-4.5 w-4.5 rounded-full bg-surface shadow-soft transition-transform',
+                smartMode ? 'translate-x-5.5' : 'translate-x-0.5',
+              )}
+              aria-hidden="true"
+            />
+          </button>
         </div>
-        <p className="mt-2 text-[11px] leading-4 text-muted">
-          {effectiveMode === 'single' ? copy.liquidity.add.modeSingleHint : copy.liquidity.add.modeDualHint}
-        </p>
 
-        {fallbackReason !== undefined || (effectiveMode === 'single' && quote.isError) ? (
+        {fallbackReason !== undefined || (hubPath && quote.isError) ? (
           <p
             className="mt-2 rounded-xl border border-warning/20 bg-warning-soft/50 p-2 text-[11px] leading-4 text-warning"
             data-testid="liquidity-fallback-note"
@@ -362,9 +475,12 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
           <div>
             <div className="flex items-center justify-between gap-2">
               <label htmlFor="liquidity-token-amount" className="text-xs font-medium text-muted">
-                {copy.liquidity.add.amountTokenLabel} · {token.symbol}
+                {copy.liquidity.add.amountTokenLabel}
               </label>
-              <span className="text-[11px] leading-4 text-muted" data-testid="liquidity-balance-token">
+              <span
+                className="text-[11px] leading-4 text-muted"
+                data-testid="liquidity-balance-token"
+              >
                 {tokenBalance.isLoading
                   ? copy.liquidity.balanceLoading
                   : `${copy.liquidity.balanceLabel(token.symbol)} ${formatTokenAmount(tokenBalance.value, token.decimals)}`}
@@ -379,17 +495,17 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
                 autoComplete="off"
                 spellCheck={false}
                 value={tokenInput}
-                onChange={(event) => {
-                  setTokenInput(event.target.value);
-                  setSubmitError(null);
-                  tx.clearError();
-                }}
+                readOnly={tokenLinked}
+                aria-readonly={tokenLinked}
+                onFocus={() => switchDriverTo('token')}
+                onChange={(event) => handleTokenChange(event.target.value)}
                 placeholder={copy.liquidity.add.amountPlaceholder}
-                className={INPUT}
+                className={cn(INPUT, tokenLinked && INPUT_LINKED)}
               />
               <button
                 type="button"
                 onClick={setTokenMax}
+                data-testid="liquidity-token-max"
                 disabled={tokenBalance.value === undefined}
                 className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft disabled:opacity-50"
               >
@@ -403,7 +519,10 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
               <label htmlFor="liquidity-native-amount" className="text-xs font-medium text-muted">
                 {copy.liquidity.add.amountNativeLabel(native.symbol)}
               </label>
-              <span className="text-[11px] leading-4 text-muted" data-testid="liquidity-balance-native">
+              <span
+                className="text-[11px] leading-4 text-muted"
+                data-testid="liquidity-balance-native"
+              >
                 {nativeBalance.isLoading
                   ? copy.liquidity.balanceLoading
                   : `${copy.liquidity.balanceLabel(native.symbol)} ${formatTokenAmount(nativeBalance.value, native.decimals)}`}
@@ -418,17 +537,17 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
                 autoComplete="off"
                 spellCheck={false}
                 value={nativeInput}
-                onChange={(event) => {
-                  setNativeInput(event.target.value);
-                  setSubmitError(null);
-                  tx.clearError();
-                }}
+                readOnly={nativeLinked}
+                aria-readonly={nativeLinked}
+                onFocus={() => switchDriverTo('native')}
+                onChange={(event) => handleNativeChange(event.target.value)}
                 placeholder={copy.liquidity.add.amountPlaceholder}
-                className={INPUT}
+                className={cn(INPUT, nativeLinked && INPUT_LINKED)}
               />
               <button
                 type="button"
                 onClick={setNativeMax}
+                data-testid="liquidity-native-max"
                 disabled={nativeAvailable === undefined}
                 className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft disabled:opacity-50"
               >
@@ -437,20 +556,26 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
             </div>
           </div>
 
-          {effectiveMode === 'single' ? (
-            <p className="text-[11px] leading-4 text-muted">{copy.liquidity.add.singleHint}</p>
-          ) : (
-            <p className="text-[11px] leading-4 text-muted">
-              {firstMint ? copy.liquidity.add.firstMintHint : copy.liquidity.add.dualHint}
-            </p>
-          )}
-          {nativeAmount > 0n ? (
-            <p className="text-[11px] leading-4 text-muted">
-              {copy.liquidity.add.nativeGasNote(native.symbol)}
+          {!smartMode && ratioAvailable ? (
+            <p className="text-[11px] leading-4 text-muted">{copy.liquidity.add.linkedNote}</p>
+          ) : null}
+          {/* owner 2026-11-14：「已为网络手续费预留」只在用户点过「全部」原生币时出现。 */}
+          {nativeMaxPicked && nativeAmount > 0n ? (
+            <p className="text-[11px] leading-4 text-muted" data-testid="liquidity-native-gas-note">
+              {copy.liquidity.add.maxNativeNote(
+                formatTokenAmount(NATIVE_GAS_RESERVE_WEI, native.decimals),
+                native.symbol,
+              )}
             </p>
           ) : null}
+          {firstMint && !ratioAvailable ? (
+            <p className="text-[11px] leading-4 text-muted">{copy.liquidity.add.firstMintHint}</p>
+          ) : null}
           {amountError !== null ? (
-            <p className="text-xs leading-5 text-danger-strong" data-testid="liquidity-amount-error">
+            <p
+              className="text-xs leading-5 text-danger-strong"
+              data-testid="liquidity-amount-error"
+            >
               {amountError}
             </p>
           ) : null}
@@ -467,117 +592,98 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
         </div>
       </div>
 
-      <div className={CARD} data-testid="liquidity-quote">
-        <p className="text-sm font-semibold text-foreground">{copy.liquidity.add.quoteTitle}</p>
-        {effectiveMode === 'single' ? (
-          quote.isLoading ? (
-            <div className="mt-2 space-y-2">
+      {hasInput ? (
+        <div className={CARD} data-testid="liquidity-quote">
+          {hubPath && quote.isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-5 w-2/3" />
               <Skeleton className="h-3.5 w-full" />
-              <Skeleton className="h-3.5 w-4/5" />
             </div>
-          ) : quote.data !== undefined ? (
-            <div className="mt-2 space-y-1.5 text-sm leading-6">
-              {quote.data.willSwap ? (
-                <p className="text-muted" data-testid="liquidity-quote-swap">
-                  {copy.liquidity.add.quoteSwap(
-                    formatTokenAmount(
-                      quote.data.amountToSwap,
-                      quote.data.swapTokenIn.toLowerCase() === token.address?.toLowerCase()
-                        ? token.decimals
-                        : native.decimals,
-                    ),
-                    quote.data.swapTokenIn.toLowerCase() === token.address?.toLowerCase()
-                      ? token.symbol
-                      : native.symbol,
-                    formatTokenAmount(
-                      quote.data.amountOutFromSwap,
-                      quote.data.swapTokenOut.toLowerCase() === token.address?.toLowerCase()
-                        ? token.decimals
-                        : native.decimals,
-                    ),
-                    quote.data.swapTokenOut.toLowerCase() === token.address?.toLowerCase()
-                      ? token.symbol
-                      : native.symbol,
-                  )}
-                </p>
-              ) : (
-                <p className="text-muted">{copy.liquidity.add.quoteNoSwap}</p>
-              )}
-              <p className="text-foreground" data-testid="liquidity-quote-prepared">
-                {copy.liquidity.add.quotePrepared(
-                  formatTokenAmount(quote.data.preparedAmountA, token.decimals),
-                  token.symbol,
-                  formatTokenAmount(quote.data.preparedAmountB, native.decimals),
-                  native.symbol,
-                )}
-              </p>
-              <p className="text-foreground" data-testid="liquidity-quote-liquidity">
-                {copy.liquidity.add.quoteLiquidity(formatTokenAmount(quote.data.expectedLiquidity, 18))}
-              </p>
-              <p className="text-muted" data-testid="liquidity-quote-min">
-                {copy.liquidity.add.quoteMin(
-                  formatTokenAmount(minToken, token.decimals),
-                  token.symbol,
-                  formatTokenAmount(minNative, native.decimals),
-                  native.symbol,
-                )}
-              </p>
-            </div>
-          ) : quote.isError ? (
-            <div className="mt-2">
+          ) : hubPath && quote.isError ? (
+            <div>
               <p className="text-sm text-danger-strong">{copy.liquidity.add.quoteErrorTitle}</p>
-              <p className="mt-1 text-xs leading-5 text-muted">{copy.liquidity.add.quoteErrorBody}</p>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="mt-2"
-                onClick={() => quote.refetch()}
-              >
-                {copy.liquidity.add.quoteErrorRetry}
-              </Button>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-muted" data-testid="liquidity-quote-hint">
-              {effectiveMode === 'single' ? copy.liquidity.add.singleHint : copy.liquidity.add.dualHint}
-            </p>
-          )
-        ) : (
-          <div className="mt-2 space-y-1.5 text-sm leading-6">
-            {firstMint && firstMintPrice !== undefined ? (
-              <p className="text-muted" data-testid="liquidity-quote-first-mint">
-                {copy.liquidity.add.quoteFirstMint(firstMintPrice, token.symbol, native.symbol)}
+              <p className="mt-1 text-xs leading-5 text-muted">
+                {copy.liquidity.add.quoteErrorBody}
               </p>
-            ) : null}
-            <p className="text-foreground" data-testid="liquidity-quote-prepared">
-              {copy.liquidity.add.quotePrepared(
-                formatTokenAmount(plan.amountA, token.decimals),
-                token.symbol,
-                formatTokenAmount(plan.amountB, native.decimals),
-                native.symbol,
-              )}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button variant="secondary" size="sm" onClick={() => quote.refetch()}>
+                  {copy.liquidity.add.quoteErrorRetry}
+                </Button>
+                <Button variant="secondary" size="sm" onClick={toggleSmartMode}>
+                  {copy.liquidity.add.disableSmartMode}
+                </Button>
+              </div>
+            </div>
+          ) : quoteReady ? (
+            <>
+              <p
+                className="flex items-center gap-1.5 text-base font-semibold text-foreground"
+                data-testid="liquidity-quote-liquidity"
+              >
+                <Zap className="h-4 w-4 text-brand-strong" aria-hidden="true" />
+                {copy.liquidity.add.quoteLiquidity(formatTokenAmount(expectedLiquidity, 18))}
+              </p>
+              <button
+                type="button"
+                data-testid="liquidity-details-toggle"
+                aria-expanded={detailsOpen}
+                onClick={() => setDetailsOpen((current) => !current)}
+                className="mt-2 inline-flex items-center gap-1 rounded-full px-1 py-0.5 text-[11px] font-medium text-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                {detailsOpen ? copy.liquidity.add.detailsHide : copy.liquidity.add.detailsToggle}
+                <ChevronDown
+                  className={cn('h-3.5 w-3.5 transition-transform', detailsOpen && 'rotate-180')}
+                  aria-hidden="true"
+                />
+              </button>
+              {detailsOpen ? (
+                <div
+                  className="mt-2 space-y-1.5 rounded-2xl border border-line bg-elevated p-3 text-xs leading-5"
+                  data-testid="liquidity-details"
+                >
+                  {hubPath ? (
+                    swapLeg !== undefined ? (
+                      <p className="text-muted" data-testid="liquidity-quote-swap">
+                        {swapLeg}
+                      </p>
+                    ) : (
+                      <p className="text-muted">{copy.liquidity.add.quoteNoSwap}</p>
+                    )
+                  ) : firstMint && firstMintPrice !== undefined ? (
+                    <p className="text-muted" data-testid="liquidity-quote-first-mint">
+                      {copy.liquidity.add.quoteFirstMint(
+                        firstMintPrice,
+                        token.symbol,
+                        native.symbol,
+                      )}
+                    </p>
+                  ) : null}
+                  <p className="text-foreground" data-testid="liquidity-quote-prepared">
+                    {copy.liquidity.add.quotePrepared(
+                      formatTokenAmount(usableToken, token.decimals),
+                      token.symbol,
+                      formatTokenAmount(usableNative, native.decimals),
+                      native.symbol,
+                    )}
+                  </p>
+                  <p className="text-muted" data-testid="liquidity-quote-min">
+                    {copy.liquidity.add.quoteMin(
+                      formatTokenAmount(minToken, token.decimals),
+                      token.symbol,
+                      formatTokenAmount(minNative, native.decimals),
+                      native.symbol,
+                    )}
+                  </p>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-sm text-muted" data-testid="liquidity-quote-hint">
+              {copy.liquidity.add.quoteEmptyHint}
             </p>
-            <p className="text-foreground" data-testid="liquidity-quote-liquidity">
-              {copy.liquidity.add.quoteLiquidity(formatTokenAmount(plan.liquidity, 18))}
-            </p>
-            <p className="text-muted" data-testid="liquidity-quote-min">
-              {copy.liquidity.add.quoteMin(
-                formatTokenAmount(minToken, token.decimals),
-                token.symbol,
-                formatTokenAmount(minNative, native.decimals),
-                native.symbol,
-              )}
-            </p>
-          </div>
-        )}
-        {effectiveMode === 'single' && quote.data !== undefined && nativeAmount > 0n ? (
-          <p className="mt-2 text-[11px] leading-4 text-muted">
-            {copy.liquidity.add.maxNativeNote(
-              formatTokenAmount(NATIVE_GAS_RESERVE_WEI, native.decimals),
-              native.symbol,
-            )}
-          </p>
-        ) : null}
-      </div>
+          )}
+        </div>
+      ) : null}
 
       {errorMessage !== null ? (
         <div
@@ -644,17 +750,6 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
       </ActionStack>
 
       <LiquidityReceiptSheet record={tx.receipt} onDismiss={tx.clearReceipt} />
-
-      {effectiveMode === 'single' && quote.isError ? (
-        <button
-          type="button"
-          onClick={() => setMode('dual')}
-          className="w-full rounded-2xl border border-line px-3 py-2 text-xs font-medium text-brand-strong hover:bg-elevated"
-        >
-          {copy.liquidity.add.modeDual}
-        </button>
-      ) : null}
     </div>
   );
 }
-

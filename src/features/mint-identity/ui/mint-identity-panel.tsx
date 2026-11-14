@@ -90,7 +90,7 @@ export function MintIdentityPanel({
   const [preflightStaleBlock, setPreflightStaleBlock] = useState(false);
   // The eth_call preflight is async; without this a double tap could send two mints.
   const [isPreflighting, setIsPreflighting] = useState(false);
-  // 留在此页: the receipt collapses into the in-page success strip.
+  // 知道了: the receipt collapses into the in-page success strip.
   const [dismissedReceiptHash, setDismissedReceiptHash] = useState<string | null>(null);
 
   const config = useMintConfig();

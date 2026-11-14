@@ -1,24 +1,16 @@
 import { BaseError, ContractFunctionRevertedError } from 'viem';
 import type { HexAddress } from '@/config/networks';
 import { isSameAddress } from '@/shared/lib/format';
-
-const MEMBER_ID_RE = /^#?(\d+)$/;
-const MAX_UINT256 = (1n << 256n) - 1n;
+import { parseMemberIdInput } from '@/shared/lib/identity-input';
 
 /**
  * 按身份 NFT: the input is a member `#id`, with or without the `#`.
  * Returns null for anything that is not a plain non-negative integer that fits
- * a uint256 (the input is never silently truncated or prefixed).
+ * a uint256 (the input is never silently truncated or prefixed). Parsing lives
+ * in the shared identity-input module so both transfer surfaces agree.
  */
 export function parseMemberId(value: string): bigint | null {
-  const match = MEMBER_ID_RE.exec(value.trim());
-  if (match === null) return null;
-  try {
-    const memberId = BigInt(match[1] ?? '');
-    return memberId <= MAX_UINT256 ? memberId : null;
-  } catch {
-    return null;
-  }
+  return parseMemberIdInput(value);
 }
 
 export type MemberIdResolution =

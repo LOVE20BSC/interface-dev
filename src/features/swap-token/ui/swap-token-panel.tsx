@@ -270,7 +270,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     setUsedNativeMax(false);
   };
 
-  // 留在此页: collapse the receipt into the success strip, keep the form reset.
+  // 知道了: collapse the receipt into the success strip, keep the form reset.
   const dismissReceipt = () => {
     if (tx.receipt === null) return;
     setDismissedReceiptHash(tx.receipt.hash);

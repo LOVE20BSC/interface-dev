@@ -1,42 +1,26 @@
 import { useState } from 'react';
-import { AlertTriangle, Check, ChevronDown } from '@/shared/ui/icons';
+import { AlertTriangle } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy-pages';
-import { cn } from '@/shared/lib/cn';
-import { shortenAddress } from '@/shared/lib/format';
+import {
+  identityInputErrorMessage,
+  identityInputReadingText,
+  type IdentityInputMode,
+} from '@/shared/lib/identity-input';
 import { Button } from '@/shared/ui/button';
-import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
+import { CopyableAddress } from '@/shared/ui/copyable-address';
+import { IdentityRecipientField } from '@/shared/ui/identity-input-mode';
+import { IdentityRecipientCard } from '@/shared/ui/identity-recipient-card';
 import { Sheet } from '@/shared/ui/sheet';
 import type { HexAddress } from '@/config/networks';
 import type { MemberIdentity } from '@/entities/member-identity/model/use-member-identities';
 import { IdentityPill } from '@/features/select-identity/ui/identity-pill';
 import { validateRecipient } from '@/features/transfer-identity/lib/validate-recipient';
-import {
-  useMemberRecipient,
-  type MemberRecipientState,
-} from '@/features/transfer-identity/model/use-member-recipient';
-import {
-  useMemberNameRecipient,
-  type MemberNameRecipientState,
-} from '@/features/transfer-identity/model/use-member-name-recipient';
+import { useMemberRecipient } from '@/features/transfer-identity/model/use-member-recipient';
+import { useMemberNameRecipient } from '@/features/transfer-identity/model/use-member-name-recipient';
 import type { TransferPhase } from '@/features/transfer-identity/model/use-transfer-identity';
-import {
-  canSubmitTransfer,
-  type TransferRecipientMode,
-} from '@/features/transfer-identity/lib/transfer-submit';
+import { canSubmitTransfer } from '@/features/transfer-identity/lib/transfer-submit';
 
-type RecipientMode = TransferRecipientMode;
-
-const MODE_OPTIONS: readonly { readonly mode: RecipientMode; readonly label: string }[] = [
-  { mode: 'address', label: copy.transferIdentity.modeAddress },
-  { mode: 'member', label: copy.transferIdentity.modeMember },
-  { mode: 'name', label: copy.transferIdentity.modeName },
-];
-
-const MODE_LABELS: Readonly<Record<RecipientMode, string>> = {
-  address: copy.transferIdentity.modeAddress,
-  member: copy.transferIdentity.modeMember,
-  name: copy.transferIdentity.modeName,
-};
+type RecipientMode = IdentityInputMode;
 
 export interface TransferDrawerProps {
   readonly target: MemberIdentity | null;
@@ -59,68 +43,6 @@ function recipientErrorCopy(validation: ReturnType<typeof validateRecipient>): s
     default:
       return null;
   }
-}
-
-function memberErrorCopy(status: MemberRecipientState['status']): string | null {
-  switch (status) {
-    case 'invalid':
-      return copy.transferIdentity.memberInvalid;
-    case 'not-found':
-      return copy.transferIdentity.memberNotFound;
-    case 'self':
-      return copy.transferIdentity.memberSelf;
-    case 'error':
-      return copy.transferIdentity.memberFailed;
-    default:
-      return null;
-  }
-}
-
-function nameErrorCopy(status: MemberNameRecipientState['status']): string | null {
-  switch (status) {
-    case 'not-found':
-      return copy.transferIdentity.nameNotFound;
-    case 'self':
-      return copy.transferIdentity.nameSelf;
-    case 'error':
-      return copy.transferIdentity.nameFailed;
-    default:
-      return null;
-  }
-}
-
-function ModeOption({
-  mode,
-  label,
-  selected,
-  onSelect,
-}: {
-  readonly mode: RecipientMode;
-  readonly label: string;
-  readonly selected: boolean;
-  readonly onSelect: (mode: RecipientMode) => void;
-}) {
-  return (
-    <PopoverClose asChild>
-      <button
-        type="button"
-        role="menuitemradio"
-        aria-checked={selected}
-        data-testid={`transfer-mode-${mode}`}
-        onClick={() => onSelect(mode)}
-        className={cn(
-          'flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm',
-          'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
-          selected && 'bg-brand-soft/60 font-medium',
-        )}
-      >
-        <span>{label}</span>
-        {selected ? (
-          <Check className="h-4 w-4 shrink-0 text-brand-strong" aria-hidden="true" />
-        ) : null}
-      </button>
-    </PopoverClose>
-  );
 }
 
 export function TransferDrawer({
@@ -192,8 +114,8 @@ export function TransferForm({
     mode === 'name',
     selfAddress,
   );
-  const memberMessage = memberErrorCopy(member.status);
-  const nameMessage = nameErrorCopy(nameRecipient.status);
+  const memberMessage = identityInputErrorMessage('member', member.status);
+  const nameMessage = identityInputErrorMessage('name', nameRecipient.status);
   const memberReading = mode === 'member' && member.status === 'reading';
   const nameReading = mode === 'name' && nameRecipient.status === 'reading';
 
@@ -212,7 +134,6 @@ export function TransferForm({
     nameResolved,
     nameAcknowledged,
   });
-  const selectedModeLabel = MODE_LABELS[mode];
   const invalid =
     mode === 'address'
       ? addressMessage !== null
@@ -254,70 +175,24 @@ export function TransferForm({
         {copy.pages.myNft.transferWarning}
       </p>
 
-      <div>
-        <label htmlFor="transfer-recipient" className="text-xs font-medium text-muted">
-          {copy.transferIdentity.recipientLabel}
-        </label>
-        <div className="mt-1.5 flex">
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                data-testid="transfer-mode-trigger"
-                aria-label={`${copy.transferIdentity.modeLabel}: ${selectedModeLabel}`}
-                disabled={busy}
-                className="inline-flex h-11 shrink-0 items-center gap-1 rounded-l-2xl border border-r-0 border-line bg-elevated px-2.5 text-xs font-medium text-foreground hover:bg-elevated focus:outline-none focus:ring-2 focus:ring-brand disabled:opacity-60"
-              >
-                {selectedModeLabel}
-                <ChevronDown className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-48 p-1">
-              <div role="menu" aria-label={copy.transferIdentity.modeLabel}>
-                {MODE_OPTIONS.map((option) => (
-                  <ModeOption
-                    key={option.mode}
-                    mode={option.mode}
-                    label={option.label}
-                    selected={option.mode === mode}
-                    onSelect={handleModeChange}
-                  />
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-          <input
-            id="transfer-recipient"
-            type="text"
-            value={recipient}
-            onChange={(event) => {
-              setRecipient(event.target.value);
-              setTouched(true);
-              setNameAcknowledged(false);
-            }}
-            onBlur={() => setTouched(true)}
-            placeholder={
-              mode === 'address'
-                ? copy.pages.myNft.recipientPlaceholder
-                : mode === 'member'
-                  ? copy.transferIdentity.memberPlaceholder
-                  : copy.transferIdentity.namePlaceholder
-            }
-            aria-label={copy.transferIdentity.recipientLabel}
-            data-testid="transfer-recipient-input"
-            inputMode={mode === 'member' ? 'numeric' : 'text'}
-            spellCheck={false}
-            autoComplete="off"
-            disabled={busy}
-            aria-invalid={invalid}
-            className={cn(
-              'h-11 min-w-0 flex-1 rounded-r-2xl border bg-surface px-3 font-mono text-sm text-foreground',
-              'focus:outline-none focus:ring-2 focus:ring-brand',
-              invalid ? 'border-danger/50' : 'border-line',
-            )}
-          />
-        </div>
-      </div>
+      <IdentityRecipientField
+        id="transfer-recipient"
+        label={copy.transferIdentity.recipientLabel}
+        mode={mode}
+        onModeChange={handleModeChange}
+        value={recipient}
+        onValueChange={(next) => {
+          setRecipient(next);
+          setTouched(true);
+          setNameAcknowledged(false);
+        }}
+        onBlur={() => setTouched(true)}
+        disabled={busy}
+        invalid={invalid}
+        inputTestId="transfer-recipient-input"
+        modeTriggerTestId="transfer-mode-trigger"
+        modeOptionTestIdPrefix="transfer-mode"
+      />
 
       {mode === 'address' && addressMessage !== null ? (
         <p className="text-xs text-danger-strong" role="alert">
@@ -325,15 +200,9 @@ export function TransferForm({
         </p>
       ) : null}
 
-      {mode === 'member' && memberReading ? (
+      {memberReading || nameReading ? (
         <p className="text-xs text-muted" role="status">
-          {copy.transferIdentity.memberReading}
-        </p>
-      ) : null}
-
-      {mode === 'name' && nameReading ? (
-        <p className="text-xs text-muted" role="status">
-          {copy.transferIdentity.nameReading}
+          {identityInputReadingText(mode)}
         </p>
       ) : null}
 
@@ -368,44 +237,37 @@ export function TransferForm({
       ) : null}
 
       {resolvedRecipient !== null ? (
-        <p className="text-xs leading-5 text-success" data-testid="transfer-recipient-resolved">
-          {copy.transferIdentity.resolvedRecipient(shortenAddress(resolvedRecipient))}
+        <p
+          className="flex flex-wrap items-center gap-1 text-xs leading-5 text-success"
+          data-testid="transfer-recipient-resolved"
+        >
+          <span>{copy.transferIdentity.resolvedRecipient('')}</span>
+          <CopyableAddress
+            address={resolvedRecipient}
+            label={copy.transferIdentity.recipientLabel}
+            className="text-success hover:text-success"
+          />
         </p>
       ) : null}
 
-      {showNameConfirmation ? (
-        <div
-          data-testid="transfer-name-confirmation"
-          className="space-y-2 rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
-        >
-          <p className="text-sm font-semibold text-foreground">
-            {copy.transferIdentity.nameConfirmTitle(
-              nameRecipient.name ?? '',
-              nameRecipient.memberId?.toString() ?? '',
-            )}
-          </p>
-          <p className="font-mono text-[11px] text-muted">
-            {copy.transferIdentity.nameConfirmRecipient(
-              shortenAddress(nameRecipient.address ?? ''),
-            )}
-          </p>
-          <p className="flex items-start gap-1.5 text-warning">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            {copy.transferIdentity.nameConfirmWarning}
-          </p>
-          <label className="flex items-start gap-2 rounded-xl bg-surface/80 p-2 font-medium text-foreground">
-            <input
-              type="checkbox"
-              data-testid="transfer-name-ack"
-              checked={nameAcknowledged}
-              onChange={(event) => setNameAcknowledged(event.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-line accent-brand"
-            />
-            <span>
-              {copy.transferIdentity.nameConfirmCheckbox(nameRecipient.memberId?.toString() ?? '')}
-            </span>
-          </label>
-        </div>
+      {showNameConfirmation && nameRecipient.address !== null ? (
+        <IdentityRecipientCard
+          title={copy.transferIdentity.nameConfirmTitle(
+            nameRecipient.name ?? '',
+            nameRecipient.memberId?.toString() ?? '',
+          )}
+          recipientLabel={copy.transferIdentity.recipientLabel}
+          address={nameRecipient.address}
+          addressLabel={copy.transferIdentity.recipientLabel}
+          warning={copy.transferIdentity.nameConfirmWarning}
+          checkboxLabel={copy.transferIdentity.nameConfirmCheckbox(
+            nameRecipient.memberId?.toString() ?? '',
+          )}
+          checked={nameAcknowledged}
+          onCheckedChange={setNameAcknowledged}
+          testId="transfer-name-confirmation"
+          checkboxTestId="transfer-name-ack"
+        />
       ) : null}
 
       {phase === 'error' && errorMessage !== null ? (

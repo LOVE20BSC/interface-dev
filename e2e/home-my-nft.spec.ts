@@ -27,6 +27,7 @@ import {
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
 
 test.use({
+  permissions: ['clipboard-read', 'clipboard-write'],
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 1,
   isMobile: true,
@@ -373,6 +374,12 @@ test('my-nft: transfer recipient can be an address or an identity NFT', async ({
   const resolved = page.getByTestId('transfer-recipient-resolved');
   await expect(resolved).toBeVisible({ timeout: 15_000 });
   await expect(resolved).toContainText('收款人：0x7099');
+  // 抽屉里的 owner 地址同样走全局地址组件：点击复制完整地址。
+  await resolved.getByRole('button').click();
+  await expect(resolved).toContainText('已复制');
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe('0x70997970C51812dc3A010C7d01b50e0d17dc79C8');
   await expect(page.getByRole('button', { name: '确认转让' })).toBeEnabled();
   await shot(page, 'transfer-drawer-member-mode.png');
 

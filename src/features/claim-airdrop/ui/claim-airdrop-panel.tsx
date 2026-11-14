@@ -159,7 +159,7 @@ export function ClaimAirdropPanel({
     );
   }
 
-  // 留在此页 with the post-claim refetch still in flight: a loading card, never
+  // 知道了 with the post-claim refetch still in flight: a loading card, never
   // the claim CTA again.
   if (receipt !== null && dismissedReceipt && receiptView === 'waiting') {
     return <LoadingCard meta={meta} />;

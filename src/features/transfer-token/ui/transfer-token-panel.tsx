@@ -4,10 +4,17 @@ import { useAccount, useBytecode } from 'wagmi';
 import { AlertTriangle, Check, RefreshCw } from '@/shared/ui/icons';
 import { configuredAddress, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import { cn } from '@/shared/lib/cn';
-import { formatTokenAmount, formatUnits, shortenAddress } from '@/shared/lib/format';
+import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
+import {
+  identityInputErrorMessage,
+  identityInputReadingText,
+  isIdentityInputMode,
+  type IdentityInputMode,
+} from '@/shared/lib/identity-input';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
+import { IdentityRecipientField } from '@/shared/ui/identity-input-mode';
+import { IdentityRecipientCard } from '@/shared/ui/identity-recipient-card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { ActionStack } from '@/shared/ui/action-stack';
 import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shared/ui/token-picker';
@@ -38,10 +45,6 @@ import {
 import { useTransferBalance } from '@/features/transfer-token/model/use-transfer-balance';
 import { useTransferCatalog } from '@/features/transfer-token/model/use-transfer-catalog';
 import { useTransferTransaction } from '@/features/transfer-token/model/use-transfer-transaction';
-import {
-  RecipientModeMenu,
-  type TransferRecipientMode,
-} from '@/features/transfer-token/ui/recipient-mode-menu';
 import { TransferReceipt } from '@/features/transfer-token/ui/transfer-receipt';
 
 export interface TransferTokenPanelProps {
@@ -49,11 +52,11 @@ export interface TransferTokenPanelProps {
   readonly isWrongChain: boolean;
   readonly connectAction: ReactNode;
   /** Test seam only; production always opens on 按地址. */
-  readonly initialMode?: TransferRecipientMode | undefined;
+  readonly initialMode?: IdentityInputMode | undefined;
 }
 
 /** Owner 2026-11-14: the card row order is ① 收款方 → ② 代币数量. */
-const IDENTITY_MODE: Readonly<Record<TransferRecipientMode, IdentityRecipientMode>> = {
+const IDENTITY_MODE: Readonly<Record<IdentityInputMode, IdentityRecipientMode>> = {
   address: 'id',
   member: 'id',
   name: 'name',
@@ -79,24 +82,6 @@ function StateCard({
   );
 }
 
-function identityErrorMessage(
-  status: ReturnType<typeof useIdentityRecipient>['status'],
-  mode: TransferRecipientMode,
-): string | null {
-  switch (status) {
-    case 'invalid':
-      return copy.transfer.memberInvalid;
-    case 'not-found':
-      return mode === 'name' ? copy.transfer.nameNotFound : copy.transfer.memberNotFound;
-    case 'self':
-      return copy.transfer.identitySelf;
-    case 'error':
-      return copy.transfer.identityFailed;
-    default:
-      return null;
-  }
-}
-
 /**
  * 代币转账 (owner 2026-11-14 layout). One card, 收款方 first, then the token
  * amount block: its first line is the bare balance number (no 「代币」 heading, no
@@ -105,7 +90,7 @@ function identityErrorMessage(
  * approval ladder), the native coin is a plain value transfer. Recipient
  * protection is visible before submit: an address-book contract must be
  * acknowledged, any other contract only warns. Success is an in-page receipt
- * that collapses to a strip on 留在此页.
+ * that collapses to a strip on 知道了.
  */
 export function TransferTokenPanel({
   isConnected,
@@ -119,7 +104,7 @@ export function TransferTokenPanel({
 
   const [selectedToken, setSelectedToken] = useState<TransferToken | undefined>(undefined);
   const [amountInput, setAmountInput] = useState('');
-  const [mode, setMode] = useState<TransferRecipientMode>(initialMode);
+  const [mode, setMode] = useState<IdentityInputMode>(initialMode);
   const [addressInput, setAddressInput] = useState('');
   const [identityInput, setIdentityInput] = useState('');
   const [knownAck, setKnownAck] = useState(false);
@@ -131,7 +116,7 @@ export function TransferTokenPanel({
   const token = selectedToken ?? catalog.nativeToken;
   const native = token.kind === 'native';
   const catalogReady = isConnected && !isWrongChain;
-  const identityMode = mode !== 'address';
+  const identityMode = isIdentityInputMode(mode);
 
   const balance = useTransferBalance(token, account, catalogReady);
   const identity = useIdentityRecipient(
@@ -223,7 +208,7 @@ export function TransferTokenPanel({
           ? copy.transfer.insufficient(token.symbol, formatTokenAmount(shortfall, token.decimals))
           : null;
 
-  const identityError = identityErrorMessage(identity.status, mode);
+  const identityError = identityInputErrorMessage(mode, identity.status);
   const identityReading =
     identityMode &&
     (identity.status === 'reading' || identity.status === 'idle') &&
@@ -386,58 +371,33 @@ export function TransferTokenPanel({
       <div className="rounded-3xl border border-line bg-surface p-5 shadow-soft">
         {/* ① 收款方（owner 2026-11-14：先收款方，再代币数量） */}
         <div>
-          <label htmlFor="transfer-recipient" className="text-xs font-medium text-muted">
-            {copy.transfer.recipientLabel}
-          </label>
-          <div className="mt-1.5 flex">
-            <RecipientModeMenu
-              mode={mode}
-              disabled={busy}
-              onChange={(next) => {
-                if (next === mode) return;
-                setMode(next);
-                setKnownAck(false);
+          <IdentityRecipientField
+            id="transfer-recipient"
+            label={copy.transfer.recipientLabel}
+            mode={mode}
+            onModeChange={(next) => {
+              if (next === mode) return;
+              setMode(next);
+              setKnownAck(false);
+              setIdentityAck(false);
+              tx.clearError();
+            }}
+            value={identityMode ? identityInput : addressInput}
+            onValueChange={(next) => {
+              if (mode === 'address') {
+                setAddressInput(next);
+              } else {
+                setIdentityInput(next);
                 setIdentityAck(false);
-                tx.clearError();
-              }}
-            />
-            <input
-              id="transfer-recipient"
-              data-testid="transfer-recipient"
-              type="text"
-              value={mode === 'address' ? addressInput : identityInput}
-              onChange={(event) => {
-                if (mode === 'address') {
-                  setAddressInput(event.target.value);
-                } else {
-                  setIdentityInput(event.target.value);
-                  setIdentityAck(false);
-                }
-                tx.clearError();
-              }}
-              placeholder={
-                mode === 'address'
-                  ? copy.transfer.addressPlaceholder
-                  : mode === 'member'
-                    ? copy.transfer.memberPlaceholder
-                    : copy.transfer.namePlaceholder
               }
-              aria-label={copy.transfer.recipientLabel}
-              inputMode={mode === 'member' ? 'numeric' : 'text'}
-              autoComplete="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              disabled={busy}
-              aria-invalid={mode === 'address' ? addressInvalid : identityInvalid}
-              className={cn(
-                'h-11 min-w-0 flex-1 rounded-r-2xl border bg-surface px-3 font-mono text-sm text-foreground',
-                'outline-none focus:ring-2 focus:ring-brand',
-                (mode === 'address' ? addressInvalid : identityInvalid)
-                  ? 'border-danger/50'
-                  : 'border-line',
-              )}
-            />
-          </div>
+              tx.clearError();
+            }}
+            disabled={busy}
+            invalid={identityMode ? identityInvalid : addressInvalid}
+            inputTestId="transfer-recipient"
+            modeTriggerTestId="transfer-recipient-mode"
+            modeOptionTestIdPrefix="transfer-mode"
+          />
 
           {addressInvalidNow && addressCheck === 'invalid' ? (
             <p className="mt-1.5 text-xs text-danger-strong" role="alert">
@@ -457,7 +417,7 @@ export function TransferTokenPanel({
 
           {identityReading ? (
             <p className="mt-1.5 text-xs text-muted" role="status">
-              {mode === 'member' ? copy.transfer.memberReading : copy.transfer.nameReading}
+              {identityInputReadingText(mode)}
             </p>
           ) : null}
           {identityInvalidNow && identityError !== null ? (
@@ -479,30 +439,21 @@ export function TransferTokenPanel({
           ) : null}
 
           {identityMode && identityResolved && identity.memberId !== null ? (
-            <div
-              data-testid="transfer-identity-summary"
-              className="mt-2 space-y-2 rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
-            >
-              <p className="text-sm font-semibold text-foreground">
-                {copy.transfer.identityTitle(identity.memberId.toString(), identity.name ?? '')}
-              </p>
-              <p
-                className="font-mono text-[11px] text-muted"
-                data-testid="transfer-identity-recipient"
-              >
-                {copy.transfer.identityRecipient(shortenAddress(identity.address ?? ''))}
-              </p>
-              <label className="flex items-start gap-2 rounded-xl bg-surface/80 p-2 font-medium text-foreground">
-                <input
-                  type="checkbox"
-                  data-testid="transfer-identity-ack"
-                  checked={identityAck}
-                  onChange={(event) => setIdentityAck(event.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-line accent-brand"
-                />
-                <span>{copy.transfer.identityConfirmCheckbox(identity.memberId.toString())}</span>
-              </label>
-            </div>
+            <IdentityRecipientCard
+              title={copy.transfer.identityTitle(
+                identity.memberId.toString(),
+                identity.name ?? '',
+              )}
+              recipientLabel={copy.transfer.receiptTo}
+              address={identity.address ?? ''}
+              addressLabel={copy.transfer.receiptTo}
+              checkboxLabel={copy.transfer.identityConfirmCheckbox(identity.memberId.toString())}
+              checked={identityAck}
+              onCheckedChange={setIdentityAck}
+              testId="transfer-identity-summary"
+              recipientTestId="transfer-identity-recipient"
+              checkboxTestId="transfer-identity-ack"
+            />
           ) : null}
 
           {protection.kind === 'known' && protectionLabel !== undefined ? (

@@ -1,5 +1,6 @@
 import { copy } from '@/shared/config/copy-pages';
-import { formatTokenAmount, shortenAddress } from '@/shared/lib/format';
+import { formatTokenAmount } from '@/shared/lib/format';
+import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { Skeleton } from '@/shared/ui/skeleton';
 import type { BatchParsedRow } from '@/features/batch-transfer/lib/batch-parse';
 
@@ -56,13 +57,14 @@ export function BatchEntryTable({
                 className="grid grid-cols-[minmax(0,1fr)_5.5rem_6rem] items-center gap-2 px-3 py-2 text-xs"
               >
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <span
-                    className="truncate font-mono text-[11px] text-foreground"
-                    title={row.address}
-                    data-testid={`batch-transfer-row-recipient-${index}`}
-                  >
-                    {shortenAddress(row.address, 6, 4)}
-                  </span>
+                  <CopyableAddress
+                    address={row.address}
+                    label={copy.batchTransfer.preBalanceHeaderRecipient}
+                    front={6}
+                    back={4}
+                    testId={`batch-transfer-row-recipient-${index}`}
+                    className="min-w-0 text-foreground"
+                  />
                   {hasCode[index] === true ? (
                     <span className="shrink-0 rounded-full bg-warning-soft px-1.5 py-0.5 text-[10px] font-medium text-warning">
                       {copy.batchTransfer.rowContractBadge}

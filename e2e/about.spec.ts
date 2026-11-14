@@ -30,6 +30,7 @@ const deployment = JSON.parse(
 };
 
 test.use({
+  permissions: ['clipboard-read', 'clipboard-write'],
   viewport: { width: 390, height: 844 },
   deviceScaleFactor: 1,
   isMobile: true,
@@ -85,9 +86,12 @@ test.describe('关于页', () => {
     await expect(page.getByRole('link', { name: /在区块浏览器查看/ })).toHaveCount(0);
 
     // Copy button gives immediate feedback in place.
-    const copyButton = page.getByRole('button', { name: '复制地址：身份 NFT' });
+    const copyButton = page.getByTestId('about-copy-memberNFT');
     await copyButton.click();
     await expect(copyButton).toContainText('已复制');
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe(deployment.addresses.memberNFT);
 
     // Click switches the tab; ArrowLeft returns to 合约地址 with focus.
     await dataTab.click();

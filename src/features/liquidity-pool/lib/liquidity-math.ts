@@ -92,12 +92,7 @@ export function planDualAdd(
   amountBDesired: bigint,
 ): DualAddPlan {
   const firstMint = totalSupply === 0n || reserveA <= 0n || reserveB <= 0n;
-  const { amountA, amountB } = optimalAmounts(
-    reserveA,
-    reserveB,
-    amountADesired,
-    amountBDesired,
-  );
+  const { amountA, amountB } = optimalAmounts(reserveA, reserveB, amountADesired, amountBDesired);
   return {
     amountA,
     amountB,
@@ -133,6 +128,18 @@ export function lpForPercent(lpBalance: bigint, percent: number): bigint {
   const result = (lpBalance * basisPoints) / 10_000n;
   // 100% 必须撤干净：小数比例向下取整可能留下 1 wei 的残留。
   return basisPoints === 10_000n ? lpBalance : result;
+}
+
+/**
+ * 智能模式关闭时的「另一侧按池子比例自动填充」：`amountIn·reserveOut/reserveIn`，向下取整。
+ *
+ * 这是 Uniswap V2 `quote` 的同一条比例；储备为 0（空池 / 首币建池前）没有比例可依，
+ * 返回 0，调用方据此不联动、让两侧都可填。整数除法向下取整会让填充值最多比理论少
+ * 1 wei，Router 的 `_optimalAmounts` 之后再截断一次，所以不会被多扣。
+ */
+export function mirrorAmount(amountIn: bigint, reserveIn: bigint, reserveOut: bigint): bigint {
+  if (amountIn <= 0n || reserveIn <= 0n || reserveOut <= 0n) return 0n;
+  return (amountIn * reserveOut) / reserveIn;
 }
 
 /**

@@ -332,10 +332,10 @@ test('mint: approve → mint produces a real receipt with MemberMinted data', as
     ACCOUNTS.funded.toLowerCase(),
   );
 
-  // 留在此页 is the only receipt button (owner 2026-11-14): it dismisses the
+  // 知道了 is the only receipt button (owner 2026-11-14): it dismisses the
   // receipt without changing the route and leaves a compact success strip with
   // the form reset, so the just-minted name cannot be submitted twice.
-  await page.getByRole('button', { name: '留在此页' }).click();
+  await page.getByRole('button', { name: '知道了' }).click();
   await expect(page).toHaveURL(/\/mint/);
   await expect(page.getByRole('heading', { name: '铸造成功' })).toHaveCount(0);
   const strip = page.getByTestId('mint-success-strip');

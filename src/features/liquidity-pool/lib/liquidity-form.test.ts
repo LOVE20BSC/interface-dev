@@ -5,7 +5,6 @@ import {
   DEFAULT_SLIPPAGE_PERCENT,
   isSlippageValid,
   parseAmount,
-  parseWithdrawPercent,
   percentToBps,
 } from '@/features/liquidity-pool/lib/liquidity-form';
 
@@ -41,16 +40,5 @@ describe('deadline', () => {
   it('is now + 20 minutes in seconds', () => {
     expect(DEADLINE_SECONDS).toBe(1200);
     expect(deadlineFromNow(1_700_000_000_000)).toBe(1_700_001_200n);
-  });
-});
-
-describe('parseWithdrawPercent', () => {
-  it('accepts 0–100 and rejects invalid input', () => {
-    expect(parseWithdrawPercent('25')).toBe(25);
-    expect(parseWithdrawPercent('33.5')).toBe(33.5);
-    expect(parseWithdrawPercent('0')).toBeUndefined();
-    expect(parseWithdrawPercent('100.5')).toBeUndefined();
-    expect(parseWithdrawPercent('')).toBeUndefined();
-    expect(parseWithdrawPercent('abc')).toBeUndefined();
   });
 });

@@ -3,10 +3,11 @@ import { Check, Copy } from '@/shared/ui/icons';
 import { NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
-import { formatTokenAmount, shortenAddress } from '@/shared/lib/format';
+import { formatTokenAmount } from '@/shared/lib/format';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
+import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { Sheet } from '@/shared/ui/sheet';
 import type { BatchAuditRow } from '@/features/batch-transfer/lib/batch-audit';
 import type { BatchReceiptRecord } from '@/features/batch-transfer/lib/batch-receipt';
@@ -54,9 +55,13 @@ function ReceiptRow({
       className="flex items-center justify-between gap-3 py-2 text-xs"
     >
       <span className="min-w-0">
-        <span className="block truncate font-mono text-[11px] text-foreground" title={row.address}>
-          {shortenAddress(row.address, 6, 4)}
-        </span>
+        <CopyableAddress
+          address={row.address}
+          label={copy.batchTransfer.preBalanceHeaderRecipient}
+          front={6}
+          back={4}
+          className="text-foreground"
+        />
         <span
           className="block font-mono text-[10px] text-muted"
           data-testid={`batch-transfer-receipt-amount-${index}`}

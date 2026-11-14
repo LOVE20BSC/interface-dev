@@ -1,20 +1,16 @@
 import type { KeyboardEvent, ReactNode } from 'react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { BUILD_ID } from '@/config/build-id.generated';
 import { APP_ENV } from '@/config/env';
 import { ADDRESSES, BRAND_DOCS_URL, DEPLOYMENT, NETWORK } from '@/config/networks';
-import {
-  resolveAboutAddressGroups,
-  type AboutAddressKey,
-  type AboutAddressRow,
-} from '@/domain/about-addresses';
+import { resolveAboutAddressGroups, type AboutAddressRow } from '@/domain/about-addresses';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { copyText } from '@/shared/lib/clipboard';
 import { formatBuildId } from '@/shared/lib/format';
 import { variantLabel } from '@/shared/lib/variant-label';
-import { ArrowUpLeft, BookOpen, Check, Copy } from '@/shared/ui/icons';
+import { ArrowUpLeft, BookOpen } from '@/shared/ui/icons';
+import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { Skeleton } from '@/shared/ui/skeleton';
 import {
   formatDeploymentBlock,
@@ -145,84 +141,44 @@ function ChainInfoRow({
   );
 }
 
-function AddressRow({
-  row,
-  copied,
-  onCopy,
-}: {
-  readonly row: AboutAddressRow;
-  readonly copied: boolean;
-  readonly onCopy: (row: AboutAddressRow) => void;
-}) {
+function AddressRow({ row }: { readonly row: AboutAddressRow }) {
   const label = copy.about.addresses.labels[row.key];
 
   return (
     <li className="py-2.5" data-testid={`about-address-${row.key}`}>
       <div className="flex items-start justify-between gap-2">
         <span className="text-xs text-muted">{label}</span>
-        {row.address !== undefined ? (
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={() => onCopy(row)}
-              aria-label={copy.about.addresses.copyAddress(label)}
-              className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[11px] font-medium text-muted hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-            >
-              {copied ? (
-                <Check className="h-3.5 w-3.5" aria-hidden="true" />
-              ) : (
-                <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-              )}
-              <span aria-live="polite">
-                {copied ? copy.about.addresses.copied : copy.common.copy}
-              </span>
-            </button>
-            {row.explorerUrl !== null ? (
-              <a
-                href={row.explorerUrl}
-                target="_blank"
-                rel="noreferrer"
-                aria-label={copy.about.addresses.explorer(label)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted hover:bg-elevated hover:text-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-              >
-                <ArrowUpLeft className="h-3.5 w-3.5" aria-hidden="true" />
-              </a>
-            ) : null}
-          </div>
+        {row.explorerUrl !== null ? (
+          <a
+            href={row.explorerUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={copy.about.addresses.explorer(label)}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-elevated hover:text-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          >
+            <ArrowUpLeft className="h-3.5 w-3.5" aria-hidden="true" />
+          </a>
         ) : null}
       </div>
-      <p
-        className={cn(
-          'mt-1 break-all font-mono text-[11px] leading-5',
-          row.address !== undefined ? 'text-foreground' : 'font-sans text-muted',
-        )}
-      >
-        {row.address ?? copy.about.addresses.notConfigured}
-      </p>
+      {row.address !== undefined ? (
+        <CopyableAddress
+          address={row.address}
+          label={label}
+          display="full"
+          testId={`about-copy-${row.key}`}
+          className="mt-1 text-foreground"
+        />
+      ) : (
+        <p className="mt-1 font-sans text-[11px] leading-5 text-muted">
+          {copy.about.addresses.notConfigured}
+        </p>
+      )}
     </li>
   );
 }
 
 function AddressesPanel() {
   const groups = resolveAboutAddressGroups(ADDRESSES, NETWORK.blockExplorerUrl);
-  const [copiedKey, setCopiedKey] = useState<AboutAddressKey | null>(null);
-  const timer = useRef<number | undefined>(undefined);
-
-  useEffect(() => {
-    return () => {
-      if (timer.current !== undefined) window.clearTimeout(timer.current);
-    };
-  }, []);
-
-  const onCopy = (row: AboutAddressRow) => {
-    if (row.address === undefined) return;
-    void copyText(row.address).then((ok) => {
-      if (!ok) return;
-      setCopiedKey(row.key);
-      if (timer.current !== undefined) window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => setCopiedKey(null), 2000);
-    });
-  };
 
   return (
     <div className="space-y-5">
@@ -246,7 +202,7 @@ function AddressesPanel() {
           </h3>
           <ul className="mt-1 divide-y divide-line rounded-2xl border border-line bg-surface px-4">
             {group.rows.map((row) => (
-              <AddressRow key={row.key} row={row} copied={copiedKey === row.key} onCopy={onCopy} />
+              <AddressRow key={row.key} row={row} />
             ))}
           </ul>
         </section>

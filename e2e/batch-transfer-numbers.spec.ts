@@ -203,7 +203,7 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('batch-transfer-receipt-delta-2')).toHaveText('+0.15');
     await expect(page.getByTestId('batch-transfer-receipt-delta-3')).toHaveText('+0.000001');
 
-    await page.getByRole('button', { name: '留在此页' }).click();
+    await page.getByRole('button', { name: '知道了' }).click();
     await expect(page.getByTestId('batch-transfer-success-strip-amount')).toHaveText(
       `已转出 0.450001 ${NATIVE}`,
     );
@@ -268,7 +268,7 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('batch-transfer-receipt-delta-1')).toHaveText('+0.5');
     await expect(page.getByTestId('batch-transfer-receipt-delta-2')).toHaveText('+0.000002');
 
-    await page.getByRole('button', { name: '留在此页' }).click();
+    await page.getByRole('button', { name: '知道了' }).click();
     await expect(page.getByTestId('batch-transfer-balance')).toHaveText(
       `${SYMBOL} 余额 99,799,097.999998`,
       { timeout: 20_000 },

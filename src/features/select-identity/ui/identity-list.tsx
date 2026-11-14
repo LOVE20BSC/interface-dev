@@ -3,11 +3,12 @@ import { Check, RefreshCw } from '@/shared/ui/icons';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { copy } from '@/shared/config/copy-pages';
-import { shortenAddress, UNKNOWN } from '@/shared/lib/format';
+import { UNKNOWN } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/badge';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
+import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { Skeleton } from '@/shared/ui/skeleton';
 import type { MemberIdentity } from '@/entities/member-identity/model/use-member-identities';
 import type { MemberIdentityState } from '@/entities/member-identity/model/use-member-identity';
@@ -252,7 +253,12 @@ function TransferReceipt({ recipient }: { readonly recipient: `0x${string}` }) {
   return (
     <p className="rounded-2xl border border-success/20 bg-success-soft/60 px-3 py-2 text-sm text-success">
       <Check className="mr-1.5 inline h-4 w-4 align-[-2px]" aria-hidden="true" />
-      {copy.pages.myNft.transferSuccess(shortenAddress(recipient))}
+      <span>{copy.pages.myNft.transferSuccess('')}</span>
+      <CopyableAddress
+        address={recipient}
+        label={copy.pages.myNft.recipientLabel}
+        className="text-success hover:text-success"
+      />
     </p>
   );
 }

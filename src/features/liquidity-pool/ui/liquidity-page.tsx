@@ -173,7 +173,7 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
       </div>
 
       {token !== undefined ? (
-        <LiquidityTokenBar catalog={catalog} selected={token} onSelect={setCustomToken} />
+        <LiquidityTokenBar catalog={catalog} selected={token} />
       ) : null}
 
       {token === undefined ? (

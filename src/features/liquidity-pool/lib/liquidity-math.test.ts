@@ -5,6 +5,7 @@ import {
   liquidityMinted,
   lpForPercent,
   MINIMUM_LIQUIDITY,
+  mirrorAmount,
   optimalAmounts,
   planDualAdd,
   planWithdraw,
@@ -158,6 +159,23 @@ describe('planDualAdd', () => {
     expect(plan.amountA).toBe(1_000_000_000_000_000_000_000n);
     expect(plan.amountB).toBe(500_000_000_000_000_000n);
     expect(plan.liquidity).toBe(22_360_679_774_997_896_964n);
+  });
+});
+
+describe('mirrorAmount（智能模式关闭时的一侧联动）', () => {
+  it('mirrors the other side at the pool ratio, flooring like Uniswap quote', () => {
+    // 池子 200,000 TestLOVE20 / 100 WETH：1000 TestLOVE20 → 0.5 WETH（用例 D 的两侧）。
+    expect(mirrorAmount(1000n * 10n ** 18n, RESERVE_TOKEN, RESERVE_NATIVE)).toBe(5n * 10n ** 17n);
+    // 反向：0.5 WETH → 1000 TestLOVE20。
+    expect(mirrorAmount(5n * 10n ** 17n, RESERVE_NATIVE, RESERVE_TOKEN)).toBe(1000n * 10n ** 18n);
+    // 除不尽时向下取整，不多扣用户。
+    expect(mirrorAmount(3n, 7n, 10n)).toBe(4n);
+  });
+
+  it('returns 0 when there is no ratio to follow', () => {
+    expect(mirrorAmount(0n, RESERVE_TOKEN, RESERVE_NATIVE)).toBe(0n);
+    expect(mirrorAmount(10n ** 18n, 0n, RESERVE_NATIVE)).toBe(0n);
+    expect(mirrorAmount(10n ** 18n, RESERVE_TOKEN, 0n)).toBe(0n);
   });
 });
 

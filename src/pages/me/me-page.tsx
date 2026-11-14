@@ -4,7 +4,8 @@ import { BUILD_ID } from '@/config/build-id.generated';
 import { APP_ENV } from '@/config/env';
 import { BRAND_DOCS_URL, NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import { formatBuildId, formatTokenAmount, shortenAddress } from '@/shared/lib/format';
+import { CopyableAddress } from '@/shared/ui/copyable-address';
+import { formatBuildId, formatTokenAmount } from '@/shared/lib/format';
 import { variantLabel } from '@/shared/lib/variant-label';
 import { useCommunityBalance } from '@/entities/community-token/model/use-community-balance';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
@@ -84,7 +85,11 @@ export function MePage() {
             {wallet.address === undefined ? (
               copy.me.walletNotConnected
             ) : (
-              <span className="font-mono text-xs">{shortenAddress(wallet.address)}</span>
+              <CopyableAddress
+                address={wallet.address}
+                label={copy.me.walletLabel}
+                className="text-foreground"
+              />
             )}
           </Row>
           <Row label={copy.me.networkLabel}>

@@ -16,7 +16,10 @@ export const MAX_SLIPPAGE_PERCENT = 50;
 export const DEADLINE_MINUTES = 20;
 export const DEADLINE_SECONDS = DEADLINE_MINUTES * 60;
 
-/** 撤出比例预设；自定义输入走 0–100 的百分数。 */
+/**
+ * 撤出页的快捷填充比例（owner 2026-11-14：撤出输入的是 LP 数量，比例只是快捷按钮，
+ * 点一下把对应比例的 LP 数量填进输入框，用户仍然可以手改数量）。
+ */
 export const WITHDRAW_PERCENTS = [25, 50, 75, 100] as const;
 
 /** 原生币「全部」的展示型预留（与兑换页同一口径），页面文案永远写「约」。 */
@@ -43,16 +46,6 @@ export function parseAmount(raw: string, decimals: number): ParsedAmount {
   } catch {
     return { kind: 'invalid' };
   }
-}
-
-/** 撤出比例输入：0–100 的百分数，允许小数两位。 */
-export function parseWithdrawPercent(raw: string): number | undefined {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return undefined;
-  if (!AMOUNT_RE.test(trimmed)) return undefined;
-  const value = Number.parseFloat(trimmed);
-  if (!Number.isFinite(value) || value <= 0 || value > 100) return undefined;
-  return value;
 }
 
 export function isSlippageValid(percent: number): boolean {

@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
-import { AlertTriangle, Check, Copy, RefreshCw, ShieldCheck } from '@/shared/ui/icons';
+import { AlertTriangle, Check, RefreshCw, ShieldCheck } from '@/shared/ui/icons';
 import { ADDRESSES, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { buttonStyles, Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
+import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { cn } from '@/shared/lib/cn';
-import { copyText } from '@/shared/lib/clipboard';
-import { formatTokenAmount, shortenAddress } from '@/shared/lib/format';
+import { formatTokenAmount } from '@/shared/lib/format';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shared/ui/token-picker';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
@@ -17,6 +17,7 @@ import { useTransferCatalog } from '@/features/transfer-token/model/use-transfer
 import { transferTokenKey, type TransferToken } from '@/features/transfer-token/lib/transfer-types';
 import {
   approvalDisplayText,
+  approvalKind,
   canRaiseAllowance,
   canRevokeAllowance,
 } from '@/features/approve-token/lib/approval-amount';
@@ -68,55 +69,9 @@ function StateCard({
   );
 }
 
-/**
- * Local address-copy affordance (owner 2026-11-14: 合约列表地址要能点击复制).
- * TODO(shared/ui, e293): replace with the shared address component once the
- * global 地址复制 task lands — same 缩略 + 点击复制 + 「已复制」 + aria contract.
- */
-function CopyableAddress({
-  address,
-  label,
-  status,
-  onCopy,
-  testId,
-}: {
-  readonly address: HexAddress;
-  readonly label: string;
-  readonly status: AddressCopyStatus;
-  readonly onCopy: (address: HexAddress) => void;
-  readonly testId: string;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      title={address}
-      onClick={() => onCopy(address)}
-      aria-label={copy.approvals.copyAddress(label)}
-      className="mt-1.5 inline-flex max-w-full flex-wrap items-center gap-1 rounded-lg text-left text-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-    >
-      <span className="font-mono text-[11px] leading-4">{shortenAddress(address, 6, 4)}</span>
-      <span className="flex shrink-0 items-center gap-0.5 text-[10px]" aria-live="polite">
-        {status === 'copied' ? (
-          <Check className="h-3 w-3 text-success" aria-hidden="true" />
-        ) : (
-          <Copy className="h-3 w-3" aria-hidden="true" />
-        )}
-        {status === 'copied' ? (
-          <span className="text-success">{copy.approvals.addressCopied}</span>
-        ) : status === 'failed' ? (
-          <span className="text-danger-strong">{copy.approvals.copyFailed}</span>
-        ) : null}
-      </span>
-    </button>
-  );
-}
-
 function riskLines(): readonly string[] {
   return [copy.approvals.riskWhy, copy.approvals.riskDanger, copy.approvals.riskAdvice];
 }
-
-type AddressCopyStatus = 'idle' | 'copied' | 'failed';
 
 /**
  * 代币授权 (owner 2026-11-14). One token at a time: pick a token, then read the
@@ -135,11 +90,6 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
   const [preference, setPreference] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingApprovalAction | null>(null);
   const [submitBusy, setSubmitBusy] = useState(false);
-  const [copiedAddress, setCopiedAddress] = useState<{
-    address: string;
-    status: AddressCopyStatus;
-  } | null>(null);
-  const copiedTimer = useRef<number | undefined>(undefined);
 
   const ready = isConnected && !isWrongChain;
   const token = selectedToken;
@@ -161,32 +111,6 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
     setPreference(readUnlimitedApprovalPreference());
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
-
-  useEffect(() => {
-    return () => {
-      if (copiedTimer.current !== undefined) window.clearTimeout(copiedTimer.current);
-    };
-  }, []);
-
-  /**
-   * Copy a spender address. `copyText` already falls back to a hidden textarea +
-   * execCommand when `navigator.clipboard` is unavailable (http, old webviews);
-   * if that also fails the row says so instead of going silently dead.
-   */
-  const onCopyAddress = (target: HexAddress) => {
-    const key = target.toLowerCase();
-    const settle = (status: AddressCopyStatus) => {
-      setCopiedAddress({ address: key, status });
-      if (copiedTimer.current !== undefined) window.clearTimeout(copiedTimer.current);
-      copiedTimer.current = window.setTimeout(() => setCopiedAddress(null), 2000);
-    };
-    void copyText(target).then((ok) => settle(ok ? 'copied' : 'failed'));
-  };
-
-  const copyStatus = (target: HexAddress): AddressCopyStatus =>
-    copiedAddress !== null && copiedAddress.address === target.toLowerCase()
-      ? copiedAddress.status
-      : 'idle';
 
   // A resolved custom token becomes the selection exactly once per address, the
   // same pattern the 代币转账 page uses.
@@ -306,6 +230,15 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
       currentText: spenderAmountText(spender) ?? copy.approvals.states.unapproved,
     });
   };
+
+  /**
+   * owner 2026-11-14: an already long-term row keeps the button disabled but the
+   * label must read 已长期授权 — a disabled 「长期授权」 reads like "still pending".
+   */
+  const unlimitedButtonLabel = (allowance: bigint | undefined): string =>
+    allowance !== undefined && approvalKind(allowance) === 'unlimited'
+      ? copy.approve.longTermActive
+      : copy.approvals.unlimitedAction;
 
   const rowCurrentAllowance = (address: HexAddress): bigint | undefined =>
     allowances.byAddress.get(address.toLowerCase());
@@ -572,9 +505,10 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
             <CopyableAddress
               address={customSpender}
               label={customSpenderLabel}
-              status={copyStatus(customSpender)}
-              onCopy={onCopyAddress}
+              front={6}
+              back={4}
               testId="approvals-custom-address"
+              className="mt-1.5"
             />
             {customAllowance === undefined ? (
               <p className="mt-1.5 text-xs leading-5 text-muted">
@@ -633,7 +567,7 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
                     disabled={busy || !canRaiseAllowance(customAllowance)}
                     onClick={() => openAction(customSpender, customSpenderLabel, 'unlimited')}
                   >
-                    {copy.approvals.unlimitedAction}
+                    {unlimitedButtonLabel(customAllowance)}
                   </Button>
                 </div>
               </>
@@ -698,9 +632,10 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
                     <CopyableAddress
                       address={spender.address}
                       label={item.label}
-                      status={copyStatus(spender.address)}
-                      onCopy={onCopyAddress}
+                      front={6}
+                      back={4}
                       testId={`approvals-address-${spender.id}`}
+                      className="mt-1.5"
                     />
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Button
@@ -719,7 +654,7 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
                         disabled={busy || !canRaiseAllowance(allowance)}
                         onClick={() => openAction(spender.address, item.label, 'unlimited')}
                       >
-                        {copy.approvals.unlimitedAction}
+                        {unlimitedButtonLabel(allowance)}
                       </Button>
                     </div>
                   </li>

@@ -112,18 +112,22 @@ test.describe('代币授权 前端线（理论线 §1）', () => {
     await openApprovals(page);
 
     const amount = page.getByTestId('approvals-amount-router');
+    const unlimitedButton = page.getByTestId('approvals-unlimited-router');
     await expect(amount).toHaveText('未授权', { timeout: 20_000 });
     await expect(page.getByTestId('approvals-amount-stake')).toHaveText('未授权');
     await expect(page.getByTestId('approvals-revoke-router')).toBeDisabled();
-    await expect(page.getByTestId('approvals-unlimited-router')).toBeEnabled();
+    await expect(unlimitedButton).toBeEnabled();
+    await expect(unlimitedButton).toHaveText('长期授权');
 
-    // B: 长期授权，写 maxUint256 → 页面显示 长期授权。
-    await page.getByTestId('approvals-unlimited-router').click();
+    // B: 长期授权，写 maxUint256 → 行金额显示 长期授权；按钮转只读的「已长期授权」。
+    await unlimitedButton.click();
     const dialog = page.getByRole('dialog');
     await expect(dialog).toContainText('把「兑换路由」设为长期授权？');
     await expect(page.getByTestId('approvals-confirm-next')).toHaveText('长期授权');
     await page.getByTestId('approvals-confirm-submit').click();
     await expect(amount).toHaveText('长期授权', { timeout: 30_000 });
+    await expect(unlimitedButton).toHaveText('已长期授权');
+    await expect(unlimitedButton).toBeDisabled();
 
     const strip = page.getByTestId('approvals-success-strip');
     await expect(strip).toContainText('已把「兑换路由」设为长期授权');
@@ -136,13 +140,15 @@ test.describe('代币授权 前端线（理论线 §1）', () => {
     await expect(amount).toHaveText('长期授权');
     await expect(page).toHaveURL(/\/approvals(\?.*)?$/);
 
-    // D: 撤销，写 0 → 页面显示 未授权。
+    // D: 撤销，写 0 → 页面显示 未授权；按钮回到可点的「长期授权」。
     await page.getByTestId('approvals-revoke-router').click();
     await expect(dialog).toContainText('撤销「兑换路由」的授权？');
     await expect(page.getByTestId('approvals-confirm-next')).toHaveText('未授权');
     await page.getByTestId('approvals-confirm-submit').click();
     await expect(amount).toHaveText('未授权', { timeout: 30_000 });
     await expect(page.getByTestId('approvals-revoke-router')).toBeDisabled();
+    await expect(unlimitedButton).toHaveText('长期授权');
+    await expect(unlimitedButton).toBeEnabled();
   });
 
   test('用例 C/E/F 具体额度截断、阈值边界与最小可见额度', async ({ page }) => {
@@ -158,9 +164,10 @@ test.describe('代币授权 前端线（理论线 §1）', () => {
     });
     // E1: 2^255 − 1 仍是具体额度，显示按 6 位小数截断。
     await expect(page.getByTestId('approvals-amount-vote')).toHaveText(BOUNDARY_TEXT);
-    // E2: 2^255 起算长期授权。
+    // E2: 2^255 起算长期授权；按钮文案为只读的「已长期授权」。
     await expect(page.getByTestId('approvals-amount-submit')).toHaveText('长期授权');
     await expect(page.getByTestId('approvals-unlimited-submit')).toBeDisabled();
+    await expect(page.getByTestId('approvals-unlimited-submit')).toHaveText('已长期授权');
     // F: 1 wei 不能显示成 0（会被误读为未授权）。
     await expect(page.getByTestId('approvals-amount-mint')).toHaveText(BELOW_MINIMUM_TEXT);
 
@@ -181,10 +188,12 @@ test.describe('代币授权 前端线（理论线 §1）', () => {
     await expect(customAmount).toHaveText('这个地址没有授权额度。', { timeout: 20_000 });
     await expect(page.getByTestId('approvals-custom-revoke')).toBeDisabled();
 
-    // G3: 自定义地址走页面「长期授权」。
+    // G3: 自定义地址走页面「长期授权」，确认后按钮转只读的「已长期授权」。
     await page.getByTestId('approvals-custom-unlimited').click();
     await page.getByTestId('approvals-confirm-submit').click();
     await expect(customAmount).toHaveText('长期授权', { timeout: 30_000 });
+    await expect(page.getByTestId('approvals-custom-unlimited')).toHaveText('已长期授权');
+    await expect(page.getByTestId('approvals-custom-unlimited')).toBeDisabled();
 
     await page.getByTestId('approvals-custom-revoke').click();
     await page.getByTestId('approvals-confirm-submit').click();

@@ -1,7 +1,7 @@
 import { ADDRESSES, isConfiguredAddress, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { isSameAddress } from '@/shared/lib/format';
-import { validateRecipient } from '@/features/transfer-identity/lib/validate-recipient';
+import { checkAddressInput } from '@/shared/lib/identity-input';
 
 /**
  * Recipient checks for 代币转账 (pure, no React, no chain).
@@ -19,8 +19,7 @@ export function checkTransferRecipient(
   value: string,
   self: string | undefined,
 ): TransferRecipientCheck {
-  if (value.trim().length === 0) return 'empty';
-  return validateRecipient(value, self);
+  return checkAddressInput(value, self);
 }
 
 export type KnownContractLabelKey = keyof (typeof copy)['about']['addresses']['labels'];

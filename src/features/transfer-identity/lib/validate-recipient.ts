@@ -1,15 +1,15 @@
-import { isSameAddress } from '@/shared/lib/format';
+import { checkAddressInput } from '@/shared/lib/identity-input';
 
 export type RecipientValidation = 'ok' | 'invalid' | 'zero' | 'self';
 
-const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
-const ZERO = '0x0000000000000000000000000000000000000000';
-
-/** 0x + 40 hex, non-zero, not the current wallet. No ENS support in M0. */
+/**
+ * 0x + 40 hex, non-zero, not the current wallet. No ENS support in M0.
+ *
+ * The parsing lives in `@/shared/lib/identity-input` so 代币转账 and 转让身份 NFT
+ * share one implementation; this wrapper keeps the historical 转让 vocabulary
+ * (an empty input is reported as 'invalid', the input's touched flag gates it).
+ */
 export function validateRecipient(value: string, self: string | undefined): RecipientValidation {
-  const trimmed = value.trim();
-  if (!ADDRESS_RE.test(trimmed)) return 'invalid';
-  if (trimmed.toLowerCase() === ZERO) return 'zero';
-  if (self !== undefined && isSameAddress(trimmed, self)) return 'self';
-  return 'ok';
+  const check = checkAddressInput(value, self);
+  return check === 'empty' ? 'invalid' : check;
 }

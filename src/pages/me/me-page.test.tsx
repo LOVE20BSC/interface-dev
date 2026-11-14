@@ -124,7 +124,11 @@ describe('MePage', () => {
   it('never renders a filled button: the page is a settings-ish list', () => {
     renderPage();
 
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    // The only button is the 全局地址复制 affordance (owner 2026-11-14): the page
+    // itself stays a settings-ish list with no primary/filled action.
+    const buttons = screen.queryAllByRole('button');
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]).toHaveAccessibleName('复制地址：钱包地址');
     const filled = document.querySelectorAll('.bg-brand');
     expect(filled).toHaveLength(0);
   });

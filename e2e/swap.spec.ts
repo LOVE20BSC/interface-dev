@@ -364,10 +364,10 @@ test('swap: ETH → TestLOVE20 shows path/min-out and a receipt from the pair Sw
   await page.getByTestId('swap-submit').click();
   await expect(page.getByRole('heading', { name: '兑换完成' })).toBeVisible({ timeout: 30_000 });
 
-  // 回执只留一个按钮「留在此页」（owner 2026-11-14）：不再有「再兑换一次」。
+  // 回执只留一个按钮「知道了」（owner 2026-11-14）：不再有「再兑换一次」。
   await expect(page.getByRole('button', { name: '再兑换一次' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: '再兑换一次' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '留在此页' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '知道了' })).toHaveCount(1);
 
   const actualText = (await page.getByTestId('swap-receipt-amount').innerText()).trim();
   const hash = (await page.getByTestId('swap-receipt-hash').innerText()).trim() as `0x${string}`;
@@ -389,9 +389,9 @@ test('swap: ETH → TestLOVE20 shows path/min-out and a receipt from the pair Sw
 
   await shot(page, 'swap-receipt.png');
 
-  // 留在此页 is the only receipt button (owner 2026-11-14): the receipt
+  // 知道了 is the only receipt button (owner 2026-11-14): the receipt
   // collapses into a success strip and the route stays /swap.
-  await page.getByRole('button', { name: '留在此页' }).click();
+  await page.getByRole('button', { name: '知道了' }).click();
   await expect(page).toHaveURL(/\/swap/);
   const strip = page.getByTestId('swap-success-strip');
   await expect(strip).toBeVisible();
@@ -665,8 +665,8 @@ test('swap: native ↔ wrapped is a 1:1 wrap/unwrap with its own receipt', async
     .poll(() => uintOf(WETH, 'balanceOf(address)(uint256)', BUYER), { timeout: 15_000 })
     .toBe(wethBefore + 10n ** 16n);
 
-  // 留在此页 is the only receipt button (owner 2026-11-14); the form is back.
-  await page.getByRole('button', { name: '留在此页' }).click();
+  // 知道了 is the only receipt button (owner 2026-11-14); the form is back.
+  await page.getByRole('button', { name: '知道了' }).click();
   await page.getByRole('button', { name: '交换方向' }).click();
   await expect(page.getByTestId('swap-from-token')).toContainText('TestWETH');
   await expect(page.getByTestId('swap-to-token')).toContainText(NATIVE);

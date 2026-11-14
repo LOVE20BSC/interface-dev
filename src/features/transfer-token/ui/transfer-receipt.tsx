@@ -6,6 +6,7 @@ import { copyText } from '@/shared/lib/clipboard';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
+import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { Sheet } from '@/shared/ui/sheet';
 import {
   transferAmountText,
@@ -56,12 +57,13 @@ function ReceiptBody({ record, onDismiss }: TransferReceiptProps) {
                 {record.recipientLabel}
               </span>
             ) : null}
-            <span
-              className="break-all font-mono text-[11px] leading-5 text-foreground"
-              data-testid="transfer-receipt-recipient"
-            >
-              {record.recipient}
-            </span>
+            <CopyableAddress
+              address={record.recipient}
+              label={copy.transfer.receiptTo}
+              display="full"
+              testId="transfer-receipt-recipient"
+              className="text-foreground"
+            />
           </dd>
         </div>
         <div className="flex items-start justify-between gap-3">

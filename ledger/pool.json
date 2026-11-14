@@ -1,7 +1,5 @@
 {
   "tasks": {
-    "20261114-0136-3195-流动性池-智能模式与撤出-查询重做": {"category": "交互整改", "created": "2026-11-14 01:36:24", "creator": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "creator_name": "tester", "finished": null, "owner": null, "owner_name": null, "started": null, "status": "open", "tags": ["流动性池", "智能模式", "撤出", "查询"], "title": "流动性池·智能模式与撤出/查询重做", "updated": "2026-11-14 01:36:24", "worklog": "worklog/202611/14-0136-3195-流动性池-智能模式与撤出-查询重做.md"},
-    "20261114-0137-e293-全局-地址复制与身份输入模式与社区符号搜索": {"category": "交互整改", "created": "2026-11-14 01:37:12", "creator": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "creator_name": "tester", "finished": null, "owner": null, "owner_name": null, "started": null, "status": "open", "tags": ["全局", "地址复制", "身份", "社区切换"], "title": "全局·地址复制与身份输入模式与社区符号搜索", "updated": "2026-11-14 01:37:12", "worklog": "worklog/202611/14-0137-e293-全局-地址复制与身份输入模式与社区符号搜索.md"}
   },
   "version": "20261022000000"
 }

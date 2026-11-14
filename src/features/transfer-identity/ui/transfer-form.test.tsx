@@ -72,7 +72,7 @@ describe('TransferForm 按身份 NFT 名字 confirmation gate', () => {
     renderNameForm();
 
     expect(screen.getByText('名称「Testdev-member-1」→ 身份 NFT #2')).toBeVisible();
-    expect(screen.getByText(/收款人 0x7099/)).toBeVisible();
+    expect(screen.getByTestId('transfer-name-confirmation')).toHaveTextContent(/收款人 0x7099/);
     expect(screen.getByText(/名称不是唯一依据/)).toBeVisible();
 
     const submit = screen.getByRole('button', { name: '确认转让' });

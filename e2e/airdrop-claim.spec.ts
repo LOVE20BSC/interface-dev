@@ -359,9 +359,9 @@ test('airdrop: eligible wallet sees the estimate, claims, and gets a real receip
 
   await shot(page, 'airdrop-receipt.png');
 
-  // 留在此页 is the only receipt button (owner 2026-11-14): it must land on the
+  // 知道了 is the only receipt button (owner 2026-11-14): it must land on the
   // page's S6 已铸造 state with the real amount, never back on the claim CTA.
-  await page.getByRole('button', { name: '留在此页' }).click();
+  await page.getByRole('button', { name: '知道了' }).click();
   await expect(page).toHaveURL(/\/airdrop/);
   await expect(page.getByTestId('airdrop-claimed-title')).toHaveText(
     `已铸造 ${receiptAmountText}`,
