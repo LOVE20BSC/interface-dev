@@ -19,7 +19,7 @@ M0 范围共 6 项（[m0-scope](product/m0-scope.md)「范围内」）。✅ 完
 | 5 | 一条命令起全栈 | ✅ | [ADR-0004](adr/0004-anvil-local-chain.md)；clean bootstrap 两次导出同 sha256；本次 `cast chain-id`=31337，`merkleRoot` 与快照一致；前端地址簿由 `pnpm sync:anvil` 生成 |
 | 6 | 文案纪律落地 | ✅ | 所有中文进 `src/shared/config/copy.ts`（生成的错误文案除外），`src/architecture.test.ts` 强制；`7dc0949`；对照 [GLOSSARY](../GLOSSARY.md) |
 | — | M0 验收报告 | ✅ | [m0-acceptance](product/m0-acceptance.md)（14 步 + 证据；§3 的 O1–O4 已修复复核，见 §3.1） |
-| — | E2E 65 条 | ✅ | `e2e/*.spec.ts` 合计 65 个 `test()`；跑在独立 **8555** 链（`pnpm e2e` 自举/复用），按文件 `anvil_snapshot`/`anvil_revert` 隔离；**2026-11-12 AirdropDistributor 重构适配后连跑两遍均 52/52**（§6.1） |
+| — | E2E 87 条 | ✅ | `e2e/*.spec.ts` 合计 87 个 `test()`；跑在独立 **8555** 链（`pnpm e2e` 自举/复用），按文件 `anvil_snapshot`/`anvil_revert` 隔离；**2026-11-14 五个应用页合并后权威跑 87/87 全绿**（§6.1） |
 | — | 首页身份读取状态 | ✅ | `loading` / `error` / `unconfigured` 不再只剩问候：骨架卡、错误卡 +「重试」、未部署说明；无身份与未选择卡不变；[m0-ux-spec](product/m0-ux-spec.md) §3.1 · `home-identity-error.png` / `home-no-identity.png` |
 | — | 主题（浅色/深色） | ✅ | [ADR-0005](adr/0005-color-tokens-and-theme.md)；`/theme` 应用目录「设置」分类、`requires: null`；两套语义 token 在 `src/index.css`（深色币安配色 canvas `#0B0E11` / surface `#1E2329` / brand `#FCD535`）；`index.html` 首帧前应用 `love20:theme`；全仓清掉 49 处硬编码色类；配色三线 [three-line/theme.md](product/three-line/theme.md)；`e2e/theme-colors.spec.ts` |
 | — | 应用·代币转账 | ✅ | `/transfer` 应用目录「代币」分类、`requires: null`（普通转账不依赖协议合约）；代币 = 原生币 / Launch 社区代币分页+搜索 / WETH / LP（地址簿 `pair`）/ 自定义 ERC20（校验 bytecode + 读 symbol/decimals）；收款方 = 地址或按身份 NFT（复用转让页的 ownerOf/memberId 解析 + ID 确认）；已知合约收款强制二次确认、任意合约警告；ERC20 直接 `transfer`（界面无授权）、原生币普通转账；`tx-watch` 90s 有界 + 重新查询/重新提交；回执可关闭留在原页；`shared/ui/token-picker.tsx` 从兑换页提升并由两页共用；三线校验 [three-line/transfer.md](product/three-line/transfer.md)（理论 先于实现 → 合约线 `scripts/verify/transfer-contract.mjs` 26/26 → 前端线 `e2e/transfer-numbers.spec.ts`）；截图 12 张 `transfer-{form,protection,receipt}-{light,dark}-{mobile,desktop}.png` |
@@ -29,7 +29,7 @@ M0 范围共 6 项（[m0-scope](product/m0-scope.md)「范围内」）。✅ 完
 | — | 发布 interface-test | 🔄 | 线上 200，但 build id `mwb9werl-379de9b0`；远端 `main`=`a217ddb`，本仓 HEAD 未发布（领先 11 个） |
 | — | M1 治理 | ⏳ | 未开工；[CI-001](contract-issues/001-no-member-round-index.md) Blocker 未解 |
 
-**未完成清单（别误读为 done）**：三处真机体验、发布到 interface-test、test/prod 地址簿填充。e2e 已隔离到独立 8555 链（§6.1）；包体 prod 158.3 / dev 159.2 kB（2026-11-12 airdropInfo 重构后实测；dev 有 1 kB 部署数据豁免，§6.2）；ABI manifest 与漂移门禁已补（§6.5）。
+**未完成清单（别误读为 done）**：三处真机体验、发布到 interface-test、test/prod 地址簿填充。e2e 已隔离到独立 8555 链（§6.1）；包体 prod 159.1 / dev 160.1 kB（2026-11-14 五个应用页合并后实测；dev 预算 161 = 160 + 1 kB 部署数据豁免，§6.2）；ABI manifest 与漂移门禁已补（§6.5）。
 
 截图共 97 张：home 7（含链不对药丸与身份读取错误卡）/ airdrop 6（含「还没到可铸造轮次」）/ mint 5 / my-nft 2 / swap 4 / about 2 / apps 1 / me 1 / transfer 15（代币转账 12：`transfer-{form,protection,receipt}-{light,dark}-{mobile,desktop}.png`；转让抽屉 3）/ tx-recovery 1 / live 1 / 主题 12（`theme-{light,dark}-{home,apps,theme}-{mobile,desktop}.png`，2026-11-14）/ 代币授权 12（`approvals-{list,confirm,custom}-{light,dark}-{mobile,desktop}.png`，2026-11-14）/ 批量转账 12（`batch-transfer-{entry-errors,review,receipt}-{light,dark}-{mobile,desktop}.png`，2026-11-14）/ 流动性池 16（`liquidity-{add,mine,withdraw,empty}-{light,dark}-{mobile,desktop}.png`，2026-11-14），见 [`product/screenshots/`](product/screenshots/)。本次核对用到的文件：`home-identity-error.png`、`home-no-identity.png`、`swap-form.png`、`mint-form.png`、`airdrop-eligible.png`、[`live/interface-test-live-2026-11-11.png`](product/screenshots/live/interface-test-live-2026-11-11.png)。
 
@@ -177,6 +177,8 @@ CI 环境规则（`.github/workflows/deploy.yml`）：取 `github.repository` �
 | [CI-012](contract-issues/012-name-homoglyph-spoofing.md) | 名称同形可伪造身份（Medium） |
 | [CI-013](contract-issues/013-member-nft-no-token-uri.md) | MemberNFT 无 `tokenURI`，钱包里是空白 NFT（Low） |
 | [GLOSSARY](../GLOSSARY.md) | 界面中文的硬约束、一词一义、易混对（写文案前必读） |
+| [delivery-2026-11-14](product/delivery-2026-11-14.md) | 本轮五页 + anvil 外围合约接入的交付索引：三线证据、门禁、人工验收路径、已知限制 |
+| [three-line-verification](product/three-line-verification.md) | 三线校验规范（理论线 → 合约线 → 前端线，理论线为基准） |
 | [README](../README.md) | 栈、命令、分层、环境注入、连接按钮、存储/错误、i18n、托管、stub 清单 |
 | [.research/protocol-contracts.md](../.research/protocol-contracts.md) | core/action/group-chat 前端可用面与合约事实清单 |
 | [.research/domain-model.md](../.research/domain-model.md) | 领域术语、Phase/Round 语义、角色与对象关系 |
