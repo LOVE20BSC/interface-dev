@@ -1,5 +1,6 @@
 {
   "tasks": {
+    "20261114-1121-8892-全局-精度显示统一-只有-18-位不显示-其他都显示": {"category": "交互整改", "created": "2026-11-14 11:21:07", "creator": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "creator_name": "tester", "finished": null, "owner": null, "owner_name": null, "started": null, "status": "open", "tags": ["全局", "精度", "代币"], "title": "全局·精度显示统一（只有 18 位不显示，其他都显示）", "updated": "2026-11-14 11:21:07", "worklog": "worklog/202611/14-1121-8892-全局-精度显示统一-只有-18-位不显示-其他都显示.md"}
   },
   "version": "20261022000000"
 }
