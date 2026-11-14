@@ -150,6 +150,8 @@ liquidity member + 付得起的 deployer」场景下低余额 bootstrap 全绿�
 - `../anvil/export/VERIFIED.md` 工作区脏是子代理在 8576 验证链上 `make verify` 产生的（报告头 `rpc=8576`）。已还原并对 8545 人工链重新 `make verify` → `ALL CHECKS PASSED`（`rpc=8545`，block 25055），anvil 仓 `fe30361` 提交。
 - **遗留待 owner 决策（结构性）**：默认 `SEED_LIQUIDITY_MEMBER_INDEX=0` 时，liquidity member 就是 deployer 自己，`_fundEth` 的 top-up 是**自转账**（净变化只有 gas），所以「均匀调低 `--balance`」下 index 0 不存在「红→绿」窗口——要支持它必须从其它种子账户盈余回补（或把默认 staker 改成非 deployer），属设计变更，不在 N-01「按语义修计算」范围内。
 
+**owner 决策（2026-11-14 18:53）：选 A —— 保持现状。** 默认 `SEED_LIQUIDITY_MEMBER_INDEX=0`（deployer 即 staker）时不做跨账户回补，也不改默认 staker；N-01 的「按语义修计算」即为最终修复。若未来要支持「均匀调低 `--balance` + index 0」场景，再走 B/C 方案（见上文）。
+
 ## Execution Log
 
 <!-- Maintained by the script: appended by new / claim / set / release / log / close. Do not edit.
