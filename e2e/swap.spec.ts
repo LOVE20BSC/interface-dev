@@ -304,6 +304,48 @@ async function waitForQuote(page: Page, symbol: string): Promise<string> {
   return (await amount.innerText()).trim();
 }
 
+/**
+ * Owner 2026-11-16: 「授权和兑换按钮应放到一起，价格卡片应放到两个按钮上面」.
+ * The information card (rate / path / min-out / slippage / fee) must end above the
+ * action group — the buttons are the last block of the page, not wrapped around
+ * the price rows.
+ */
+async function expectInfoCardAboveActions(page: Page): Promise<void> {
+  const info = page.getByTestId('swap-info');
+  const actions = page.getByTestId('swap-actions');
+  await expect(info).toBeVisible({ timeout: 20_000 });
+  await expect(actions).toBeVisible();
+  const [infoBox, actionsBox] = [await info.boundingBox(), await actions.boundingBox()];
+  expect(infoBox).not.toBeNull();
+  expect(actionsBox).not.toBeNull();
+  if (infoBox === null || actionsBox === null) return;
+  expect(infoBox.y + infoBox.height).toBeLessThanOrEqual(actionsBox.y);
+}
+
+/**
+ * 授权 and 兑换 are one group: same row (approve left / secondary, swap right /
+ * primary) and both fit the 390px mobile viewport without wrapping.
+ */
+async function expectApproveBesideSwap(page: Page): Promise<void> {
+  const approve = page.getByTestId('swap-approve');
+  const submit = page.getByTestId('swap-submit');
+  await expect(approve).toBeVisible();
+  await expect(submit).toBeVisible();
+  const [approveBox, submitBox] = [await approve.boundingBox(), await submit.boundingBox()];
+  expect(approveBox).not.toBeNull();
+  expect(submitBox).not.toBeNull();
+  if (approveBox === null || submitBox === null) return;
+  const approveMid = approveBox.y + approveBox.height / 2;
+  const submitMid = submitBox.y + submitBox.height / 2;
+  expect(Math.abs(approveMid - submitMid)).toBeLessThanOrEqual(1);
+  expect(approveBox.x + approveBox.width).toBeLessThanOrEqual(submitBox.x);
+  const viewport = page.viewportSize();
+  expect(viewport).not.toBeNull();
+  if (viewport === null) return;
+  expect(submitBox.x + submitBox.width).toBeLessThanOrEqual(viewport.width);
+  expect(approveBox.x).toBeGreaterThanOrEqual(0);
+}
+
 interface SwapLedger {
   readonly amountIn: bigint;
   readonly amountOut: bigint;
@@ -358,6 +400,18 @@ test('swap: ETH → TestLOVE20 shows path/min-out and a receipt from the pair Sw
   const quotedText = await waitForQuote(page, 'TestLOVE20');
   await expect(page.getByTestId('swap-min-out')).toContainText('TestLOVE20');
   const minOutText = (await page.getByTestId('swap-min-out').innerText()).trim();
+
+  // 价格/信息卡在按钮组上方（owner 2026-11-16）。原生币输入不需要授权：
+  // 按钮组里只有「兑换」，占满整行，没有授权按钮。
+  await expectInfoCardAboveActions(page);
+  await expect(page.getByTestId('swap-approve')).toHaveCount(0);
+  const submitBox = await page.getByTestId('swap-submit').boundingBox();
+  const actionsBox = await page.getByTestId('swap-actions').boundingBox();
+  expect(submitBox).not.toBeNull();
+  expect(actionsBox).not.toBeNull();
+  if (submitBox !== null && actionsBox !== null) {
+    expect(submitBox.width).toBeGreaterThanOrEqual(actionsBox.width - 1);
+  }
 
   await shot(page, 'swap-form.png');
 
@@ -499,16 +553,29 @@ test('swap: TestLOVE20 → ETH requires the exact approve, then settles native o
   await page.getByTestId('swap-from-amount').fill('100');
   const quotedText = await waitForQuote(page, NATIVE);
 
-  // The 授权 step sits inside the swap card, before 兑换 (owner 2026-11-14),
-  // and uses the global label `授权 {symbol}`.
+  // 授权与兑换按钮并排成一组，且都在价格/信息卡下方（owner 2026-11-16）。
+  // 授权用次要样式、兑换用主样式，390 宽下同排不换行；授权文案仍是 `授权 {symbol}`。
+  await expectInfoCardAboveActions(page);
+  await expectApproveBesideSwap(page);
   const approve = page.getByTestId('swap-approve');
-  await expect(approve).toBeVisible({ timeout: 20_000 });
   await expect(approve).toContainText('授权 TestLOVE20');
+  await expect(approve).toHaveClass(/border-line/); // secondary, not primary
+  const submit = page.getByTestId('swap-submit');
+  await expect(submit).toHaveClass(/bg-brand/); // primary
+  await expect(submit).toBeVisible();
+
+  // 截图证据（移动端 390）：把「价格卡片 + 授权/兑换并排」滚到同一屏，扣掉底部
+  // 标签栏遮挡（fixed 底栏不参与滚动，fullPage 截图会被它压住按钮）。
+  await page.getByTestId('swap-actions').scrollIntoViewIfNeeded();
+  await page.evaluate(() => window.scrollBy(0, 160));
+  await shot(page, 'swap-approve-pair.png');
+
   await approve.click();
   await expect(page.getByText('已授权', { exact: true })).toBeVisible({ timeout: 30_000 });
   // §4.1/§3.5: the approval is exactly amountIn, never infinite and never a quote.
   expect(uintOf(TOKEN, 'allowance(address,address)(uint256)', SELLER, ROUTER)).toBe(amountIn);
-  const submit = page.getByTestId('swap-submit');
+  // 授权确认后两个按钮仍在同一行（授权变只读「已授权」，兑换解锁）。
+  await expectApproveBesideSwap(page);
   await expect(submit).toBeEnabled({ timeout: 20_000 });
   await submit.click();
 

@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ADDRESSES } from '@/config/networks';
 import { BatchTransferPanel } from '@/features/batch-transfer/ui/batch-transfer-panel';
 
 /**
@@ -129,6 +130,8 @@ function renderPanel(): void {
 }
 
 beforeEach(() => {
+  // 智能资产保护 is a device preference; every test starts from the shipped default (on).
+  window.localStorage.clear();
   catalogState.value.nativeToken = {
     kind: 'native',
     address: undefined,
@@ -172,5 +175,51 @@ describe('BatchTransferPanel 精度字样', () => {
     renderPanel();
 
     expect(screen.getByTestId('batch-transfer-decimals')).toHaveTextContent('精度 6 位');
+  });
+});
+
+describe('BatchTransferPanel 智能资产保护（owner 2026-11-16）', () => {
+  const PAIR = ADDRESSES.pair as string;
+
+  function fillBatch(value: string): void {
+    fireEvent.change(screen.getByTestId('batch-transfer-input'), { target: { value } });
+  }
+
+  it('shares the same switch and default as 代币转账', () => {
+    renderPanel();
+    expect(screen.getByText('智能资产保护')).toBeVisible();
+    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+
+  it('intercepts a batch that names a known address-book contract while on', () => {
+    renderPanel();
+    fillBatch(`${PAIR} 0.1`);
+
+    const panel = screen.getByTestId('batch-transfer-known-contract');
+    expect(panel).toHaveTextContent('有收款方是已知合约地址，智能资产保护已拦截');
+    expect(panel).toHaveTextContent('第 1 行：这是「交易对」合约地址');
+    expect(screen.getByTestId('batch-transfer-submit')).toBeDisabled();
+  });
+
+  it('falls back to a warning and allows the batch once the switch is off', () => {
+    renderPanel();
+    fillBatch(`${PAIR} 0.1`);
+    expect(screen.getByTestId('batch-transfer-submit')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('asset-protection-toggle'));
+    const panel = screen.getByTestId('batch-transfer-known-contract');
+    expect(panel).toHaveTextContent('这是「交易对」合约地址');
+    expect(panel).toHaveTextContent('智能资产保护已关闭，可以继续提交。');
+    expect(screen.getByTestId('batch-transfer-submit')).toBeEnabled();
+  });
+
+  it('never blocks a batch of plain wallets', () => {
+    renderPanel();
+    fillBatch('0x70997970C51812dc3A010C7d01b50e0d17dc79C8 0.1');
+    expect(screen.queryByTestId('batch-transfer-known-contract')).toBeNull();
+    expect(screen.getByTestId('batch-transfer-submit')).toBeEnabled();
   });
 });

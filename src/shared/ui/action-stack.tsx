@@ -19,8 +19,8 @@ export interface ActionStackProps {
  *
  * This component is deliberately dumb — an in-flow vertical stack with no
  * positioning, no surface and no reserved viewport space. Callers decide where
- * the stack belongs (inside the swap card for the approval step, below the
- * details block for the submit button).
+ * the stack belongs (on the swap page it holds the 授权 + 兑换 button row below
+ * the information card; the other pages keep their own blocks).
  */
 export function ActionStack({ children, className }: ActionStackProps) {
   return <div className={cn('space-y-2', className)}>{children}</div>;

@@ -207,7 +207,9 @@ test('D3 余额读取失败：主按钮禁用并说明「余额暂时读不到�
 test('D5 余额为 0：全部禁用，不产生注定非法的 0 金额', async ({ page }) => {
   await openTransfer(page, ZERO_TOKEN_ACCOUNT);
   await selectToken(page, SYMBOL);
-  await expect(page.getByTestId('transfer-balance')).toHaveText('0', { timeout: 20_000 });
+  await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 0 ${SYMBOL}`, {
+    timeout: 20_000,
+  });
 
   await expect(page.getByTestId('transfer-max')).toBeDisabled();
   await page.getByTestId('transfer-max').click({ force: true });

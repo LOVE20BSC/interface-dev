@@ -102,7 +102,10 @@ export function SwapInfo(props: SwapInfoProps) {
   const impactHigh = priceImpactBps !== undefined && priceImpactBps > 1000;
 
   return (
-    <dl className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3">
+    <dl
+      className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3"
+      data-testid="swap-info"
+    >
       <div className="text-xs leading-5 text-foreground" data-testid="swap-rate">
         {isWrap ? (
           copy.swap.rateWrap(from.symbol, to.symbol)

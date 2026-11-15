@@ -195,6 +195,50 @@ export function writePreference(businessKey: string, value: string): boolean {
 }
 
 /**
+ * Global preferences whose exact key is carried over verbatim from the legacy
+ * library (TKM). Those keys are segmented (`love20:transfer:assetProtectionEnabled`),
+ * which the business-key grammar above deliberately forbids, so they get their own
+ * narrowly-validated reader/writer: the whole key is the storage key, not
+ * `love20:` + a business key. New preferences should use readPreference /
+ * writePreference; this pair exists only for compatibility with entries a user
+ * may already have on this device.
+ */
+const NAMED_PREFERENCE_RE = /^love20:[A-Za-z][A-Za-z0-9_]*(?::[A-Za-z][A-Za-z0-9_]*)+$/;
+
+function assertNamedPreferenceKey(key: string): void {
+  if (!NAMED_PREFERENCE_RE.test(key)) {
+    throw new Error(
+      `cache: invalid named preference key "${key}" (expected love20:<seg>[<:seg>...])`,
+    );
+  }
+}
+
+/** Reads a named (legacy-key) global preference verbatim; null when absent/unavailable. */
+export function readNamedPreference(fullKey: string): string | null {
+  assertNamedPreferenceKey(fullKey);
+  const store = storage();
+  if (store === null) return null;
+  try {
+    return store.getItem(fullKey);
+  } catch {
+    return null;
+  }
+}
+
+/** Writes a named (legacy-key) global preference verbatim; false when unavailable/full. */
+export function writeNamedPreference(fullKey: string, value: string): boolean {
+  assertNamedPreferenceKey(fullKey);
+  const store = storage();
+  if (store === null) return false;
+  try {
+    store.setItem(fullKey, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * One-shot session flags (e.g. "already reloaded after vite:preloadError").
  * They are deliberately outside the chain/wallet namespace: they describe this
  * browser tab, not a chain-scoped user preference.

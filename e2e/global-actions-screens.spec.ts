@@ -60,13 +60,42 @@ test.describe('全局动作按钮与回执整改截图', () => {
       for (const theme of THEMES) {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
-        // 兑换：ERC20 输入 → 卡内出现 授权 {symbol}，兑换按钮在其后。
+        // 兑换：ERC20 输入 → 价格卡片在上、授权与兑换按钮并排成一组（owner 2026-11-16）。
         await open(page, `/swap${QUERY}&from=${SYMBOL}&to=ETH`, theme);
         await expect(page.getByTestId('swap-from-token')).toContainText(SYMBOL, {
           timeout: 20_000,
         });
         await page.getByTestId('swap-from-amount').fill('100');
-        await expect(page.getByTestId('swap-approve-step')).toBeVisible({ timeout: 20_000 });
+        const approve = page.getByTestId('swap-approve');
+        await expect(approve).toBeVisible({ timeout: 20_000 });
+        await expect(approve).toContainText(`授权 ${SYMBOL}`);
+        await expect(page.getByTestId('swap-submit')).toBeVisible();
+        // 同一行：授权在左、兑换在右，价格卡片在两者上方。
+        const [approveBox, submitBox] = [
+          await approve.boundingBox(),
+          await page.getByTestId('swap-submit').boundingBox(),
+        ];
+        const infoBox = await page.getByTestId('swap-info').boundingBox();
+        expect(approveBox).not.toBeNull();
+        expect(submitBox).not.toBeNull();
+        expect(infoBox).not.toBeNull();
+        if (approveBox !== null && submitBox !== null && infoBox !== null) {
+          expect(
+            Math.abs(approveBox.y + approveBox.height / 2 - (submitBox.y + submitBox.height / 2)),
+          ).toBeLessThanOrEqual(1);
+          expect(approveBox.x + approveBox.width).toBeLessThanOrEqual(submitBox.x);
+          expect(infoBox.y + infoBox.height).toBeLessThanOrEqual(approveBox.y);
+          expect(submitBox.x + submitBox.width).toBeLessThanOrEqual(viewport.width);
+        }
+        // 让「价格卡片 + 授权/兑换并排」同时进画面。移动端按钮在首屏折叠线以下，
+        // 且 fixed 底部标签栏会压住它，所以滚到按钮组并多滚一点；桌面没有底栏，
+        // 回到页顶就能同时看到整张卡与按钮组，不切掉页头与「从」行。
+        if (viewport.width < 768) {
+          await page.getByTestId('swap-actions').scrollIntoViewIfNeeded();
+          await page.evaluate(() => window.scrollBy(0, 160));
+        } else {
+          await page.evaluate(() => window.scrollTo(0, 0));
+        }
         await shot(page, 'swap', theme, viewport.name);
 
         // 铸造：先授权按钮、后铸造主按钮，都在内容流里。

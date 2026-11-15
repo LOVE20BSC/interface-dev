@@ -63,7 +63,7 @@ describe('RpcBlockedNotice', () => {
 
   it('dismisses immediately and stays hidden for the rest of the session', () => {
     const first = renderNotice(HTTPS_ORIGIN, LOOPBACK_RPC);
-    fireEvent.click(screen.getByRole('button', { name: '知道了' }));
+    fireEvent.click(screen.getByRole('button', { name: '好的' }));
     expect(screen.queryByTestId('rpc-blocked-notice')).toBeNull();
     first.unmount();
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useBytecode } from 'wagmi';
 import { AlertTriangle } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy-pages';
 import {
@@ -6,6 +7,12 @@ import {
   identityInputReadingText,
   type IdentityInputMode,
 } from '@/shared/lib/identity-input';
+import { useAssetProtection } from '@/shared/lib/use-asset-protection';
+import {
+  decideRecipientProtection,
+  knownContractLabel,
+} from '@/shared/lib/recipient-protection';
+import { AssetProtectionSwitch } from '@/shared/ui/asset-protection-switch';
 import { Button } from '@/shared/ui/button';
 import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { IdentityRecipientField } from '@/shared/ui/identity-input-mode';
@@ -126,14 +133,46 @@ export function TransferForm({
     nameRecipient.name !== null &&
     nameRecipient.address !== null;
 
-  const canSubmit = canSubmitTransfer({
-    mode,
-    busy,
-    addressValid: validation === 'ok',
-    memberResolved: member.status === 'ok',
-    nameResolved,
-    nameAcknowledged,
+  // The recipient address this mode would actually transfer to — the input for
+  // 按地址, the resolved owner for the two identity modes. 智能资产保护 reads the
+  // bytecode of exactly that address (never of the NFT contract).
+  const resolvedRecipient =
+    mode === 'member' && member.status === 'ok' && member.address !== null ? member.address : null;
+  const protectionRecipient: `0x${string}` | undefined =
+    mode === 'address'
+      ? validation === 'ok'
+        ? (recipient.trim() as `0x${string}`)
+        : undefined
+      : mode === 'member'
+        ? (resolvedRecipient ?? undefined)
+        : nameResolved && nameRecipient.address !== null
+          ? nameRecipient.address
+          : undefined;
+  const bytecode = useBytecode({
+    address: protectionRecipient,
+    query: { enabled: protectionRecipient !== undefined },
   });
+  const hasBytecode = bytecode.data == null ? undefined : bytecode.data !== '0x';
+  const protection = decideRecipientProtection(protectionRecipient ?? '', hasBytecode);
+  const protectionLabel =
+    protection.kind === 'known' ? knownContractLabel(protection.labelKey) : undefined;
+  const assetProtection = useAssetProtection();
+  // Owner 2026-11-16: ON intercepts a known address-book contract outright; OFF
+  // keeps the address/amount/self validation but no longer blocks. Any other
+  // contract only warns in both states.
+  const knownBlocked = protection.kind === 'known' && assetProtection.enabled;
+  const knownWarnOnly = protection.kind === 'known' && !assetProtection.enabled;
+
+  const canSubmit =
+    !knownBlocked &&
+    canSubmitTransfer({
+      mode,
+      busy,
+      addressValid: validation === 'ok',
+      memberResolved: member.status === 'ok',
+      nameResolved,
+      nameAcknowledged,
+    });
   const invalid =
     mode === 'address'
       ? addressMessage !== null
@@ -154,9 +193,6 @@ export function TransferForm({
     setRecipient('');
     resetNameAcknowledgement();
   };
-
-  const resolvedRecipient =
-    mode === 'member' && member.status === 'ok' && member.address !== null ? member.address : null;
 
   const showNameConfirmation =
     nameResolved &&
@@ -269,6 +305,52 @@ export function TransferForm({
           checkboxTestId="transfer-name-ack"
         />
       ) : null}
+
+      {knownBlocked && protectionLabel !== undefined ? (
+        <div
+          role="alert"
+          data-testid="transfer-identity-protection"
+          className="space-y-1.5 rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
+        >
+          <p className="flex items-start gap-1.5 text-sm font-semibold text-warning">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            {copy.assetProtection.blockedTitle(protectionLabel)}
+          </p>
+          <p className="text-foreground/80">{copy.assetProtection.blockedBody}</p>
+        </div>
+      ) : null}
+
+      {knownWarnOnly && protectionLabel !== undefined ? (
+        <div
+          role="status"
+          data-testid="transfer-identity-protection"
+          className="space-y-1 rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
+        >
+          <p className="flex items-start gap-1.5 font-semibold text-warning">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            {copy.assetProtection.knownTitle(protectionLabel)}
+          </p>
+          <p className="text-foreground/80">{copy.assetProtection.knownBody}</p>
+          <p className="text-muted">{copy.assetProtection.offSubmitNote}</p>
+        </div>
+      ) : null}
+
+      {protection.kind === 'contract' ? (
+        <div
+          role="status"
+          data-testid="transfer-identity-contract-warning"
+          className="space-y-1 rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
+        >
+          <p className="flex items-start gap-1.5 font-semibold text-warning">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            {copy.assetProtection.contractTitle}
+          </p>
+          <p className="text-foreground/80">{copy.assetProtection.contractBody}</p>
+        </div>
+      ) : null}
+
+      {/* 智能资产保护：与代币转账、批量转账共用同一个偏好与组件 */}
+      <AssetProtectionSwitch disabled={busy} />
 
       {phase === 'error' && errorMessage !== null ? (
         <p className="rounded-2xl border border-danger/20 bg-danger-soft/60 px-3 py-2 text-xs leading-5 text-danger-strong">

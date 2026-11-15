@@ -87,7 +87,8 @@ function StateCard({
 }
 
 /**
- * 通用兑换 (UX spec §3.5). One card, one information block, one primary action.
+ * 通用兑换 (UX spec §3.5). 兑换卡 → 信息块（价格/路径/最少到账）→ 动作组
+ * （授权 + 兑换并排，或单个兑换）。
  * All reads are scoped to the selected pair; when the environment has no router
  * or the wallet is disconnected this component renders a single state card and
  * issues no quote/route request.
@@ -452,9 +453,10 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     void handlePrimary();
   };
 
-  // 授权步骤 sits inside the swap card, right below the amount rows, so the
-  // prerequisite reads before 兑换 (owner 2026-11-14). It stays visible when the
-  // token is already approved — long-term approvals say so instead of hiding.
+  // 授权步骤 lives in the action group below the information card, side by side
+  // with 兑换 (owner 2026-11-16: 「授权和兑换按钮应放到一起，价格卡片应放到两个
+  // 按钮上面」). It stays visible when the token is already approved — long-term
+  // approvals say so instead of hiding.
   const showApproveStep =
     from !== undefined &&
     from.kind !== 'native' &&
@@ -927,33 +929,6 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
           ) : null}
         </div>
 
-        {showApproveStep ? (
-          <div className="mt-3 border-t border-line pt-3" data-testid="swap-approve-step">
-            <Button
-              variant={needsApproval ? 'primary' : 'secondary'}
-              size="lg"
-              className="w-full"
-              data-testid="swap-approve"
-              onClick={() => {
-                if (amountIn !== undefined) tx.approve(amountIn);
-              }}
-              disabled={!needsApproval || !canApprove || tx.approveStage !== 'idle'}
-              loading={tx.approveStage === 'wallet'}
-            >
-              {approveLabel}
-            </Button>
-            {approveNote !== null ? (
-              <p className="mt-1.5 text-xs leading-5 text-muted" data-testid="swap-approve-note">
-                {approveNote}
-              </p>
-            ) : null}
-            {needsApproval && tx.isApproved ? (
-              <p className="mt-1 text-xs leading-5 text-warning">
-                {copy.swap.ladder.approvalShort}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
       </div>
 
       {route !== null ? (
@@ -1058,19 +1033,51 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
 
       <section aria-label={copy.pages.swap.title} className="space-y-2">
         <ActionStack>
-          <Button
-            variant="primary"
-            size="lg"
-            className="w-full"
-            data-testid="swap-submit"
-            onClick={() => {
-              void handlePrimary();
-            }}
-            disabled={!canSwap || needsApproval || isPreparing || tx.swapStage !== 'idle'}
-            loading={tx.swapStage === 'wallet' || isPreparing}
+          {/* Owner 2026-11-16: 授权与兑换是同一组动作，并排放在信息块下方。
+              授权是次要样式（前提步骤），兑换是主样式（最终动作）。
+              不需要授权时（原生币输入 / 包装解包）只剩一个占满宽度的兑换按钮。 */}
+          <div
+            className={cn('flex items-stretch', showApproveStep ? 'gap-2' : 'flex-col')}
+            data-testid="swap-actions"
           >
-            {isPreparing ? copy.swap.quoteRefreshing : swapLabel}
-          </Button>
+            {showApproveStep ? (
+              <Button
+                variant="secondary"
+                size="lg"
+                className="min-w-0 flex-1 px-3 whitespace-nowrap"
+                data-testid="swap-approve"
+                onClick={() => {
+                  if (amountIn !== undefined) tx.approve(amountIn);
+                }}
+                disabled={!needsApproval || !canApprove || tx.approveStage !== 'idle'}
+                loading={tx.approveStage === 'wallet'}
+              >
+                {approveLabel}
+              </Button>
+            ) : null}
+            <Button
+              variant="primary"
+              size="lg"
+              className={showApproveStep ? 'min-w-0 flex-1 px-3 whitespace-nowrap' : 'w-full'}
+              data-testid="swap-submit"
+              onClick={() => {
+                void handlePrimary();
+              }}
+              disabled={!canSwap || needsApproval || isPreparing || tx.swapStage !== 'idle'}
+              loading={tx.swapStage === 'wallet' || isPreparing}
+            >
+              {isPreparing ? copy.swap.quoteRefreshing : swapLabel}
+            </Button>
+          </div>
+
+          {showApproveStep && approveNote !== null ? (
+            <p className="text-xs leading-5 text-muted" data-testid="swap-approve-note">
+              {approveNote}
+            </p>
+          ) : null}
+          {showApproveStep && needsApproval && tx.isApproved ? (
+            <p className="text-xs leading-5 text-warning">{copy.swap.ladder.approvalShort}</p>
+          ) : null}
         </ActionStack>
 
         {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}

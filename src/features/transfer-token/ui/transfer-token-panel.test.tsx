@@ -163,6 +163,8 @@ function fillRecipient(value: string): void {
 }
 
 beforeEach(() => {
+  // 智能资产保护 is a device preference; every test starts from the shipped default (on).
+  window.localStorage.clear();
   identityState.value = {
     status: 'idle',
     memberId: null,
@@ -194,32 +196,41 @@ beforeEach(() => {
   submitMock.mockClear();
 });
 
-describe('TransferTokenPanel 布局与余额', () => {
-  it('renders the bare balance first, with no symbol, no 「余额」 and no precision at 18', () => {
+describe('TransferTokenPanel 布局与余额（owner 2026-11-16 布局）', () => {
+  it('puts the balance under the amount as small muted text, not above it', () => {
     renderPanel();
-    // Owner 2026-11-14: 左上角不写「代币」，第一行直接是余额数字。
+    // The first line of the amount block is 转账金额 + the amount input; the
+    // balance is a small muted line *below* the amount row, with a symbol.
     expect(screen.queryByText('代币')).toBeNull();
-    expect(screen.getByTestId('transfer-balance')).toHaveTextContent(/^10,000$/);
-    expect(screen.queryByText(/余额/)).toBeNull();
+    const amount = screen.getByTestId('transfer-amount');
+    const balance = screen.getByTestId('transfer-balance');
+    expect(
+      amount.compareDocumentPosition(balance) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(balance).toHaveTextContent('余额 10,000 ETH');
+    expect(balance.className).toContain('text-muted');
     expect(screen.queryByText(/精度/)).toBeNull();
   });
 
   it('writes the precision only when it is not the 18-digit default', () => {
     catalogState.decimals = 20;
     renderPanel();
-    expect(screen.getByTestId('transfer-balance')).toHaveTextContent(/^100$/);
+    expect(screen.getByTestId('transfer-balance')).toHaveTextContent('余额 100 ETH');
     expect(screen.getByTestId('transfer-decimals')).toHaveTextContent('精度 20 位');
   });
 
-  it('puts the recipient before the token amount in the card', () => {
+  it('puts the token picker on the amount row, after the input', () => {
     renderPanel();
     const recipient = screen.getByTestId('transfer-recipient');
     const amount = screen.getByTestId('transfer-amount');
     expect(
       recipient.compareDocumentPosition(amount) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    // The selected token trigger sits on the right of the balance line.
-    expect(screen.getByTestId('transfer-token')).toBeVisible();
+    // The selected token trigger is the amount row's right-hand control.
+    expect(
+      amount.compareDocumentPosition(screen.getByTestId('transfer-token')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.getByTestId('transfer-recipient-mode')).toHaveTextContent('按地址');
   });
 });
@@ -237,6 +248,8 @@ describe('TransferTokenPanel 按地址', () => {
     // A plain wallet must never show the contract-recipient warning.
     expect(screen.queryByTestId('transfer-contract-warning')).toBeNull();
     expect(screen.queryByTestId('transfer-protection')).toBeNull();
+    // …but the shared protection switch is always available on the card.
+    expect(screen.getByTestId('asset-protection')).toBeVisible();
 
     fillAmount('0');
     expect(screen.getByTestId('transfer-amount-error')).toHaveTextContent('金额必须大于 0');
@@ -248,17 +261,41 @@ describe('TransferTokenPanel 按地址', () => {
     expect(submitButton()).toBeDisabled();
   });
 
-  it('blocks a known address-book contract behind an explicit acknowledgement', () => {
+  it('intercepts a known address-book contract while 智能资产保护 is on (default)', () => {
     renderPanel();
     fillAmount('0.1');
     fillRecipient(PAIR);
 
+    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
     expect(screen.getByTestId('transfer-protection')).toBeVisible();
+    expect(screen.getByText('智能资产保护已拦截：这是「交易对」合约地址')).toBeVisible();
+    // The interception offers no page-level checkbox: the only way forward is the
+    // shared switch (the explicit way to force the transfer).
+    expect(screen.queryByTestId('transfer-known-ack')).toBeNull();
+    expect(submitButton()).toBeDisabled();
+  });
+
+  it('keeps the known-contract acknowledgement once 智能资产保护 is turned off', () => {
+    renderPanel();
+    fillAmount('0.1');
+    fillRecipient(PAIR);
+
+    fireEvent.click(screen.getByTestId('asset-protection-toggle'));
+    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
     expect(screen.getByText('这是「交易对」合约地址')).toBeVisible();
     expect(submitButton()).toBeDisabled();
 
     fireEvent.click(screen.getByTestId('transfer-known-ack'));
     expect(submitButton()).toBeEnabled();
+    // Turning protection back on re-blocks the same recipient, even when ticked.
+    fireEvent.click(screen.getByTestId('asset-protection-toggle'));
+    expect(submitButton()).toBeDisabled();
   });
 
   it('shows the insufficient-balance reason with the exact shortfall', () => {

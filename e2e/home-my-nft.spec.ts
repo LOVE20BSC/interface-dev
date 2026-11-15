@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { isolateChain } from './chain';
@@ -31,6 +31,13 @@ import {
  */
 
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
+
+// 地址簿已知合约（交易对）：转让抽屉的 智能资产保护 拦截对象。
+const PAIR = (
+  JSON.parse(
+    readFileSync(resolve(process.cwd(), 'src/config/deployments/anvil31337_dev.json'), 'utf8'),
+  ) as { addresses: { pair: string } }
+).addresses.pair;
 
 test.use({
   permissions: ['clipboard-read', 'clipboard-write'],
@@ -86,6 +93,26 @@ test('home: disconnected shows the greeting, connect entry and wordmark', async 
   await expect(page).toHaveTitle('TestLOVE20');
 
   await shot(page, 'home-disconnected.png');
+});
+
+test('home: no injected wallet opens the no-wallet sheet, closed with 好的', async ({ page }) => {
+  // No installWallet(): the page must offer the fallback sheet instead of a dead
+  // connect button (UX spec §4.6), and its close button follows the global
+  // 「好的」copy (owner 2026-11-16).
+  await page.goto('/');
+
+  const connect = page.getByRole('button', { name: '连接钱包' }).first();
+  await expect(connect).toBeEnabled({ timeout: 15_000 });
+  await connect.click();
+
+  const sheet = page.getByRole('dialog', { name: '没有检测到钱包' });
+  await expect(sheet).toBeVisible({ timeout: 15_000 });
+  await expect(sheet.getByRole('button', { name: '复制本页链接' })).toBeVisible();
+  await expect(sheet.getByRole('button', { name: '好的' })).toBeVisible();
+  await shot(page, 'wallet-no-wallet.png');
+
+  await sheet.getByRole('button', { name: '好的' }).click();
+  await expect(sheet).toHaveCount(0);
 });
 
 test('home: wrong chain shows the red outlined switch pill, not a solid fill', async ({ page }) => {
@@ -377,6 +404,40 @@ test('my-nft: transfer drawer warns and rejects the current wallet', async ({ pa
   await page.getByPlaceholder('0x 开头的 40 位地址').fill(ACCOUNTS.withIdentity);
   await expect(page.getByText('不能转让给自己。')).toBeVisible();
   await expect(page.getByRole('button', { name: '确认转让' })).toBeDisabled();
+  await page.getByRole('button', { name: '取消' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('my-nft: 智能资产保护 与代币转账共享，已知合约被拦截', async ({ page }) => {
+  await installWallet(page, ACCOUNTS.withIdentity);
+  await seedIdentity(page, ACCOUNTS.withIdentity, '1');
+  await page.goto('/my-nft');
+  await connect(page);
+
+  await page.getByRole('button', { name: '转让' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  // 默认开启，与 /transfer 同一个偏好。
+  await expect(dialog.getByTestId('asset-protection-toggle')).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+
+  const input = page.getByTestId('transfer-recipient-input');
+  await input.fill(PAIR);
+  await expect(page.getByTestId('transfer-identity-protection')).toContainText(
+    '智能资产保护已拦截：这是「交易对」合约地址',
+  );
+  await expect(page.getByRole('button', { name: '确认转让' })).toBeDisabled();
+  await shot(page, 'transfer-drawer-protection.png');
+
+  // 关闭开关：只警告，转让恢复可用（按地址的基础校验仍在）。
+  await dialog.getByTestId('asset-protection-toggle').click();
+  await expect(page.getByTestId('transfer-identity-protection')).toContainText(
+    '智能资产保护已关闭，可以继续提交。',
+  );
+  await expect(page.getByRole('button', { name: '确认转让' })).toBeEnabled();
+
   await page.getByRole('button', { name: '取消' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });

@@ -107,7 +107,8 @@ export const copy = {
     noWalletStepInApp: '在手机钱包 App 的内置浏览器中打开本页；已经在内置浏览器里，关掉再打开。',
     noWalletStepInstall: '在电脑浏览器安装钱包扩展后刷新。',
     noWalletCopyLink: '复制本页链接',
-    noWalletDismiss: '知道了',
+    /** owner 2026-11-16: 全局关闭按钮统一「好的」，旧文案已退役。 */
+    noWalletDismiss: '好的',
     connectErrorTitle: '连接没有完成',
     networkErrorTitle: '网络切换没有完成',
     networkErrorClose: '关闭',
@@ -224,7 +225,7 @@ export const copy = {
     rpcBlockedTitle: '线上页面不能访问本地链',
     rpcBlockedBody:
       '浏览器会拦截 HTTPS 页面对本地链（127.0.0.1）的请求。请用本地开发服务打开（pnpm dev，如 http://localhost:5180），或换成可访问的链。',
-    rpcBlockedDismiss: '知道了',
+    rpcBlockedDismiss: '好的',
     buildMismatchTitle: '有新版本，请刷新',
     buildMismatchBody: '当前输入会丢失。',
     buildMismatchAction: '刷新页面',

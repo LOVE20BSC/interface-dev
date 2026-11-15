@@ -15,22 +15,24 @@ import {
 } from '@/shared/lib/identity-input';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
+import { AssetProtectionSwitch } from '@/shared/ui/asset-protection-switch';
 import { IdentityRecipientField } from '@/shared/ui/identity-input-mode';
 import { IdentityRecipientCard } from '@/shared/ui/identity-recipient-card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { ActionStack } from '@/shared/ui/action-stack';
 import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shared/ui/token-picker';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { useAssetProtection } from '@/shared/lib/use-asset-protection';
+import {
+  decideRecipientProtection,
+  knownContractLabel,
+} from '@/shared/lib/recipient-protection';
 import {
   maxTransferAmount,
   parseTransferAmount,
   spendableTransferBalance,
 } from '@/features/transfer-token/lib/transfer-amount';
-import {
-  checkTransferRecipient,
-  decideRecipientProtection,
-  knownContractLabel,
-} from '@/features/transfer-token/lib/transfer-recipient';
+import { checkTransferRecipient } from '@/features/transfer-token/lib/transfer-recipient';
 import {
   transferAmountText,
   type TransferRecord,
@@ -85,14 +87,17 @@ function StateCard({
 }
 
 /**
- * 代币转账 (owner 2026-11-14 layout). One card, 收款方 first, then the token
- * amount block: its first line is the bare balance number (no 「代币」 heading, no
- * symbol, no 「余额」) with the token picker on the right; precision only appears
+ * 代币转账 (owner 2026-11-14 layout, updated owner 2026-11-16). One card, 收款方
+ * first, then the token amount block: the amount input owns the row with the token
+ * picker (a pill) on its right, and the balance moves *below* the amount as small
+ * muted text — no longer the card's first, loudest line. Precision only appears
  * when it is not the 18-digit default. ERC20 goes straight to `transfer` (no
- * approval ladder), the native coin is a plain value transfer. Recipient
- * protection is visible before submit: an address-book contract must be
- * acknowledged, any other contract only warns. Success is an in-page receipt
- * that collapses to a strip on 「好的」.
+ * approval ladder), the native coin is a plain value transfer.
+ *
+ * Recipient protection is shared with the other transfer surfaces: 智能资产保护 is
+ * ON by default, a known address-book contract is intercepted while it is on, and
+ * the page requires an explicit acknowledgement once it is off. Any other contract
+ * only warns. Success is an in-page receipt that collapses to a strip on 「好的」.
  */
 export function TransferTokenPanel({
   isConnected,
@@ -103,6 +108,7 @@ export function TransferTokenPanel({
   const { address: account } = useAccount();
   const memberNftAddress = configuredAddress('memberNFT');
   const catalog = useTransferCatalog();
+  const assetProtection = useAssetProtection();
 
   const [selectedToken, setSelectedToken] = useState<TransferToken | undefined>(undefined);
   const [amountInput, setAmountInput] = useState('');
@@ -162,6 +168,11 @@ export function TransferTokenPanel({
   const protection = decideRecipientProtection(recipientAddress ?? '', hasBytecode);
   const protectionLabel =
     protection.kind === 'known' ? knownContractLabel(protection.labelKey) : undefined;
+  // 智能资产保护 (owner 2026-11-16): ON intercepts a known address-book contract
+  // outright; OFF keeps the existing explicit acknowledgement as the last gate.
+  // An arbitrary contract only ever warns, in both states.
+  const knownBlocked = protection.kind === 'known' && assetProtection.enabled;
+  const knownNeedsAck = protection.kind === 'known' && !assetProtection.enabled;
 
   const tx = useTransferTransaction(() => {
     balance.refetch();
@@ -211,8 +222,8 @@ export function TransferTokenPanel({
     parsed.kind === 'ok' &&
     !insufficient &&
     (mode === 'address'
-      ? addressCheck === 'ok' && (protection.kind !== 'known' || knownAck)
-      : identityReady && identityAck);
+      ? addressCheck === 'ok' && !knownBlocked && (!knownNeedsAck || knownAck)
+      : identityReady && identityAck && !knownBlocked);
 
   const addressInvalid = addressCheck !== 'ok' && addressCheck !== 'empty';
   const identityInvalid =
@@ -530,7 +541,21 @@ export function TransferTokenPanel({
             />
           ) : null}
 
-          {protection.kind === 'known' && protectionLabel !== undefined ? (
+          {knownBlocked && protectionLabel !== undefined ? (
+            <div
+              data-testid="transfer-protection"
+              role="alert"
+              className="mt-2 space-y-1.5 rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
+            >
+              <p className="flex items-start gap-1.5 text-sm font-semibold text-warning">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                {copy.assetProtection.blockedTitle(protectionLabel)}
+              </p>
+              <p className="text-foreground/80">{copy.assetProtection.blockedBody}</p>
+            </div>
+          ) : null}
+
+          {knownNeedsAck && protectionLabel !== undefined ? (
             <div
               data-testid="transfer-protection"
               role="alert"
@@ -538,9 +563,9 @@ export function TransferTokenPanel({
             >
               <p className="flex items-start gap-1.5 text-sm font-semibold text-warning">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                {copy.transfer.knownContractTitle(protectionLabel)}
+                {copy.assetProtection.knownTitle(protectionLabel)}
               </p>
-              <p className="text-foreground/80">{copy.transfer.knownContractBody}</p>
+              <p className="text-foreground/80">{copy.assetProtection.knownBody}</p>
               <label className="flex items-start gap-2 rounded-xl bg-surface/80 p-2 font-medium text-foreground">
                 <input
                   type="checkbox"
@@ -549,7 +574,7 @@ export function TransferTokenPanel({
                   onChange={(event) => setKnownAck(event.target.checked)}
                   className="mt-0.5 h-4 w-4 shrink-0 rounded border-line accent-brand"
                 />
-                <span>{copy.transfer.knownContractCheckbox(protectionLabel)}</span>
+                <span>{copy.assetProtection.knownCheckbox(protectionLabel)}</span>
               </label>
             </div>
           ) : null}
@@ -562,43 +587,42 @@ export function TransferTokenPanel({
             >
               <p className="flex items-start gap-1.5 font-semibold text-warning">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                {copy.transfer.contractTitle}
+                {copy.assetProtection.contractTitle}
               </p>
-              <p className="mt-1 text-foreground/80">{copy.transfer.contractBody}</p>
+              <p className="mt-1 text-foreground/80">{copy.assetProtection.contractBody}</p>
             </div>
           ) : null}
+
+          {/* 智能资产保护：与转让抽屉、批量转账共用同一个偏好与组件 */}
+          <AssetProtectionSwitch className="mt-3" disabled={busy} />
         </div>
 
-        {/* ② 代币数量：第一行是余额（不带 symbol / 不带「余额」二字），右侧是代币下拉 */}
+        {/* ② 代币数量（owner 2026-11-16 布局）：金额输入框独占一行、右侧是当前代币
+            下拉；余额缩到金额下方的小号 muted 文字，不再占卡片第一行的醒目位。 */}
         <div className="mt-5 border-t border-line pt-4">
-          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
-            <div
-              className="min-w-0"
-              role="group"
-              aria-label={copy.transfer.balanceLabel(token.symbol)}
-            >
-              <p
-                className="text-xl font-semibold leading-7 tracking-tight text-foreground tabular-nums sm:text-2xl"
-                data-testid="transfer-balance"
-              >
-                {balanceText === null ? (
-                  <>
-                    <span className="sr-only">{copy.transfer.balanceLoading}</span>
-                    <Skeleton className="h-6 w-32" />
-                  </>
-                ) : (
-                  balanceText
-                )}
-              </p>
-              {shouldShowPrecision(token.decimals) ? (
-                <p
-                  className="mt-0.5 text-[11px] leading-4 text-muted"
-                  data-testid="transfer-decimals"
-                >
-                  {copy.transfer.decimalsLabel(token.decimals.toString())}
-                </p>
-              ) : null}
-            </div>
+          <label htmlFor="transfer-amount" className="text-xs font-medium text-muted">
+            {copy.transfer.amountLabel}
+          </label>
+          <div className="mt-1 flex items-center gap-2">
+            <input
+              id="transfer-amount"
+              data-testid="transfer-amount"
+              name="transfer-amount"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              spellCheck={false}
+              value={amountInput}
+              onChange={(event) => {
+                setAmountInput(event.target.value);
+                setUsedNativeMax(false);
+                tx.clearError();
+              }}
+              placeholder={copy.transfer.amountPlaceholder}
+              aria-label={copy.transfer.amountLabel}
+              disabled={busy}
+              className="h-12 min-w-0 flex-1 bg-transparent text-3xl font-semibold tracking-tight text-foreground outline-none placeholder:text-muted disabled:opacity-60"
+            />
             <TokenPicker
               optionTestIdPrefix="transfer"
               triggerTestId="transfer-token"
@@ -629,6 +653,7 @@ export function TransferTokenPanel({
               onLoadMore={catalog.loadMore}
               isLoading={catalog.isLoading}
               disabled={busy}
+              triggerClassName="shrink-0"
               extraContent={
                 <div className="mt-3 space-y-1.5 border-t border-line pt-3">
                   <p className="px-1 text-[11px] font-medium text-muted">
@@ -680,77 +705,77 @@ export function TransferTokenPanel({
             />
           </div>
 
-          <div className="mt-3">
-            <label htmlFor="transfer-amount" className="text-xs font-medium text-muted">
-              {copy.transfer.amountLabel}
-            </label>
-            <input
-              id="transfer-amount"
-              data-testid="transfer-amount"
-              name="transfer-amount"
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              spellCheck={false}
-              value={amountInput}
-              onChange={(event) => {
-                setAmountInput(event.target.value);
-                setUsedNativeMax(false);
-                tx.clearError();
-              }}
-              placeholder={copy.transfer.amountPlaceholder}
-              aria-label={copy.transfer.amountLabel}
-              disabled={busy}
-              className="mt-1 h-12 w-full bg-transparent text-3xl font-semibold tracking-tight text-foreground outline-none placeholder:text-muted"
-            />
-            <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[11px] leading-4 text-muted">
-                {parsed.kind === 'ok' && parsed.truncated
-                  ? copy.transfer.amountTruncated(token.decimals)
-                  : null}
-              </span>
-              <button
-                type="button"
-                data-testid="transfer-max"
-                onClick={() => {
-                  // D5: a zero spendable balance would only produce the invalid
-                  // 「金额必须大于 0。」 state, so 全部 does nothing there.
-                  if (balance.balance === undefined || spendable === undefined || spendable === 0n)
-                    return;
-                  setAmountInput(
-                    formatUnits(maxTransferAmount(balance.balance, native), token.decimals),
-                  );
-                  setUsedNativeMax(native);
-                  tx.clearError();
-                }}
-                disabled={busy || spendable === undefined || spendable === 0n}
-                className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft disabled:opacity-50"
-              >
-                {copy.transfer.max}
-              </button>
-            </div>
-            {amountError !== null ? (
-              <p
-                className="mt-1.5 text-xs leading-5 text-danger-strong"
-                data-testid="transfer-amount-error"
-              >
-                {amountError}
-              </p>
-            ) : null}
-            {native && usedNativeMax ? (
-              <p className="mt-1 text-[11px] leading-4 text-muted">
-                {copy.transfer.maxNativeNote(
-                  formatTokenAmount(NATIVE_FEE_RESERVE_WEI, token.decimals),
-                  token.symbol,
-                )}
-              </p>
-            ) : null}
-            {native && insufficient ? (
-              <p className="mt-1 text-[11px] leading-4 text-muted">
-                {copy.transfer.nativeGasNote(token.symbol)}
+          <div
+            className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1"
+            role="group"
+            aria-label={copy.transfer.balanceLabel(token.symbol)}
+          >
+            <p className="text-xs leading-5 text-muted tabular-nums" data-testid="transfer-balance">
+              {balanceText === null ? (
+                <>
+                  <span className="sr-only">{copy.transfer.balanceLoading}</span>
+                  <Skeleton className="h-3.5 w-24" />
+                </>
+              ) : balance.isError ? (
+                balanceText
+              ) : (
+                copy.transfer.balanceInline(balanceText, token.symbol)
+              )}
+            </p>
+            {shouldShowPrecision(token.decimals) ? (
+              <p className="text-[11px] leading-4 text-muted" data-testid="transfer-decimals">
+                {copy.transfer.decimalsLabel(token.decimals.toString())}
               </p>
             ) : null}
           </div>
+
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[11px] leading-4 text-muted">
+              {parsed.kind === 'ok' && parsed.truncated
+                ? copy.transfer.amountTruncated(token.decimals)
+                : null}
+            </span>
+            <button
+              type="button"
+              data-testid="transfer-max"
+              onClick={() => {
+                // D5: a zero spendable balance would only produce the invalid
+                // 「金额必须大于 0。」 state, so 全部 does nothing there.
+                if (balance.balance === undefined || spendable === undefined || spendable === 0n)
+                  return;
+                setAmountInput(
+                  formatUnits(maxTransferAmount(balance.balance, native), token.decimals),
+                );
+                setUsedNativeMax(native);
+                tx.clearError();
+              }}
+              disabled={busy || spendable === undefined || spendable === 0n}
+              className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft disabled:opacity-50"
+            >
+              {copy.transfer.max}
+            </button>
+          </div>
+          {amountError !== null ? (
+            <p
+              className="mt-1.5 text-xs leading-5 text-danger-strong"
+              data-testid="transfer-amount-error"
+            >
+              {amountError}
+            </p>
+          ) : null}
+          {native && usedNativeMax ? (
+            <p className="mt-1 text-[11px] leading-4 text-muted">
+              {copy.transfer.maxNativeNote(
+                formatTokenAmount(NATIVE_FEE_RESERVE_WEI, token.decimals),
+                token.symbol,
+              )}
+            </p>
+          ) : null}
+          {native && insufficient ? (
+            <p className="mt-1 text-[11px] leading-4 text-muted">
+              {copy.transfer.nativeGasNote(token.symbol)}
+            </p>
+          ) : null}
         </div>
       </div>
 

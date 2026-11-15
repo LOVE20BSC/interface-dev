@@ -525,6 +525,8 @@ export const copy = {
     customUnreadable: '读不到这个代币的名称或精度，暂时不能转账。',
     customRetry: '重新读取',
     balanceLabel: (symbol: string) => `${symbol} 余额`,
+    /** Owner 2026-11-16: 余额移到金额下方，用小号 muted 文字，带 symbol。 */
+    balanceInline: (amount: string, symbol: string) => `余额 ${amount} ${symbol}`,
     balanceLoading: '读取余额中…',
     balanceError: '余额暂时读不到',
     decimalsLabel: (digits: string) => `精度 ${digits} 位`,
@@ -561,11 +563,6 @@ export const copy = {
     identityTitle: (id: string, name: string) =>
       name.length > 0 ? `身份 NFT #${id} ${name}` : `身份 NFT #${id}`,
     identityConfirmCheckbox: (id: string) => `我确认 #${id} 及上面的收款地址都正确`,
-    knownContractTitle: (label: string) => `这是「${label}」合约地址`,
-    knownContractBody: '转进合约的代币很可能取不回来。',
-    knownContractCheckbox: (label: string) => `我确认要转到「${label}」合约地址`,
-    contractTitle: '这个地址是一个合约',
-    contractBody: '转进合约的代币可能取不回来，请确认你清楚它的用途。',
     actionsLabel: '转账操作',
     submit: '确认转账',
     submitting: '转账中…',
@@ -598,6 +595,34 @@ export const copy = {
       balanceShort: (symbol: string) => `${symbol} 不够，这次没有转出。`,
       reverted: '交易上链了，但没有成功。你的资产没有变化。',
     },
+  },
+  // ───────────────────────────────────────────────────────────────────────────
+  // 智能资产保护 (owner 2026-11-16). One switch, one preference and one wording on
+  // every transfer surface (代币转账 / 身份 NFT 转让 / 批量转账): 开启时收款方是
+  // 已知协议合约就被拦截，关闭开关才可强制转账；任意合约只警告。The known-contract
+  // 二次确认（勾选）在开关关闭后仍然保留，作为「我就是要转」的最后一道确认。
+  // ───────────────────────────────────────────────────────────────────────────
+  assetProtection: {
+    title: '智能资产保护',
+    toggleAria: '智能资产保护开关',
+    onHint: '转给已知合约地址时会先拦下来，要先关闭这个开关才能强制转账。',
+    offHint: '已关闭：转给合约地址只会提示，不再拦截。',
+    /** 开启 + 命中已知协议合约：拦截，不再给页内勾选（唯一出口是关开关）。 */
+    blockedTitle: (label: string) => `智能资产保护已拦截：这是「${label}」合约地址`,
+    blockedBody: '转进合约的资产很可能取不回来。要强制转账，请先关闭「智能资产保护」。',
+    /** 关闭 + 已知协议合约：保留二次确认，勾选后才可提交。 */
+    knownTitle: (label: string) => `这是「${label}」合约地址`,
+    knownBody: '转进合约的资产很可能取不回来。',
+    knownCheckbox: (label: string) => `我确认要转给「${label}」合约地址`,
+    /** 任意有 bytecode 但不是地址簿条目的合约：只警告，不拦截。 */
+    contractTitle: '这个地址是一个合约',
+    contractBody: '转进合约的资产可能取不回来，请确认你清楚它的用途。',
+    /** 开关关闭且命中已知合约：提示会直转，不再拦截。 */
+    offSubmitNote: '智能资产保护已关闭，可以继续提交。',
+    /** 批量转账：已知合约收款方按行点名后整批拦截。 */
+    batchBlockedTitle: '有收款方是已知合约地址，智能资产保护已拦截',
+    batchBlockedBody: '转进合约的资产很可能取不回来。要强制转账，请先关闭「智能资产保护」。',
+    batchKnownLine: (line: number, label: string) => `第 ${line} 行：这是「${label}」合约地址`,
   },
   // ───────────────────────────────────────────────────────────────────────────
   // 批量转账 (owner 2026-11-14). One atomic batch through the BatchTransfer
@@ -847,7 +872,7 @@ export const copy = {
     confirmErrorHint: '这次没有产生交易。可以再点一次上面的按钮重试，或点「取消」先关掉这个窗口。',
     stripUnlimited: (label: string) => `已把「${label}」设为长期授权，可随时撤销。`,
     stripRevoked: (label: string) => `已撤销「${label}」的授权。`,
-    stripClose: '知道了',
+    stripClose: '好的',
     footerNote: '授权只改变可用额度，不会立刻扣走代币；撤销也不会影响已经完成的交易。',
     errors: {
       rejected: '你在钱包里点了取消，这次授权没有改动。',
@@ -911,9 +936,9 @@ export const copy = {
     resolvedRecipient: (address: string) => `收款人：${address}`,
   },
   /**
-   * 回执唯一按钮。owner 2026-11-16：由「知道了」改为「好的」（更轻、不暗示
-   * 「你早该知道」）。六类回执（swap / mint / airdrop / transfer / batch /
-   * liquidity）共用这一个键。
+   * 回执唯一按钮。owner 2026-11-16：统一为「好的」（更轻、不暗示「你早该
+   * 知道」）。六类回执（swap / mint / airdrop / transfer / batch / liquidity）
+   * 共用这一个键。
    *
    * 行为：mint 回执点「好的」关闭后自动进入 /my-nft 并高亮刚铸造的身份
    * （owner 2026-11-16）；其余五类仍是「关掉回执、留在当前页」，导航交给

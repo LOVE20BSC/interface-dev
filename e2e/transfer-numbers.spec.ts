@@ -96,23 +96,39 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
   test('用例 A 原生转账：余额 10,000 → 回执 0.1 ETH', async ({ page }) => {
     await openTransfer(page, NATIVE_SENDER);
     await expect(page.getByTestId('transfer-token')).toContainText(NATIVE, { timeout: 20_000 });
-    // owner 2026-11-14: 第一行直接是余额数字，不带 symbol、不带「余额」；18 位精度不显示。
+    // owner 2026-11-16 布局：余额在金额下方、小号 muted；金额右侧是代币下拉。
     const balance = page.getByTestId('transfer-balance');
-    await expect(balance).toHaveText('10,000', { timeout: 20_000 });
-    await expect(balance).not.toContainText(NATIVE);
-    await expect(balance).not.toContainText('余额');
+    await expect(balance).toHaveText(`余额 10,000 ${NATIVE}`, { timeout: 20_000 });
     await expect(page.getByTestId('transfer-decimals')).toHaveCount(0);
     await expect(page.getByText('代币', { exact: true })).toHaveCount(0);
 
-    // 区块顺序：先收款方，再代币数量（余额行 + 金额行）。
+    // 区块顺序：收款方 → 金额输入（右侧代币下拉）→ 余额小字。
     const recipientBox = await page.getByTestId('transfer-recipient').boundingBox();
     const balanceBox = await balance.boundingBox();
     const amountBox = await page.getByTestId('transfer-amount').boundingBox();
+    const tokenBox = await page.getByTestId('transfer-token').boundingBox();
     expect(recipientBox).not.toBeNull();
     expect(balanceBox).not.toBeNull();
     expect(amountBox).not.toBeNull();
-    expect(recipientBox!.y).toBeLessThan(balanceBox!.y);
-    expect(balanceBox!.y).toBeLessThan(amountBox!.y);
+    expect(tokenBox).not.toBeNull();
+    expect(recipientBox!.y).toBeLessThan(amountBox!.y);
+    expect(amountBox!.y).toBeLessThan(balanceBox!.y);
+    // 代币下拉在金额输入框右侧、同一行（不是金额下方）。
+    expect(tokenBox!.x).toBeGreaterThan(amountBox!.x + amountBox!.width - 4);
+    expect(tokenBox!.y).toBeLessThan(amountBox!.y + amountBox!.height);
+    // 余额是小号 muted 文字，不再是醒目大数字。
+    const balanceStyle = await balance.evaluate((node) => {
+      const computed = window.getComputedStyle(node as HTMLElement);
+      return { fontSize: parseFloat(computed.fontSize), color: computed.color };
+    });
+    expect(balanceStyle.fontSize).toBeLessThanOrEqual(13);
+
+    // 智能资产保护：默认开启（owner 2026-11-16），与另外两个转账页共用同一偏好。
+    await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await expect(page.getByText('智能资产保护')).toBeVisible();
 
     await fillTransfer(page, '0.1', NATIVE_RECIPIENT);
     await expect(page.getByTestId('transfer-submit')).toBeEnabled();
@@ -143,7 +159,7 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
   test('用例 B 非整数 ERC20 转账：99,799,100 → 99,799,098.5 TestLOVE20', async ({ page }) => {
     await openTransfer(page, ERC20_SENDER);
     await selectToken(page, SYMBOL);
-    await expect(page.getByTestId('transfer-balance')).toHaveText('99,799,100', {
+    await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 99,799,100 ${SYMBOL}`, {
       timeout: 20_000,
     });
     // 精度只在 ≠18 时显示；ETH/TestLOVE20 都是 18 位，默认不写。
@@ -159,7 +175,7 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
 
     await page.getByRole('button', { name: '好的' }).click();
     // 余额刷新后与理论线 §1 用例 B 的 S_after 逐字相等。
-    await expect(page.getByTestId('transfer-balance')).toHaveText('99,799,098.5', {
+    await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 99,799,098.5 ${SYMBOL}`, {
       timeout: 20_000,
     });
   });
@@ -167,14 +183,18 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
   test('用例 C 余额不足：ERC20 差 1，原生币差 0.001', async ({ page }) => {
     await openTransfer(page, OUTSIDER);
     await selectToken(page, SYMBOL);
-    await expect(page.getByTestId('transfer-balance')).toHaveText('0', { timeout: 20_000 });
+    await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 0 ${SYMBOL}`, {
+      timeout: 20_000,
+    });
     await fillTransfer(page, '1', RECIPIENT);
     await expect(page.getByTestId('transfer-amount-error')).toHaveText(`${SYMBOL} 不够，还差 1`);
     await expect(page.getByTestId('transfer-submit')).toBeDisabled();
 
     // 原生币：10,000 − 0.001 预留 = 9,999.999 可花，输入 10,000 差 0.001。
     await selectToken(page, NATIVE);
-    await expect(page.getByTestId('transfer-balance')).toHaveText('10,000', { timeout: 20_000 });
+    await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 10,000 ${NATIVE}`, {
+      timeout: 20_000,
+    });
     await page.getByTestId('transfer-amount').fill('10000');
     await expect(page.getByTestId('transfer-amount-error')).toHaveText(
       `${NATIVE} 不够，还差 0.001`,
@@ -183,29 +203,84 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('transfer-submit')).toBeDisabled();
   });
 
-  test('用例 D 收款方是已知合约：显示合约名并强制二次确认', async ({ page }) => {
+  test('用例 D 已知合约：智能资产保护拦截，关闭开关后二次确认才可强制转账', async ({
+    page,
+  }) => {
     await openTransfer(page, ERC20_SENDER);
     await fillTransfer(page, '0.1', PAIR);
 
+    // 开关开启（默认）：硬拦截，页内不出现勾选，唯一出口是关闭开关。
     const protection = page.getByTestId('transfer-protection');
     await expect(protection).toBeVisible({ timeout: 20_000 });
-    await expect(protection).toContainText('这是「交易对」合约地址');
+    await expect(protection).toContainText('智能资产保护已拦截：这是「交易对」合约地址');
+    await expect(page.getByTestId('transfer-known-ack')).toHaveCount(0);
     await expect(page.getByTestId('transfer-submit')).toBeDisabled();
 
+    // 关闭开关：拦截退化为「已知合约二次确认」，勾选后才可提交。
+    await page.getByTestId('asset-protection-toggle').click();
+    await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    await expect(protection).toContainText('这是「交易对」合约地址');
+    await expect(page.getByTestId('transfer-submit')).toBeDisabled();
     await page.getByTestId('transfer-known-ack').check();
     await expect(page.getByTestId('transfer-submit')).toBeEnabled();
 
-    // 任意有 bytecode 但不是地址簿条目的合约：只警告、不要求勾选。
+    // 任意有 bytecode 但不是地址簿条目的合约：只警告、不拦截（开关关闭时同样）。
     await page.getByTestId('transfer-recipient').fill(TOKEN);
     await expect(page.getByTestId('transfer-contract-warning')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId('transfer-protection')).toHaveCount(0);
     await expect(page.getByTestId('transfer-submit')).toBeEnabled();
+
+    // 重新打开开关后，同一已知合约立刻回到拦截（开关与拦截联动）。
+    await page.getByTestId('asset-protection-toggle').click();
+    await page.getByTestId('transfer-recipient').fill(PAIR);
+    await expect(page.getByTestId('transfer-protection')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('transfer-submit')).toBeDisabled();
+  });
+
+  test('智能资产保护 偏好持久化、跨页共享同一键', async ({ page }) => {
+    await openTransfer(page, ERC20_SENDER);
+    const toggle = page.getByTestId('asset-protection-toggle');
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+    // 沿用旧库的同名键与 1/0 编码，刷新后仍是关闭。
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.localStorage.getItem('love20:transfer:assetProtectionEnabled')),
+      )
+      .toBe('0');
+    await page.reload();
+    await connect(page);
+    await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+
+    // 跨页共享：批量转账页读到同一个偏好。
+    await page.goto(`/batch-transfer${QUERY}`);
+    await connect(page);
+    await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    // 在批量转账页打开后，代币转账页同样变为开启。
+    await page.getByTestId('asset-protection-toggle').click();
+    await page.goto(`/transfer${QUERY}`);
+    await connect(page);
+    await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
   });
 
   test('用例 E 按身份 NFT 收款：#2 → Testdev-member-1 的 owner', async ({ page }) => {
     await openTransfer(page, IDENTITY_SENDER);
     await selectToken(page, SYMBOL);
-    await expect(page.getByTestId('transfer-balance')).toHaveText('99,999,099.999639', {
+    await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 99,999,099.999639 ${SYMBOL}`, {
       timeout: 20_000,
     });
 
@@ -240,7 +315,7 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('transfer-receipt-recipient')).toHaveText(IDENTITY_2_OWNER);
 
     await page.getByRole('button', { name: '好的' }).click();
-    await expect(page.getByTestId('transfer-balance')).toHaveText('99,999,097.499639', {
+    await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 99,999,097.499639 ${SYMBOL}`, {
       timeout: 20_000,
     });
   });
@@ -286,7 +361,9 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await page.getByRole('button', { name: '添加代币' }).click();
     // A resolved custom token replaces the selection and closes the picker.
     await expect(page.getByTestId('transfer-token')).toContainText('TestWETH', { timeout: 20_000 });
-    await expect(page.getByTestId('transfer-balance')).toHaveText('0', { timeout: 20_000 });
+    await expect(page.getByTestId('transfer-balance')).toHaveText('余额 0 TestWETH', {
+      timeout: 20_000,
+    });
 
     // An EOA has no bytecode: honest failure, never a broken token entry.
     await page.getByTestId('transfer-token').click();
@@ -337,6 +414,9 @@ test.describe('代币转账 验收截图', () => {
     await page.setViewportSize({ width, height });
     await page.addInitScript((nextTheme: string) => {
       window.localStorage.setItem('love20:theme', nextTheme);
+      // Every screenshot starts from the shipped default (智能资产保护 开启), so a
+      // previous loop iteration that turned it off cannot leak into the next shot.
+      window.localStorage.setItem('love20:transfer:assetProtectionEnabled', '1');
     }, theme);
     await page.goto(`/transfer${QUERY}`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
@@ -358,9 +438,10 @@ test.describe('代币转账 验收截图', () => {
       for (const theme of THEMES) {
         await prepare(page, theme, viewport.width, viewport.height);
         await selectToken(page, SYMBOL);
-        await expect(page.getByTestId('transfer-balance')).toHaveText(/^[\d,]+(\.\d+)?$/, {
-          timeout: 20_000,
-        });
+        await expect(page.getByTestId('transfer-balance')).toHaveText(
+          new RegExp(`^余额 [\\d,]+(\\.\\d+)? ${SYMBOL}$`),
+          { timeout: 20_000 },
+        );
         await fillTransfer(page, '1.5', RECIPIENT);
         await expect(page.getByTestId('transfer-submit')).toBeEnabled();
         await shoot(page, `form-${theme}-${viewport.key}`);
@@ -368,15 +449,36 @@ test.describe('代币转账 验收截图', () => {
     }
   });
 
-  test('资产保护警告截图', async ({ page }) => {
+  test('资产保护拦截截图（开关开启）', async ({ page }) => {
     await installWallet(page, ERC20_SENDER);
     for (const viewport of VIEWPORTS) {
       for (const theme of THEMES) {
         await prepare(page, theme, viewport.width, viewport.height);
         await fillTransfer(page, '0.1', PAIR);
         await expect(page.getByTestId('transfer-protection')).toBeVisible({ timeout: 20_000 });
+        await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
+          'aria-checked',
+          'true',
+        );
         await expect(page.getByTestId('transfer-submit')).toBeDisabled();
         await shoot(page, `protection-${theme}-${viewport.key}`);
+      }
+    }
+  });
+
+  test('资产保护关闭截图（关闭开关后的二次确认）', async ({ page }) => {
+    await installWallet(page, ERC20_SENDER);
+    for (const viewport of VIEWPORTS) {
+      for (const theme of THEMES) {
+        await prepare(page, theme, viewport.width, viewport.height);
+        await fillTransfer(page, '0.1', PAIR);
+        await page.getByTestId('asset-protection-toggle').click();
+        await expect(page.getByTestId('transfer-known-ack')).toBeVisible({ timeout: 20_000 });
+        await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
+          'aria-checked',
+          'false',
+        );
+        await shoot(page, `protection-off-${theme}-${viewport.key}`);
       }
     }
   });
@@ -387,9 +489,10 @@ test.describe('代币转账 验收截图', () => {
       for (const theme of THEMES) {
         await prepare(page, theme, viewport.width, viewport.height);
         await selectToken(page, SYMBOL);
-        await expect(page.getByTestId('transfer-balance')).toHaveText(/^[\d,]+(\.\d+)?$/, {
-          timeout: 20_000,
-        });
+        await expect(page.getByTestId('transfer-balance')).toHaveText(
+          new RegExp(`^余额 [\\d,]+(\\.\\d+)? ${SYMBOL}$`),
+          { timeout: 20_000 },
+        );
         await fillTransfer(page, '0.5', RECIPIENT);
         await page.getByTestId('transfer-submit').click();
         await expect(page.getByTestId('transfer-receipt-amount')).toHaveText(`0.5 ${SYMBOL}`, {

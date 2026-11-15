@@ -6,7 +6,10 @@ import { NETWORK, configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { formatAmount, formatVisibleTokenAmount } from '@/shared/lib/format';
+import { knownContractLabelOf } from '@/shared/lib/recipient-protection';
 import { shouldShowPrecision } from '@/shared/lib/token-precision';
+import { useAssetProtection } from '@/shared/lib/use-asset-protection';
+import { AssetProtectionSwitch } from '@/shared/ui/asset-protection-switch';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -119,6 +122,7 @@ export function BatchTransferPanel({
   const { address: account } = useAccount();
   const batchTransfer = configuredAddress('batchTransfer');
   const catalog = useTransferCatalog();
+  const assetProtection = useAssetProtection();
 
   const [mode, setMode] = useState<BatchMode>('native');
   const [selectedToken, setSelectedToken] = useState<TransferToken | undefined>(undefined);
@@ -281,12 +285,24 @@ export function BatchTransferPanel({
     !tokenUnresolved &&
     gasOk;
 
+  // 智能资产保护 (owner 2026-11-16): ON intercepts a batch that names any known
+  // address-book contract; turning the switch off is the only way to force it. A
+  // merely-unknown contract recipient never blocks, it only warns.
+  const knownRows = parse.rows.flatMap((row) => {
+    const label = knownContractLabelOf(row.address);
+    return label === undefined ? [] : [{ line: row.line, label }];
+  });
+  const knownBlocked = assetProtection.enabled && knownRows.length > 0;
+
   const canApprove = baseValid && needsApproval && token?.address !== undefined;
   const canBatch =
     baseValid &&
     !allowanceUnavailable &&
     (mode === 'native' || (token?.address !== undefined && allowance.value !== undefined));
-  const actionEnabled = !approvalRefreshing && (mode === 'token' && needsApproval ? canApprove : canBatch);
+  const actionEnabled =
+    !approvalRefreshing &&
+    !knownBlocked &&
+    (mode === 'token' && needsApproval ? canApprove : canBatch);
 
   const buildRequest = (): BatchRequest | undefined => {
     if (token === undefined || parse.rows.length === 0) return undefined;
@@ -304,6 +320,8 @@ export function BatchTransferPanel({
   };
 
   const submit = () => {
+    // 智能资产保护 是硬门禁：即使 CTA 状态过期，也绝不把已知合约收款方发出去。
+    if (knownBlocked) return;
     const request = buildRequest();
     if (request === undefined) return;
     if (mode === 'token' && needsApproval) {
@@ -711,6 +729,36 @@ export function BatchTransferPanel({
             <p className="mt-1 text-foreground/80">{copy.batchTransfer.contractWarningBody}</p>
           </div>
         ) : null}
+
+        {knownRows.length > 0 ? (
+          <div
+            role={knownBlocked ? 'alert' : 'status'}
+            data-testid="batch-transfer-known-contract"
+            className="rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
+          >
+            <p className="flex items-start gap-1.5 font-semibold text-warning">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              {knownBlocked
+                ? copy.assetProtection.batchBlockedTitle
+                : copy.assetProtection.knownTitle(knownRows[0]!.label)}
+            </p>
+            <ul className="mt-1 space-y-0.5 text-foreground/80">
+              {knownRows.map((row) => (
+                <li key={`known-${row.line}`} data-testid={`batch-transfer-known-line-${row.line}`}>
+                  {copy.assetProtection.batchKnownLine(row.line, row.label)}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-foreground/80">
+              {knownBlocked
+                ? copy.assetProtection.batchBlockedBody
+                : copy.assetProtection.offSubmitNote}
+            </p>
+          </div>
+        ) : null}
+
+        {/* 智能资产保护：与代币转账、身份 NFT 转让共用同一个偏好与组件 */}
+        <AssetProtectionSwitch disabled={busy} />
 
         {mode === 'token' ? (
           <div className="rounded-2xl border border-line bg-elevated/60 p-3 text-xs leading-5">

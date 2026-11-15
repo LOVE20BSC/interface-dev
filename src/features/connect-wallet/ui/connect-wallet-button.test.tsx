@@ -73,6 +73,6 @@ describe('ConnectWalletButton', () => {
     // The old third step (「如果已经在钱包里…」) is folded into step 1.
     expect(screen.queryByText(/如果已经在钱包里/)).toBeNull();
     expect(screen.getByRole('button', { name: '复制本页链接' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '知道了' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '好的' })).toBeInTheDocument();
   });
 });

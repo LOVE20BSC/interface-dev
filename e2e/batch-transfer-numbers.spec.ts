@@ -28,12 +28,15 @@ const deployment = JSON.parse(
   addresses: {
     firstTokenAddress: `0x${string}`;
     batchTransfer: `0x${string}`;
+    pair: `0x${string}`;
   };
 };
 
 const NATIVE = deployment.nativeCurrency.symbol;
 const TOKEN = deployment.addresses.firstTokenAddress;
 const BATCH = deployment.addresses.batchTransfer;
+// 地址簿已知合约（交易对）：智能资产保护 拦截的对象。
+const PAIR = deployment.addresses.pair;
 const SYMBOL = 'TestLOVE20';
 const QUERY = `?symbol=${SYMBOL}`;
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
@@ -217,6 +220,35 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
       '第 1 行：不能转给批量转账合约本身。',
     );
     await expect(page.getByTestId('batch-transfer-submit')).toBeDisabled();
+  });
+
+  test('用例 C2 智能资产保护：已知合约收款方整批拦截，关闭开关后可提交', async ({ page }) => {
+    await openBatch(page, NATIVE_SENDER);
+    // 默认开启（owner 2026-11-16）。
+    await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+
+    await fillBatch(page, [`${PAIR} 0.1`]);
+    const known = page.getByTestId('batch-transfer-known-contract');
+    await expect(known).toBeVisible({ timeout: 20_000 });
+    await expect(known).toContainText('有收款方是已知合约地址，智能资产保护已拦截');
+    await expect(known).toContainText('第 1 行：这是「交易对」合约地址');
+    await expect(page.getByTestId('batch-transfer-submit')).toBeDisabled();
+
+    // 关闭开关：拦截退化为警告，提交恢复可用（基础校验仍保留）。
+    await page.getByTestId('asset-protection-toggle').click();
+    await expect(known).toContainText('智能资产保护已关闭，可以继续提交。');
+    await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
+
+    // 任意合约（有 bytecode、不在地址簿）：只警告，不点名拦截。
+    await fillBatch(page, [`${TOKEN} 0.1`]);
+    await expect(page.getByTestId('batch-transfer-contract-warning')).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId('batch-transfer-known-contract')).toHaveCount(0);
+    await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
   });
 
   test('用例 D 合计超余额：ERC20 差 1，原生币差 0.501', async ({ page }) => {

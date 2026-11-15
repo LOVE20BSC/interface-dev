@@ -197,7 +197,17 @@ test.describe('代币授权 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('approvals-success-strip-hash')).toHaveText(
       /^0x[0-9a-fA-F]{64}$/,
     );
-    await page.getByRole('button', { name: '知道了' }).click();
+    // Owner 2026-11-16: the strip close button is 「好的」like every other dismiss.
+    await expect(page.getByRole('button', { name: '好的' })).toBeVisible();
+    // The strip sits at the top of the page; bring it into the frame for the shot.
+    await strip.scrollIntoViewIfNeeded();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    mkdirSync(SHOTS, { recursive: true });
+    await page.screenshot({
+      path: resolve(SHOTS, 'approvals-success-strip.png'),
+      animations: 'disabled',
+    });
+    await page.getByRole('button', { name: '好的' }).click();
     await expect(strip).toHaveCount(0);
     // 关闭回执后不丢已提交状态：列表仍是撤销后的链上真值。
     await expect(amount).toHaveText('长期授权');
