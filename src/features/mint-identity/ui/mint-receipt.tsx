@@ -100,11 +100,17 @@ function ReceiptBody({ receipt, paymentSymbol, paymentDecimals, onDismiss }: Min
 
       <p className="text-xs leading-5 text-muted">{copy.mintIdentity.receipt.notSelected}</p>
 
-      {/* Owner 2026-11-14: one button only — close the receipt and stay here.
-          The minted identity is listed on 我的 NFT; that is a nav entry, not a
-          second receipt button. */}
-      <Button variant="primary" size="lg" className="w-full" onClick={onDismiss}>
-        {copy.receiptDismiss.stayHere}
+      {/* Owner 2026-11-16: one button only —「好的」closes the receipt and the
+          panel then lands on 我的 NFT with the new identity highlighted. The
+          receipt itself still carries no second navigation button. */}
+      <Button
+        variant="primary"
+        size="lg"
+        className="w-full"
+        data-testid="mint-receipt-dismiss"
+        onClick={onDismiss}
+      >
+        {copy.receiptDismiss.dismiss}
       </Button>
     </div>
   );
@@ -112,7 +118,7 @@ function ReceiptBody({ receipt, paymentSymbol, paymentDecimals, onDismiss }: Min
 
 /**
  * Success receipt is a page state (UX spec §4.3), never a toast + redirect.
- * On phones it is presented as a bottom sheet so the primary "去我的 NFT" stays
+ * On phones it is presented as a bottom sheet so the primary 「好的」 stays
  * thumb-reachable; md+ shows the same content in the page flow, same order.
  */
 export function MintReceipt(props: MintReceiptProps) {

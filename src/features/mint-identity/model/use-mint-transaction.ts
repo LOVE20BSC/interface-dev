@@ -6,7 +6,12 @@ import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cache } from '@/shared/lib/cache';
 import { describeMintError } from '@/features/mint-identity/lib/mint-errors';
-import { useNextNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
+import {
+  useNextNonce,
+  usePendingNonce,
+  useTxWatch,
+  type TxWatch,
+} from '@/shared/model/use-tx-watch';
 import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 
 type HexHash = `0x${string}`;
@@ -109,6 +114,7 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
   const readNextNonce = useNextNonce(account);
+  const readPendingNonce = usePendingNonce(account);
 
   const [walletAction, setWalletAction] = useState<PendingKind | null>(null);
   const [pending, setPending] = useState<PendingTx | null>(null);
@@ -229,6 +235,8 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
     setWalletAction('approve');
     void (async () => {
       try {
+        // R5: a new approval queues behind whatever the wallet already broadcast.
+        const sendNonce = nonce ?? (await readPendingNonce());
         const hash = await writeContractAsync({
           address: paymentTokenAddress,
           abi: love20TokenAbi,
@@ -236,7 +244,7 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
           args: [memberNftAddress, amount],
           // 重新提交 passes the on-chain nonce so a wallet stuck on a stale
           // queued nonce heals itself instead of signing into a gap forever.
-          ...(nonce !== undefined ? { nonce } : {}),
+          ...(sendNonce !== undefined ? { nonce: sendNonce } : {}),
         });
         setPending({ kind: 'approve', hash, amount });
       } catch (cause) {
@@ -259,12 +267,14 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
     setWalletAction('mint');
     void (async () => {
       try {
+        // R5: a new mint queues behind whatever the wallet already broadcast.
+        const sendNonce = nonce ?? (await readPendingNonce());
         const hash = await writeContractAsync({
           address: memberNftAddress,
           abi: memberNftAbi,
           functionName: 'mint',
           args: [name],
-          ...(nonce !== undefined ? { nonce } : {}),
+          ...(sendNonce !== undefined ? { nonce: sendNonce } : {}),
         });
         // Persist before waiting: a refresh while pending must recover this hash.
         if (scope !== null) cache.set(scope, MINT_TASK_KEY, { hash, name });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { DEFAULT_SYMBOL } from '@/config/networks';
 import { useRecentCommunities } from '@/features/switch-community/model/use-recent-communities';
 
@@ -19,21 +19,24 @@ export interface CommunityContextValue {
  */
 export function useCommunityContext(): CommunityContextValue {
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const rawSymbol = (searchParams.get('symbol') ?? '').trim();
   const symbol = rawSymbol.length > 0 ? rawSymbol : DEFAULT_SYMBOL;
   const { record } = useRecentCommunities();
 
   useEffect(() => {
     if (rawSymbol.length > 0) return;
+    // Seeding the default community must not erase route state: /my-nft relies on
+    // the `state` handed over by a mint receipt (owner 2026-11-16 highlight).
     setSearchParams(
       (previous) => {
         const next = new URLSearchParams(previous);
         next.set('symbol', DEFAULT_SYMBOL);
         return next;
       },
-      { replace: true },
+      { replace: true, state: location.state },
     );
-  }, [rawSymbol, setSearchParams]);
+  }, [location.state, rawSymbol, setSearchParams]);
 
   const switchSymbol = useCallback(
     (nextSymbol: string) => {

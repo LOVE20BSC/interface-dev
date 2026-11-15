@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { expectSoftTransition, recordSoftTransition } from './soft-transition';
 
 /**
  * 主题 (ADR-0005): colour three-line check — line 2, the browser line.
@@ -176,12 +177,20 @@ test.describe('主题配色（线二：浏览器计算样式）', () => {
   });
 
   test('switching on /theme takes effect immediately and persists', async ({ page }) => {
+    await recordSoftTransition(page);
     await seedStoredTheme(page, 'light');
     await page.goto('/theme');
     await expect(page.getByTestId('theme-page')).toBeVisible({ timeout: 15_000 });
     await expectApplied(page, 'light');
 
     await page.getByRole('radio', { name: '深色' }).click();
+    // Owner 2026-11-16: 主题切换是整页变化，先淡出再应用配色，不是硬切换。
+    await expectSoftTransition(page);
+    // The palette is applied after the 180 ms fade-out, so poll instead of
+    // reading the DOM in the same tick as the click.
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+      .toBe('dark');
     await expectApplied(page, 'dark');
     expect(await page.evaluate(() => window.localStorage.getItem('love20:theme'))).toBe('dark');
 
@@ -190,6 +199,9 @@ test.describe('主题配色（线二：浏览器计算样式）', () => {
     await expectApplied(page, 'dark');
 
     await page.getByRole('radio', { name: '浅色' }).click();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+      .toBe('light');
     await expectApplied(page, 'light');
     expect(await page.evaluate(() => window.localStorage.getItem('love20:theme'))).toBe('light');
   });

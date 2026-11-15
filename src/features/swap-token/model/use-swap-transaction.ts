@@ -3,7 +3,12 @@ import { useAccount, useChainId, useWriteContract } from 'wagmi';
 import { love20TokenAbi, uniswapV2Router02Abi, weth9Abi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import { useNextNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
+import {
+  useNextNonce,
+  usePendingNonce,
+  useTxWatch,
+  type TxWatch,
+} from '@/shared/model/use-tx-watch';
 import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 import { describeSwapError, swapRetryLabel } from '@/features/swap-token/lib/swap-errors';
 import { parseSwapReceipt } from '@/features/swap-token/lib/swap-events';
@@ -130,6 +135,7 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
   const readNextNonce = useNextNonce(account);
+  const readPendingNonce = usePendingNonce(account);
 
   const [pending, setPending] = useState<PendingTx | null>(null);
   const [receipt, setReceipt] = useState<SwapRecord | null>(null);
@@ -326,12 +332,17 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
    * transaction sat in the wallet's queue with a gap, and only a resubmission
    * carrying the on-chain nonce could mine it.
    *
+   * R5 (owner 2026-11-16): the pin is the **pool-aware** count (`pending`), so a
+   * new swap queues behind a transaction the wallet already broadcast instead of
+   * re-using its nonce. An explicit nonce only ever replaces a known transaction
+   * (its own nonce), never a new operation.
+   *
    * A failed read falls back to undefined: the wallet assigns the nonce and the
    * bounded watcher still turns any gap into the recovery card.
    */
   const pinnedNonce = async (): Promise<number | undefined> => {
     try {
-      return await readNextNonce();
+      return await readPendingNonce();
     } catch {
       return undefined;
     }

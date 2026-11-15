@@ -13,6 +13,11 @@ export interface TxWatchCardProps {
    * the call (the card then still offers 重新查询 and the explorer link).
    */
   readonly onResubmit?: (() => void) | undefined;
+  /**
+   * True while a 重新提交 is in flight: the button is disabled so a second click
+   * cannot open the wallet again and sign the same action twice (R7).
+   */
+  readonly resubmitDisabled?: boolean;
 }
 
 /**
@@ -27,7 +32,7 @@ export interface TxWatchCardProps {
  * Copy comes from `shared/config/copy-pages.ts`; this component never renders a
  * raw hex error, revert selector, gas or nonce value.
  */
-export function TxWatchCard({ watch, onResubmit }: TxWatchCardProps) {
+export function TxWatchCard({ watch, onResubmit, resubmitDisabled = false }: TxWatchCardProps) {
   const hash = watch.hash;
   if (hash === null) return null;
   if (watch.status === 'wallet' || watch.status === 'idle') return null;
@@ -74,7 +79,13 @@ export function TxWatchCard({ watch, onResubmit }: TxWatchCardProps) {
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {onResubmit !== undefined ? (
-          <Button variant="primary" size="sm" onClick={onResubmit}>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onResubmit}
+            disabled={resubmitDisabled}
+            data-testid="tx-watch-resubmit"
+          >
             {copy.txWatch.actions.resubmit}
           </Button>
         ) : null}

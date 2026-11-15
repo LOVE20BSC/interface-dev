@@ -92,7 +92,7 @@ function StateCard({
  * approval ladder), the native coin is a plain value transfer. Recipient
  * protection is visible before submit: an address-book contract must be
  * acknowledged, any other contract only warns. Success is an in-page receipt
- * that collapses to a strip on 知道了.
+ * that collapses to a strip on 「好的」.
  */
 export function TransferTokenPanel({
   isConnected,
@@ -812,7 +812,13 @@ export function TransferTokenPanel({
           </p>
         ) : null}
 
-        {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
+        {tx.watch.hash !== null ? (
+          <TxWatchCard
+            watch={tx.watch}
+            onResubmit={tx.resubmit}
+            resubmitDisabled={tx.isResubmitting}
+          />
+        ) : null}
       </section>
     </div>
   );

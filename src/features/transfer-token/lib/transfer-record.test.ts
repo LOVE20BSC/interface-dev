@@ -19,10 +19,13 @@ const SCOPE = createTransferScope(31337, WALLET);
 
 const PENDING: StoredTransfer = {
   hash: HASH,
+  chainId: 31337,
+  account: WALLET,
   token: { kind: 'community', address: TOKEN, symbol: 'TestLOVE20', decimals: 18 },
   amount: 1500000000000000000n,
   recipient: RECIPIENT,
   recipientLabel: '身份 NFT #2 Testdev-member-1',
+  nonce: 7,
   confirmed: false,
   recordedAt: 1_700_000_000_000,
 };
@@ -42,6 +45,14 @@ describe('transfer-record 在途交易持久化（D1/D4）', () => {
     const stored = readStoredTransfer(SCOPE);
     expect(stored?.confirmed).toBe(true);
     expect(stored?.hash).toBe(HASH);
+  });
+
+  it('round-trips the owner and the original nonce a retry must replace (R2/R3)', () => {
+    writeStoredTransfer(SCOPE, PENDING);
+    const stored = readStoredTransfer(SCOPE);
+    expect(stored?.chainId).toBe(31337);
+    expect(stored?.account).toBe(WALLET);
+    expect(stored?.nonce).toBe(7);
   });
 
   it('scopes the task by chain + wallet, never leaking across wallets', () => {
@@ -71,6 +82,8 @@ describe('transfer-record 在途交易持久化（D1/D4）', () => {
   it('rejects a non-native token without an address instead of faking a request', () => {
     cache.set(SCOPE, TRANSFER_TASK_CACHE_KEY, {
       hash: HASH,
+      chainId: 31337,
+      account: WALLET,
       token: { kind: 'community', symbol: 'TestLOVE20', decimals: 18 },
       amount: '1',
       recipient: RECIPIENT,
@@ -94,6 +107,10 @@ describe('transfer-record 在途交易持久化（D1/D4）', () => {
       { ...base, recipient: '0xnot-an-address' },
       { ...base, token: { kind: 'community', address: TOKEN, symbol: '', decimals: 18 } },
       { ...base, token: { kind: 'community', address: TOKEN, symbol: 'X', decimals: 99 } },
+      // R3: a record without an owner can never be restored (old format).
+      { ...base, chainId: undefined },
+      { ...base, account: undefined },
+      { ...base, account: '0xnot-an-address' },
     ]) {
       clearStoredTransfer(SCOPE);
       cache.set(SCOPE, TRANSFER_TASK_CACHE_KEY, broken);

@@ -782,7 +782,13 @@ export function BatchTransferPanel({
             </Button>
           </ActionStack>
 
-          {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
+          {tx.watch.hash !== null ? (
+            <TxWatchCard
+              watch={tx.watch}
+              onResubmit={tx.resubmit}
+              resubmitDisabled={tx.isResubmitting}
+            />
+          ) : null}
 
           {txError !== null ? (
             <div

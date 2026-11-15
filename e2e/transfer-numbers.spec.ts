@@ -133,7 +133,7 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     expect(hash).toMatch(/^0x[0-9a-fA-F]{64}$/);
 
     // 回执可关闭且留在原页：收成成功条，不跳转。
-    await page.getByRole('button', { name: '知道了' }).click();
+    await page.getByRole('button', { name: '好的' }).click();
     await expect(page.getByTestId('transfer-success-strip-amount')).toHaveText(
       `已转出 0.1 ${NATIVE}`,
     );
@@ -157,7 +157,7 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     });
     await expect(page.getByTestId('transfer-receipt-recipient')).toHaveText(RECIPIENT);
 
-    await page.getByRole('button', { name: '知道了' }).click();
+    await page.getByRole('button', { name: '好的' }).click();
     // 余额刷新后与理论线 §1 用例 B 的 S_after 逐字相等。
     await expect(page.getByTestId('transfer-balance')).toHaveText('99,799,098.5', {
       timeout: 20_000,
@@ -239,7 +239,7 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     );
     await expect(page.getByTestId('transfer-receipt-recipient')).toHaveText(IDENTITY_2_OWNER);
 
-    await page.getByRole('button', { name: '知道了' }).click();
+    await page.getByRole('button', { name: '好的' }).click();
     await expect(page.getByTestId('transfer-balance')).toHaveText('99,999,097.499639', {
       timeout: 20_000,
     });

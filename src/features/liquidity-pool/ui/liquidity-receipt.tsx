@@ -72,9 +72,10 @@ export function LiquidityReceiptSheet({ record, onDismiss }: LiquidityReceiptShe
           </div>
         </dl>
         <p className="text-xs leading-5 text-muted">{copy.liquidity.receipt.pendingNote}</p>
-        {/* Owner 2026-11-14: one button only — close the receipt and stay here. */}
+        {/* Owner 2026-11-16: one button only —「好的」closes the receipt and stays
+            here; the panel keeps its post-success state. */}
         <Button variant="primary" size="lg" className="w-full" onClick={onDismiss}>
-          {copy.receiptDismiss.stayHere}
+          {copy.receiptDismiss.dismiss}
         </Button>
         {explorerUrl !== null ? (
           <a

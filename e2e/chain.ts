@@ -87,21 +87,96 @@ export async function revertChain(snapshotId: string): Promise<void> {
 }
 
 /**
+ * The mining mode the suite chain must be in between spec files.
+ *
+ * `make bootstrap` enables 1 s interval mining after `make verify` (and leaves
+ * automine off, because `--block-time` is not passed at startup). Every other spec
+ * relies on it: without interval mining a submitted transaction never mines and
+ * the whole file times out. See 「挖矿模式」 in e2e/README.md for the 2026-11-16 flake.
+ */
+export const SUITE_MINING = Object.freeze({ automine: false, intervalMining: 1 });
+
+export interface MiningMode {
+  readonly automine: boolean;
+  readonly intervalMining: number;
+}
+
+export async function readMiningMode(): Promise<MiningMode> {
+  const [automine, intervalMining] = await Promise.all([
+    anvilRpc<boolean>('anvil_getAutomine'),
+    anvilRpc<number>('anvil_getIntervalMining'),
+  ]);
+  return { automine, intervalMining };
+}
+
+/**
+ * Turns interval + automine mining off so a submitted transaction stays in the
+ * pool (the slow-chain window a real wallet sees while the transaction is
+ * broadcast but not mined).
+ */
+export async function suspendMining(): Promise<void> {
+  await anvilRpc('anvil_setIntervalMining', [0]);
+  await anvilRpc('anvil_setAutomine', [false]);
+}
+
+/**
+ * Puts the chain back into `SUITE_MINING` and ASSERTS the read-back.
+ *
+ * This is the fix for the 「链挖矿模式泄漏」 flake: a spec that disables mining and
+ * never restores it (a failed `afterAll`, a killed worker, a stray `return`) makes
+ * every following spec on the same chain wait forever, which showed up as two
+ * full-suite failures. The assertion fails the tearing-down spec instead of the
+ * innocent next one.
+ */
+export async function restoreMining(): Promise<void> {
+  try {
+    await anvilRpc('anvil_setAutomine', [SUITE_MINING.automine]);
+    await anvilRpc('anvil_setIntervalMining', [SUITE_MINING.intervalMining]);
+  } catch (error) {
+    // Keep going: the read-back below is the assertion that matters, and it says
+    // what the chain is actually left in.
+    console.error('[chain] restoring the mining mode failed; verifying by read-back', error);
+  }
+  const mode = await readMiningMode();
+  if (
+    mode.automine !== SUITE_MINING.automine ||
+    mode.intervalMining !== SUITE_MINING.intervalMining
+  ) {
+    throw new Error(
+      `[chain] mining mode not restored: automine=${mode.automine} intervalMining=${mode.intervalMining}, ` +
+        `expected automine=${SUITE_MINING.automine} intervalMining=${SUITE_MINING.intervalMining}. ` +
+        'Every later spec will hang without 1 s interval mining — run `pnpm e2e:reset-chain`.',
+    );
+  }
+}
+
+/**
  * Registers a file-scoped snapshot before every hook declared after this call
  * and reverts it after the file's tests. Call it once at the top level of a
  * spec file, before that file's own `test.beforeAll` mutations.
+ *
+ * Mining mode is restored on BOTH ends: before the snapshot (so a leak left by a
+ * crashed previous file cannot poison this one) and after the revert (so a spec
+ * that suspended mining cannot poison the next one, even when its own `afterAll`
+ * did not run).
  */
 export function isolateChain(): void {
   let snapshotId: string | undefined;
 
   test.beforeAll(async () => {
+    await restoreMining();
     snapshotId = await snapshotChain();
     console.log(`[chain] snapshot ${snapshotId} (${ANVIL_RPC})`);
   });
 
   test.afterAll(async () => {
-    if (snapshotId === undefined) return;
-    await revertChain(snapshotId);
-    console.log(`[chain] reverted ${snapshotId} (${ANVIL_RPC})`);
+    try {
+      if (snapshotId !== undefined) {
+        await revertChain(snapshotId);
+        console.log(`[chain] reverted ${snapshotId} (${ANVIL_RPC})`);
+      }
+    } finally {
+      await restoreMining();
+    }
   });
 }

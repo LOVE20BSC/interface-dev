@@ -5,7 +5,12 @@ import { airdropDistributorAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 import type { AirdropSnapshotEntry } from '@/domain/airdrop-snapshot';
 import { copy } from '@/shared/config/copy-pages';
-import { useNextNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
+import {
+  useNextNonce,
+  usePendingNonce,
+  useTxWatch,
+  type TxWatch,
+} from '@/shared/model/use-tx-watch';
 import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 import { describeAirdropClaimError } from '@/features/claim-airdrop/lib/airdrop-errors';
 import {
@@ -79,6 +84,7 @@ export function useAirdropClaimTransaction(
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
   const readNextNonce = useNextNonce(account);
+  const readPendingNonce = usePendingNonce(account);
 
   const [pending, setPending] = useState<PendingClaim | null>(null);
   const [receipt, setReceipt] = useState<AirdropClaimReceipt | null>(null);
@@ -219,12 +225,14 @@ export function useAirdropClaimTransaction(
     setWalletAction(true);
     submittingRef.current = true;
     try {
+      // R5: a new claim queues behind whatever the wallet already broadcast.
+      const sendNonce = nonce ?? (await readPendingNonce());
       const hash = await writeContractAsync({
         address: airdropAddress,
         abi: airdropDistributorAbi,
         functionName: 'claim',
         args: [tokenAddress, entry.share, entry.proof],
-        ...(nonce !== undefined ? { nonce } : {}),
+        ...(sendNonce !== undefined ? { nonce: sendNonce } : {}),
       });
       // Persist before waiting: a refresh while pending must recover this hash.
       if (scope !== null) writeAirdropClaimPending(scope, hash);

@@ -26,7 +26,11 @@ export const copy = {
       tableActions: '操作',
       currentBadge: '当前',
       useAction: '使用此身份 NFT',
+      useSwitching: '切换中…',
       currentAction: '当前身份 NFT',
+      justMinted: '刚铸造',
+      justMintedStrip: (memberId: string, name: string) =>
+        `已铸造 #${memberId} ${name}，已经出现在下面的列表里。`,
       transferAction: '转让',
       transferTitle: '转让身份 NFT',
       transferWarning:
@@ -313,6 +317,12 @@ export const copy = {
       quoteErrorTitle: '价格暂时读不到。',
       quoteErrorBody: '网络可能不稳，你的资产没有变化。',
       quoteErrorRetry: '重新报价',
+      /** R8: an explicit route-loading state instead of a dead form at 0 quote. */
+      routeLoadingTitle: '正在计算兑换路径…',
+      routeLoadingBody: '正在读取交易对与池子，读完后会显示报价。',
+      /** R8: the loading state times out into this retryable card, never a dead form. */
+      routeTimeoutTitle: '兑换路径读得太久了。',
+      routeTimeoutBody: '网络可能不稳，点「重试」重新读取；你的资产没有变化。',
       amountInvalid: '请输入有效的金额。',
       amountTooPrecise: (digits: number) => `小数位不能超过 ${digits} 位。`,
       amountTooSmall: '金额太小，换不到代币。',
@@ -384,6 +394,8 @@ export const copy = {
     },
     staleBlock: '钱包和当前网络对不上，刷新页面或重新连接钱包后再试。',
     nonceUnavailable: '暂时读不到网络状态，请稍后再试。',
+    /** R3: an unfinished task belongs to another wallet/chain; it is never signed here. */
+    ownerChanged: '钱包或网络已经切换，刚才那笔交易没有再提交。请用当前钱包重新发起。',
   },
   advanced: {
     buildId: '构建 ID',
@@ -899,14 +911,16 @@ export const copy = {
     resolvedRecipient: (address: string) => `收款人：${address}`,
   },
   /**
-   * 回执唯一按钮。owner 2026-11-14 二次确认：由「留在本页」改为「知道了」——
-   * 按钮的职责是「关掉回执、留在当前页」，不是再承诺一次「留在本页」；
-   * 导航交给页头返回与底部标签栏。六类回执（swap / mint / airdrop /
-   * transfer / batch / liquidity）共用这一个键。
+   * 回执唯一按钮。owner 2026-11-16：由「知道了」改为「好的」（更轻、不暗示
+   * 「你早该知道」）。六类回执（swap / mint / airdrop / transfer / batch /
+   * liquidity）共用这一个键。
+   *
+   * 行为：mint 回执点「好的」关闭后自动进入 /my-nft 并高亮刚铸造的身份
+   * （owner 2026-11-16）；其余五类仍是「关掉回执、留在当前页」，导航交给
+   * 页头返回与底部标签栏。
    */
   receiptDismiss: {
-    stayHere: '知道了',
-    mintStripTitle: (id: string, name: string) => `已铸造 #${id} ${name}`,
+    dismiss: '好的',
     swapStripTitle: '兑换完成',
     swapStripAmount: (amount: string) => `已到账 ${amount}`,
   },

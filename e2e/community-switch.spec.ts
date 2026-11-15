@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { isolateChain } from './chain';
+import { expectSoftTransition, recordSoftTransition } from './soft-transition';
 import { ACCOUNTS, connect, installWallet } from './wallet-stub';
 
 /**
@@ -119,6 +120,7 @@ test.beforeAll(() => {
 });
 
 test('社区菜单：输入 symbol 精确匹配并切换社区，保留最近访问', async ({ page }) => {
+  await recordSoftTransition(page);
   await installWallet(page, ACCOUNTS.withIdentity);
   await page.goto(`/?symbol=${GENESIS_SYMBOL}`);
   await connect(page);
@@ -141,6 +143,8 @@ test('社区菜单：输入 symbol 精确匹配并切换社区，保留最近访
   });
 
   await result.click();
+  // Owner 2026-11-16: 社区切换换掉整页数据，也要走软过渡（先淡出再淡入）。
+  await expectSoftTransition(page);
   await expect(page).toHaveURL(new RegExp(`[?&]symbol=${CHILD_SYMBOL}(&|$)`), {
     timeout: 15_000,
   });

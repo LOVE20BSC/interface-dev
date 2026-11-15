@@ -3,6 +3,12 @@ import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { isolateChain } from './chain';
 import {
+  expectBusyButtonDuringTransition,
+  expectSoftTransition,
+  freezePageFadeAtMidpoint,
+  recordSoftTransition,
+} from './soft-transition';
+import {
   ACCOUNTS,
   MULTICALL3,
   RPC_URL,
@@ -37,6 +43,12 @@ test.use({
 async function shot(page: Page, name: string): Promise<void> {
   mkdirSync(SHOTS, { recursive: true });
   await page.screenshot({ path: resolve(SHOTS, name), animations: 'disabled' });
+}
+
+/** Mid-transition evidence: the fade must not be fast-forwarded to its end. */
+async function shotLive(page: Page, name: string): Promise<void> {
+  mkdirSync(SHOTS, { recursive: true });
+  await page.screenshot({ path: resolve(SHOTS, name), animations: 'allow' });
 }
 
 /** The page h1 greeting (never a link). */
@@ -241,6 +253,7 @@ test('wallet menu: identity row agrees with the pill when the chain is unreachab
 });
 
 test('my-nft: card list and local selection without a transaction', async ({ page }) => {
+  await recordSoftTransition(page);
   await installWallet(page, ACCOUNTS.withIdentity);
   await page.goto('/my-nft?symbol=TestLOVE20');
   await connect(page);
@@ -251,6 +264,14 @@ test('my-nft: card list and local selection without a transaction', async ({ pag
   await shot(page, 'my-nft-list.png');
 
   await page.getByRole('button', { name: '使用此身份 NFT' }).click();
+  // Owner 2026-11-16: 选择身份 NFT 是整页变化，必须走软过渡而不是「突然刷新」。
+  // Freeze the fade at its midpoint for the screenshot; the probe below records
+  // the phases itself, so neither assertion races the 180/200 ms animation.
+  await freezePageFadeAtMidpoint(page);
+  await shotLive(page, 'my-nft-selecting.png');
+  await expectBusyButtonDuringTransition(page);
+  await expectSoftTransition(page);
+
   // The row keeps its 当前 pill + tint; the disabled button carries the state
   // only as its accessible name (the visible duplicate is gone).
   const identityList = page.getByRole('list', { name: '我的 NFT' });
@@ -264,6 +285,32 @@ test('my-nft: card list and local selection without a transaction', async ({ pag
   await expect(
     page.getByRole('list', { name: '我的 NFT' }).getByText('当前', { exact: true }),
   ).toBeVisible({ timeout: 15_000 });
+});
+
+test('my-nft: 1280×800 dark selection also fades through the soft transition', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await recordSoftTransition(page);
+  await installWallet(page, ACCOUNTS.withIdentity);
+  await page.addInitScript(() => {
+    window.localStorage.setItem('love20:theme', 'dark');
+  });
+  await page.goto('/my-nft');
+  await connect(page);
+
+  await expect(page.getByRole('button', { name: '使用此身份 NFT' })).toBeVisible({
+    timeout: 20_000,
+  });
+  await page.getByRole('button', { name: '使用此身份 NFT' }).click();
+  await freezePageFadeAtMidpoint(page);
+  await shotLive(page, 'my-nft-selecting-dark-desktop.png');
+  await expectBusyButtonDuringTransition(page);
+  await expectSoftTransition(page);
+
+  const table = page.getByRole('table');
+  await expect(table.getByText('当前', { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('button', { name: '当前身份 NFT' })).toBeDisabled();
 });
 
 test('identity cache is cleared when ownerOf belongs to someone else', async ({ page }) => {

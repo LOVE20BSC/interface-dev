@@ -35,6 +35,7 @@ pnpm e2e:reset-chain
 
 - **Stale-build guard（`playwright.config.ts`）**：启动测试前请求已有 preview 的 `/build-id.json`，与本次即将构建的 `E2E_BUILD_ID`（源码 + 构建环境/端点指纹，`scripts/gen-build-id.mjs` 接受该值）比较。一致才 `reuseExistingServer`；不一致时只有 `lsof` + `ps` 证明监听者确实是该端口的 `vite preview` 才重启它，否则立即失败并打印 `:4173 上是旧构建（A ≠ B），拒绝复用`。绝不静默测试旧 bundle。
 - **Wedged-chain guard（`scripts/e2e-chain.mjs`）**：bootstrap 前先用 3 s 超时发 `eth_chainId`。有应答视为链存活，继续校验 chain id、`cast code <memberNFT>` 与完整地址簿部署，而不是重新 bootstrap；端口被占用但不应答则立即 fatal，打印 `lsof -nP -iTCP:8555` 结果并提示 `pnpm e2e:reset-chain`。只在 pidfile + `ps` cmdline 同时证明是本套件的 anvil 时才停止它。`make` 另有 10 分钟上限，避免卡死到 15 分钟锁超时。
+- **Mining-mode restore（`e2e/chain.ts`，2026-11-16）**：`suspendMining()` / `restoreMining()` 成对使用，`restoreMining()` 回读 `anvil_getAutomine` + `anvil_getIntervalMining` 并在不一致时失败；`isolateChain()` 在取快照前与回滚后各恢复一次，见下文「挖矿模式」。`--grep "swap" --repeat-each=3` 用来验证不再泄漏。
 - **Known flake fix（`e2e/tx-recovery.spec.ts`）**：连接后等待 pill 进入稳定态（`打开钱包与身份 NFT 菜单` 触发按钮可见、`网络不对，点此切换` 不存在），并在提交前断言注入钱包的 `eth_chainId` 等于 app chain（31337），避免偶发落到 wrong-network pill 后恢复卡断言超时。
 
 ### 覆盖端点 / 使用别人的链
@@ -65,7 +66,27 @@ E2E_ANVIL_RPC=http://127.0.0.1:8556 pnpm e2e
 - 文件内测试共享夹具（例如 `mint-identity.spec.ts` 先铸造、随后用同一收据去 my-nft 断言），按测试回滚会把下一个测试依赖的状态也抹掉；
 - 快照/回滚作用于整条链，多个 worker 并发时 A 的回滚会覆盖 B 的写入。所以 `playwright.config.ts` 固定 `workers: 1`、`fullyParallel: false`，同一时刻只有一个文件在改链。
 
-不隔离的东西：浏览器 local storage（每个测试有独立 context）、`docs/product/screenshots/` 里的截图文件、构建产物。截图是幂等覆盖写，不会跨运行累积。
+### 挖矿模式（interval mining）—— 必须恢复并回读断言
+
+`make bootstrap` 在 `make verify` 之后把链切成 **1 s interval mining**（`ANVIL_BLOCK_TIME=1`，automine 关）。
+这条链的绝大部分 spec 依赖它：没有出块，提交的交易永远不会上链，整片用例会一起超时。
+
+少数 spec 需要「已广播但还没打包」的窗口，会临时 `anvil_setIntervalMining 0` + `anvil_setAutomine false`
+（`swap-slow-wallet.spec.ts`、`transfer-recovery.spec.ts` 的 D1/D2）。**快照/回滚只恢复链上状态，
+不恢复挖矿模式**（`anvil_snapshot` 不包含它），所以：
+
+1. 需要冻结出块的 spec 用 [`chain.ts`](chain.ts) 的 `suspendMining()`；
+2. `test.afterAll` 必须用 `try/finally` 调 `restoreMining()`，并在 `finally` 里用
+   `readMiningMode()` **回读断言** `automine === SUITE_MINING.automine && intervalMining === SUITE_MINING.intervalMining`；
+3. `isolateChain()` 在 `beforeAll`（取快照前）与 `afterAll`（回滚后）也会各自 `restoreMining()` 一次，
+   所以即使某个文件的 `afterAll` 被跳过（worker 被杀、超时、异常退出），下一个文件仍会把链修回来。
+
+2026-11-16 的两次全量 flake 就是这条泄漏：`afterAll` 里恢复 automine 的分支被跳过（或恢复成
+automine=true 而不是套件默认的 interval mining），后续 spec 的交易再也没被打包。现在恢复失败会在
+**泄漏的那个文件**里以 `[chain] mining mode not restored …` 失败，而不是让下一个文件神秘超时。
+手工抢救：`pnpm e2e:reset-chain`（或 `cast rpc anvil_setIntervalMining 1 --rpc-url http://127.0.0.1:8555`）。
+
+不隔离的东西：浏览器 local storage（每个测试有独立 context）、`docs/product/screenshots/` 里的截图文件、构建产物、**挖矿模式**（靠上面的约定恢复，不靠快照）。截图是幂等覆盖写，不会跨运行累积。
 
 ## 同一时刻只跑一个 e2e 进程（文件锁）
 

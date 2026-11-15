@@ -188,3 +188,50 @@
     animation: none;
   }
 }
+
+/*
+ * Page-level soft transition (owner 2026-11-16: 整页变化不要「突然刷新」).
+ *
+ * `AppShell` puts `data-transition` on <main> and `useSoftTransition().run()`
+ * walks idle → leaving → entering → idle. The change (identity selection,
+ * community, palette, mint receipt → /my-nft) is applied between the two
+ * animations, so it lands while the page content is invisible.
+ *
+ * Durations mirror TRANSITION_LEAVE_MS / TRANSITION_ENTER_MS in
+ * src/shared/model/soft-transition.tsx (180 / 200 ms). CSS only, no library.
+ */
+@keyframes l20-page-leave {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes l20-page-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.l20-page-transition[data-transition='leaving'] {
+  animation: l20-page-leave 180ms ease-in both;
+  /* No double taps while the page is fading out. */
+  pointer-events: none;
+}
+
+.l20-page-transition[data-transition='entering'] {
+  animation: l20-page-enter 200ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .l20-page-transition[data-transition='leaving'],
+  .l20-page-transition[data-transition='entering'] {
+    animation: none;
+    pointer-events: auto;
+  }
+}

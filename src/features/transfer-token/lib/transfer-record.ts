@@ -18,14 +18,25 @@ export type HexHash = `0x${string}`;
  * - `true` → only the success strip is restored (amount + hash + explorer);
  *   the receipt sheet never pops up again (owner 2026-11-14, same rule as
  *   mint/swap).
+ *
+ * `chainId` / `account` / `nonce` are stored *inside* the record as well (R2/R3):
+ * the scope already namespaces the entry, but a record that is read through the
+ * wrong scope (or was written by an older build) must still be rejected instead
+ * of signed by whichever wallet happens to be connected now — and a 「重新提交」
+ * after a refresh must know the original nonce so it replaces that transaction
+ * rather than sending a second one.
  */
 export interface StoredTransfer {
   readonly hash: HexHash;
+  readonly chainId: number;
+  readonly account: HexAddress;
   /** Replay context: token + amount + recipient rebuild the exact same call. */
   readonly token: TransferToken;
   readonly amount: bigint;
   readonly recipient: HexAddress;
   readonly recipientLabel: string | undefined;
+  /** Nonce we asked for / observed; the retry replaces this one, not the next. */
+  readonly nonce: number | undefined;
   readonly confirmed: boolean;
   readonly recordedAt: number;
 }
@@ -66,6 +77,14 @@ function hashOf(value: unknown): HexHash | null {
 
 function addressOf(value: unknown): HexAddress | null {
   return typeof value === 'string' && ADDRESS_RE.test(value) ? (value as HexAddress) : null;
+}
+
+function chainIdOf(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined;
+}
+
+function nonceOf(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 }
 
 function decimalOf(value: unknown): bigint | undefined {
@@ -110,6 +129,12 @@ function timestampOf(value: unknown): number | undefined {
  * Validating read: a malformed / outdated entry is treated as absent (the cache
  * removes only truly unparseable JSON), so a bad record can never rebuild a fake
  * pending state that would block the page.
+ *
+ * The record carries its own `{chainId, account}` and is returned as-is here; the
+ * hook compares it with the connected wallet before restoring/signing anything
+ * (R3) so the mismatch can surface as neutral copy instead of a silent no-op.
+ * The cache scope already namespaces the entry, so the wrong wallet cannot even
+ * read another wallet's record.
  */
 export function readStoredTransfer(scope: CacheScope): StoredTransfer | null {
   const raw: unknown = cache.get<unknown>(scope, TRANSFER_TASK_CACHE_KEY);
@@ -119,13 +144,19 @@ export function readStoredTransfer(scope: CacheScope): StoredTransfer | null {
   const amount = decimalOf(raw.amount);
   const recipient = addressOf(raw.recipient);
   const recordedAt = timestampOf(raw.recordedAt);
+  const storedChainId = chainIdOf(raw.chainId);
+  const storedAccount = addressOf(raw.account);
   if (hash === null || token === null || amount === undefined || recipient === null) return null;
+  if (storedChainId === undefined || storedAccount === null) return null;
   return {
     hash,
+    chainId: storedChainId,
+    account: storedAccount,
     token,
     amount,
     recipient,
     recipientLabel: labelOf(raw.recipientLabel),
+    nonce: nonceOf(raw.nonce),
     confirmed: raw.confirmed === true,
     recordedAt: recordedAt ?? Date.now(),
   };
@@ -139,6 +170,8 @@ export function readStoredTransfer(scope: CacheScope): StoredTransfer | null {
 export function writeStoredTransfer(scope: CacheScope, stored: StoredTransfer): void {
   cache.set(scope, TRANSFER_TASK_CACHE_KEY, {
     hash: stored.hash,
+    chainId: stored.chainId,
+    account: stored.account,
     token: {
       kind: stored.token.kind,
       ...(stored.token.address !== undefined ? { address: stored.token.address } : {}),
@@ -148,6 +181,7 @@ export function writeStoredTransfer(scope: CacheScope, stored: StoredTransfer): 
     amount: stored.amount.toString(),
     recipient: stored.recipient,
     ...(stored.recipientLabel !== undefined ? { recipientLabel: stored.recipientLabel } : {}),
+    ...(stored.nonce !== undefined ? { nonce: stored.nonce } : {}),
     confirmed: stored.confirmed,
     recordedAt: stored.recordedAt,
   });

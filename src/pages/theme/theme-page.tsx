@@ -2,6 +2,7 @@ import type { KeyboardEvent } from 'react';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { THEMES, type ThemeDefinition, type ThemePreview } from '@/shared/lib/theme';
+import { useSoftTransition } from '@/shared/model/soft-transition';
 import { useTheme } from '@/shared/model/use-theme';
 import { Check } from '@/shared/ui/icons';
 
@@ -99,6 +100,17 @@ function ThemeCard({
 
 export function ThemePage() {
   const { theme, selectTheme } = useTheme();
+  const transition = useSoftTransition();
+
+  /**
+   * Owner 2026-11-16: switching the palette repaints every surface. Fade the
+   * page content out, apply the palette while it is invisible, fade back in —
+   * same 180/200 ms soft transition as identity and community switches.
+   */
+  const applyTheme = (next: ThemeDefinition) => {
+    if (transition.isTransitioning) return;
+    transition.run(() => selectTheme(next.id));
+  };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
@@ -106,7 +118,7 @@ export function ThemePage() {
     const current = THEMES.findIndex((item) => item.id === theme);
     const offset = event.key === 'ArrowRight' ? 1 : -1;
     const next = THEMES[(current + offset + THEMES.length) % THEMES.length];
-    if (next !== undefined) selectTheme(next.id);
+    if (next !== undefined) applyTheme(next);
   };
 
   return (
@@ -126,7 +138,7 @@ export function ThemePage() {
             key={definition.id}
             definition={definition}
             selected={theme === definition.id}
-            onSelect={(next) => selectTheme(next.id)}
+            onSelect={applyTheme}
           />
         ))}
       </div>

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ADDRESSES } from '@/config/networks';
@@ -58,7 +58,16 @@ const ROUTE = {
   displayPath: ['ETH', 'TestLOVE20'],
 };
 
-const { pairState, catalogState, txState, quoteState, balanceState } = vi.hoisted(() => ({
+const { pairState, catalogState, txState, quoteState, balanceState, routeState } = vi.hoisted(() => ({
+  routeState: {
+    value: {
+      status: 'ready',
+      route: null as unknown,
+      allPairs: [] as unknown[],
+      failingHopLabel: undefined as string | undefined,
+      retry: () => {},
+    },
+  },
   pairState: {
     value: {
       status: 'ready',
@@ -166,13 +175,7 @@ vi.mock('@/features/swap-token/model/use-swap-fee', () => ({
 }));
 
 vi.mock('@/features/swap-token/model/use-swap-route', () => ({
-  useSwapRoute: () => ({
-    status: 'ready',
-    route: ROUTE,
-    allPairs: [],
-    failingHopLabel: undefined,
-    retry: () => {},
-  }),
+  useSwapRoute: () => routeState.value,
 }));
 
 vi.mock('@/features/swap-token/model/use-swap-quote', () => ({
@@ -186,6 +189,10 @@ vi.mock('@/features/swap-token/model/use-swap-balance', () => ({
 vi.mock('@/features/swap-token/model/use-swap-transaction', () => ({
   useSwapTransaction: () => txState.value,
 }));
+
+function setRoute(status: string, route: unknown): void {
+  routeState.value = { ...routeState.value, status, route };
+}
 
 function renderPanel(): void {
   render(
@@ -210,6 +217,7 @@ function setPair(from: SwapToken, to: SwapToken): void {
 
 beforeEach(() => {
   setPair(ETH, COMMUNITY);
+  setRoute('ready', ROUTE);
 });
 
 describe('SwapTokenPanel 精度字样', () => {
@@ -235,5 +243,45 @@ describe('SwapTokenPanel 精度字样', () => {
     renderPanel();
 
     expect(screen.getByTestId('swap-to-decimals')).toHaveTextContent('精度 6 位');
+  });
+});
+
+
+/**
+ * R8（owner 2026-11-16）：`selectSwapScreenState` 会返回 `route-loading`，但面板没有
+ * 这个分支 —— route 为 null 时直接落最终表单，到账显示 —、报价请求根本不发
+ * （`quote.enabled` 要求 route ready），用户看到的是一个什么都不动的死界面。
+ * 这里锁住：loading 必须有自己的界面，且超时后落成可重试的 route-error。
+ */
+describe('SwapTokenPanel · route-loading（R8）', () => {
+  it('renders an explicit loading screen instead of the final form while the route loads', () => {
+    setRoute('loading', null);
+    renderPanel();
+
+    expect(screen.getByTestId('swap-route-loading')).toBeVisible();
+    expect(screen.getByTestId('swap-route-loading')).toHaveAttribute('aria-busy', 'true');
+    // 死界面的特征（最终表单 + 到账 —）不能出现。
+    expect(screen.queryByTestId('swap-to-amount')).toBeNull();
+    expect(screen.queryByTestId('swap-submit')).toBeNull();
+  });
+
+  it('falls back to a retryable route-error card when loading outlives the timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      setRoute('loading', null);
+      renderPanel();
+      expect(screen.getByTestId('swap-route-loading')).toBeVisible();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+      });
+
+      expect(screen.queryByTestId('swap-route-loading')).toBeNull();
+      expect(screen.getByText('兑换路径读得太久了。')).toBeVisible();
+      expect(screen.getByRole('button', { name: '重试' })).toBeEnabled();
+      expect(screen.queryByTestId('swap-to-amount')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

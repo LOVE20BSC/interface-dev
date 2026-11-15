@@ -332,25 +332,48 @@ test('mint: approve → mint produces a real receipt with MemberMinted data', as
     ACCOUNTS.funded.toLowerCase(),
   );
 
-  // 知道了 is the only receipt button (owner 2026-11-14): it dismisses the
-  // receipt without changing the route and leaves a compact success strip with
-  // the form reset, so the just-minted name cannot be submitted twice.
-  await page.getByRole('button', { name: '知道了' }).click();
+  // 「好的」is the only receipt button (owner 2026-11-16). Not clicking it
+  // leaves the user on /mint: the receipt is a page state, never an auto-jump.
+  await expect(page.getByRole('button', { name: '好的' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: /去我的 NFT|再铸造|回首页/ })).toHaveCount(0);
+  await page.waitForTimeout(500);
   await expect(page).toHaveURL(/\/mint/);
-  await expect(page.getByRole('heading', { name: '铸造成功' })).toHaveCount(0);
-  const strip = page.getByTestId('mint-success-strip');
-  await expect(strip).toBeVisible();
-  await expect(strip).toContainText(`#${mintedMemberId}`);
-  await expect(strip).toContainText(mintedName);
-  await expect(page.getByRole('textbox', { name: /起个名字/ })).toHaveValue('');
-  await expect(page.getByRole('button', { name: /铸造身份/ })).toBeDisabled();
-  await shot(page, 'mint-receipt-dismissed.png');
 
-  // §4.3 / owner 2026-11-14: the receipt is a one-time page state, never
-  // replayed when the page is revisited (reload included).
+  // Owner 2026-11-16: 点「好的」→ 自动回到 /my-nft，新铸造的身份可见且高亮。
+  await page.getByRole('button', { name: '好的' }).click();
+  await expect(page).toHaveURL(/\/my-nft/, { timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: '铸造成功' })).toHaveCount(0);
+
+  const justMintedStrip = page.getByTestId('my-nft-just-minted-strip');
+  await expect(justMintedStrip).toBeVisible({ timeout: 20_000 });
+  await expect(justMintedStrip).toContainText(`#${mintedMemberId}`);
+  await expect(justMintedStrip).toContainText(mintedName);
+
+  const identityList = page.getByRole('list', { name: '我的 NFT' });
+  await expect(identityList.getByText(mintedName, { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(identityList.getByTestId('identity-just-minted')).toBeVisible();
+  const justMintedRow = identityList.getByTestId('identity-just-minted-row');
+  await expect(justMintedRow).toContainText(`#${mintedMemberId}`);
+  // Highlight is not selection: the local identity cache is still empty and the
+  // new row keeps its 「使用此身份 NFT」 action (the wallet may own other
+  // identities, so scope the assertion to the just-minted row).
+  expect(
+    await page.evaluate(
+      (key) => window.localStorage.getItem(key),
+      identityCacheKey(ACCOUNTS.funded),
+    ),
+  ).toBeNull();
+  await expect(justMintedRow.getByRole('button', { name: '使用此身份 NFT' })).toBeVisible();
+  await shot(page, 'my-nft-after-mint.png');
+
+  // §4.3: the receipt is a one-time page state, never replayed when /mint is
+  // revisited (reload included).
+  await page.goto('/mint');
+  await expect(page.getByRole('heading', { name: '铸造成功' })).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole('heading', { name: '铸造成功' })).toHaveCount(0);
-  await expect(page.getByTestId('mint-success-strip')).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: /起个名字/ })).toBeVisible({
     timeout: 30_000,
   });

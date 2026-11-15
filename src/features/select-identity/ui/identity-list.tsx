@@ -5,6 +5,7 @@ import { useAccount } from 'wagmi';
 import { copy } from '@/shared/config/copy-pages';
 import { UNKNOWN } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
+import { useSoftTransition } from '@/shared/model/soft-transition';
 import { Badge } from '@/shared/ui/badge';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
@@ -17,9 +18,17 @@ const TransferIdentityLayer = lazy(async () => {
   return { default: module.TransferIdentityLayer };
 });
 
+/** Handoff from a mint receipt: the row it should highlight after arriving. */
+export interface JustMintedIdentity {
+  readonly tokenId: bigint;
+  readonly name: string;
+}
+
 export interface IdentityListProps {
   readonly identity: MemberIdentityState;
   readonly onRetry: () => void;
+  /** Just minted on /mint: highlight this row until the user leaves the page. */
+  readonly justMinted?: JustMintedIdentity | null;
 }
 
 function SummarySkeleton() {
@@ -50,10 +59,14 @@ function InvalidatedNotice() {
   );
 }
 
-export function IdentityList({ identity, onRetry }: IdentityListProps) {
+export function IdentityList({ identity, onRetry, justMinted = null }: IdentityListProps) {
   const { address: account } = useAccount();
+  const transition = useSoftTransition();
   const [target, setTarget] = useState<MemberIdentity | null>(null);
   const [busy, setBusy] = useState(false);
+  // 使用此身份 NFT is a local cache write (no transaction), but the whole page
+  // changes: keep the tapped row busy while the shell fades it out and back in.
+  const [usingTokenId, setUsingTokenId] = useState<bigint | null>(null);
   const [successRecipient, setSuccessRecipient] = useState<`0x${string}` | null>(null);
 
   const handleConfirmed = (memberId: bigint, to: `0x${string}`) => {
@@ -62,6 +75,20 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
     setSuccessRecipient(to);
     setTarget(null);
     setBusy(false);
+  };
+
+  /**
+   * Owner 2026-11-16: selecting an identity repaints the page (pill, greeting,
+   * balances). Fade the page out, write the selection while it is invisible, then
+   * fade back in — no more「突然刷新」. The row shows a loading button meanwhile.
+   */
+  const handleUse = (tokenId: bigint) => {
+    if (usingTokenId !== null || transition.isTransitioning) return;
+    setUsingTokenId(tokenId);
+    transition.run(() => {
+      identity.select(tokenId);
+      setUsingTokenId(null);
+    });
   };
   const count = identity.balance !== undefined ? identity.balance.toString() : UNKNOWN;
 
@@ -121,19 +148,31 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
         <ul className="space-y-2.5 md:hidden" aria-label={copy.identity.myNftTitle}>
           {identity.identities.map((entry) => {
             const current = identity.selected?.tokenId === entry.tokenId;
+            const justMintedRow = justMinted !== null && justMinted.tokenId === entry.tokenId;
             return (
               <li
                 key={entry.tokenId.toString()}
+                data-testid={justMintedRow ? 'identity-just-minted-row' : undefined}
                 className={cn(
                   'rounded-2xl border p-4 transition-colors',
-                  current ? 'border-brand/40 bg-brand-soft/30' : 'border-line bg-surface',
+                  current
+                    ? 'border-brand/40 bg-brand-soft/30'
+                    : justMintedRow
+                      ? 'border-success/40 bg-success-soft/30'
+                      : 'border-line bg-surface',
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-xs text-muted">
                     {copy.identity.memberId(entry.tokenId.toString())}
                   </span>
-                  {current ? <Badge tone="brand">{copy.pages.myNft.currentBadge}</Badge> : null}
+                  {current ? (
+                    <Badge tone="brand">{copy.pages.myNft.currentBadge}</Badge>
+                  ) : justMintedRow ? (
+                    <Badge tone="success" data-testid="identity-just-minted">
+                      {copy.pages.myNft.justMinted}
+                    </Badge>
+                  ) : null}
                 </div>
                 <p className="mt-1.5 truncate text-base font-semibold text-foreground">
                   {entry.name ?? UNKNOWN}
@@ -142,8 +181,9 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
                   <RowActions
                     current={current}
                     busy={busy}
+                    using={usingTokenId === entry.tokenId}
                     transferring={busy && target?.tokenId === entry.tokenId}
-                    onUse={() => identity.select(entry.tokenId)}
+                    onUse={() => handleUse(entry.tokenId)}
                     onTransfer={() => setTarget(entry)}
                   />
                 </div>
@@ -170,12 +210,18 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
             <tbody>
               {identity.identities.map((entry) => {
                 const current = identity.selected?.tokenId === entry.tokenId;
+                const justMintedRow = justMinted !== null && justMinted.tokenId === entry.tokenId;
                 return (
                   <tr
                     key={entry.tokenId.toString()}
+                    data-testid={justMintedRow ? 'identity-just-minted-row' : undefined}
                     className={cn(
                       'border-t border-line',
-                      current ? 'bg-brand-soft/30' : 'bg-surface',
+                      current
+                        ? 'bg-brand-soft/30'
+                        : justMintedRow
+                          ? 'bg-success-soft/30'
+                          : 'bg-surface',
                     )}
                   >
                     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-muted">
@@ -187,6 +233,14 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
                         <Badge tone="brand" className="ml-2">
                           {copy.pages.myNft.currentBadge}
                         </Badge>
+                      ) : justMintedRow ? (
+                        <Badge
+                          tone="success"
+                          className="ml-2"
+                          data-testid="identity-just-minted"
+                        >
+                          {copy.pages.myNft.justMinted}
+                        </Badge>
                       ) : null}
                     </td>
                     <td className="px-4 py-3">
@@ -194,8 +248,9 @@ export function IdentityList({ identity, onRetry }: IdentityListProps) {
                         <RowActions
                           current={current}
                           busy={busy}
+                          using={usingTokenId === entry.tokenId}
                           transferring={busy && target?.tokenId === entry.tokenId}
-                          onUse={() => identity.select(entry.tokenId)}
+                          onUse={() => handleUse(entry.tokenId)}
                           onTransfer={() => setTarget(entry)}
                         />
                       </div>
@@ -266,12 +321,14 @@ function TransferReceipt({ recipient }: { readonly recipient: `0x${string}` }) {
 function RowActions({
   current,
   busy,
+  using,
   transferring,
   onUse,
   onTransfer,
 }: {
   readonly current: boolean;
   readonly busy: boolean;
+  readonly using: boolean;
   readonly transferring: boolean;
   readonly onUse: () => void;
   readonly onTransfer: () => void;
@@ -287,8 +344,8 @@ function RowActions({
           leadingIcon={<Check className="h-4 w-4" aria-hidden="true" />}
         />
       ) : (
-        <Button size="sm" variant="secondary" onClick={onUse}>
-          {copy.pages.myNft.useAction}
+        <Button size="sm" variant="secondary" onClick={onUse} loading={using}>
+          {using ? copy.pages.myNft.useSwitching : copy.pages.myNft.useAction}
         </Button>
       )}
       <Button

@@ -27,7 +27,10 @@ import {
   selectSwapReceiptView,
   swapPostDismiss,
 } from '@/features/swap-token/lib/swap-receipt-dismissal';
-import { selectSwapScreenState } from '@/features/swap-token/lib/swap-state';
+import {
+  ROUTE_LOADING_TIMEOUT_MS,
+  selectSwapScreenState,
+} from '@/features/swap-token/lib/swap-state';
 import { useSwapBalance } from '@/features/swap-token/model/use-swap-balance';
 import { useSwapCatalog } from '@/features/swap-token/model/use-swap-catalog';
 import { useSwapFee } from '@/features/swap-token/model/use-swap-fee';
@@ -260,6 +263,35 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
             ? 'loading'
             : 'error'
           : routeState.status;
+
+  // R8: `route-loading` is a real screen now, and it has a deadline. Without one,
+  // a slow/failed route read left the form rendered with `route === null`: the 到
+  // amount showed 到 read as —, no quote was requested (quote.enabled needs a ready
+  // route) and the user stared at a dead card forever.
+  const [routeLoadingTimedOut, setRouteLoadingTimedOut] = useState(false);
+  const [routeRetryKey, setRouteRetryKey] = useState(0);
+  /* eslint-disable react-hooks/set-state-in-effect -- a timeout is an external clock event */
+  useEffect(() => {
+    if (routeStatus !== 'loading') {
+      setRouteLoadingTimedOut(false);
+      return;
+    }
+    setRouteLoadingTimedOut(false);
+    const timer = window.setTimeout(
+      () => setRouteLoadingTimedOut(true),
+      ROUTE_LOADING_TIMEOUT_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [routeStatus, routeRetryKey]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const retryRoute = () => {
+    setRouteLoadingTimedOut(false);
+    setRouteRetryKey((key) => key + 1);
+    routeState.retry();
+    wrapped.refetch();
+  };
+
   const pairResolved = pair.status !== 'loading';
   const screen = selectSwapScreenState({
     configured,
@@ -268,6 +300,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     pairResolved,
     pairInvalid: pair.status === 'invalid',
     routeStatus,
+    routeLoadingTimedOut,
   });
 
   const [dismissedReceiptHash, setDismissedReceiptHash] = useState<string | null>(null);
@@ -285,7 +318,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     setUsedNativeMax(false);
   };
 
-  // 知道了: collapse the receipt into the success strip, keep the form reset, and
+  // 「好的」: collapse the receipt into the success strip, keep the form reset, and
   // release every send guard (pending / receipt / approval) so the very next 兑换
   // really submits a second transaction.
   const dismissReceipt = () => {
@@ -503,6 +536,22 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     return <SwapReceipt record={tx.receipt} onDismiss={dismissReceipt} />;
   }
 
+  // R8: an explicit loading screen. It must render before the final form so a null
+  // route can never fall through to a submit-able card with no quote.
+  if (screen === 'route-loading') {
+    return (
+      <div className="space-y-3" data-testid="swap-route-loading" aria-busy="true">
+        <StateCard
+          description={copy.swap.states.routeLoadingBody}
+          title={copy.swap.states.routeLoadingTitle}
+        >
+          <span className="sr-only">{copy.swap.states.routeLoadingTitle}</span>
+        </StateCard>
+        <FormSkeleton />
+      </div>
+    );
+  }
+
   if (screen === 'resolving' || tx.isHydrating || pair.status === 'loading') {
     return (
       <div className="space-y-4" aria-busy="true">
@@ -627,6 +676,28 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
           disabled={catalog.isLoading}
         />
         <Link to="/" className={buttonStyles('secondary', 'md', 'w-full sm:w-auto')}>
+          {copy.swap.states.backHome}
+        </Link>
+      </StateCard>
+    );
+  }
+
+  // R8: the route read timed out — same retryable card, but the copy names the
+  // real cause instead of claiming the quote failed.
+  if (screen === 'route-error' && routeLoadingTimedOut && routeStatus === 'loading') {
+    return (
+      <StateCard
+        title={copy.swap.states.routeTimeoutTitle}
+        description={copy.swap.states.routeTimeoutBody}
+      >
+        <Button
+          variant="primary"
+          onClick={retryRoute}
+          leadingIcon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+        >
+          {copy.swap.states.retry}
+        </Button>
+        <Link to="/" className={buttonStyles('ghost', 'md', 'w-full sm:w-auto')}>
           {copy.swap.states.backHome}
         </Link>
       </StateCard>

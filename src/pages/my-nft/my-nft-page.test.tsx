@@ -5,7 +5,6 @@ import { useAccount } from 'wagmi';
 import { MyNftPage } from '@/pages/my-nft/my-nft-page';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import type { MemberIdentityState } from '@/entities/member-identity/model/use-member-identity';
-
 vi.mock('wagmi', () => ({ useAccount: vi.fn() }));
 
 vi.mock('@/entities/member-identity/model/use-member-identity', () => ({
@@ -39,9 +38,13 @@ function identity(overrides: Partial<MemberIdentityState> = {}): MemberIdentityS
   };
 }
 
-function renderPage(): void {
+function renderPage(
+  entry:
+    | string
+    | { readonly pathname: string; readonly state?: unknown } = '/my-nft?symbol=TestLOVE20',
+): void {
   render(
-    <MemoryRouter initialEntries={['/my-nft?symbol=TestLOVE20']}>
+    <MemoryRouter initialEntries={[entry]}>
       <MyNftPage />
     </MemoryRouter>,
   );
@@ -72,5 +75,43 @@ describe('MyNftPage identity states', () => {
     expect(screen.getByText('这里暂时不能铸造身份 NFT。')).toBeVisible();
     expect(screen.queryByTestId('identity-list')).toBeNull();
     expect(screen.queryByRole('link')).toBeNull();
+  });
+});
+
+describe('MyNftPage after a mint', () => {
+  it('refetches and highlights the identity handed over by the mint receipt', () => {
+    const state = identity({ status: 'needs-selection', selected: null });
+    memberIdentity.mockReturnValue(state);
+
+    renderPage({
+      pathname: '/my-nft',
+      state: { mintedMemberId: '7', mintedName: 'Testdev-member-7' },
+    });
+
+    // 15 s of chain-read cache would hide the row the receipt just announced.
+    expect(state.refetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('my-nft-just-minted-strip')).toHaveTextContent(
+      '已铸造 #7 Testdev-member-7',
+    );
+  });
+
+  it('a plain visit neither refetches nor shows the just-minted strip', () => {
+    const state = identity();
+    memberIdentity.mockReturnValue(state);
+
+    renderPage();
+
+    expect(state.refetch).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('my-nft-just-minted-strip')).toBeNull();
+  });
+
+  it('ignores a malformed handoff instead of crashing on a bad member id', () => {
+    const state = identity();
+    memberIdentity.mockReturnValue(state);
+
+    renderPage({ pathname: '/my-nft', state: { mintedMemberId: 'abc', mintedName: 'x' } });
+
+    expect(state.refetch).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('my-nft-just-minted-strip')).toBeNull();
   });
 });

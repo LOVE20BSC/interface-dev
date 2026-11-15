@@ -11,7 +11,12 @@ import type {
   ApprovalRequest,
   ApprovalTxError,
 } from '@/features/approve-token/lib/approval-types';
-import { useNextNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
+import {
+  useNextNonce,
+  usePendingNonce,
+  useTxWatch,
+  type TxWatch,
+} from '@/shared/model/use-tx-watch';
 import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 
 export type ApprovalStage = 'idle' | 'wallet' | 'pending';
@@ -45,6 +50,7 @@ export function useApprovalTransaction(onConfirmed: () => void): ApprovalTransac
   const { address: account } = useAccount();
   const { writeContractAsync } = useWriteContract();
   const readNextNonce = useNextNonce(account);
+  const readPendingNonce = usePendingNonce(account);
 
   const [pending, setPending] = useState<PendingApproval | null>(null);
   const [record, setRecord] = useState<ApprovalRecord | null>(null);
@@ -108,7 +114,9 @@ export function useApprovalTransaction(onConfirmed: () => void): ApprovalTransac
     setIsWalletAction(true);
     submittingRef.current = true;
     try {
-      const hash = await send(request, nonce);
+      // R5: a new approval queues behind whatever the wallet already broadcast.
+      const sendNonce = nonce ?? (await readPendingNonce());
+      const hash = await send(request, sendNonce);
       setPending({ hash, request });
       return true;
     } catch (cause) {

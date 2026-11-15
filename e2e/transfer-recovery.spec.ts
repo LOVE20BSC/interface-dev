@@ -2,7 +2,15 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { createPublicClient, http, parseAbi } from 'viem';
-import { ANVIL_RPC, anvilRpc, isolateChain } from './chain';
+import {
+  ANVIL_RPC,
+  anvilRpc,
+  isolateChain,
+  readMiningMode,
+  restoreMining,
+  SUITE_MINING,
+  suspendMining,
+} from './chain';
 import { connect, installWallet } from './wallet-stub';
 
 /**
@@ -53,22 +61,20 @@ test.describe.configure({ mode: 'serial', timeout: 240_000 });
 
 isolateChain();
 
-let miningDisabled = false;
-
-async function disableMining(): Promise<void> {
-  await anvilRpc('anvil_setIntervalMining', [0]);
-  await anvilRpc('anvil_setAutomine', [false]);
-  miningDisabled = true;
-}
-
 async function mine(): Promise<void> {
   await anvilRpc('anvil_mine', []);
 }
 
 test.afterAll(async () => {
-  if (miningDisabled) {
-    await anvilRpc('anvil_setAutomine', [true]);
-    await anvilRpc('anvil_setIntervalMining', [1]);
+  // 「挖矿模式泄漏」修复 (owner 2026-11-16): D1 会关掉 interval mining 冻结出块窗口，
+  // 所以必须在这里恢复并回读断言。泄漏出去的慢链会让同链后续 spec 全面超时；
+  // `finally` 保证恢复调用自身失败时断言仍然执行，让失败落在本文件。
+  try {
+    await restoreMining();
+  } finally {
+    const mode = await readMiningMode();
+    expect(mode.automine).toBe(SUITE_MINING.automine);
+    expect(mode.intervalMining).toBe(SUITE_MINING.intervalMining);
   }
 });
 
@@ -223,7 +229,7 @@ test('D4 完成后刷新：成功条与哈希恢复，不再重复弹回执', as
   const hash = (await page.getByTestId('transfer-receipt-hash').innerText()).trim();
   expect(hash).toMatch(/^0x[0-9a-fA-F]{64}$/);
 
-  await page.getByRole('button', { name: '知道了' }).click();
+  await page.getByRole('button', { name: '好的' }).click();
   await expect(page.getByTestId('transfer-success-strip')).toBeVisible();
   await expect.poll(() => tokenBalance(RECIPIENT)).toBe(balanceBefore + 100_000_000_000_000_000n);
 
@@ -294,7 +300,7 @@ test('D2 恢复卡：主按钮禁用并说明，只能从卡里「重新提交�
 
 test('D1 提交后立即刷新：在途卡恢复、不能再发，链上只有一笔', async ({ page }) => {
   // 先冻结出块：刷新窗口里交易必须仍在池中，pending 卡才是真实状态（与慢链一致）。
-  await disableMining();
+  await suspendMining();
   await installWallet(page, SENDER);
   await page.goto(`/transfer${QUERY}`);
   await connect(page);
@@ -355,7 +361,7 @@ test('D1 提交后立即刷新：在途卡恢复、不能再发，链上只有�
   await expect.poll(() => tokenBalance(OUTSIDER)).toBe(balanceBefore + 1_000_000_000_000_000_000n);
   expect(await latestNonce(SENDER)).toBe(nonceBefore + 1);
 
-  await page.getByRole('button', { name: '知道了' }).click();
+  await page.getByRole('button', { name: '好的' }).click();
   await expect(page.getByTestId('transfer-success-strip-amount')).toHaveText(`已转出 1 ${SYMBOL}`);
   await shot(page, 'transfer-d1-single-transfer-receipt.png');
 });

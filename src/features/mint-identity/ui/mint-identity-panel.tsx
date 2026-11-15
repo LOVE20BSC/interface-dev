@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useSimulateContract } from 'wagmi';
 import { RefreshCw } from '@/shared/ui/icons';
 import { memberNftAbi } from '@/config/abis';
@@ -8,6 +8,7 @@ import { copy } from '@/shared/config/copy-pages';
 import { approvalKind } from '@/shared/lib/approval-kind';
 import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { useSoftTransition } from '@/shared/model/soft-transition';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -20,7 +21,8 @@ import { describeMintError } from '@/features/mint-identity/lib/mint-errors';
 import { useMintConfig } from '@/features/mint-identity/model/use-mint-config';
 import { useMintQuote, type MintNameStatus } from '@/features/mint-identity/model/use-mint-quote';
 import { useMintTransaction } from '@/features/mint-identity/model/use-mint-transaction';
-import { selectMintReceiptView } from '@/features/mint-identity/lib/receipt-dismissal';
+import { mintHandoffState } from '@/features/mint-identity/lib/mint-handoff';
+import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { MintFundsBranch } from '@/features/mint-identity/ui/mint-funds-branch';
 import { MintReceipt } from '@/features/mint-identity/ui/mint-receipt';
 
@@ -83,6 +85,9 @@ export function MintIdentityPanel({
   isWrongChain,
   connectAction,
 }: MintIdentityPanelProps) {
+  const navigate = useNavigate();
+  const transition = useSoftTransition();
+  const community = useCommunityContext();
   const [name, setName] = useState('');
   const [preflightError, setPreflightError] = useState<string | null>(null);
   // A stale wallet chain view can also break the eth_call preflight; the card
@@ -90,8 +95,6 @@ export function MintIdentityPanel({
   const [preflightStaleBlock, setPreflightStaleBlock] = useState(false);
   // The eth_call preflight is async; without this a double tap could send two mints.
   const [isPreflighting, setIsPreflighting] = useState(false);
-  // 知道了: the receipt collapses into the in-page success strip.
-  const [dismissedReceiptHash, setDismissedReceiptHash] = useState<string | null>(null);
 
   const config = useMintConfig();
   const quote = useMintQuote(name, config);
@@ -177,24 +180,29 @@ export function MintIdentityPanel({
     tx.clearError();
   };
 
-  const receiptView = selectMintReceiptView(tx.receipt, dismissedReceiptHash);
-  const dismissReceipt = () => {
-    if (tx.receipt === null) return;
-    setDismissedReceiptHash(tx.receipt.hash);
-    // Reset the form so a refreshed quote can never re-submit the minted name.
-    setName('');
-    setPreflightError(null);
-    setPreflightStaleBlock(false);
-    tx.clearError();
+  /**
+   * Owner 2026-11-16: 「好的」on the mint receipt closes it and lands on 我的 NFT,
+   * with the new identity passed through history state so the page refetches and
+   * highlights it. Not clicking the button leaves the user on /mint; the receipt
+   * is a one-time in-memory page state, so a refresh never replays it.
+   */
+  const closeReceipt = () => {
+    if (tx.receipt === null || transition.isTransitioning) return;
+    const handoff = mintHandoffState(tx.receipt);
+    transition.run(() => {
+      // Keep the community context in the URL so /my-nft does not have to seed
+      // (and rewrite) it just to keep the handover state.
+      navigate(`/my-nft?symbol=${encodeURIComponent(community.symbol)}`, { state: handoff });
+    });
   };
 
-  if (tx.receipt !== null && receiptView === 'receipt') {
+  if (tx.receipt !== null) {
     return (
       <MintReceipt
         receipt={tx.receipt}
         paymentSymbol={config.paymentTokenSymbol}
         paymentDecimals={config.paymentTokenDecimals}
-        onDismiss={dismissReceipt}
+        onDismiss={closeReceipt}
       />
     );
   }
@@ -342,13 +350,6 @@ export function MintIdentityPanel({
 
   return (
     <div className="space-y-4">
-      {tx.receipt !== null && receiptView === 'dismissed' ? (
-        <Card data-testid="mint-success-strip" className="border-success/20 bg-success-soft/40">
-          <p className="text-sm font-semibold text-foreground">
-            {copy.receiptDismiss.mintStripTitle(tx.receipt.memberId.toString(), tx.receipt.name)}
-          </p>
-        </Card>
-      ) : null}
       <div>
         <label htmlFor="mint-name" className="text-sm font-medium text-foreground">
           {copy.mintIdentity.name.label}

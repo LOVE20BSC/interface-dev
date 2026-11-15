@@ -1,14 +1,28 @@
-import { useEffect, useRef, useState } from 'react';
-import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAccount, useChainId, usePublicClient, useWriteContract } from 'wagmi';
 import { batchTransferAbi, love20TokenAbi } from '@/config/abis';
 import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import { useNextNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
+import {
+  readResubmitSnapshot,
+  usePendingNonce,
+  useTxWatch,
+  type TxWatch,
+} from '@/shared/model/use-tx-watch';
+import { decideResubmit } from '@/shared/lib/tx-resubmit';
+import { isSameTxOwner, type TxOwner } from '@/shared/lib/tx-owner';
 import { describeBatchError, type BatchErrorMessage } from '@/features/batch-transfer/lib/batch-errors';
+import {
+  clearStoredBatch,
+  createBatchScope,
+  readStoredBatch,
+  writeStoredBatch,
+  type BatchPendingKind,
+} from '@/features/batch-transfer/lib/batch-record';
 import type { BatchRequest } from '@/features/batch-transfer/lib/batch-types';
 
 export type BatchStage = 'idle' | 'wallet' | 'pending';
-export type BatchPendingKind = 'approve' | 'batch';
+export type { BatchPendingKind };
 
 export interface BatchTransactionState {
   readonly stage: BatchStage;
@@ -19,6 +33,8 @@ export interface BatchTransactionState {
   readonly approve: (request: BatchRequest) => Promise<void>;
   /** Simulates, then sends the batch. A simulation failure never asks the wallet. */
   readonly submit: (request: BatchRequest) => Promise<void>;
+  /** A 重新提交 is running: the recovery button must not be clickable again. */
+  readonly isResubmitting: boolean;
   readonly resubmit: () => void;
   readonly clearError: () => void;
 }
@@ -28,10 +44,27 @@ export interface UseBatchTransactionOptions {
   readonly onBatchConfirmed: (hash: `0x${string}`, request: BatchRequest) => void;
 }
 
-interface PendingBatch {
-  readonly hash: `0x${string}`;
+/**
+ * One attempt, remembered BEFORE the wallet opens (R1).
+ *
+ * The old code only recorded the attempt after a hash came back, so a failed
+ * second send left the *previous successful* request as the retry target (the
+ * owner saw the 100 batch re-sent when the 200 batch had failed) and a failed
+ * first send left nothing at all (the recovery button did nothing).
+ */
+interface BatchAttempt extends TxOwner {
   readonly kind: BatchPendingKind;
   readonly request: BatchRequest;
+  readonly hash: `0x${string}` | undefined;
+  readonly nonce: number | undefined;
+}
+
+interface PendingBatch {
+  readonly hash: `0x${string}`;
+  readonly owner: TxOwner;
+  readonly kind: BatchPendingKind;
+  readonly request: BatchRequest;
+  readonly nonce: number | undefined;
 }
 
 /**
@@ -45,22 +78,29 @@ interface PendingBatch {
  * balance) without burning gas — and it keeps 「你的资产没有变化」 literally true.
  *
  * Waiting is the shared bounded watcher; a stuck hash exposes the recovery card
- * with 「重新提交」 (explicit on-chain nonce), exactly like 代币转账.
+ * with 「重新提交」, exactly like 代币转账. R1/R2/R4 (owner 2026-11-16): the attempt
+ * is persisted before the wallet opens and kept while the hash waits, so a refresh
+ * restores the in-flight card (and blocks a second batch), while 重新提交 re-checks
+ * the chain and either replaces the same nonce or stops when the batch already
+ * landed.
  */
 export function useBatchTransaction(
   options: UseBatchTransactionOptions,
 ): BatchTransactionState {
   const { address: account } = useAccount();
+  const chainId = useChainId();
   const batchTransfer = configuredAddress('batchTransfer');
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
-  const readNextNonce = useNextNonce(account);
+  const readPendingNonce = usePendingNonce(account);
 
   const [pending, setPending] = useState<PendingBatch | null>(null);
   const [isWalletAction, setIsWalletAction] = useState(false);
+  const [isResubmitting, setIsResubmitting] = useState(false);
   const [error, setError] = useState<BatchErrorMessage | null>(null);
+  const [isHydrating, setIsHydrating] = useState(true);
   const submittingRef = useRef(false);
-  const lastAttemptRef = useRef<PendingBatch | null>(null);
+  const lastAttemptRef = useRef<BatchAttempt | null>(null);
 
   const onApprovedRef = useRef(options.onApproved);
   const onBatchConfirmedRef = useRef(options.onBatchConfirmed);
@@ -68,6 +108,60 @@ export function useBatchTransaction(
     onApprovedRef.current = options.onApproved;
     onBatchConfirmedRef.current = options.onBatchConfirmed;
   });
+
+  const scope = useMemo(
+    () => (account !== undefined ? createBatchScope(chainId, account) : null),
+    [account, chainId],
+  );
+
+  // R4: a refresh (or leaving the page and coming back) resumes the in-flight batch
+  // instead of showing an empty, submittable form.
+  /* eslint-disable react-hooks/set-state-in-effect -- hydration from the namespaced cache */
+  useEffect(() => {
+    setPending(null);
+    setError(null);
+    setIsWalletAction(false);
+    setIsResubmitting(false);
+    submittingRef.current = false;
+    lastAttemptRef.current = null;
+    setIsHydrating(true);
+    if (scope === null || account === undefined) {
+      setIsHydrating(false);
+      return;
+    }
+    const stored = readStoredBatch(scope);
+    if (stored !== null) {
+      const owner: TxOwner = { chainId: stored.chainId, account: stored.account };
+      // R3: a task belonging to another wallet/chain is cleared, never signed.
+      if (!isSameTxOwner(owner, { chainId, account })) {
+        clearStoredBatch(scope);
+        setError({ message: copy.txWatch.ownerChanged });
+        setIsHydrating(false);
+        return;
+      }
+      if (stored.hash !== null) {
+        setPending({
+          hash: stored.hash,
+          owner,
+          kind: stored.kind,
+          request: stored.request,
+          nonce: stored.nonce,
+        });
+      } else {
+        // The wallet never returned a hash: keep the request retryable, but do not
+        // pretend something is pending (there is nothing to watch).
+        lastAttemptRef.current = {
+          ...owner,
+          kind: stored.kind,
+          request: stored.request,
+          hash: undefined,
+          nonce: stored.nonce,
+        };
+      }
+    }
+    setIsHydrating(false);
+  }, [account, chainId, scope]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const watch = useTxWatch({
     hash: pending?.hash ?? null,
@@ -82,6 +176,8 @@ export function useBatchTransaction(
     if (pending === null || mined === null) return;
 
     if (mined.status === 'reverted') {
+      if (scope !== null) clearStoredBatch(scope);
+      lastAttemptRef.current = null;
       setPending(null);
       setError({
         message:
@@ -92,13 +188,15 @@ export function useBatchTransaction(
       return;
     }
 
+    if (scope !== null) clearStoredBatch(scope);
+    lastAttemptRef.current = null;
     setPending(null);
     if (pending.kind === 'approve') {
       onApprovedRef.current();
     } else {
       onBatchConfirmedRef.current(pending.hash, pending.request);
     }
-  }, [mined, pending]);
+  }, [mined, pending, scope]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const errorContext = (request: BatchRequest) => ({
@@ -171,6 +269,51 @@ export function useBatchTransaction(
     });
   };
 
+  /** Sign one attempt and adopt its hash; the caller owns the locks and wallet state. */
+  const signAttempt = async (attempt: BatchAttempt, nonce: number | undefined): Promise<void> => {
+    const hash =
+      attempt.kind === 'approve'
+        ? await sendApprove(attempt.request, nonce)
+        : await sendBatch(attempt.request, nonce);
+    const settledNonce = nonce ?? attempt.nonce;
+    // R1: the attempt now carries the hash, so the retry targets this transaction.
+    lastAttemptRef.current = { ...attempt, hash, nonce: settledNonce };
+    if (scope !== null) {
+      writeStoredBatch(scope, {
+        hash,
+        chainId: attempt.chainId,
+        account: attempt.account,
+        kind: attempt.kind,
+        request: attempt.request,
+        nonce: settledNonce,
+        recordedAt: Date.now(),
+      });
+    }
+    setPending({
+      hash,
+      owner: { chainId: attempt.chainId, account: attempt.account },
+      kind: attempt.kind,
+      request: attempt.request,
+      nonce: settledNonce,
+    });
+  };
+
+  /** R1: persist the attempt before the wallet opens (hash filled in later). */
+  const persistAttempt = (attempt: BatchAttempt): void => {
+    lastAttemptRef.current = attempt;
+    if (scope !== null) {
+      writeStoredBatch(scope, {
+        hash: attempt.hash ?? null,
+        chainId: attempt.chainId,
+        account: attempt.account,
+        kind: attempt.kind,
+        request: attempt.request,
+        nonce: attempt.nonce,
+        recordedAt: Date.now(),
+      });
+    }
+  };
+
   const submitInternal = async (
     request: BatchRequest,
     kind: BatchPendingKind,
@@ -178,13 +321,24 @@ export function useBatchTransaction(
   ): Promise<void> => {
     if (submittingRef.current) return;
     if (account === undefined || request.rows.length === 0) return;
+    const attempt: BatchAttempt = {
+      chainId,
+      account,
+      kind,
+      request,
+      hash: undefined,
+      nonce,
+    };
+    // R1: persist BEFORE the wallet sheet opens, so a failure — even the first one
+    // — still knows which request 「重试」 must re-send.
+    persistAttempt(attempt);
     setError(null);
     setIsWalletAction(true);
     submittingRef.current = true;
     try {
-      const hash = kind === 'approve' ? await sendApprove(request, nonce) : await sendBatch(request, nonce);
-      lastAttemptRef.current = { hash, kind, request };
-      setPending({ hash, kind, request });
+      // R5: a new operation queues behind whatever the wallet already broadcast.
+      const sendNonce = nonce ?? (await readPendingNonce());
+      await signAttempt(attempt, sendNonce);
     } catch (cause) {
       setError(describeBatchError(cause, errorContext(request)));
     } finally {
@@ -199,20 +353,93 @@ export function useBatchTransaction(
   };
 
   const submit = async (request: BatchRequest): Promise<void> => {
-    if (submittingRef.current || pending !== null) return;
+    if (submittingRef.current || pending !== null || isHydrating) return;
     await submitInternal(request, 'batch');
+  };
+
+  const currentAttempt = (): BatchAttempt | null => {
+    if (pending !== null) {
+      return {
+        ...pending.owner,
+        kind: pending.kind,
+        request: pending.request,
+        hash: pending.hash,
+        nonce: pending.nonce,
+      };
+    }
+    return lastAttemptRef.current;
   };
 
   const resubmit = (): void => {
     void (async () => {
-      const attempt = pending ?? lastAttemptRef.current;
+      if (submittingRef.current) return;
+      const attempt = currentAttempt();
       if (attempt === null) return;
-      const nonce = await readNextNonce();
-      if (nonce === undefined) {
-        setError({ message: copy.txWatch.nonceUnavailable });
+      // R3: never sign another wallet's / chain's request.
+      if (account === undefined || !isSameTxOwner(attempt, { chainId, account })) {
+        lastAttemptRef.current = null;
+        setPending(null);
+        if (scope !== null) clearStoredBatch(scope);
+        setError({ message: copy.txWatch.ownerChanged });
         return;
       }
-      await submitInternal(attempt.request, attempt.kind, nonce);
+      // No hash yet: the wallet rejected/cancelled the send — a plain retry of the
+      // same request, nothing on chain to re-check (R1).
+      if (attempt.hash === undefined) {
+        await submitInternal(attempt.request, attempt.kind);
+        return;
+      }
+
+      const hash = attempt.hash;
+      setError(null);
+      setIsResubmitting(true);
+      setIsWalletAction(true);
+      submittingRef.current = true;
+      try {
+        // R2: re-check the chain right before signing; the original can confirm
+        // during the nonce read.
+        const snapshot = await readResubmitSnapshot(publicClient, account, hash);
+        const decision = decideResubmit(snapshot, attempt.nonce ?? watch.submittedNonce);
+        if (decision.action === 'settled') {
+          if (decision.status === 'reverted') {
+            if (scope !== null) clearStoredBatch(scope);
+            lastAttemptRef.current = null;
+            setPending(null);
+            setError({
+              message:
+                attempt.kind === 'approve'
+                  ? copy.batchTransfer.errors.approveReverted
+                  : copy.batchTransfer.errors.reverted,
+            });
+            return;
+          }
+          // Mined: hand the receipt to the panel exactly like the watcher would —
+          // the retry must never send a second batch.
+          if (scope !== null) clearStoredBatch(scope);
+          lastAttemptRef.current = null;
+          setPending(null);
+          if (attempt.kind === 'approve') onApprovedRef.current();
+          else onBatchConfirmedRef.current(hash, attempt.request);
+          return;
+        }
+        if (decision.action === 'replaced') {
+          // Another transaction took this nonce: re-sending would run the batch
+          // twice. Keep the hash so the watcher's own card explains the state.
+          watch.refresh();
+          return;
+        }
+        if (decision.action === 'unavailable') {
+          setError({ message: copy.txWatch.nonceUnavailable });
+          return;
+        }
+        await signAttempt(attempt, decision.nonce);
+      } catch (cause) {
+        setError(describeBatchError(cause, errorContext(attempt.request)));
+      } finally {
+        setIsWalletAction(false);
+        setIsResubmitting(false);
+        submittingRef.current = false;
+      }
     })();
   };
 
@@ -229,6 +456,7 @@ export function useBatchTransaction(
     watch,
     approve,
     submit,
+    isResubmitting,
     resubmit,
     clearError: () => setError(null),
   };

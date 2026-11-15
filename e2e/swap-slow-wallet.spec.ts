@@ -2,7 +2,14 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { createPublicClient, http, parseAbi } from 'viem';
-import { anvilRpc, isolateChain } from './chain';
+import {
+  anvilRpc,
+  isolateChain,
+  readMiningMode,
+  restoreMining,
+  SUITE_MINING,
+  suspendMining,
+} from './chain';
 import { CHAIN_HEX, connect, installWallet, type WalletStubSend } from './wallet-stub';
 
 /**
@@ -74,30 +81,22 @@ async function writesSent(page: Page): Promise<number> {
   return (await stubState(page)).sends.length;
 }
 
-let miningDisabled = false;
-
-/**
- * The bootstrap chain mines every second (`interval mining enabled`). Turning both
- * interval mining and automine off keeps a submitted transaction in the pool, so
- * `eth_getTransactionReceipt` really returns null for several polls — the slow
- * chain the owner sees while the wallet has already broadcast.
- */
-async function disableMining(): Promise<void> {
-  await anvilRpc('anvil_setIntervalMining', [0]);
-  await anvilRpc('anvil_setAutomine', [false]);
-  miningDisabled = true;
-}
-
 async function mine(): Promise<void> {
   await anvilRpc('anvil_mine', []);
 }
 
 test.afterAll(async () => {
-  // The snapshot revert restores state, not necessarily the mining mode, so put
-  // the chain back the way the suite expects it (1 s interval mining).
-  if (miningDisabled) {
-    await anvilRpc('anvil_setAutomine', [true]);
-    await anvilRpc('anvil_setIntervalMining', [1]);
+  // 「挖矿模式泄漏」修复 (owner 2026-11-16): this file turns interval mining off, so it
+  // MUST put it back with a read-back assertion. A leaked slow chain made every
+  // following spec on the same 8555 hang — the two full-suite flakes. `finally`
+  // keeps the assertion running even if the restore call itself throws, and the
+  // assertion fails THIS spec instead of timing out the next one.
+  try {
+    await restoreMining();
+  } finally {
+    const mode = await readMiningMode();
+    expect(mode.automine).toBe(SUITE_MINING.automine);
+    expect(mode.intervalMining).toBe(SUITE_MINING.intervalMining);
   }
 });
 
@@ -143,7 +142,7 @@ async function receiptHash(page: Page): Promise<`0x${string}`> {
 test('慢钱包 + 钱包 nonce 领先链上（修复前首笔的真实状态）：卡在钱包里，重新提交带链上 nonce 才上链', async ({
   page,
 }) => {
-  await disableMining();
+  await suspendMining();
   // ignorePinnedNonce: 首笔仍然由钱包决定 nonce（修复前行为），把钱包侧那笔 stale
   // nonce 原样提交；「重新提交」的显式 nonce 会被尊重（与 MetaMask 一致）。
   await installWallet(page, ACCOUNT, CHAIN_HEX, {
@@ -210,7 +209,7 @@ test('慢钱包 + 钱包 nonce 领先链上（修复前首笔的真实状态）�
 test('慢钱包首笔一次成功：3 s 钱包延迟 + receipt 先返回 null，不出现「卡在钱包里」、不需要重新提交', async ({
   page,
 }) => {
-  await disableMining();
+  await suspendMining();
   await installWallet(page, ACCOUNT, CHAIN_HEX, { sendDelayMs: 3_000, staleNonceOffset: 1 });
 
   await openWrapForm(page);
@@ -274,7 +273,7 @@ test('慢钱包首笔一次成功：3 s 钱包延迟 + receipt 先返回 null，
 });
 
 test('回执关闭后第二次兑换真实成交：按钮 enabled，第二笔上链并拿到 receipt', async ({ page }) => {
-  await disableMining();
+  await suspendMining();
   await installWallet(page, ACCOUNT, CHAIN_HEX, { sendDelayMs: 3_000, staleNonceOffset: 1 });
 
   await openWrapForm(page);
@@ -287,9 +286,9 @@ test('回执关闭后第二次兑换真实成交：按钮 enabled，第二笔上
   await expect(page.getByRole('heading', { name: '兑换完成' })).toBeVisible({ timeout: 30_000 });
   const firstHash = await receiptHash(page);
 
-  // 知道了 collapses the receipt into the success strip and must release every
+  // 「好的」collapses the receipt into the success strip and must release every
   // send guard (owner 2026-11-14: 回执关闭后再点兑换没反应).
-  await page.getByRole('button', { name: '知道了' }).click();
+  await page.getByRole('button', { name: '好的' }).click();
   await expect(page.getByTestId('swap-success-strip')).toBeVisible();
   await expect(page.getByTestId('swap-from-amount')).toBeVisible({ timeout: 20_000 });
 

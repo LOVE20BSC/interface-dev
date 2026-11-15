@@ -274,7 +274,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       });
       const hash = (await page.getByTestId('liquidity-receipt-hash').innerText()).trim();
       expect(hash).toMatch(/^0x[0-9a-fA-F]{64}$/);
-      await page.getByRole('button', { name: '知道了' }).click();
+      await page.getByRole('button', { name: '好的' }).click();
 
       // 用例 C 的初始状态：我的 LP 与份额。
       await page.getByTestId('liquidity-tab-mine').click();
@@ -304,7 +304,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
         '已撤出 54,983.491651 TestLOVE20 + 18.32783 ETH',
         { timeout: 30_000 },
       );
-      await page.getByRole('button', { name: '知道了' }).click();
+      await page.getByRole('button', { name: '好的' }).click();
       await expect(page.getByText('你还没有这个池子的流动性。')).toBeVisible({ timeout: 20_000 });
     }),
   );
@@ -345,7 +345,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       await expect(page.getByTestId('liquidity-receipt-title')).toHaveText('流动性添加完成', {
         timeout: 30_000,
       });
-      await page.getByRole('button', { name: '知道了' }).click();
+      await page.getByRole('button', { name: '好的' }).click();
 
       await page.getByTestId('liquidity-tab-mine').click();
       await expect(page.getByTestId('liquidity-my-lp')).toHaveText('217.951904', {
@@ -405,7 +405,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       await expect(page.getByTestId('liquidity-receipt-title')).toHaveText('流动性添加完成', {
         timeout: 30_000,
       });
-      await page.getByRole('button', { name: '知道了' }).click();
+      await page.getByRole('button', { name: '好的' }).click();
 
       await page.getByTestId('liquidity-tab-mine').click();
       await expect(page.getByTestId('liquidity-my-lp')).toHaveText('22.360679', {
@@ -451,7 +451,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       await expect(page.getByTestId('liquidity-receipt-title')).toHaveText('流动性添加完成', {
         timeout: 30_000,
       });
-      await page.getByRole('button', { name: '知道了' }).click();
+      await page.getByRole('button', { name: '好的' }).click();
 
       // 建池后查询页只给全局数据：两侧储备 + 双向价格，没有「我的占比」。
       await page.getByTestId('liquidity-tab-query').click();
@@ -526,7 +526,7 @@ test.describe('流动性池 QA 缺陷回归（D1/D2/D4/D5/D6/D7/D8/D9/D10）', (
       await expect(page.getByTestId('liquidity-receipt-title')).toHaveText('流动性添加完成', {
         timeout: 30_000,
       });
-      await page.getByRole('button', { name: '知道了' }).click();
+      await page.getByRole('button', { name: '好的' }).click();
 
       // 第二笔：上一笔把额度用光了，授权按钮重新可点；授权后主按钮必须解锁（旧 bug 永久禁用）。
       await expect(page.getByTestId('liquidity-add-approve')).toBeEnabled({ timeout: 20_000 });
@@ -534,7 +534,7 @@ test.describe('流动性池 QA 缺陷回归（D1/D2/D4/D5/D6/D7/D8/D9/D10）', (
       await expect(page.getByTestId('liquidity-receipt-title')).toHaveText('流动性添加完成', {
         timeout: 30_000,
       });
-      await page.getByRole('button', { name: '知道了' }).click();
+      await page.getByRole('button', { name: '好的' }).click();
 
       await page.getByTestId('liquidity-tab-mine').click();
       await expect(page.getByTestId('liquidity-withdraw-lp')).toBeVisible({ timeout: 20_000 });
@@ -563,7 +563,7 @@ test.describe('流动性池 QA 缺陷回归（D1/D2/D4/D5/D6/D7/D8/D9/D10）', (
       await expect(page.getByTestId('liquidity-receipt-detail')).toContainText('已撤出', {
         timeout: 30_000,
       });
-      await page.getByRole('button', { name: '知道了' }).click();
+      await page.getByRole('button', { name: '好的' }).click();
 
       // 第二笔撤出：LP 额度同样被用光 → 再授权 → 能继续提交。先等「我的凭证」刷新，
       // 否则预设按钮会按旧余额填出超过持仓的数量。
@@ -578,7 +578,7 @@ test.describe('流动性池 QA 缺陷回归（D1/D2/D4/D5/D6/D7/D8/D9/D10）', (
       await expect(page.getByTestId('liquidity-receipt-detail')).toContainText('已撤出', {
         timeout: 30_000,
       });
-      await page.getByRole('button', { name: '知道了' }).click();
+      await page.getByRole('button', { name: '好的' }).click();
     }),
   );
 
@@ -773,7 +773,7 @@ test.describe('流动性池 验收截图', () => {
           await expect(page.getByTestId('liquidity-receipt-title')).toHaveText('流动性添加完成', {
             timeout: 30_000,
           });
-          await page.getByRole('button', { name: '知道了' }).click();
+          await page.getByRole('button', { name: '好的' }).click();
           await page.getByTestId('liquidity-tab-mine').click();
           await expect(page.getByTestId('liquidity-my-lp')).toHaveText('1,003.579928', {
             timeout: 20_000,

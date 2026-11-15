@@ -44,6 +44,22 @@ describe('swap screen state selector', () => {
     expect(selectSwapScreenState({ ...base, routeStatus: 'error' })).toBe('route-error');
   });
 
+  it('renders route-loading as its own screen instead of a dead final form (R8)', () => {
+    expect(selectSwapScreenState({ ...base, routeStatus: 'loading' })).toBe('route-loading');
+  });
+
+  it('turns a route load that outlived the timeout into the retryable route-error (R8)', () => {
+    expect(
+      selectSwapScreenState({ ...base, routeStatus: 'loading', routeLoadingTimedOut: true }),
+    ).toBe('route-error');
+  });
+
+  it('ignores a stale timeout flag once the route is ready', () => {
+    expect(selectSwapScreenState({ ...base, routeStatus: 'ready', routeLoadingTimedOut: true })).toBe(
+      'ready',
+    );
+  });
+
   it('waits on the pair metadata before route loading', () => {
     expect(selectSwapScreenState({ ...base, pairResolved: false, routeStatus: 'ready' })).toBe(
       'resolving',

@@ -101,9 +101,10 @@ function ReceiptBody({ record, onDismiss }: TransferReceiptProps) {
         </div>
       </dl>
 
-      {/* Owner 2026-11-14: one button only — close the receipt and stay here. */}
+      {/* Owner 2026-11-16: one button only —「好的」closes the receipt and stays
+          here. */}
       <Button variant="primary" size="lg" className="w-full" onClick={onDismiss}>
-        {copy.receiptDismiss.stayHere}
+        {copy.receiptDismiss.dismiss}
       </Button>
     </div>
   );

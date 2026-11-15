@@ -820,7 +820,13 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
         >
           {tx.stage === 'pending' ? copy.liquidity.add.submitting : copy.liquidity.add.submit}
         </Button>
-        {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
+        {tx.watch.hash !== null ? (
+          <TxWatchCard
+            watch={tx.watch}
+            onResubmit={tx.resubmit}
+            resubmitDisabled={tx.isResubmitting}
+          />
+        ) : null}
       </ActionStack>
 
       <LiquidityReceiptSheet record={tx.receipt} onDismiss={tx.clearReceipt} />

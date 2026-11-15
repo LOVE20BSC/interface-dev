@@ -398,7 +398,13 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
         >
           {tx.stage === 'pending' ? copy.liquidity.mine.withdrawing : copy.liquidity.mine.withdraw}
         </Button>
-        {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
+        {tx.watch.hash !== null ? (
+          <TxWatchCard
+            watch={tx.watch}
+            onResubmit={tx.resubmit}
+            resubmitDisabled={tx.isResubmitting}
+          />
+        ) : null}
       </ActionStack>
 
       <LiquidityReceiptSheet record={tx.receipt} onDismiss={tx.clearReceipt} />

@@ -18,12 +18,16 @@ import {
   type TxWatchTxObservation,
   resolveTxDeadlineMs,
 } from '@/shared/lib/tx-watch';
+import type { ResubmitSnapshot } from '@/shared/lib/tx-resubmit';
 
 /**
  * Build-time transaction deadline. `VITE_TX_DEADLINE_MS` exists so Playwright can
  * shorten the wait; production uses the 90 s default from the pure module.
  */
 export const TX_DEADLINE_MS = resolveTxDeadlineMs(import.meta.env.VITE_TX_DEADLINE_MS);
+
+/** The wagmi public client the watcher (and a retry re-check) reads through. */
+export type TxReadClient = NonNullable<ReturnType<typeof usePublicClient>>;
 
 /** Poll cadence: three cheap reads per tick; nothing fires without a hash. */
 export const TX_POLL_INTERVAL_MS = 2_500;
@@ -48,6 +52,11 @@ export interface TxWatch {
   readonly hash: HexHash | null;
   /** The receipt for the watched hash, once mined. */
   readonly receipt: TransactionReceipt | null;
+  /**
+   * Nonce the watched hash was observed with, as soon as the node reports it.
+   * A 「重新提交」 must replace *this* nonce, not the wallet's next one (R2).
+   */
+  readonly submittedNonce: number | undefined;
   readonly remainingMs: number;
   readonly remainingSeconds: number;
   /** `slow | dropped | replaced | nonceGap`: render the recovery card, free the CTA. */
@@ -73,15 +82,27 @@ function isNotFoundError(error: unknown): boolean {
   return name === 'TransactionNotFoundError' || name === 'TransactionReceiptNotFoundError';
 }
 
+/**
+ * Three-valued receipt read.
+ *
+ * `none` (the node answered "no such receipt") is a fact the replacement scan may
+ * act on. `failed` is not: a transient RPC failure looks exactly like "not mined
+ * yet", and treating it as either mined or missing is how the watcher used to
+ * report a transaction as its own replacement (P2).
+ */
+type ReceiptRead =
+  | { readonly kind: 'mined'; readonly receipt: TransactionReceipt }
+  | { readonly kind: 'none' }
+  | { readonly kind: 'failed' };
+
 async function readReceipt(
   client: NonNullable<ReturnType<typeof usePublicClient>>,
   hash: HexHash,
-): Promise<TransactionReceipt | null> {
+): Promise<ReceiptRead> {
   try {
-    return await client.getTransactionReceipt({ hash });
-  } catch {
-    // Not mined yet and a transient RPC failure look the same here: no receipt.
-    return null;
+    return { kind: 'mined', receipt: await client.getTransactionReceipt({ hash }) };
+  } catch (error) {
+    return isNotFoundError(error) ? { kind: 'none' } : { kind: 'failed' };
   }
 }
 
@@ -120,12 +141,18 @@ async function readWalletNonces(
  * Best-effort replacement lookup: a different mined transaction from the same
  * wallet with the same nonce. Bounded to the recent blocks and attempted once
  * per watch, because it is the only way to find the hash that actually mined.
+ *
+ * `excludeHash` is the watched hash itself: a transaction that already mined is
+ * still listed in its block, so without this filter a single lagging receipt read
+ * makes the watcher find the transaction and call it its own replacement (P2).
  */
 async function findReplacementHash(
   client: NonNullable<ReturnType<typeof usePublicClient>>,
   wallet: HexAddress,
   nonce: number,
+  excludeHash: HexHash,
 ): Promise<HexHash | null> {
+  const excluded = excludeHash.toLowerCase();
   try {
     const latest = await client.getBlockNumber();
     const oldest =
@@ -135,6 +162,7 @@ async function findReplacementHash(
       for (const entry of block.transactions) {
         if (typeof entry === 'string') continue;
         if (entry.nonce === nonce && entry.from.toLowerCase() === wallet.toLowerCase()) {
+          if (entry.hash.toLowerCase() === excluded) continue;
           return entry.hash;
         }
       }
@@ -207,7 +235,7 @@ export function useTxWatch(options: UseTxWatchOptions): TxWatch {
     };
 
     const observe = async (): Promise<void> => {
-      const [receipt, tx, walletNonces] = await Promise.all([
+      const [receiptRead, tx, walletNonces] = await Promise.all([
         readReceipt(client, hash),
         readTx(client, hash),
         readWalletNonces(client, wallet),
@@ -217,8 +245,11 @@ export function useTxWatch(options: UseTxWatchOptions): TxWatch {
       if (tx !== null && tx !== undefined) knownNonce = tx.nonce;
 
       let replacementHash: HexHash | null | undefined;
+      // Only a *definitive* "no receipt" may trigger the replacement scan. A failed
+      // read cannot tell "mined" from "not mined", so scanning then would let a
+      // single RPC hiccup mark a mined transaction as replaced and stop polling.
       if (
-        receipt === null &&
+        receiptRead.kind === 'none' &&
         !replacementScanned &&
         wallet !== undefined &&
         knownNonce !== undefined &&
@@ -226,18 +257,26 @@ export function useTxWatch(options: UseTxWatchOptions): TxWatch {
         walletNonce > knownNonce
       ) {
         replacementScanned = true;
-        replacementHash = await findReplacementHash(client, wallet, knownNonce);
+        replacementHash = await findReplacementHash(client, wallet, knownNonce, hash);
         if (cancelled) return;
+        // The scan returns only *mined* transactions; never let a defensive miss in
+        // the lookup turn the watched hash into its own replacement.
+        if (replacementHash !== null && replacementHash.toLowerCase() === hash.toLowerCase()) {
+          replacementHash = null;
+        }
       }
 
       const observation: TxWatchObservation = {
-        receipt: receipt === null ? null : { status: receipt.status },
+        receipt:
+          receiptRead.kind === 'mined' ? { status: receiptRead.receipt.status } : null,
         tx,
         walletNonce,
         walletPendingNonce: walletNonces.pending,
         replacementHash,
       };
-      if (receipt !== null) setReceiptForHash({ hash, receipt });
+      if (receiptRead.kind === 'mined') {
+        setReceiptForHash({ hash, receipt: receiptRead.receipt });
+      }
       publish(reduceTxWatch(current, { type: 'observe', observation, now: Date.now() }));
     };
 
@@ -296,6 +335,7 @@ export function useTxWatch(options: UseTxWatchOptions): TxWatch {
     hash,
     receipt:
       receiptForHash !== null && receiptForHash.hash === hash ? receiptForHash.receipt : null,
+    submittedNonce: isCurrentHash ? state.observation.tx?.nonce : undefined,
     remainingMs,
     remainingSeconds,
     isStuck: isTxWatchRecovery(resolvedStatus),
@@ -305,13 +345,43 @@ export function useTxWatch(options: UseTxWatchOptions): TxWatch {
 }
 
 /**
- * Reader for the nonce a 「重新提交」 must carry. Sending it explicitly is what
- * heals the owner-reported dead end: the wallet had nonce 68 cached while the
- * chain was at 3, so its queued transaction could never mine. Reading `latest`
- * (not the wallet's cached value) puts the resubmission back on the chain.
+ * Reader for the nonce a **new operation** must carry (R5): the pool-aware count
+ * (`pending`), so a fresh transaction queues *behind* whatever the wallet already
+ * broadcast instead of reusing a nonce that is still in flight.
  *
- * A failed read returns undefined so callers can show neutral copy instead of
- * signing another possibly-bad transaction.
+ * This replaced the old `latest` read: with 3 mined transactions and a 4th already
+ * in the wallet's queue, `latest` hands out 3 again and the new operation either
+ * gets rejected or bumps the queued one. Explicit nonces are only ever pinned for
+ * a *new* operation (here) or for replacing a known transaction, which uses that
+ * transaction's own nonce (`shared/lib/tx-resubmit.ts`), never this reader.
+ *
+ * A failed read returns undefined so the wallet assigns the nonce and the bounded
+ * watcher still turns any resulting gap into the recovery card.
+ */
+export function usePendingNonce(wallet: HexAddress | undefined): () => Promise<number | undefined> {
+  const client = usePublicClient();
+  return useCallback(async () => {
+    if (client === undefined || wallet === undefined) return undefined;
+    try {
+      return await client.getTransactionCount({ address: wallet, blockTag: 'pending' });
+    } catch {
+      return undefined;
+    }
+  }, [client, wallet]);
+}
+
+/**
+ * Reader for the nonce the wallet-stale-nonce heal carried before R5 existed.
+ *
+ * Sending `latest` explicitly is what healed the owner-reported dead end: the
+ * wallet had nonce 68 cached while the chain was at 3, so its queued transaction
+ * could never mine. The swap 「重新提交」 still uses this reader because the heal it
+ * implements (re-send at the chain's next mined nonce) is the documented owner
+ * fix; the three recovery hooks in this batch use `decideResubmit` instead, which
+ * replaces a still-queued transaction at its own nonce.
+ *
+ * A failed read returns undefined so callers show neutral copy instead of signing
+ * another possibly-bad transaction.
  */
 export function useNextNonce(wallet: HexAddress | undefined): () => Promise<number | undefined> {
   const client = usePublicClient();
@@ -323,4 +393,56 @@ export function useNextNonce(wallet: HexAddress | undefined): () => Promise<numb
       return undefined;
     }
   }, [client, wallet]);
+}
+
+/**
+ * One snapshot for the 「重新提交」 decision (`decideResubmit`).
+ *
+ * Everything is read fresh, on the same client the watcher polls, right before the
+ * retry is allowed to sign — this is the re-check that catches 「读 nonce 期间原交易
+ * 已经确认」. A read failure is preserved as `undefined` (never collapsed into
+ * `null`) so the decision can refuse to sign instead of guessing.
+ */
+export async function readResubmitSnapshot(
+  client: TxReadClient | undefined,
+  wallet: HexAddress | undefined,
+  hash: HexHash,
+): Promise<ResubmitSnapshot> {
+  if (client === undefined || wallet === undefined) {
+    return {
+      receiptStatus: undefined,
+      txNonce: undefined,
+      latestNonce: undefined,
+      pendingNonce: undefined,
+    };
+  }
+  const [receiptRead, txNonce, walletNonces] = await Promise.all([
+    readReceipt(client, hash),
+    readTxNonce(client, hash),
+    readWalletNonces(client, wallet),
+  ]);
+  return {
+    receiptStatus:
+      receiptRead.kind === 'mined'
+        ? receiptRead.receipt.status
+        : receiptRead.kind === 'none'
+          ? null
+          : undefined,
+    txNonce,
+    latestNonce: walletNonces.latest,
+    pendingNonce: walletNonces.pending,
+  };
+}
+
+/** Nonce of the hash when the node still has it; `null` when unknown to the node. */
+async function readTxNonce(
+  client: NonNullable<ReturnType<typeof usePublicClient>>,
+  hash: HexHash,
+): Promise<number | null | undefined> {
+  try {
+    const tx = await client.getTransaction({ hash });
+    return tx.nonce;
+  } catch (error) {
+    return isNotFoundError(error) ? null : undefined;
+  }
 }

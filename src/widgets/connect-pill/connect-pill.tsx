@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { copy } from '@/shared/config/copy';
 import { shortenAddress } from '@/shared/lib/format';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
+import { useSoftTransition } from '@/shared/model/soft-transition';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
 import { WrongNetworkButton } from '@/features/connect-wallet/ui/wrong-network-button';
@@ -36,11 +37,21 @@ export function ConnectPill() {
   const compactChip = location.pathname !== '/' && isCompactViewport;
   const wallet = useWalletConnection();
   const { symbol, switchSymbol } = useCommunityContext();
+  const transition = useSoftTransition();
   const chipSymbol = useCommunityDisplay(symbol).symbol;
   const identity = useMemberIdentity();
   const [openMenu, setOpenMenu] = useState<ConnectPillMenu | null>(null);
   const [communityAnchor, setCommunityAnchor] = useState<HTMLButtonElement | null>(null);
   const [walletAnchor, setWalletAnchor] = useState<HTMLButtonElement | null>(null);
+
+  // Owner 2026-11-16: a community switch swaps every page's data; route it
+  // through the shell's soft transition so the content does not snap.
+  const switchCommunity = (nextSymbol: string) => {
+    const trimmed = nextSymbol.trim();
+    if (trimmed.length === 0 || trimmed === symbol) return;
+    if (transition.isTransitioning) return;
+    transition.run(() => switchSymbol(trimmed));
+  };
 
   // D11: the injected wallet's own chain answers before the dapp is connected,
   // so an installed wallet on another chain gets the switch pill, not 「连接钱包」.
@@ -134,7 +145,7 @@ export function ConnectPill() {
             communityAnchor={communityAnchor}
             walletAnchor={walletAnchor}
             symbol={symbol}
-            onSwitchSymbol={switchSymbol}
+            onSwitchSymbol={switchCommunity}
             address={address}
             identity={identity}
             onDisconnect={wallet.disconnect}

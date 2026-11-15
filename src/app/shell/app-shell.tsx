@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { DEPLOYMENT } from '@/config/networks';
 import { copy } from '@/shared/config/copy';
 import { cn } from '@/shared/lib/cn';
+import { SoftTransitionProvider, useSoftTransition } from '@/shared/model/soft-transition';
 import { AppErrorBoundary } from '@/app/shell/error-boundary';
 import { RouteFallback } from '@/app/shell/route-fallback';
 import { RoutePrefetcher } from '@/app/router/route-prefetcher';
@@ -27,10 +28,24 @@ function TestnetBanner() {
  * Application shell: header + content + mobile tab bar / desktop sidebar.
  * Navigation config is shared by both presentations; the bottom bar is not
  * restyled into the sidebar at md (they are distinct components on purpose).
+ *
+ * The content area carries the page-level soft transition (owner 2026-11-16):
+ * whole-page changes such as selecting an identity NFT, switching the community
+ * or the palette, and the mint receipt jump to /my-nft fade the content out and
+ * back in instead of snapping to the new state.
  */
 export function AppShell() {
+  return (
+    <SoftTransitionProvider>
+      <AppShellLayout />
+    </SoftTransitionProvider>
+  );
+}
+
+function AppShellLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const transition = useSoftTransition();
 
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -45,7 +60,10 @@ export function AppShell() {
         <AppHeader />
         <TestnetBanner />
         <RpcBlockedNotice />
-        <main className="mx-auto w-full max-w-[32rem] flex-1 px-4 pb-[calc(var(--bottom-navigation-height)+16px)] pt-4 md:max-w-2xl md:pb-10">
+        <main
+          data-transition={transition.phase}
+          className="l20-page-transition mx-auto w-full max-w-[32rem] flex-1 px-4 pb-[calc(var(--bottom-navigation-height)+16px)] pt-4 md:max-w-2xl md:pb-10"
+        >
           <AppErrorBoundary key={location.pathname}>
             <Suspense fallback={<RouteFallback />}>
               <Outlet />
