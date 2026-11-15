@@ -3,8 +3,9 @@ import { isTxSendNonceError, isTxStaleBlockError } from '@/shared/lib/tx-send-er
 import { copy } from '@/shared/config/copy-pages';
 
 /**
- * AirdropDistributor custom errors are not part of the protocol error registry,
- * so the handful the claim can actually produce are mapped by selector. Signatures
+ * The claim page needs page-specific wording for the AirdropDistributor errors
+ * it can actually produce, so the handful it cares about are pinned here by
+ * selector; the generated registry table is the generic fallback. Signatures
  * from `export/abis/AirdropDistributor.json`:
  *   AirdropAlreadyClaimed(address,address)          → 0x3349f079
  *   InvalidProof()                                  → 0x09bde339

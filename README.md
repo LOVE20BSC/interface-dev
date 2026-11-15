@@ -151,10 +151,12 @@ and a separate `awaiting-phase-end` state models the current round’s mint. Bou
   and exposes one-shot session flags for preload recovery. No other source file may touch storage.
 - `shared/lib/errors.ts` maps contract custom-error selectors to Chinese sentences. The map is
   generated from `matt-gov/registry/errors.json` into `src/config/errors.generated.ts`
-  (189 unique selectors) with a small hand-written fallback plus `// TODO: regenerate` when the
+  (248 unique selectors) with a small hand-written fallback plus `// TODO: regenerate` when the
   registry is unavailable. Raw revert data, gas/allowance/nonce/revert words and library internals
   never reach the user. Wallet-layer errors live in `features/connect-wallet/lib/wallet-errors.ts`
   so the large contract map is not in the entry chunk.
+- 新增合约错误时，要同步 `scripts/error-messages.zh.json`（这条中文文案就是界面用语），再跑
+  `pnpm gen:errors` 重新生成 `src/config/errors.generated.ts`；缺文案时生成器会直接失败并列出错误名。
 - All UI copy is in `shared/config/copy.ts` (Chinese only; i18n deferred). Follow GLOSSARY terms.
 
 ## i18n readiness (discipline now, library later)
