@@ -1,8 +1,9 @@
 # 20261115-1414-fb74-错误文案同步-补齐-63-条缺失中文并重生成-errors-generated: 错误文案同步：补齐 63 条缺失中文并重生成 errors.generated
 
 - **Tags**: 错误文案, registry, 门禁
-- **Status**: doing · 2026-11-15 14:14:57 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Status**: done · 2026-11-15 14:33:19 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 - **Created**: 2026-11-15 14:14:22 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Sealed**: 2026-11-15 14:33:19 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 
 <!-- Header lines are maintained by the script, fixed order: Tags → Status → Created → Sealed.
      The `- **Tags**: …` line is inserted at the top by new --tags; omitted when there are no tags
@@ -212,3 +213,4 @@ dist/assets/index-DtTS6Dmg.js  548.82 kB │ gzip: 164.94 kB
      Backfill with: progress log --id 20261115-1414-fb74-错误文案同步-补齐-63-条缺失中文并重生成-errors-generated --note "...". -->
 - 2026-11-15 14:14:22 · new · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · created
 - 2026-11-15 14:14:57 · claim · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · claimed → doing
+- 2026-11-15 14:33:19 · close · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · sealed: 已将 registry 同步到 248 选择器并补齐 63 条中文文案（189→252 条），gen:errors 通过、新增 registry 防漂移单测（3 例），首屏 160.8 kB 不变（错误表在懒加载 chunk，+5.2 kB gzip）；633 tests、typecheck/lint/build 全绿，已发布 dev+test。
