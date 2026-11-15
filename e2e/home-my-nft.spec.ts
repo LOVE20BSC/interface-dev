@@ -398,6 +398,9 @@ test('my-nft: transfer drawer warns and rejects the current wallet', async ({ pa
   // promises (irreversible, history/stake move with the NFT) must stay.
   await expect(page.getByText(/转让会改变这个身份/)).toBeVisible();
   await expect(page.getByText(/历史与质押/)).toBeVisible();
+  // owner 2026-11-16 纠正方向：历史与质押绑定在身份 NFT 上，是随 NFT 一起转
+  // 到对方钱包（旧句「不随钱包转走」会被读成留在原钱包）。
+  await expect(page.getByText(/随身份 NFT 一起转到对方钱包/)).toBeVisible();
   // Owner 2026-11-14: the redundant 「转让不可撤销」 line is gone; the asset
   // protection sentences stay.
   await expect(page.getByText(/转让不可撤销/)).toHaveCount(0);

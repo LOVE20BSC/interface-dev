@@ -1,5 +1,5 @@
 import type { MemberIdentityState } from '@/entities/member-identity/model/use-member-identity';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { CommunityMenuContent } from '@/widgets/connect-pill/community-menu-content';
 import { MenuLayer } from '@/widgets/connect-pill/menu-layer';
 import { WalletMenuContent } from '@/widgets/connect-pill/wallet-menu-content';

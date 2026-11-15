@@ -1,6 +1,6 @@
 import { Badge } from '@/shared/ui/badge';
 import { cn } from '@/shared/lib/cn';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import type { MemberIdentity } from '@/entities/member-identity/model/use-member-identities';
 
 export interface IdentityPillProps {

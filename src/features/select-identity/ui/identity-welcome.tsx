@@ -1,7 +1,7 @@
 import { RefreshCw } from '@/shared/ui/icons';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';

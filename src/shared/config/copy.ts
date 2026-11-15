@@ -1,10 +1,4 @@
-import { BRAND_NAME, NETWORK } from '@/config/networks';
-
-/**
- * The chain's native coin (ETH on the local anvil, BNB on BSC). Every string
- * that names it renders this, never a hardcoded ticker (UX spec §1.3/§3.3).
- */
-const NATIVE_SYMBOL = NETWORK.nativeCurrency.symbol;
+import { BRAND_NAME } from '@/config/networks';
 
 /**
  * First-screen copy: shell, home and everything the identity/connect path renders.
@@ -74,77 +68,34 @@ export const copy = {
     expandSidebar: '展开侧栏',
     brandAria: (symbol: string) => `${symbol} 首页`,
   },
+  /**
+   * Connect path only: the button/pill states and the strings they render.
+   * The wallet menu body (labels, identity row, footer) lives in ./copy-pages —
+   * the layer is lazy, so those strings must not ride the first-screen chunk.
+   */
   wallet: {
     connect: '连接钱包',
     connecting: '连接中…',
     checkingWallet: '检测钱包中…',
     wrongNetwork: '网络不对，点此切换',
     switchingNetwork: '切换中…',
-    addressLabel: '钱包地址',
-    copyAddressAria: '复制钱包地址',
-    copiedAddressAria: '钱包地址已复制',
-    identityLabel: '身份 NFT',
     walletMenuAria: '打开钱包与身份 NFT 菜单',
-    tokenBalanceLabel: (symbol: string) => `${symbol} 余额`,
-    viewNft: '查看NFT',
-    goSelect: '去选择',
-    goMint: '去铸造',
     noIdentity: '未关联 NFT',
     noIdentitySelected: '未选择身份 NFT',
     identityReading: '读取身份 NFT 中…',
     identityNotDeployed: '身份 NFT 未部署',
-    /** Wallet-menu identity row: every state must agree with useMemberIdentity(). */
-    identityUnavailable: '身份 NFT 暂时读不到',
-    identityUnavailableBody: '网络可能不稳，身份 NFT 没有变化。',
-    identityUnconfigured: '这个环境还没有部署身份 NFT 合约',
-    nativeFeeNote: `${NATIVE_SYMBOL} 用于支付网络手续费`,
-    nativeBalanceLabel: (symbol: string) => `${symbol} 余额`,
-    disconnect: '断开连接',
-    footer: '当前身份 NFT 保存在这台设备；换浏览器需要重新选择。',
-    menuTitle: '钱包与身份 NFT',
-    noWalletTitle: '没有检测到钱包',
-    noWalletBody: '你可以换一个入口打开本页。',
-    noWalletStepInApp: '在手机钱包 App 的内置浏览器中打开本页；已经在内置浏览器里，关掉再打开。',
-    noWalletStepInstall: '在电脑浏览器安装钱包扩展后刷新。',
-    noWalletCopyLink: '复制本页链接',
-    /** owner 2026-11-16: 全局关闭按钮统一「好的」，旧文案已退役。 */
-    noWalletDismiss: '好的',
     connectErrorTitle: '连接没有完成',
     networkErrorTitle: '网络切换没有完成',
-    networkErrorClose: '关闭',
-    networkErrorRetry: '再试一次',
   },
   community: {
-    recent: '最近访问',
-    emptyRecent: '还没有访问过其他社区。',
-    parent: '父币',
-    child: '子币',
-    notWired: '未接入',
-    switchHint: '切换社区不会切换网络。',
     menuTitle: '代币社区',
     chipAria: (symbol: string) => `当前代币社区 ${symbol}，打开社区菜单`,
-    searchLabel: '按 symbol 搜索代币社区',
-    searchPlaceholder: '输入代币 symbol',
-    searchResults: '搜索结果',
-    searchEmpty: '没有找到这个 symbol 的社区。',
-    searchHint: '输入完整 symbol 可直接切换；前缀相同的社区也会列出来。',
-    searchLoading: '正在查找…',
-    searchError: '社区列表暂时读不到。',
-    searchExact: '精确匹配',
-    searchCurrent: '当前',
   },
   identity: {
-    memberId: (id: string) => `NFT #${id}`,
     disconnectedTitle: '先连接钱包',
     /** Shared honest line for an environment whose address book has no MemberNFT. */
     notDeployedTitle: '这个环境还没有部署身份 NFT 合约',
     notDeployedBody: '这里暂时不能铸造身份 NFT。',
-    unconfiguredBody: '部署地址还没有填。',
-    truncated: '这个钱包持有的身份 NFT 较多，这里只显示前 100 个。',
-    emptyBody: '每个身份 NFT 都是一个独立的身份。铸造后可以参与社区治理与行动。',
-    selectedLabel: '当前身份 NFT',
-    myNftTitle: '我的 NFT',
-    selectedBadge: '当前',
   },
   /**
    * 首页 = 提醒流 (UX spec §3.1, owner 2026-11-11). The page answers one
@@ -198,26 +149,20 @@ export const copy = {
     approvals: '代币授权',
     liquidity: '流动性池',
   },
+  /** Page titles the eager router/header needs; bodies live in ./copy-pages. */
   placeholders: {
     gov: {
       title: '治理',
-      body: '用身份 NFT 对提案投票，按治理轮结算。M0 只做身份 NFT 与兑换。',
     },
     act: {
       title: '行动',
-      body: '链群行动、链群服务、LP 行动。',
     },
     group: {
       title: '链群',
-      body: '链群是身份 NFT 组成的协作单位。',
     },
     me: {
       title: '我的',
-      body: '个人中心还在做。现在可以从首页或右上角进入「我的 NFT」。',
-      extra: '去我的 NFT',
     },
-    nextHome: '回首页',
-    badge: '即将上线',
   },
   banners: {
     testnet: '测试网 · 没有真实价值',
@@ -226,9 +171,6 @@ export const copy = {
     rpcBlockedBody:
       '浏览器会拦截 HTTPS 页面对本地链（127.0.0.1）的请求。请用本地开发服务打开（pnpm dev，如 http://localhost:5180），或换成可访问的链。',
     rpcBlockedDismiss: '好的',
-    buildMismatchTitle: '有新版本，请刷新',
-    buildMismatchBody: '当前输入会丢失。',
-    buildMismatchAction: '刷新页面',
   },
   errors: {
     generic: '操作没有完成，请稍后重试。',
@@ -249,8 +191,6 @@ export const copy = {
   },
   notFound: {
     title: '页面不存在',
-    body: '可能是链接过期或拼错了。',
-    action: '回首页',
   },
   build: {
     version: (buildId: string) => `版本 ${buildId}`,

@@ -1,7 +1,7 @@
 import { LogOut } from '@/shared/ui/icons';
 import { Link } from 'react-router-dom';
 import { NETWORK } from '@/config/networks';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
 import { Badge } from '@/shared/ui/badge';

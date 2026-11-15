@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { buttonStyles } from '@/shared/ui/button';
 import { EmptyState } from '@/widgets/empty-state/empty-state';
 

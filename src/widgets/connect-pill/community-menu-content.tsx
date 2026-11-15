@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowUpLeft, List } from '@/shared/ui/icons';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { Separator } from '@/shared/ui/separator';
 import { useCommunitySymbolSearch } from '@/features/switch-community/model/use-community-symbol-search';

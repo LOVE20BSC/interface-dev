@@ -1,6 +1,6 @@
 import { Check, Copy, Wallet } from '@/shared/ui/icons';
 import { useState } from 'react';
-import { copy } from '@/shared/config/copy';
+import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
 import { Button } from '@/shared/ui/button';
 import { Sheet } from '@/shared/ui/sheet';
