@@ -1,8 +1,9 @@
 # 20261115-1607-42e8-e2e-稳定性-根治-swap-spec-串行-flake-报价超时-余额不足错: e2e 稳定性：根治 swap.spec 串行 flake（报价超时 / 余额不足错误未渲染）
 
 - **Tags**: e2e, flaky, swap
-- **Status**: doing · 2026-11-15 16:08:36 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Status**: done · 2026-11-15 17:57:49 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 - **Created**: 2026-11-15 16:07:44 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Sealed**: 2026-11-15 17:57:49 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 
 <!-- Header lines are maintained by the script, fixed order: Tags → Status → Created → Sealed.
      The `- **Tags**: …` line is inserted at the top by new --tags; omitted when there are no tags
@@ -56,3 +57,4 @@
      Backfill with: progress log --id 20261115-1607-42e8-e2e-稳定性-根治-swap-spec-串行-flake-报价超时-余额不足错 --note "...". -->
 - 2026-11-15 16:07:44 · new · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · created
 - 2026-11-15 16:08:36 · claim · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · claimed → doing
+- 2026-11-15 17:57:49 · close · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · sealed: 已由 recovery-hardening 一并根治：根因是 swap route-loading 无 UI 分支（报价请求根本不发）+ 慢钱包 spec 停矿泄漏（automine/interval 未恢复）；已修（route-loading 独立界面 + 15s 超时降级可重试、e2e 挖矿模式 suspend/restore 回读断言 + isolateChain 双端兜底）；证据：全量 131/131 两遍、--grep swap --repeat-each=3 48 绿。
