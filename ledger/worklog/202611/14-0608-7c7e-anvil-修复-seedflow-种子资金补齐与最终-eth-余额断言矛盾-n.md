@@ -1,8 +1,9 @@
 # 20261114-0608-7c7e-anvil-修复-seedflow-种子资金补齐与最终-eth-余额断言矛盾-n: anvil·修复 SeedFlow 种子资金补齐与最终 ETH 余额断言矛盾（N-01）
 
 - **Tags**: anvil, SeedFlow, 种子资金
-- **Status**: doing · 2026-11-14 06:08:39 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Status**: done · 2026-11-15 14:13:07 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 - **Created**: 2026-11-14 06:08:01 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Sealed**: 2026-11-15 14:13:07 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 
 <!-- Header lines are maintained by the script, fixed order: Tags → Status → Created → Sealed.
      The `- **Tags**: …` line is inserted at the top by new --tags; omitted when there are no tags
@@ -158,3 +159,4 @@ liquidity member + 付得起的 deployer」场景下低余额 bootstrap 全绿�
      Backfill with: progress log --id 20261114-0608-7c7e-anvil-修复-seedflow-种子资金补齐与最终-eth-余额断言矛盾-n --note "...". -->
 - 2026-11-14 06:08:01 · new · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · created
 - 2026-11-14 06:08:39 · claim · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · claimed → doing
+- 2026-11-15 14:13:07 · close · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · sealed: N-01 已按语义修复（启动资金 + 质押额 + 实测 gas 余量），保留最终断言；低余额场景由红转绿、默认 profile 导出逐字节不变；owner 选方案 A。

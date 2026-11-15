@@ -1,8 +1,9 @@
 # 20261114-1256-a9b6-同步-periphery-anvil-到-core-新接口并重建链-重导-abi: 同步 periphery/anvil 到 core 新接口并重建链/重导 ABI/全量回归（等 owner 确认 core 稳定）
 
 - **Tags**: core, periphery, anvil, ABI
-- **Status**: doing · 2026-11-14 12:57:23 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Status**: done · 2026-11-15 14:13:08 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 - **Created**: 2026-11-14 12:56:43 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Sealed**: 2026-11-15 14:13:08 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 
 <!-- Header lines are maintained by the script, fixed order: Tags → Status → Created → Sealed.
      The `- **Tags**: …` line is inserted at the top by new --tags; omitted when there are no tags
@@ -198,3 +199,4 @@
      Backfill with: progress log --id 20261114-1256-a9b6-同步-periphery-anvil-到-core-新接口并重建链-重导-abi --note "...". -->
 - 2026-11-14 12:56:43 · new · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · created
 - 2026-11-14 12:57:23 · claim · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · claimed → doing
+- 2026-11-15 14:13:08 · close · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · sealed: 已完成：anvil 同步 core/action 新接口、live 链三次确定性导出、地址零漂移；前端重导并适配 Hub minLiquidity；后续第三轮 bump 已跟进。

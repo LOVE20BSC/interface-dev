@@ -1,8 +1,9 @@
 # 20261114-1054-6bd1-qa-review-代币转账-逐场景复现并出缺陷清单: QA review·代币转账（逐场景复现并出缺陷清单）
 
 - **Tags**: QA, 代币转账
-- **Status**: doing · 2026-11-14 10:56:05 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Status**: done · 2026-11-15 14:13:08 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 - **Created**: 2026-11-14 10:54:54 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Sealed**: 2026-11-15 14:13:08 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 
 <!-- Header lines are maintained by the script, fixed order: Tags → Status → Created → Sealed.
      The `- **Tags**: …` line is inserted at the top by new --tags; omitted when there are no tags
@@ -92,3 +93,4 @@ owner 2026-11-14：要求「派 agent 先每个页面/模块单独 review」，�
      Backfill with: progress log --id 20261114-1054-6bd1-qa-review-代币转账-逐场景复现并出缺陷清单 --note "...". -->
 - 2026-11-14 10:54:54 · new · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · created
 - 2026-11-14 10:56:05 · claim · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · claimed → doing
+- 2026-11-15 14:13:08 · close · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · sealed: 已产出独立 QA 报告 docs/product/reviews/（场景矩阵 + 缺陷清单 + 证据）；对应缺陷已由后续修复任务闭环，最终以钉版链全量 e2e 130/130 两遍全绿收口。

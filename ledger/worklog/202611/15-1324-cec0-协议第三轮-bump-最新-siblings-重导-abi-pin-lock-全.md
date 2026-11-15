@@ -1,8 +1,9 @@
 # 20261115-1324-cec0-协议第三轮-bump-最新-siblings-重导-abi-pin-lock-全: 协议第三轮 bump：最新 siblings 重导 ABI、pin-lock、全量 e2e 与发布
 
 - **Tags**: core, periphery, ABI, 钉版
-- **Status**: doing · 2026-11-15 13:24:51 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Status**: done · 2026-11-15 14:12:30 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 - **Created**: 2026-11-15 13:24:27 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Sealed**: 2026-11-15 14:12:30 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 
 <!-- Header lines are maintained by the script, fixed order: Tags → Status → Created → Sealed.
      The `- **Tags**: …` line is inserted at the top by new --tags; omitted when there are no tags
@@ -126,3 +127,4 @@ E2E_ANVIL_RPC=http://127.0.0.1:8555 pnpm e2e   # 第 2 遍 21:38:54→21:47:01: 
      Backfill with: progress log --id 20261115-1324-cec0-协议第三轮-bump-最新-siblings-重导-abi-pin-lock-全 --note "...". -->
 - 2026-11-15 13:24:27 · new · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · created
 - 2026-11-15 13:24:51 · claim · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · claimed → doing
+- 2026-11-15 14:12:30 · close · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · sealed: 已完成：重导 ABI、地址零漂移、钉版 bump 到最新 siblings、PINNED=1 与 live 一致、全量 e2e 130/130 两遍、合约线 45/45、已发布 dev+test。

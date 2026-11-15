@@ -1,8 +1,9 @@
 # 20261114-1335-0538-anvil-钉版-siblings-lock-make-bootstrap-pi: anvil·钉版 siblings.lock + make bootstrap PINNED=1（默认仍用软链）
 
 - **Tags**: anvil, 钉版, 并行开发
-- **Status**: doing · 2026-11-14 13:36:18 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Status**: done · 2026-11-15 14:13:08 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 - **Created**: 2026-11-14 13:35:34 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Sealed**: 2026-11-15 14:13:08 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 
 <!-- Header lines are maintained by the script, fixed order: Tags → Status → Created → Sealed.
      The `- **Tags**: …` line is inserted at the top by new --tags; omitted when there are no tags
@@ -68,3 +69,4 @@ tools      44d7f542452713a63b9865b58d4866bfd7c8c804
      Backfill with: progress log --id 20261114-1335-0538-anvil-钉版-siblings-lock-make-bootstrap-pi --note "...". -->
 - 2026-11-14 13:35:34 · new · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · created
 - 2026-11-14 13:36:18 · claim · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · claimed → doing
+- 2026-11-15 14:13:08 · close · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · sealed: 方案 A 已交付：siblings.lock + make pin/pin-status/unpin + make bootstrap PINNED=1；owner 改 core 期间仍可建链，导出与 live 逐字节一致。
