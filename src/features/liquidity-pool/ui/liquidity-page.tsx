@@ -171,8 +171,6 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
 
   return (
     <div className="space-y-4">
-      <p className="text-sm leading-6 text-muted">{copy.liquidity.intro}</p>
-
       <div
         role="tablist"
         aria-label={copy.liquidity.tabs.add}
@@ -266,6 +264,7 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
               customSlippageError={customSlippageError}
               onSelectSlippagePreset={handleSelectPreset}
               onCustomSlippageChange={handleCustomSlippage}
+              onGoWithdraw={() => setTab('mine')}
               isConnected={isConnected}
             />
           </div>

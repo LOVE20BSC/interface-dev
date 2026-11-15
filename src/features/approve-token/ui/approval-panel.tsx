@@ -10,6 +10,7 @@ import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount } from '@/shared/lib/format';
 import { shouldShowPrecision } from '@/shared/lib/token-precision';
+import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shared/ui/token-picker';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
@@ -26,10 +27,6 @@ import {
   buildApprovalSpenders,
   checkSpenderInput,
 } from '@/features/approve-token/lib/approval-spenders';
-import {
-  readUnlimitedApprovalPreference,
-  writeUnlimitedApprovalPreference,
-} from '@/features/approve-token/lib/approval-preference';
 import type { ApprovalMode } from '@/features/approve-token/lib/approval-types';
 import {
   findTokenByAddress,
@@ -92,7 +89,10 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
   const [selectedToken, setSelectedToken] = useState<TransferToken | undefined>(undefined);
   const [customTokenInput, setCustomTokenInput] = useState('');
   const [customInput, setCustomInput] = useState('');
-  const [preference, setPreference] = useState(false);
+  // Device-local preference, shared with every other page's approve ladder
+  // (owner 2026-11-16). The hook re-reads the same storage entry, so there is no
+  // private copy to reconcile.
+  const { enabled: preference, setEnabled: setPreference } = useUnlimitedApprovalPreference();
   const [pendingAction, setPendingAction] = useState<PendingApprovalAction | null>(null);
   const [submitBusy, setSubmitBusy] = useState(false);
 
@@ -137,13 +137,6 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
     allowances.refetch();
     balance.refetch();
   });
-
-  // Preference is a device-local memory, never chain state.
-  /* eslint-disable react-hooks/set-state-in-effect -- hydration-safe read of a browser preference */
-  useEffect(() => {
-    setPreference(readUnlimitedApprovalPreference());
-  }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // A resolved custom token becomes the selection exactly once per address, the
   // same pattern the 代币转账 page uses. D4: when that address is already a
@@ -498,9 +491,7 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
             data-testid="approvals-preference"
             checked={preference}
             onChange={(event) => {
-              const next = event.target.checked;
-              setPreference(next);
-              writeUnlimitedApprovalPreference(next);
+              setPreference(event.target.checked);
             }}
             className="mt-0.5 h-4 w-4 shrink-0 rounded border-line accent-brand"
           />

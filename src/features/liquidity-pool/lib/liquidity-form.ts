@@ -8,7 +8,12 @@ import { parseUnits } from 'viem';
  */
 
 export const DEFAULT_SLIPPAGE_PERCENT = 0.5;
-export const SLIPPAGE_PRESETS = [0.1, 0.5, 1.0] as const;
+/**
+ * 预设档位：旧库 LOVE20TKM 的滑点弹层是 `0.5 / 1.0 / 2.5`，本站默认 0.5% 与 `0.1%`
+ * 是三线口径（不能把默认值改成旧库的 2.5%，否则 `minLiquidity` 全部理论值都会变），
+ * 所以并集是 `0.1 / 0.5 / 1.0 / 2.5`：旧库用户能找到同样的 2.5% 档位。
+ */
+export const SLIPPAGE_PRESETS = [0.1, 0.5, 1.0, 2.5] as const;
 export const MIN_SLIPPAGE_PERCENT = 0.01;
 export const MAX_SLIPPAGE_PERCENT = 50;
 

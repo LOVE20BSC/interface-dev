@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ADDRESSES } from '@/config/networks';
@@ -216,6 +216,7 @@ function setPair(from: SwapToken, to: SwapToken): void {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
   setPair(ETH, COMMUNITY);
   setRoute('ready', ROUTE);
 });
@@ -283,5 +284,56 @@ describe('SwapTokenPanel · route-loading（R8）', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+
+/**
+ * 默认使用长期授权 (owner 2026-11-16): 兑换页的授权按钮必须读同一个设备偏好，
+ * 按钮文案随之变成「长期授权 {symbol}」，点击后写 maxUint256；关闭时仍是精确额。
+ */
+describe('SwapTokenPanel · 默认使用长期授权偏好', () => {
+  const PREFERENCE_KEY = 'love20:tokenApprovalUseUnlimitedByDefault';
+
+  async function renderWithAmount(amount: string): Promise<ReturnType<typeof vi.fn>> {
+    // ERC20 输入需要授权：allowance 0，输入 100。
+    balanceState.value = { ...balanceState.value, allowance: 0n };
+    const approve = vi.fn();
+    txState.value = { ...txState.value, approve };
+    setPair(COMMUNITY, ETH);
+    setRoute('ready', ROUTE);
+    renderPanel();
+    fireEvent.change(screen.getByTestId('swap-from-amount'), { target: { value: amount } });
+    // The amount input is debounced (400 ms); let the panel see the parsed value.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    });
+    return approve;
+  }
+
+  it('偏好关闭时按钮=授权 {symbol}，点击写精确额', async () => {
+    const approve = await renderWithAmount('0.5');
+    const button = screen.getByTestId('swap-approve');
+    expect(button).toHaveTextContent('授权 TestLOVE20');
+    expect(button).not.toHaveTextContent('长期授权');
+    expect(screen.getByTestId('swap-approve-note')).toHaveTextContent(
+      '第一次只是允许合约扣走最多这么多的 TestLOVE20',
+    );
+
+    fireEvent.click(button);
+    expect(approve).toHaveBeenCalledWith(5n * 10n ** 17n);
+  });
+
+  it('偏好开启时按钮=长期授权 {symbol}，点击写 maxUint256，提示说明会授权长期额度', async () => {
+    window.localStorage.setItem(PREFERENCE_KEY, '1');
+    const approve = await renderWithAmount('0.5');
+    const button = screen.getByTestId('swap-approve');
+    expect(button).toHaveTextContent('长期授权 TestLOVE20');
+    expect(screen.getByTestId('swap-approve-note')).toHaveTextContent(
+      '这次会授权长期额度（几乎无限）',
+    );
+
+    fireEvent.click(button);
+    expect(approve).toHaveBeenCalledWith(2n ** 256n - 1n);
   });
 });

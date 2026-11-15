@@ -6,11 +6,13 @@ import { NETWORK, configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { approvalKind } from '@/shared/lib/approval-kind';
+import { decideApproveAmount } from '@/shared/lib/approve-amount';
 import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
 import { shouldShowPrecision } from '@/shared/lib/token-precision';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
+import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
 import { ActionStack } from '@/shared/ui/action-stack';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import {
@@ -130,6 +132,9 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
   const [usedNativeMax, setUsedNativeMax] = useState(false);
+  // 默认使用长期授权 (owner 2026-11-16): the same device preference the approvals
+  // page writes decides this page's approve amount and its button copy.
+  const { enabled: useUnlimitedApproval } = useUnlimitedApprovalPreference();
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedAmount(amountInput), 400);
@@ -197,6 +202,9 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
   });
 
   const effectiveAllowance = tx.approvedAmount ?? balance.allowance;
+  /** The amount the 授权 button writes: maxUint256 when the preference is on. */
+  const approveAmount =
+    amountIn === undefined ? undefined : decideApproveAmount(useUnlimitedApproval, amountIn);
   const needsApproval =
     from !== undefined &&
     from.kind !== 'native' &&
@@ -404,8 +412,8 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     if (isPreparing || amountIn === undefined || amountIn <= 0n) return;
     if (txBusy) return;
     if (needsApproval) {
-      if (!canApprove) return;
-      tx.approve(amountIn);
+      if (!canApprove || approveAmount === undefined) return;
+      tx.approve(approveAmount);
       return;
     }
     if (!canSwap) return;
@@ -447,7 +455,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
       return;
     }
     if (tx.error?.action === 'approve') {
-      if (amountIn !== undefined) tx.approve(amountIn);
+      if (approveAmount !== undefined) tx.approve(approveAmount);
       return;
     }
     void handlePrimary();
@@ -470,14 +478,18 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
       ? copy.approve.approving
       : tx.approveStage === 'pending'
         ? copy.approve.confirming
-        : copy.approve.action(from?.symbol ?? '')
+        : useUnlimitedApproval
+          ? copy.approve.longTermAction(from?.symbol ?? '')
+          : copy.approve.action(from?.symbol ?? '')
     : effectiveAllowance === undefined
       ? copy.approve.loading
       : longTermApproved
         ? copy.approve.longTermActive
         : copy.approve.approved;
   const approveNote = needsApproval
-    ? copy.approve.note(from?.symbol ?? '')
+    ? useUnlimitedApproval
+      ? copy.approve.longTermApproveNote(from?.symbol ?? '')
+      : copy.approve.note(from?.symbol ?? '')
     : effectiveAllowance === undefined
       ? null
       : longTermApproved
@@ -1047,7 +1059,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
                 className="min-w-0 flex-1 px-3 whitespace-nowrap"
                 data-testid="swap-approve"
                 onClick={() => {
-                  if (amountIn !== undefined) tx.approve(amountIn);
+                  if (approveAmount !== undefined) tx.approve(approveAmount);
                 }}
                 disabled={!needsApproval || !canApprove || tx.approveStage !== 'idle'}
                 loading={tx.approveStage === 'wallet'}

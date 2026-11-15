@@ -71,7 +71,11 @@ export function LiquiditySettings({
                   key={preset}
                   type="button"
                   data-testid={`liquidity-slippage-${preset}`}
-                  onClick={() => onSelectPreset(preset)}
+                  onClick={() => {
+                    // 旧库 LOVE20TKM 的滑点弹层：点预设即应用并关闭弹层。
+                    onSelectPreset(preset);
+                    setOpen(false);
+                  }}
                   className={cn(
                     'rounded-full border px-3 py-1.5 text-xs font-medium',
                     !isPreset

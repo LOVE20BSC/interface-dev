@@ -173,6 +173,7 @@ function panelElement(overrides: {
       customSlippageError={overrides.customSlippageError}
       onSelectSlippagePreset={() => {}}
       onCustomSlippageChange={() => {}}
+      onGoWithdraw={() => {}}
       isConnected
     />
   );

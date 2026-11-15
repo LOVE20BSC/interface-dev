@@ -5,6 +5,7 @@ import { AlertTriangle, Check, RefreshCw } from '@/shared/ui/icons';
 import { NETWORK, configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
+import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
 import { formatAmount, formatVisibleTokenAmount } from '@/shared/lib/format';
 import { knownContractLabelOf } from '@/shared/lib/recipient-protection';
 import { shouldShowPrecision } from '@/shared/lib/token-precision';
@@ -293,6 +294,9 @@ export function BatchTransferPanel({
     return label === undefined ? [] : [{ line: row.line, label }];
   });
   const knownBlocked = assetProtection.enabled && knownRows.length > 0;
+  // 默认使用长期授权 (owner 2026-11-16): the approvals-page switch. Amount decision
+  // lives in the transaction hook (send time); here it only drives copy.
+  const { enabled: useUnlimitedApproval } = useUnlimitedApprovalPreference();
 
   const canApprove = baseValid && needsApproval && token?.address !== undefined;
   const canBatch =
@@ -421,7 +425,12 @@ export function BatchTransferPanel({
     }
     if (mode === 'token') {
       // Global 授权 copy (owner 2026-11-14): same sentence on every page.
-      if (needsApproval) return copy.approve.action(symbol);
+      // 长期授权 preference (owner 2026-11-16) also renames the button.
+      if (needsApproval) {
+        return useUnlimitedApproval
+          ? copy.approve.longTermAction(symbol)
+          : copy.approve.action(symbol);
+      }
       return copy.batchTransfer.ctaBatch;
     }
     return copy.batchTransfer.ctaNative;
@@ -802,7 +811,9 @@ export function BatchTransferPanel({
                 data-state={needsApproval ? 'need' : 'ready'}
               >
                 {needsApproval
-                  ? copy.batchTransfer.allowanceNeed
+                  ? useUnlimitedApproval
+                    ? copy.batchTransfer.allowanceNeedLongTerm
+                    : copy.batchTransfer.allowanceNeed
                   : copy.batchTransfer.allowanceReady}
               </p>
             ) : null}

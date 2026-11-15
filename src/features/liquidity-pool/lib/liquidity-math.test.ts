@@ -9,8 +9,10 @@ import {
   optimalAmounts,
   planDualAdd,
   planWithdraw,
+  priceChangePercent,
   priceRatio,
   sharePercent,
+  hubReservesAfterAdd,
 } from '@/features/liquidity-pool/lib/liquidity-math';
 
 /**
@@ -186,5 +188,86 @@ describe('priceRatio', () => {
       base: RESERVE_NATIVE,
     });
     expect(priceRatio(0n, RESERVE_TOKEN)).toBeUndefined();
+  });
+});
+
+describe('hubReservesAfterAdd（旧库「添加后价格」）', () => {
+  it('用例 A：单边社区代币 swap + 进池后 = 300,000 / 100', () => {
+    const after = hubReservesAfterAdd({
+      reserveToken: RESERVE_TOKEN,
+      reserveNative: RESERVE_NATIVE,
+      swapTokenInIsToken: true,
+      amountToSwap: 45_016_508_348_071_107_131_609n,
+      amountOutFromSwap: 18_327_830_550_642_964_289n,
+      usableToken: 54_983_491_651_928_892_868_391n,
+      usableNative: 18_327_830_550_642_964_289n,
+    });
+    expect(after).toEqual({
+      reserveToken: 300_000_000_000_000_000_000_000n,
+      reserveNative: RESERVE_NATIVE,
+    });
+  });
+
+  it('用例 B：单边原生币 swap + 进池后 = 200,000 / 109999999999999999999', () => {
+    const after = hubReservesAfterAdd({
+      reserveToken: RESERVE_TOKEN,
+      reserveNative: RESERVE_NATIVE,
+      swapTokenInIsToken: false,
+      amountToSwap: 4_888_217_399_419_358_069n,
+      amountOutFromSwap: 9_294_150_182_873_894_419_011n,
+      usableToken: 9_294_150_182_873_894_419_011n,
+      // 理论线：usableAmountB 比 preparedAmountB 少 1 wei（Hub 按比例截断后退回用户）。
+      usableNative: 5_111_782_600_580_641_930n,
+    });
+    expect(after).toEqual({
+      reserveToken: RESERVE_TOKEN,
+      reserveNative: 109_999_999_999_999_999_999n,
+    });
+  });
+
+  it('储备不够扣 swap 输出时返回 undefined（不显示错误价格）', () => {
+    expect(
+      hubReservesAfterAdd({
+        reserveToken: 10n,
+        reserveNative: 10n,
+        swapTokenInIsToken: true,
+        amountToSwap: 1n,
+        amountOutFromSwap: 11n,
+        usableToken: 0n,
+        usableNative: 0n,
+      }),
+    ).toBeUndefined();
+  });
+});
+
+describe('priceChangePercent（旧库「添加后价格」的涨跌幅）', () => {
+  it('用例 A：1 ETH 从 2,000 涨到 3,000 TestLOVE20 → +50.00%', () => {
+    expect(
+      priceChangePercent(
+        { quote: RESERVE_TOKEN, base: RESERVE_NATIVE },
+        { quote: 3n * 10n ** 23n, base: RESERVE_NATIVE },
+      ),
+    ).toBe('+50.00%');
+  });
+
+  it('下跌与不变都带正确的符号', () => {
+    expect(
+      priceChangePercent(
+        { quote: RESERVE_TOKEN, base: RESERVE_NATIVE },
+        { quote: RESERVE_TOKEN, base: 2n * 10n ** 20n },
+      ),
+    ).toBe('-50.00%');
+    expect(
+      priceChangePercent(
+        { quote: RESERVE_TOKEN, base: RESERVE_NATIVE },
+        { quote: RESERVE_TOKEN, base: RESERVE_NATIVE },
+      ),
+    ).toBe('0.00%');
+  });
+
+  it('任一比率为 0 时不显示涨跌', () => {
+    expect(
+      priceChangePercent({ quote: 0n, base: RESERVE_NATIVE }, { quote: 1n, base: 1n }),
+    ).toBeUndefined();
   });
 });

@@ -250,7 +250,31 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
         'true',
       );
 
+      // 旧库 LOVE20TKM 加池抬头：底池总LP / 我的LP（还没有 LP 时是 0）。
+      await expect(page.getByTestId('liquidity-pool-total-supply')).toHaveText('4,472.135954', {
+        timeout: 20_000,
+      });
+      await expect(page.getByTestId('liquidity-pool-my-lp')).toHaveText('0');
+      await expect(page.getByTestId('liquidity-go-withdraw')).toHaveCount(0);
+      // 旧库「当前池价格」默认 1 社区代币 = X 原生币，箭头切换方向。
+      await expect(page.getByTestId('liquidity-price-current')).toHaveText(
+        '1 TestLOVE20 = 0.0005 ETH',
+        { timeout: 20_000 },
+      );
+      await page.getByTestId('liquidity-price-toggle').click();
+      await expect(page.getByTestId('liquidity-price-current')).toHaveText(
+        '1 ETH = 2,000 TestLOVE20',
+      );
+      await page.getByTestId('liquidity-price-toggle').click();
+
       await addQuote(page, '100000');
+      // Hub 会先换掉 45,016.508348 TestLOVE20：加池后 1 ETH 从 2,000 涨到 3,000，
+      // 所以默认方向（1 社区代币 = X ETH）的涨跌幅是 -33.33%。
+      await expect(page.getByTestId('liquidity-price-after')).toHaveText(
+        '1 TestLOVE20 = 0.000333 ETH',
+        { timeout: 20_000 },
+      );
+      await expect(page.getByTestId('liquidity-price-change')).toHaveText('（-33.33%）');
       // §1.2 用例 A：过程量默认收起，点开「详情」才出现。
       await expect(page.getByTestId('liquidity-details')).toHaveCount(0);
       await expect(page.getByTestId('liquidity-quote-liquidity')).toHaveText(
@@ -331,7 +355,14 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
         '至少获得 216.862145 流动性凭证',
       );
 
-      // 「已为网络手续费预留」只在点过「全部」原生币之后出现。
+      // 旧库的 25% / 50% / 最高 快捷按钮：原生币按「余额 − 手续费预留」算。
+      await page.getByTestId('liquidity-native-percent-25').click();
+      await expect(page.getByTestId('liquidity-native-amount')).toHaveValue('2499.99975');
+      await expect(page.getByTestId('liquidity-native-gas-note')).toHaveCount(0);
+      await page.getByTestId('liquidity-native-amount').fill('10');
+      await expect(page.getByTestId('liquidity-price-after')).toBeVisible({ timeout: 20_000 });
+
+      // 「已为网络手续费预留」只在点过「最高」原生币之后出现。
       await expect(page.getByTestId('liquidity-native-gas-note')).toHaveCount(0);
       await page.getByTestId('liquidity-native-max').click();
       await expect(page.getByTestId('liquidity-native-gas-note')).toHaveText(

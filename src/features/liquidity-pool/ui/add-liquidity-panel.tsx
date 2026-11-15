@@ -1,20 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, Zap } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, Zap } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { love20HubAbi, uniswapV2Router02Abi } from '@/config/abis';
 import { configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { formatRate, formatTokenAmount, formatUnits } from '@/shared/lib/format';
+import { formatPercent, formatRate, formatTokenAmount, formatUnits } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { ActionStack } from '@/shared/ui/action-stack';
 import { approvalKind } from '@/shared/lib/approval-kind';
+import { decideApproveAmount } from '@/shared/lib/approve-amount';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
 import {
   applySlippageDown,
+  hubReservesAfterAdd,
   mirrorAmount,
   planDualAdd,
+  priceChangePercent,
+  sharePercent,
 } from '@/features/liquidity-pool/lib/liquidity-math';
 import {
   addSideIssue,
@@ -47,6 +52,8 @@ export interface AddLiquidityPanelProps {
   readonly customSlippageError: string | undefined;
   readonly onSelectSlippagePreset: (percent: number) => void;
   readonly onCustomSlippageChange: (value: string) => void;
+  /** 加池抬头里的「撤出」：本站不新开路由，切到「我的流动性」页签。 */
+  readonly onGoWithdraw: () => void;
   readonly isConnected: boolean;
 }
 
@@ -64,10 +71,16 @@ export interface AddLiquidityPanelProps {
  */
 
 const CARD = 'rounded-3xl border border-line bg-surface p-5 shadow-soft';
+/** 右侧留出代币徽标的位置（旧库把代币符号放在输入框右端）。 */
 const INPUT =
-  'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated px-3 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20';
-const INPUT_LINKED =
-  'cursor-default border-dashed bg-elevated/60 pr-3 text-muted focus:border-line focus:ring-0';
+  'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated pl-3 pr-24 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20';
+const INPUT_LINKED = 'cursor-default border-dashed bg-elevated/60 text-muted focus:border-line focus:ring-0';
+const BADGE =
+  'pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-foreground';
+const QUICK_BUTTON =
+  'rounded-full border border-line px-2.5 py-0.5 text-[11px] font-medium text-foreground hover:bg-elevated disabled:opacity-50';
+/** 旧库两个输入框的快捷比例（另有「最高」= 100%）。 */
+const QUICK_PERCENTS = [25, 50] as const;
 
 type Side = 'token' | 'native';
 
@@ -82,9 +95,13 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
     customSlippageError,
     onSelectSlippagePreset,
     onCustomSlippageChange,
+    onGoWithdraw,
     isConnected,
   } = props;
   const { address: account } = useAccount();
+  // 默认使用长期授权 (owner 2026-11-16): same device preference as /approvals;
+  // off → exact required amount (unchanged), on → maxUint256 + 长期授权 copy.
+  const { enabled: useUnlimitedApproval } = useUnlimitedApprovalPreference();
   const hub = configuredAddress('hub');
   const router = configuredAddress('router');
 
@@ -96,6 +113,8 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
   /** 只有用户点过「全部」原生币，才提「已为网络手续费预留」。 */
   const [nativeMaxPicked, setNativeMaxPicked] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  /** 旧库 `Liquidity.tsx` 的「当前池价格」方向：默认 1 社区代币 = X 原生币。 */
+  const [showTokenToBase, setShowTokenToBase] = useState(true);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const tokenBalance = useTokenBalance(token, account);
@@ -371,6 +390,26 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
     mirrorOtherSide('native', value);
   };
 
+  /** 旧库同类快捷按钮：25% / 50% 按余额（原生币按「余额 − 手续费预留」）填，仍可手改。 */
+  const setTokenPercent = (percent: number) => {
+    if (tokenBalance.value === undefined) return;
+    const value = formatUnits((tokenBalance.value * BigInt(percent)) / 100n, token.decimals);
+    setTokenInput(value);
+    setSubmitError(null);
+    tx.clearError();
+    mirrorOtherSide('token', value);
+  };
+
+  const setNativePercent = (percent: number) => {
+    if (nativeAvailable === undefined) return;
+    const value = formatUnits((nativeAvailable * BigInt(percent)) / 100n, native.decimals);
+    setNativeInput(value);
+    setNativeMaxPicked(false);
+    setSubmitError(null);
+    tx.clearError();
+    mirrorOtherSide('native', value);
+  };
+
   const toggleSmartMode = () => {
     setSmartMode((current) => !current);
     setLinkedSide(null);
@@ -385,7 +424,7 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
       tokenAddress: token.address,
       kind: 'erc20',
       spender,
-      amount: requiredTokenAmount,
+      amount: decideApproveAmount(useUnlimitedApproval, requiredTokenAmount),
     });
   };
 
@@ -467,6 +506,59 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
   const tokenLinked = !smartMode && ratioAvailable && linkedSide === 'token';
   const nativeLinked = !smartMode && ratioAvailable && linkedSide === 'native';
 
+  /** 加池抬头：底池总 LP / 我的 LP（占比）。 */
+  const lpShare = sharePercent(pool.snapshot?.lpBalance ?? 0n, totalSupply);
+
+  /** 旧库「当前池价格」：默认 1 社区代币 = X 原生币，箭头切换方向。 */
+  const stableRateOptions = { maxFractionDigits: 6 } as const;
+  const nativePerTokenRate = ratioAvailable
+    ? formatRate(reserveNative, reserveToken, token.decimals, native.decimals, stableRateOptions)
+    : undefined;
+  const tokenPerNativeRate = ratioAvailable
+    ? formatRate(reserveToken, reserveNative, native.decimals, token.decimals, stableRateOptions)
+    : undefined;
+  const currentPriceText = !ratioAvailable
+    ? undefined
+    : showTokenToBase
+      ? `1 ${token.symbol} = ${nativePerTokenRate} ${native.symbol}`
+      : `1 ${native.symbol} = ${tokenPerNativeRate} ${token.symbol}`;
+
+  /**
+   * 旧库「添加后价格」：只有 Hub 会先把一侧换掉时才有意义（Router 两侧按比例进池
+   * 不改变价格）。储备由 `hubReservesAfterAdd` 按 quote 的 swap 段 + usable 进池量算。
+   */
+  const afterReserves = (() => {
+    const data = quote.data;
+    if (!ratioAvailable || !hubPath || data === undefined || !data.willSwap) return undefined;
+    return hubReservesAfterAdd({
+      reserveToken,
+      reserveNative,
+      swapTokenInIsToken: data.swapTokenIn.toLowerCase() === token.address?.toLowerCase(),
+      amountToSwap: data.amountToSwap,
+      amountOutFromSwap: data.amountOutFromSwap,
+      usableToken: data.usableAmountA,
+      usableNative: data.usableAmountB,
+    });
+  })();
+  const afterPriceText =
+    afterReserves === undefined
+      ? undefined
+      : showTokenToBase
+        ? `1 ${token.symbol} = ${formatRate(afterReserves.reserveNative, afterReserves.reserveToken, token.decimals, native.decimals, stableRateOptions)} ${native.symbol}`
+        : `1 ${native.symbol} = ${formatRate(afterReserves.reserveToken, afterReserves.reserveNative, native.decimals, token.decimals, stableRateOptions)} ${token.symbol}`;
+  const priceChange =
+    afterReserves === undefined
+      ? undefined
+      : showTokenToBase
+        ? priceChangePercent(
+            { quote: reserveNative, base: reserveToken },
+            { quote: afterReserves.reserveNative, base: afterReserves.reserveToken },
+          )
+        : priceChangePercent(
+            { quote: reserveToken, base: reserveNative },
+            { quote: afterReserves.reserveToken, base: afterReserves.reserveNative },
+          );
+
   const swapLeg = (() => {
     if (quote.data === undefined || !quote.data.willSwap) return undefined;
     const tokenIsIn = quote.data.swapTokenIn.toLowerCase() === token.address?.toLowerCase();
@@ -480,6 +572,40 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
 
   return (
     <div className="space-y-4">
+      {/* 旧库 LOVE20TKM `Liquidity.tsx` 的加池抬头：底池总LP / 我的LP（占比）/ 撤出。 */}
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 text-xs leading-5"
+        data-testid="liquidity-pool-header"
+      >
+        <p className="text-muted">
+          {copy.liquidity.add.poolTotalLp}{' '}
+          <span className="font-medium text-foreground" data-testid="liquidity-pool-total-supply">
+            {formatTokenAmount(pool.snapshot?.totalSupply, 18)}
+          </span>
+        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-muted">
+            {copy.liquidity.add.poolMyLp}{' '}
+            <span className="font-medium text-foreground" data-testid="liquidity-pool-my-lp">
+              {formatTokenAmount(pool.snapshot?.lpBalance, 18)}
+            </span>
+            {(pool.snapshot?.lpBalance ?? 0n) > 0n && lpShare !== undefined ? (
+              <span className="text-muted">（{formatPercent(lpShare)}%）</span>
+            ) : null}
+          </p>
+          {(pool.snapshot?.lpBalance ?? 0n) > 0n ? (
+            <button
+              type="button"
+              data-testid="liquidity-go-withdraw"
+              onClick={onGoWithdraw}
+              className="rounded-full border border-line px-2.5 py-0.5 text-[11px] font-medium text-brand-strong hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            >
+              {copy.liquidity.add.poolWithdraw}
+            </button>
+          ) : null}
+        </div>
+      </div>
+
       <div className={CARD}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -506,10 +632,13 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
               smartMode ? 'border-brand bg-brand' : 'border-line bg-elevated',
             )}
           >
+            {/* 修复：button 的内容默认居中，绝对定位的滑块没有左锚点会跑到胶囊中间/外面。
+                与 `shared/ui/asset-protection-switch.tsx` 统一用 left-0.5 + translate-x；
+                行程按盒模型算：44 − 2(border) − 4(两侧 gap) − 20(滑块) = 18px。 */}
             <span
               className={cn(
-                'absolute top-0.5 h-4.5 w-4.5 rounded-full bg-surface shadow-soft transition-transform',
-                smartMode ? 'translate-x-5.5' : 'translate-x-0.5',
+                'absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-surface shadow-soft transition-transform',
+                smartMode ? 'translate-x-[18px]' : 'translate-x-0',
               )}
               aria-hidden="true"
             />
@@ -527,10 +656,51 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
 
         <div className="mt-4 space-y-3">
           <div>
-            <div className="flex items-center justify-between gap-2">
-              <label htmlFor="liquidity-token-amount" className="text-xs font-medium text-muted">
-                {copy.liquidity.add.amountTokenLabel}
-              </label>
+            <div className="relative">
+              <input
+                id="liquidity-token-amount"
+                data-testid="liquidity-token-amount"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                spellCheck={false}
+                aria-label={copy.liquidity.add.amountTokenLabel}
+                value={tokenInput}
+                readOnly={tokenLinked}
+                aria-readonly={tokenLinked}
+                onFocus={() => switchDriverTo('token')}
+                onChange={(event) => handleTokenChange(event.target.value)}
+                placeholder={copy.liquidity.add.amountPlaceholder}
+                className={cn(INPUT, tokenLinked && INPUT_LINKED)}
+              />
+              <span className={BADGE} data-testid="liquidity-token-badge">
+                {token.symbol}
+              </span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1">
+                {QUICK_PERCENTS.map((percent) => (
+                  <button
+                    key={percent}
+                    type="button"
+                    data-testid={`liquidity-token-percent-${percent}`}
+                    onClick={() => setTokenPercent(percent)}
+                    disabled={tokenBalance.value === undefined || tokenBalance.value === 0n}
+                    className={QUICK_BUTTON}
+                  >
+                    {percent}%
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={setTokenMax}
+                  data-testid="liquidity-token-max"
+                  disabled={tokenBalance.value === undefined || tokenBalance.value === 0n}
+                  className={QUICK_BUTTON}
+                >
+                  {copy.liquidity.add.max}
+                </button>
+              </div>
               <span
                 className="text-[11px] leading-4 text-muted"
                 data-testid="liquidity-balance-token"
@@ -540,48 +710,9 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
                   : `${copy.liquidity.balanceLabel(token.symbol)} ${formatTokenAmount(tokenBalance.value, token.decimals)}`}
               </span>
             </div>
-            <div className="relative">
-              <input
-                id="liquidity-token-amount"
-                data-testid="liquidity-token-amount"
-                type="text"
-                inputMode="decimal"
-                autoComplete="off"
-                spellCheck={false}
-                value={tokenInput}
-                readOnly={tokenLinked}
-                aria-readonly={tokenLinked}
-                onFocus={() => switchDriverTo('token')}
-                onChange={(event) => handleTokenChange(event.target.value)}
-                placeholder={copy.liquidity.add.amountPlaceholder}
-                className={cn(INPUT, tokenLinked && INPUT_LINKED)}
-              />
-              <button
-                type="button"
-                onClick={setTokenMax}
-                data-testid="liquidity-token-max"
-                disabled={tokenBalance.value === undefined}
-                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft disabled:opacity-50"
-              >
-                {copy.liquidity.add.max}
-              </button>
-            </div>
           </div>
 
           <div>
-            <div className="flex items-center justify-between gap-2">
-              <label htmlFor="liquidity-native-amount" className="text-xs font-medium text-muted">
-                {copy.liquidity.add.amountNativeLabel(native.symbol)}
-              </label>
-              <span
-                className="text-[11px] leading-4 text-muted"
-                data-testid="liquidity-balance-native"
-              >
-                {nativeBalance.isLoading
-                  ? copy.liquidity.balanceLoading
-                  : `${copy.liquidity.balanceLabel(native.symbol)} ${formatTokenAmount(nativeBalance.value, native.decimals)}`}
-              </span>
-            </div>
             <div className="relative">
               <input
                 id="liquidity-native-amount"
@@ -590,6 +721,7 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
                 inputMode="decimal"
                 autoComplete="off"
                 spellCheck={false}
+                aria-label={copy.liquidity.add.amountNativeLabel(native.symbol)}
                 value={nativeInput}
                 readOnly={nativeLinked}
                 aria-readonly={nativeLinked}
@@ -598,15 +730,42 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
                 placeholder={copy.liquidity.add.amountPlaceholder}
                 className={cn(INPUT, nativeLinked && INPUT_LINKED)}
               />
-              <button
-                type="button"
-                onClick={setNativeMax}
-                data-testid="liquidity-native-max"
-                disabled={nativeAvailable === undefined}
-                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft disabled:opacity-50"
+              <span className={BADGE} data-testid="liquidity-native-badge">
+                {native.symbol}
+              </span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1">
+                {QUICK_PERCENTS.map((percent) => (
+                  <button
+                    key={percent}
+                    type="button"
+                    data-testid={`liquidity-native-percent-${percent}`}
+                    onClick={() => setNativePercent(percent)}
+                    disabled={nativeAvailable === undefined || nativeAvailable === 0n}
+                    className={QUICK_BUTTON}
+                  >
+                    {percent}%
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={setNativeMax}
+                  data-testid="liquidity-native-max"
+                  disabled={nativeAvailable === undefined || nativeAvailable === 0n}
+                  className={QUICK_BUTTON}
+                >
+                  {copy.liquidity.add.max}
+                </button>
+              </div>
+              <span
+                className="text-[11px] leading-4 text-muted"
+                data-testid="liquidity-balance-native"
               >
-                {copy.liquidity.add.max}
-              </button>
+                {nativeBalance.isLoading
+                  ? copy.liquidity.balanceLoading
+                  : `${copy.liquidity.balanceLabel(native.symbol)} ${formatTokenAmount(nativeBalance.value, native.decimals)}`}
+              </span>
             </div>
           </div>
 
@@ -622,9 +781,6 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
               )}
             </p>
           ) : null}
-          {firstMint && !ratioAvailable ? (
-            <p className="text-[11px] leading-4 text-muted">{copy.liquidity.add.firstMintHint}</p>
-          ) : null}
           {amountError !== null ? (
             <p
               className="text-xs leading-5 text-danger-strong"
@@ -634,28 +790,10 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
             </p>
           ) : null}
         </div>
-
-        <div className="mt-4 border-t border-line pt-3">
-          <LiquiditySettings
-            slippagePercent={slippagePercent}
-            customSlippage={customSlippage}
-            customSlippageError={customSlippageError}
-            onSelectPreset={onSelectSlippagePreset}
-            onCustomChange={onCustomSlippageChange}
-          />
-          {/* QA D2：关掉设置弹层后，非法的自定义滑点仍要在页面上可见并挡住提交。 */}
-          {customSlippageError !== undefined ? (
-            <p
-              className="mt-1.5 text-xs leading-5 text-danger-strong"
-              data-testid="liquidity-slippage-error"
-            >
-              {customSlippageError}
-            </p>
-          ) : null}
-        </div>
       </div>
 
-      {hasInput ? (
+      {/* 旧库顺序：输入 → 预估获得 LP → 当前池价格 → 滑点 → 按钮。 */}
+      {hasInput && (quotePending || quote.isError || quoteReady) ? (
         <div className={CARD} data-testid="liquidity-quote">
           {hubPath && quote.isLoading ? (
             <div className="space-y-2">
@@ -731,9 +869,7 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
                   </p>
                   <p className="text-muted" data-testid="liquidity-quote-min">
                     {hubPath
-                      ? copy.liquidity.add.quoteMinLiquidity(
-                          formatTokenAmount(minLiquidity, 18),
-                        )
+                      ? copy.liquidity.add.quoteMinLiquidity(formatTokenAmount(minLiquidity, 18))
                       : copy.liquidity.add.quoteMin(
                           formatTokenAmount(minToken, token.decimals),
                           token.symbol,
@@ -744,13 +880,71 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
                 </div>
               ) : null}
             </>
-          ) : (
-            <p className="text-sm text-muted" data-testid="liquidity-quote-hint">
-              {copy.liquidity.add.quoteEmptyHint}
-            </p>
-          )}
+          ) : null}
         </div>
       ) : null}
+
+      {currentPriceText !== undefined ? (
+        <div className="space-y-1 text-xs leading-5" data-testid="liquidity-price">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-muted">{copy.liquidity.add.priceCurrent}</span>
+            <span className="font-medium text-foreground" data-testid="liquidity-price-current">
+              {currentPriceText}
+            </span>
+            <button
+              type="button"
+              data-testid="liquidity-price-toggle"
+              aria-label={copy.liquidity.add.priceToggle}
+              onClick={() => setShowTokenToBase((current) => !current)}
+              className="rounded-full p-0.5 text-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            >
+              <ArrowUpDown className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </div>
+          {afterPriceText !== undefined ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-muted">{copy.liquidity.add.priceAfter}</span>
+              <span className="font-medium text-foreground" data-testid="liquidity-price-after">
+                {afterPriceText}
+              </span>
+              {priceChange !== undefined ? (
+                <span
+                  className={cn(
+                    'text-[11px]',
+                    priceChange.startsWith('-')
+                      ? 'text-danger-strong'
+                      : priceChange.startsWith('+')
+                        ? 'text-success'
+                        : 'text-muted',
+                  )}
+                  data-testid="liquidity-price-change"
+                >
+                  （{priceChange}）
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="space-y-1.5">
+        <LiquiditySettings
+          slippagePercent={slippagePercent}
+          customSlippage={customSlippage}
+          customSlippageError={customSlippageError}
+          onSelectPreset={onSelectSlippagePreset}
+          onCustomChange={onCustomSlippageChange}
+        />
+        {/* QA D2：关掉设置弹层后，非法的自定义滑点仍要在页面上可见并挡住提交。 */}
+        {customSlippageError !== undefined ? (
+          <p
+            className="text-xs leading-5 text-danger-strong"
+            data-testid="liquidity-slippage-error"
+          >
+            {customSlippageError}
+          </p>
+        ) : null}
+      </div>
 
       {errorMessage !== null ? (
         <div
@@ -788,7 +982,9 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
           loading={tx.approveStage === 'wallet'}
         >
           {needsApproval
-            ? copy.liquidity.add.approveToken(token.symbol)
+            ? useUnlimitedApproval
+              ? copy.approve.longTermAction(token.symbol)
+              : copy.liquidity.add.approveToken(token.symbol)
             : approval === 'not-needed'
               ? copy.approve.notNeeded
               : allowance.value === undefined
@@ -800,7 +996,9 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
         {approval !== 'not-needed' && (needsApproval || allowance.value !== undefined) ? (
           <p className="text-xs leading-5 text-muted">
             {needsApproval
-              ? copy.liquidity.add.approveNote
+              ? useUnlimitedApproval
+                ? copy.approve.longTermApproveNote(token.symbol)
+                : copy.liquidity.add.approveNote
               : approvalKind(allowance.value ?? 0n) === 'unlimited'
                 ? copy.approve.longTermNote
                 : copy.approve.approvedNote}

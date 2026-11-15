@@ -6,9 +6,11 @@ import { memberNftAbi } from '@/config/abis';
 import { DEFAULT_SYMBOL, NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { approvalKind } from '@/shared/lib/approval-kind';
+import { decideApproveAmount } from '@/shared/lib/approve-amount';
 import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { useSoftTransition } from '@/shared/model/soft-transition';
+import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -95,6 +97,9 @@ export function MintIdentityPanel({
   const [preflightStaleBlock, setPreflightStaleBlock] = useState(false);
   // The eth_call preflight is async; without this a double tap could send two mints.
   const [isPreflighting, setIsPreflighting] = useState(false);
+  // 默认使用长期授权 (owner 2026-11-16): the approvals-page switch decides whether
+  // this page's approve writes maxUint256 or just the quoted cost + 1 % buffer.
+  const { enabled: useUnlimitedApproval } = useUnlimitedApprovalPreference();
 
   const config = useMintConfig();
   const quote = useMintQuote(name, config);
@@ -127,6 +132,11 @@ export function MintIdentityPanel({
   const effectiveAllowance = tx.approvedAmount ?? config.allowance;
   const needsApproval =
     cost !== undefined && effectiveAllowance !== undefined && effectiveAllowance < cost;
+  /** What the 授权 button writes: maxUint256 (long-term) or quoted cost + buffer. */
+  const approveAmount =
+    cost === undefined
+      ? undefined
+      : decideApproveAmount(useUnlimitedApproval, approveAmountFor(cost));
   const isTxBusy = tx.approveStage !== 'idle' || tx.mintStage !== 'idle';
   const isNameReady = quote.nameStatus === 'available' && cost !== undefined;
   const canAttemptMint =
@@ -146,9 +156,9 @@ export function MintIdentityPanel({
   });
 
   const handleApprove = () => {
-    if (cost === undefined) return;
+    if (approveAmount === undefined) return;
     setPreflightError(null);
-    tx.approve(approveAmountFor(cost));
+    tx.approve(approveAmount);
   };
 
   const handleMint = async () => {
@@ -312,18 +322,22 @@ export function MintIdentityPanel({
       ? copy.approve.approving
       : tx.approveStage === 'pending'
         ? copy.approve.confirming
-        : copy.approve.action(symbol ?? '')
+        : useUnlimitedApproval
+          ? copy.approve.longTermAction(symbol ?? '')
+          : copy.approve.action(symbol ?? '')
     : effectiveAllowance === undefined
       ? copy.approve.loading
       : longTermApproved
         ? copy.approve.longTermActive
         : copy.approve.approved;
   const approveNote =
-    effectiveAllowance === undefined
-      ? null
-      : longTermApproved
-        ? copy.approve.longTermNote
-        : copy.approve.note(symbol ?? '');
+    needsApproval && useUnlimitedApproval
+      ? copy.approve.longTermApproveNote(symbol ?? '')
+      : effectiveAllowance === undefined
+        ? null
+        : longTermApproved
+          ? copy.approve.longTermNote
+          : copy.approve.note(symbol ?? '');
   const mintLabel =
     tx.mintStage === 'wallet'
       ? copy.mintIdentity.ladder.minting
@@ -341,8 +355,8 @@ export function MintIdentityPanel({
         ? { run: () => window.location.reload(), label: copy.txWatch.actions.reload }
         : null;
   const retryFailedWrite = () => {
-    if (tx.error?.action === 'approve' && cost !== undefined) {
-      tx.approve(approveAmountFor(cost));
+    if (tx.error?.action === 'approve' && approveAmount !== undefined) {
+      tx.approve(approveAmount);
       return;
     }
     void handleMint();

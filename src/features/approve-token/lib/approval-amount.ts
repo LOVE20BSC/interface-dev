@@ -24,8 +24,10 @@ export { approvalKind, UNLIMITED_APPROVAL_THRESHOLD, type ApprovalKind };
  * in `approval-amount.test.ts`.
  */
 
-/** The value a 「长期授权」 button writes; 撤销 writes 0. */
-export const UNLIMITED_APPROVAL_VALUE = 2n ** 256n - 1n;
+// The value a 「长期授权」 button writes (撤销 writes 0). Defined in shared because
+// every approve ladder (not just this page) needs the same constant; re-exported
+// here so existing imports of this module keep working.
+export { UNLIMITED_APPROVAL_VALUE } from '@/shared/lib/approve-amount';
 
 /** Smallest amount `formatTokenAmount` can show without collapsing to `0`. */
 function smallestVisibleAmount(decimals: number): bigint {

@@ -706,6 +706,8 @@ export const copy = {
     /** Allowance unknown: a third state, never 「已足够」 or 「需要授权」 (D2). */
     allowanceUnknown: '额度暂时读不到，无法判断是否需要授权，请重试读取。',
     allowanceNeed: '这笔批量转账需要先授权一次，授权确认后再提交批量转账。',
+    /** 默认使用长期授权开启时，这次授权写 maxUint256（owner 2026-11-16）。 */
+    allowanceNeedLongTerm: '这笔批量转账会先授权长期额度（几乎无限），授权确认后再提交批量转账。',
     allowanceReady: '额度已足够，不需要再次授权。',
     allowanceLongTerm: (needed: string, symbol: string) =>
       `已长期授权，本次需要 ${needed} ${symbol}，不需要再次授权。`,
@@ -837,7 +839,7 @@ export const copy = {
     unlimitedAction: '长期授权',
     preferenceLabel: '默认使用长期授权',
     preferenceBody:
-      '开启后，本页把「长期授权」按钮放在更醒目的位置；长期授权可以减少以后重复授权的次数。这个选择只记在这台设备上。',
+      '开启后，各个页面（兑换、铸造、流动性、批量转账）的授权按钮都会写长期额度，按钮也会写成「长期授权」；关闭后只授权这一笔实际需要的额度。这个选择只记在这台设备上。',
     riskTitle: '先弄懂「授权」',
     riskWhy: '额度由你控制，随时可以撤销（改回 0）。撤销不会影响已经完成的交易。',
     riskDanger:
@@ -967,6 +969,16 @@ export const copy = {
     confirming: '确认中…',
     approved: '已授权',
     note: (symbol: string) => `第一次只是允许合约扣走最多这么多的 ${symbol}，不会立刻扣钱。`,
+    /**
+     * 默认使用长期授权开启时，授权按钮写 `maxUint256`：提示必须说清「这次会授权
+     * 长期额度」，不能沿用精确额度那句（owner 2026-11-16）。
+     */
+    longTermApproveNote: (symbol: string) =>
+      `这次会授权长期额度（几乎无限）：合约以后可以从你的钱包扣走 ${symbol}，不用每次再授权。只给你信任的合约开。`,
+    /** 流动性撤出的授权对象是「流动性凭证」，没有代币 symbol（owner 2026-11-16）. */
+    longTermActionLp: '长期授权 流动性凭证',
+    longTermApproveNoteLp:
+      '这次会授权长期额度（几乎无限）：合约以后可以拿走这份流动性凭证，不用每次再授权。只给你信任的合约开。',
     approvedNote: '这次要用的额度已经够，不需要再授权。',
     longTermNote: '这个代币已经长期授权，不需要再操作。',
   },
@@ -1052,12 +1064,10 @@ export const copy = {
   // 「最多可接受的价格变化」。lazy /liquidity chunk 是唯一消费者。
   // ───────────────────────────────────────────────────────────────────────────
   liquidity: {
-    intro:
-      '把两种代币放进池子，之后每笔兑换的手续费会按你的份额分给你。存入后拿到的是流动性凭证，撤出时再按比例换回两种代币，价格会随池子变化。',
     tabs: {
       add: '添加流动性',
       mine: '我的流动性',
-      query: '社区流动性查询',
+      query: '社区流动性',
     },
     tokenLabel: '当前社区代币',
     customTitle: '换个代币地址',
@@ -1093,9 +1103,16 @@ export const copy = {
       amountTokenLabel: '社区代币数量',
       amountNativeLabel: (symbol: string) => `${symbol} 数量`,
       linkedNote: '另一侧已按池子比例自动填好；点一下那一侧的输入框，就改成由它来算。',
-      firstMintHint: '这个代币还没有池子：第一次建池要两侧都填，价格由这两个数量决定。',
       amountPlaceholder: '0.0',
-      max: '全部',
+      /** 加池区抬头（旧库 LOVE20TKM `Liquidity.tsx`）：底池总LP / 我的LP / 撤出。 */
+      poolTotalLp: '底池总LP',
+      poolMyLp: '我的LP',
+      poolWithdraw: '撤出',
+      /** 池价格（旧库同一面板）：当前池价格 + 方向切换；Hub 换币时才显示添加后价格。 */
+      priceCurrent: '当前池价格',
+      priceAfter: '添加后价格',
+      priceToggle: '切换价格显示',
+      max: '最高',
       maxNativeNote: (reserve: string, symbol: string) =>
         `已为网络手续费预留约 ${reserve} ${symbol}。`,
       amountInvalid: '请输入有效的金额。',
@@ -1105,10 +1122,8 @@ export const copy = {
       amountTooPrecise: (digits: number) => `小数位不能超过 ${digits} 位。`,
       insufficient: (symbol: string, shortfall: string) => `${symbol} 不够，还差 ${shortfall}`,
       quoteLiquidity: (amount: string) => `预计获得 ${amount} 流动性凭证`,
-      quoteEmptyHint: '填好数量后，这里显示预计获得的流动性凭证。',
       detailsToggle: '详情',
       detailsHide: '收起详情',
-      detailsTitle: '这一笔会这样进池子',
       quoteSwap: (amount: string, symbol: string, out: string, outSymbol: string) =>
         `其中 ${amount} ${symbol} 会先换成 ${out} ${outSymbol}。`,
       quoteNoSwap: '两侧正好配平，不需要兑换。',
@@ -1151,7 +1166,8 @@ export const copy = {
       withdrawLpPlaceholder: '0.0',
       withdrawLpUnit: '流动性凭证',
       lpAvailable: (amount: string) => `持有 ${amount}`,
-      presetHint: '按比例快速填入',
+      badge: '流动性凭证',
+      presetMax: '最高',
       lpInvalid: '请输入有效的流动性凭证数量。',
       lpTooMuch: (max: string) => `超过你持有的 ${max} 流动性凭证。`,
       receiveLabel: '预计收到约',

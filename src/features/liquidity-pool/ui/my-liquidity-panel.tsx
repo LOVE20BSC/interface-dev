@@ -10,7 +10,9 @@ import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { ActionStack } from '@/shared/ui/action-stack';
 import { approvalKind } from '@/shared/lib/approval-kind';
+import { decideApproveAmount } from '@/shared/lib/approve-amount';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
 import {
   applySlippageDown,
   lpForPercent,
@@ -22,6 +24,7 @@ import {
   deadlineFromNow,
   parseAmount,
   percentToBps,
+  SLIPPAGE_PRESETS,
   WITHDRAW_PERCENTS,
 } from '@/features/liquidity-pool/lib/liquidity-form';
 import { useLpAllowance } from '@/features/liquidity-pool/model/use-liquidity-reads';
@@ -44,8 +47,13 @@ export interface MyLiquidityPanelProps {
 }
 
 const CARD = 'rounded-3xl border border-line bg-surface p-5 shadow-soft';
+/** 右侧留出「流动性凭证」徽标的位置（旧库把 LP 徽标放在输入框右端）。 */
 const INPUT =
-  'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated px-3 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20';
+  'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated pl-3 pr-28 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20';
+const BADGE =
+  'pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-foreground';
+const QUICK_BUTTON =
+  'rounded-full border px-3 py-1 text-xs font-medium';
 
 /**
  * 我的流动性：读 pair 的 `balanceOf` / `totalSupply`，**按 LP 数量**撤出（owner
@@ -59,6 +67,9 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
   const { token, native, pool, slippagePercent, customSlippageError, onGoAdd, isConnected } =
     props;
   const { address: account } = useAccount();
+  // 默认使用长期授权 (owner 2026-11-16): same device preference as /approvals;
+  // off → exact LP amount (unchanged), on → maxUint256 + 长期授权 copy.
+  const { enabled: useUnlimitedApproval } = useUnlimitedApprovalPreference();
   const router = configuredAddress('router');
 
   const snapshot = pool.snapshot;
@@ -157,7 +168,7 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
       tokenAddress: snapshot.pairAddress,
       kind: 'lp',
       spender: router,
-      amount: lpToWithdraw,
+      amount: decideApproveAmount(useUnlimitedApproval, lpToWithdraw),
     });
   };
 
@@ -247,10 +258,65 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
         <span className="text-xs font-medium text-muted">{copy.liquidity.mine.withdrawLabel}</span>
 
         <div className="mt-2">
-          <div className="flex items-center justify-between gap-2">
-            <label htmlFor="liquidity-withdraw-lp" className="text-xs font-medium text-muted">
-              {copy.liquidity.mine.withdrawLpLabel}
-            </label>
+          {/* 旧库 `WithdrawForm.tsx`：输入框 + LP 徽标，下一行 25/50/75/最高 + 持有量。 */}
+          <div className="relative">
+            <input
+              id="liquidity-withdraw-lp"
+              data-testid="liquidity-withdraw-lp"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              spellCheck={false}
+              aria-label={copy.liquidity.mine.withdrawLpLabel}
+              value={lpInput}
+              onChange={(event) => {
+                setLpInput(event.target.value);
+                setLpPresetAmount(null);
+                setActivePreset(null);
+                setSubmitError(null);
+                tx.clearError();
+              }}
+              placeholder={copy.liquidity.mine.withdrawLpPlaceholder}
+              className={INPUT}
+            />
+            <span className={BADGE} data-testid="liquidity-withdraw-badge">
+              {copy.liquidity.mine.badge}
+            </span>
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1">
+              {WITHDRAW_PERCENTS.filter((preset) => preset !== 100).map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  data-testid={`liquidity-withdraw-percent-${preset}`}
+                  aria-pressed={activePreset === preset}
+                  onClick={() => fillPreset(preset)}
+                  className={cn(
+                    QUICK_BUTTON,
+                    activePreset === preset
+                      ? 'border-brand bg-brand-soft text-brand-strong'
+                      : 'border-line text-foreground hover:bg-elevated',
+                  )}
+                >
+                  {preset}%
+                </button>
+              ))}
+              <button
+                type="button"
+                data-testid="liquidity-withdraw-percent-100"
+                aria-pressed={activePreset === 100}
+                onClick={() => fillPreset(100)}
+                className={cn(
+                  QUICK_BUTTON,
+                  activePreset === 100
+                    ? 'border-brand bg-brand-soft text-brand-strong'
+                    : 'border-line text-foreground hover:bg-elevated',
+                )}
+              >
+                {copy.liquidity.mine.presetMax}
+              </button>
+            </div>
             <span
               className="text-[11px] leading-4 text-muted"
               data-testid="liquidity-withdraw-available"
@@ -258,48 +324,6 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
               {copy.liquidity.mine.lpAvailable(formatTokenAmount(lpBalance, 18))}
             </span>
           </div>
-          <input
-            id="liquidity-withdraw-lp"
-            data-testid="liquidity-withdraw-lp"
-            type="text"
-            inputMode="decimal"
-            autoComplete="off"
-            spellCheck={false}
-            value={lpInput}
-            onChange={(event) => {
-              setLpInput(event.target.value);
-              setLpPresetAmount(null);
-              setActivePreset(null);
-              setSubmitError(null);
-              tx.clearError();
-            }}
-            placeholder={copy.liquidity.mine.withdrawLpPlaceholder}
-            className={INPUT}
-            aria-describedby="liquidity-withdraw-preset-hint"
-          />
-        </div>
-
-        <p id="liquidity-withdraw-preset-hint" className="mt-2 text-[11px] leading-4 text-muted">
-          {copy.liquidity.mine.presetHint}
-        </p>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          {WITHDRAW_PERCENTS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              data-testid={`liquidity-withdraw-percent-${preset}`}
-              aria-pressed={activePreset === preset}
-              onClick={() => fillPreset(preset)}
-              className={cn(
-                'rounded-full border px-3 py-1 text-xs font-medium',
-                activePreset === preset
-                  ? 'border-brand bg-brand-soft text-brand-strong'
-                  : 'border-line text-foreground hover:bg-elevated',
-              )}
-            >
-              {preset}%
-            </button>
-          ))}
         </div>
 
         {lpError !== null ? (
@@ -366,7 +390,9 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
           loading={tx.approveStage === 'wallet'}
         >
           {needsApproval
-            ? copy.liquidity.mine.approveLp
+            ? useUnlimitedApproval
+              ? copy.approve.longTermActionLp
+              : copy.liquidity.mine.approveLp
             : approval === 'not-needed'
               ? copy.approve.notNeeded
               : lpAllowance.value === undefined
@@ -378,7 +404,9 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
         {approval !== 'not-needed' && (needsApproval || lpAllowance.value !== undefined) ? (
           <p className="text-xs leading-5 text-muted">
             {needsApproval
-              ? copy.liquidity.mine.approveLpNote
+              ? useUnlimitedApproval
+                ? copy.approve.longTermApproveNoteLp
+                : copy.liquidity.mine.approveLpNote
               : approvalKind(lpAllowance.value ?? 0n) === 'unlimited'
                 ? copy.approve.longTermNote
                 : copy.approve.approvedNote}
@@ -439,7 +467,7 @@ function LiquiditySettingsInline(props: MyLiquidityPanelProps) {
           {copy.liquidity.settings.slippageLabel} {formatPercent(slippagePercent)}%
         </span>
         <div className="flex items-center gap-1.5">
-          {[0.1, 0.5, 1.0].map((preset) => (
+          {SLIPPAGE_PRESETS.map((preset) => (
             <button
               key={preset}
               type="button"

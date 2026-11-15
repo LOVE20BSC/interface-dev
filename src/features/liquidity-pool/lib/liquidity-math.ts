@@ -171,3 +171,58 @@ export function priceRatio(
   if (baseReserve <= 0n || quoteReserve <= 0n) return undefined;
   return { quote: quoteReserve, base: baseReserve };
 }
+
+/**
+ * 旧库 `Liquidity.tsx` 的「添加后价格」：Hub 先 swap 再进池，所以加池后的储备是
+ * `(R + swap 段) + usable 进池量`。`swapTokenInIsToken` 决定 swap 方向。
+ *
+ * 只用于页面展示（旧库同样只展示、不参与交易参数）；储备不足时返回 undefined。
+ */
+export function hubReservesAfterAdd(input: {
+  readonly reserveToken: bigint;
+  readonly reserveNative: bigint;
+  readonly swapTokenInIsToken: boolean;
+  readonly amountToSwap: bigint;
+  readonly amountOutFromSwap: bigint;
+  readonly usableToken: bigint;
+  readonly usableNative: bigint;
+}): { readonly reserveToken: bigint; readonly reserveNative: bigint } | undefined {
+  const { reserveToken, reserveNative, swapTokenInIsToken } = input;
+  const swapReserveToken = swapTokenInIsToken
+    ? reserveToken + input.amountToSwap
+    : reserveToken - input.amountOutFromSwap;
+  const swapReserveNative = swapTokenInIsToken
+    ? reserveNative - input.amountOutFromSwap
+    : reserveNative + input.amountToSwap;
+  if (swapReserveToken < 0n || swapReserveNative < 0n) return undefined;
+  return {
+    reserveToken: swapReserveToken + input.usableToken,
+    reserveNative: swapReserveNative + input.usableNative,
+  };
+}
+
+/**
+ * 价格涨跌幅（旧库 `formatPriceChangePercentage` 的整数版）：`(after − before) / before`
+ * 用交叉相乘避免除法丢精度，结果四舍五入到 2 位小数、带 `+` / `-` 号。
+ *
+ * 参数是同一个方向的两个比率（`quote / base`），显示层把 `base` 的 1 单位换算成
+ * `quote` 的数量。任一比率为 0 时返回 undefined（不显示涨跌）。
+ */
+export function priceChangePercent(
+  before: { readonly quote: bigint; readonly base: bigint },
+  after: { readonly quote: bigint; readonly base: bigint },
+): string | undefined {
+  if (before.base <= 0n || before.quote <= 0n || after.base <= 0n || after.quote < 0n) {
+    return undefined;
+  }
+  // before = beforeQuote/beforeBase, after = afterQuote/afterBase
+  const numerator = after.quote * before.base;
+  const denominator = after.base * before.quote;
+  const change = numerator - denominator;
+  const sign = change > 0n ? '+' : change < 0n ? '-' : '';
+  const absolute = change < 0n ? -change : change;
+  const scaled = (absolute * 10_000n + denominator / 2n) / denominator;
+  const whole = scaled / 100n;
+  const fraction = (scaled % 100n).toString().padStart(2, '0');
+  return `${sign}${whole.toString()}.${fraction}%`;
+}

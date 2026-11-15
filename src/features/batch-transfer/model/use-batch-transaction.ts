@@ -3,6 +3,8 @@ import { useAccount, useChainId, usePublicClient, useWriteContract } from 'wagmi
 import { batchTransferAbi, love20TokenAbi } from '@/config/abis';
 import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
+import { decideApproveAmount } from '@/shared/lib/approve-amount';
+import { readUnlimitedApprovalPreference } from '@/shared/lib/approval-preference';
 import {
   readResubmitSnapshot,
   usePendingNonce,
@@ -212,11 +214,17 @@ export function useBatchTransaction(
     if (request.tokenAddress === undefined || batchTransfer === undefined) {
       throw new Error('batch transfer configuration unavailable');
     }
+    // 默认使用长期授权 (owner 2026-11-16): the amount is read at send time, so a
+    // 重新提交 also honours the current preference. Off → the exact batch total
+    // (unchanged); on → maxUint256, same value the approvals page writes.
     return writeContractAsync({
       address: request.tokenAddress,
       abi: love20TokenAbi,
       functionName: 'approve',
-      args: [batchTransfer, request.total],
+      args: [
+        batchTransfer,
+        decideApproveAmount(readUnlimitedApprovalPreference(), request.total),
+      ],
       ...(nonce !== undefined ? { nonce } : {}),
     });
   };
