@@ -1,8 +1,9 @@
 # 20261115-2009-356e-收口-dev-首屏-bundle-压回-161-kb-内-status-截图计数: 收口：dev 首屏 bundle 压回 161 kB 内 + STATUS 截图计数核对
 
 - **Tags**: bundle, 门禁
-- **Status**: doing · 2026-11-15 20:10:16 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Status**: done · 2026-11-15 21:14:58 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 - **Created**: 2026-11-15 20:09:45 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
+- **Sealed**: 2026-11-15 21:14:58 · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d
 
 <!-- Header lines are maintained by the script, fixed order: Tags → Status → Created → Sealed.
      The `- **Tags**: …` line is inserted at the top by new --tags; omitted when there are no tags
@@ -47,3 +48,4 @@
      Backfill with: progress log --id 20261115-2009-356e-收口-dev-首屏-bundle-压回-161-kb-内-status-截图计数 --note "...". -->
 - 2026-11-15 20:09:45 · new · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · created
 - 2026-11-15 20:10:16 · claim · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · claimed → doing
+- 2026-11-15 21:14:58 · close · @tester · 47d39b07-9d74-4077-8a12-8ab9280ea25d · sealed: 已完成：入口文案按懒加载边界拆分 6 组（copy.ts→copy-pages.ts，9 个消费方改 import），dev 首屏 161.3→160.2 kB、prod 159.1 kB 均无 WARN；入口 grep 被移文案 0 命中、无闪错文案；STATUS 计数/e2e 143 条/包体数字核对修正；754 tests、全量 e2e 143/143 两遍。
