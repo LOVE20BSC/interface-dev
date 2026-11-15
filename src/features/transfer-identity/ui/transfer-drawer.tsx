@@ -153,15 +153,18 @@ export function TransferForm({
     query: { enabled: protectionRecipient !== undefined },
   });
   const hasBytecode = bytecode.data == null ? undefined : bytecode.data !== '0x';
-  const protection = decideRecipientProtection(protectionRecipient ?? '', hasBytecode);
+  const assetProtection = useAssetProtection();
+  // Owner 2026-11-16: ON intercepts a known address-book contract outright. OFF
+  // skips the address-book half entirely — the same address degrades to the
+  // generic bytecode warning, with no 「这是 X 合约」 naming, no warn-only block
+  // and no acknowledgement; address / ID / name validation and the name
+  // confirmation gate are untouched.
+  const protection = decideRecipientProtection(protectionRecipient ?? '', hasBytecode, {
+    detectKnown: assetProtection.enabled,
+  });
   const protectionLabel =
     protection.kind === 'known' ? knownContractLabel(protection.labelKey) : undefined;
-  const assetProtection = useAssetProtection();
-  // Owner 2026-11-16: ON intercepts a known address-book contract outright; OFF
-  // keeps the address/amount/self validation but no longer blocks. Any other
-  // contract only warns in both states.
-  const knownBlocked = protection.kind === 'known' && assetProtection.enabled;
-  const knownWarnOnly = protection.kind === 'known' && !assetProtection.enabled;
+  const knownBlocked = protection.kind === 'known';
 
   const canSubmit =
     !knownBlocked &&
@@ -317,21 +320,6 @@ export function TransferForm({
             {copy.assetProtection.blockedTitle(protectionLabel)}
           </p>
           <p className="text-foreground/80">{copy.assetProtection.blockedBody}</p>
-        </div>
-      ) : null}
-
-      {knownWarnOnly && protectionLabel !== undefined ? (
-        <div
-          role="status"
-          data-testid="transfer-identity-protection"
-          className="space-y-1 rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
-        >
-          <p className="flex items-start gap-1.5 font-semibold text-warning">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            {copy.assetProtection.knownTitle(protectionLabel)}
-          </p>
-          <p className="text-foreground/80">{copy.assetProtection.knownBody}</p>
-          <p className="text-muted">{copy.assetProtection.offSubmitNote}</p>
         </div>
       ) : null}
 

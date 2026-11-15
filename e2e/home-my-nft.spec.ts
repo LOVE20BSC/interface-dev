@@ -431,12 +431,16 @@ test('my-nft: 智能资产保护 与代币转账共享，已知合约被拦截',
   await expect(page.getByRole('button', { name: '确认转让' })).toBeDisabled();
   await shot(page, 'transfer-drawer-protection.png');
 
-  // 关闭开关：只警告，转让恢复可用（按地址的基础校验仍在）。
+  // 关闭开关 = 只跳过「是不是地址簿已知合约」（owner 2026-11-16）：已知合约块
+  // 与勾选都不再出现，同一地址按任意合约只警告，转让恢复可用（基础校验仍在）。
   await dialog.getByTestId('asset-protection-toggle').click();
-  await expect(page.getByTestId('transfer-identity-protection')).toContainText(
-    '智能资产保护已关闭，可以继续提交。',
+  await expect(page.getByTestId('transfer-identity-protection')).toHaveCount(0);
+  await expect(page.getByTestId('transfer-identity-contract-warning')).toContainText(
+    '这个地址是一个合约',
+    { timeout: 20_000 },
   );
   await expect(page.getByRole('button', { name: '确认转让' })).toBeEnabled();
+  await shot(page, 'transfer-drawer-protection-off.png');
 
   await page.getByRole('button', { name: '取消' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);

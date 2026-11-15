@@ -222,7 +222,9 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('batch-transfer-submit')).toBeDisabled();
   });
 
-  test('用例 C2 智能资产保护：已知合约收款方整批拦截，关闭开关后可提交', async ({ page }) => {
+  test('用例 C2 智能资产保护：已知合约收款方整批拦截，关闭开关后不再检测已知合约', async ({
+    page,
+  }) => {
     await openBatch(page, NATIVE_SENDER);
     // 默认开启（owner 2026-11-16）。
     await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
@@ -233,13 +235,17 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await fillBatch(page, [`${PAIR} 0.1`]);
     const known = page.getByTestId('batch-transfer-known-contract');
     await expect(known).toBeVisible({ timeout: 20_000 });
-    await expect(known).toContainText('有收款方是已知合约地址，智能资产保护已拦截');
+    await expect(known).toContainText('有 1 行是协议合约，智能资产保护已拦截');
     await expect(known).toContainText('第 1 行：这是「交易对」合约地址');
     await expect(page.getByTestId('batch-transfer-submit')).toBeDisabled();
 
-    // 关闭开关：拦截退化为警告，提交恢复可用（基础校验仍保留）。
+    // 关闭开关 = 只跳过「是不是地址簿已知合约」（owner 2026-11-16）：已知合约块与
+    // 逐行点名都不再出现，同一地址按任意合约落到通用警告，提交恢复可用（基础校验仍在）。
     await page.getByTestId('asset-protection-toggle').click();
-    await expect(known).toContainText('智能资产保护已关闭，可以继续提交。');
+    await expect(known).toHaveCount(0);
+    await expect(page.getByTestId('batch-transfer-contract-warning')).toBeVisible({
+      timeout: 20_000,
+    });
     await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
 
     // 任意合约（有 bytecode、不在地址簿）：只警告，不点名拦截。
@@ -249,6 +255,35 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     });
     await expect(page.getByTestId('batch-transfer-known-contract')).toHaveCount(0);
     await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
+  });
+
+  test('用例 C3 智能资产保护：已知合约与任意合约同时命中时合并成一个提示块', async ({
+    page,
+  }) => {
+    await openBatch(page, NATIVE_SENDER);
+    await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+
+    // 第 1 行地址簿已知合约（交易对），第 2 行任意合约（社区代币合约，有 bytecode）。
+    await fillBatch(page, [`${PAIR} 0.1`, `${TOKEN} 0.2`]);
+    const merged = page.getByTestId('batch-transfer-known-contract');
+    await expect(merged).toBeVisible({ timeout: 20_000 });
+    // 只出现一块：通用合约警告不与合并块并存。
+    await expect(page.getByTestId('batch-transfer-contract-warning')).toHaveCount(0);
+    // 标题点明两种行数。
+    await expect(merged).toContainText('有 1 行是协议合约、1 行是其它合约地址，智能资产保护已拦截');
+    // 逐行列出：已知合约带地址簿名字，任意合约只点名「是合约」。
+    await expect(page.getByTestId('batch-transfer-known-line-1')).toHaveText(
+      '第 1 行：这是「交易对」合约地址',
+    );
+    await expect(page.getByTestId('batch-transfer-contract-line-2')).toHaveText(
+      '第 2 行：这是一个合约地址',
+    );
+    // CTA 禁用原因只写一条。
+    await expect(merged).toContainText('要强制转账，请先关闭「智能资产保护」。');
+    await expect(page.getByTestId('batch-transfer-submit')).toBeDisabled();
   });
 
   test('用例 D 合计超余额：ERC20 差 1，原生币差 0.501', async ({ page }) => {
@@ -618,6 +653,9 @@ test.describe('批量转账 验收截图', () => {
     await page.setViewportSize({ width, height });
     await page.addInitScript((nextTheme: string) => {
       window.localStorage.setItem('love20:theme', nextTheme);
+      // Every screenshot starts from the shipped default (智能资产保护 开启), so a
+      // previous test that turned it off cannot leak into the next shot.
+      window.localStorage.setItem('love20:transfer:assetProtectionEnabled', '1');
     }, theme);
     await page.goto(`/batch-transfer${QUERY}`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
@@ -649,6 +687,40 @@ test.describe('批量转账 验收截图', () => {
         await expect(page.getByTestId('batch-transfer-submit')).toBeDisabled();
         await page.getByTestId('batch-transfer-input').scrollIntoViewIfNeeded();
         await shoot(page, `entry-errors-${theme}-${viewport.key}`);
+      }
+    }
+  });
+
+  test('资产保护合并提示截图（已知合约 + 任意合约，单块）', async ({ page }) => {
+    await installWallet(page, NATIVE_SENDER);
+    for (const viewport of VIEWPORTS) {
+      for (const theme of THEMES) {
+        await prepare(page, theme, viewport.width, viewport.height);
+        await fillBatch(page, [`${PAIR} 0.1`, `${TOKEN} 0.2`]);
+        const merged = page.getByTestId('batch-transfer-known-contract');
+        await expect(merged).toBeVisible({ timeout: 20_000 });
+        await expect(page.getByTestId('batch-transfer-contract-warning')).toHaveCount(0);
+        await expect(page.getByTestId('batch-transfer-submit')).toBeDisabled();
+        await merged.scrollIntoViewIfNeeded();
+        await shoot(page, `protection-merged-${theme}-${viewport.key}`);
+      }
+    }
+  });
+
+  test('资产保护关闭截图（不再检测已知合约，只剩通用合约警告）', async ({ page }) => {
+    await installWallet(page, NATIVE_SENDER);
+    for (const viewport of VIEWPORTS) {
+      for (const theme of THEMES) {
+        await prepare(page, theme, viewport.width, viewport.height);
+        await fillBatch(page, [`${PAIR} 0.1`, `${TOKEN} 0.2`]);
+        await page.getByTestId('asset-protection-toggle').click();
+        await expect(page.getByTestId('batch-transfer-contract-warning')).toBeVisible({
+          timeout: 20_000,
+        });
+        await expect(page.getByTestId('batch-transfer-known-contract')).toHaveCount(0);
+        await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
+        await page.getByTestId('batch-transfer-contract-warning').scrollIntoViewIfNeeded();
+        await shoot(page, `protection-off-${theme}-${viewport.key}`);
       }
     }
   });

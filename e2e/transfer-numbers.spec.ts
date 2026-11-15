@@ -203,7 +203,7 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('transfer-submit')).toBeDisabled();
   });
 
-  test('用例 D 已知合约：智能资产保护拦截，关闭开关后二次确认才可强制转账', async ({
+  test('用例 D 已知合约：智能资产保护拦截，关闭开关后不再检测已知合约（只剩通用合约警告）', async ({
     page,
   }) => {
     await openTransfer(page, ERC20_SENDER);
@@ -216,18 +216,22 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('transfer-known-ack')).toHaveCount(0);
     await expect(page.getByTestId('transfer-submit')).toBeDisabled();
 
-    // 关闭开关：拦截退化为「已知合约二次确认」，勾选后才可提交。
+    // 关闭开关 = 只跳过「是不是地址簿已知合约」这一项检测（owner 2026-11-16）：
+    // 已知合约块与勾选都不再出现，同一地址退化为通用「这是一个合约」警告，可提交。
     await page.getByTestId('asset-protection-toggle').click();
     await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
       'aria-checked',
       'false',
     );
-    await expect(protection).toContainText('这是「交易对」合约地址');
-    await expect(page.getByTestId('transfer-submit')).toBeDisabled();
-    await page.getByTestId('transfer-known-ack').check();
+    await expect(page.getByTestId('transfer-protection')).toHaveCount(0);
+    await expect(page.getByTestId('transfer-known-ack')).toHaveCount(0);
+    await expect(page.getByTestId('transfer-contract-warning')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('transfer-contract-warning')).toContainText(
+      '这个地址是一个合约',
+    );
     await expect(page.getByTestId('transfer-submit')).toBeEnabled();
 
-    // 任意有 bytecode 但不是地址簿条目的合约：只警告、不拦截（开关关闭时同样）。
+    // 任意有 bytecode 但不是地址簿条目的合约：只警告、不拦截（开关开启时同样）。
     await page.getByTestId('transfer-recipient').fill(TOKEN);
     await expect(page.getByTestId('transfer-contract-warning')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId('transfer-protection')).toHaveCount(0);
@@ -238,6 +242,39 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await page.getByTestId('transfer-recipient').fill(PAIR);
     await expect(page.getByTestId('transfer-protection')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId('transfer-submit')).toBeDisabled();
+  });
+
+  test('智能资产保护滑块在胶囊内：开启时左右各留 ≥2px（与流动性智能模式一致）', async ({
+    page,
+  }) => {
+    await openTransfer(page, ERC20_SENDER);
+    const pill = page.getByTestId('asset-protection-toggle');
+    const thumb = pill.locator('span');
+    await expect(thumb).toBeVisible();
+    // 滑块基准位置 left-0.5 = 3px（含 1px 边框），行程 18px → 开启时左间隙 21px；
+    // 44(w-11) − 3 − 18 − 20(h-5) = 3px 右间隙。旧的 translate-x-[22px] 会把滑块
+    // 右沿压出胶囊（右间隙为负），这条断言防回归。
+    await expect
+      .poll(async () => {
+        const pillBox = await pill.boundingBox();
+        const thumbBox = await thumb.boundingBox();
+        if (pillBox === null || thumbBox === null) return null;
+        return {
+          leftGap: Math.round(thumbBox.x - pillBox.x),
+          rightGap: Math.round(pillBox.x + pillBox.width - (thumbBox.x + thumbBox.width)),
+        };
+      })
+      .toEqual({ leftGap: 21, rightGap: 3 });
+    // 关闭时滑块回到 left-0.5（3px），可见位移正好 18px。
+    await pill.click();
+    await expect
+      .poll(async () => {
+        const pillBox = await pill.boundingBox();
+        const thumbBox = await thumb.boundingBox();
+        if (pillBox === null || thumbBox === null) return null;
+        return Math.round(thumbBox.x - pillBox.x);
+      })
+      .toBe(3);
   });
 
   test('智能资产保护 偏好持久化、跨页共享同一键', async ({ page }) => {
@@ -466,18 +503,24 @@ test.describe('代币转账 验收截图', () => {
     }
   });
 
-  test('资产保护关闭截图（关闭开关后的二次确认）', async ({ page }) => {
+  test('资产保护关闭截图（关闭后只剩通用合约警告）', async ({ page }) => {
     await installWallet(page, ERC20_SENDER);
     for (const viewport of VIEWPORTS) {
       for (const theme of THEMES) {
         await prepare(page, theme, viewport.width, viewport.height);
         await fillTransfer(page, '0.1', PAIR);
         await page.getByTestId('asset-protection-toggle').click();
-        await expect(page.getByTestId('transfer-known-ack')).toBeVisible({ timeout: 20_000 });
+        // 关闭后：已知合约块与勾选都不再出现，同一地址按任意合约只警告。
+        await expect(page.getByTestId('transfer-contract-warning')).toBeVisible({
+          timeout: 20_000,
+        });
+        await expect(page.getByTestId('transfer-protection')).toHaveCount(0);
+        await expect(page.getByTestId('transfer-known-ack')).toHaveCount(0);
         await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
           'aria-checked',
           'false',
         );
+        await expect(page.getByTestId('transfer-submit')).toBeEnabled();
         await shoot(page, `protection-off-${theme}-${viewport.key}`);
       }
     }

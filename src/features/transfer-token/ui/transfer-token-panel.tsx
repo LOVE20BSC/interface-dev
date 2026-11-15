@@ -96,8 +96,10 @@ function StateCard({
  *
  * Recipient protection is shared with the other transfer surfaces: 智能资产保护 is
  * ON by default, a known address-book contract is intercepted while it is on, and
- * the page requires an explicit acknowledgement once it is off. Any other contract
- * only warns. Success is an in-page receipt that collapses to a strip on 「好的」.
+ * turning it off skips only that address-book half (no block, no checkbox, no
+ * 「这是 X 合约」 naming). Address / amount / balance validation and the identity
+ * NFT confirmation gate stay, and any contract with bytecode only warns.
+ * Success is an in-page receipt that collapses to a strip on 「好的」.
  */
 export function TransferTokenPanel({
   isConnected,
@@ -120,7 +122,6 @@ export function TransferTokenPanel({
     member: '',
     name: '',
   });
-  const [knownAck, setKnownAck] = useState(false);
   const [identityAck, setIdentityAck] = useState(false);
   const [usedNativeMax, setUsedNativeMax] = useState(false);
   const [customInput, setCustomInput] = useState('');
@@ -165,14 +166,18 @@ export function TransferTokenPanel({
   });
   // viem returns undefined/null for an address without code (wagmi may surface null).
   const hasBytecode = bytecode.data == null ? undefined : bytecode.data !== '0x';
-  const protection = decideRecipientProtection(recipientAddress ?? '', hasBytecode);
+  // 智能资产保护 (owner 2026-11-16, refined same day): OFF skips the address-book
+  // half entirely, so `known` can only come back while the switch is on — a
+  // known address then falls through to the bytecode warning like any other
+  // contract. ON keeps the hard intercept (the only exit is the switch). Address
+  // format / self / zero / amount / balance validation is untouched either way,
+  // and an arbitrary contract only ever warns. 身份 NFT 确认门禁 also stays.
+  const protection = decideRecipientProtection(recipientAddress ?? '', hasBytecode, {
+    detectKnown: assetProtection.enabled,
+  });
   const protectionLabel =
     protection.kind === 'known' ? knownContractLabel(protection.labelKey) : undefined;
-  // 智能资产保护 (owner 2026-11-16): ON intercepts a known address-book contract
-  // outright; OFF keeps the existing explicit acknowledgement as the last gate.
-  // An arbitrary contract only ever warns, in both states.
-  const knownBlocked = protection.kind === 'known' && assetProtection.enabled;
-  const knownNeedsAck = protection.kind === 'known' && !assetProtection.enabled;
+  const knownBlocked = protection.kind === 'known';
 
   const tx = useTransferTransaction(() => {
     balance.refetch();
@@ -191,13 +196,6 @@ export function TransferTokenPanel({
     appliedCustomKey.current = customTokenKey;
     setSelectedToken(resolved);
   }, [catalog.custom.status, catalog.custom.token, customTokenKey]);
-
-  // A different recipient invalidates the previous contract acknowledgement.
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    setKnownAck(false);
-  }, [recipientAddress]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const parsed = parseTransferAmount(amountInput, token.decimals);
   const spendable = spendableTransferBalance(balance.balance, native);
@@ -222,7 +220,7 @@ export function TransferTokenPanel({
     parsed.kind === 'ok' &&
     !insufficient &&
     (mode === 'address'
-      ? addressCheck === 'ok' && !knownBlocked && (!knownNeedsAck || knownAck)
+      ? addressCheck === 'ok' && !knownBlocked
       : identityReady && identityAck && !knownBlocked);
 
   const addressInvalid = addressCheck !== 'ok' && addressCheck !== 'empty';
@@ -305,7 +303,6 @@ export function TransferTokenPanel({
     setUsedNativeMax(false);
     setAddressInput('');
     setIdentityInputs({ member: '', name: '' });
-    setKnownAck(false);
     setIdentityAck(false);
   };
 
@@ -451,7 +448,6 @@ export function TransferTokenPanel({
             onModeChange={(next) => {
               if (next === mode) return;
               setMode(next);
-              setKnownAck(false);
               setIdentityAck(false);
               tx.clearError();
             }}
@@ -552,30 +548,6 @@ export function TransferTokenPanel({
                 {copy.assetProtection.blockedTitle(protectionLabel)}
               </p>
               <p className="text-foreground/80">{copy.assetProtection.blockedBody}</p>
-            </div>
-          ) : null}
-
-          {knownNeedsAck && protectionLabel !== undefined ? (
-            <div
-              data-testid="transfer-protection"
-              role="alert"
-              className="mt-2 space-y-2 rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
-            >
-              <p className="flex items-start gap-1.5 text-sm font-semibold text-warning">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                {copy.assetProtection.knownTitle(protectionLabel)}
-              </p>
-              <p className="text-foreground/80">{copy.assetProtection.knownBody}</p>
-              <label className="flex items-start gap-2 rounded-xl bg-surface/80 p-2 font-medium text-foreground">
-                <input
-                  type="checkbox"
-                  data-testid="transfer-known-ack"
-                  checked={knownAck}
-                  onChange={(event) => setKnownAck(event.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-line accent-brand"
-                />
-                <span>{copy.assetProtection.knownCheckbox(protectionLabel)}</span>
-              </label>
             </div>
           ) : null}
 

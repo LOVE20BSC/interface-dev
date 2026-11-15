@@ -599,30 +599,31 @@ export const copy = {
   // ───────────────────────────────────────────────────────────────────────────
   // 智能资产保护 (owner 2026-11-16). One switch, one preference and one wording on
   // every transfer surface (代币转账 / 身份 NFT 转让 / 批量转账): 开启时收款方是
-  // 已知协议合约就被拦截，关闭开关才可强制转账；任意合约只警告。The known-contract
-  // 二次确认（勾选）在开关关闭后仍然保留，作为「我就是要转」的最后一道确认。
+  // 已知协议合约就被拦截，关闭开关才可强制转账；任意合约只警告。
+  // owner 2026-11-16 收口：关闭开关只跳过「是不是地址簿已知合约」这一项检测，
+  // 不拦截、不要求勾选、不出现「这是 X 合约」；地址/金额/余额/任意合约警告、
+  // 批量逐行解析与身份 NFT 确认门禁全部保留。
   // ───────────────────────────────────────────────────────────────────────────
   assetProtection: {
     title: '智能资产保护',
     toggleAria: '智能资产保护开关',
     onHint: '转给已知合约地址时会先拦下来，要先关闭这个开关才能强制转账。',
-    offHint: '已关闭：转给合约地址只会提示，不再拦截。',
-    /** 开启 + 命中已知协议合约：拦截，不再给页内勾选（唯一出口是关开关）。 */
+    offHint: '已关闭：不再检测收款方是否已知合约，转给合约地址只提示、不拦截。',
+    /** 开启 + 命中已知协议合约：拦截，页内没有勾选（唯一出口是关开关）。 */
     blockedTitle: (label: string) => `智能资产保护已拦截：这是「${label}」合约地址`,
     blockedBody: '转进合约的资产很可能取不回来。要强制转账，请先关闭「智能资产保护」。',
-    /** 关闭 + 已知协议合约：保留二次确认，勾选后才可提交。 */
-    knownTitle: (label: string) => `这是「${label}」合约地址`,
-    knownBody: '转进合约的资产很可能取不回来。',
-    knownCheckbox: (label: string) => `我确认要转给「${label}」合约地址`,
-    /** 任意有 bytecode 但不是地址簿条目的合约：只警告，不拦截。 */
+    /** 任意有 bytecode 的合约（开关关闭时已知合约也走这条）：只警告，不拦截。 */
     contractTitle: '这个地址是一个合约',
     contractBody: '转进合约的资产可能取不回来，请确认你清楚它的用途。',
-    /** 开关关闭且命中已知合约：提示会直转，不再拦截。 */
-    offSubmitNote: '智能资产保护已关闭，可以继续提交。',
-    /** 批量转账：已知合约收款方按行点名后整批拦截。 */
-    batchBlockedTitle: '有收款方是已知合约地址，智能资产保护已拦截',
+    /** 批量转账：已知合约与其它合约合并成一个块，标题点明各自行数。 */
+    batchBlockedTitle: (knownCount: number, otherContractCount: number) =>
+      otherContractCount > 0
+        ? `有 ${knownCount} 行是协议合约、${otherContractCount} 行是其它合约地址，智能资产保护已拦截`
+        : `有 ${knownCount} 行是协议合约，智能资产保护已拦截`,
     batchBlockedBody: '转进合约的资产很可能取不回来。要强制转账，请先关闭「智能资产保护」。',
     batchKnownLine: (line: number, label: string) => `第 ${line} 行：这是「${label}」合约地址`,
+    /** 合并块里非地址簿的合约行：只点名「是合约」，不冒充已知合约。 */
+    batchContractLine: (line: number) => `第 ${line} 行：这是一个合约地址`,
   },
   // ───────────────────────────────────────────────────────────────────────────
   // 批量转账 (owner 2026-11-14). One atomic batch through the BatchTransfer

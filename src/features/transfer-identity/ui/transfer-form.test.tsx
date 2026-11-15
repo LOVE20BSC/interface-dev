@@ -150,10 +150,11 @@ describe('TransferForm 智能资产保护（owner 2026-11-16）', () => {
     expect(submit).toBeDisabled();
 
     fireEvent.click(screen.getByTestId('asset-protection-toggle'));
-    expect(screen.getByTestId('transfer-identity-protection')).toHaveTextContent(
-      '这是「交易对」合约地址',
+    // 关闭 = 只跳过已知合约检测：已知合约块消失，同一地址按任意合约只警告。
+    expect(screen.queryByTestId('transfer-identity-protection')).toBeNull();
+    expect(screen.getByTestId('transfer-identity-contract-warning')).toHaveTextContent(
+      '这个地址是一个合约',
     );
-    expect(screen.getByText('智能资产保护已关闭，可以继续提交。')).toBeVisible();
     expect(submit).toBeEnabled();
   });
 

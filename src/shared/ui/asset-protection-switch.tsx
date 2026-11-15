@@ -62,8 +62,10 @@ export function AssetProtectionSwitch({
               // A button centers its inline content, so an absolutely positioned
               // thumb needs an explicit left anchor — without it the static
               // position is the centered one and the knob leaks out of the pill.
+              // 与 liquidity 的智能模式开关一致：w-11(44) 的胶囊里放 w-5(20) 的
+              // 滑块，left-0.5 起 / 到 right-0.5 止 = 位移 18px，左右各留 2px。
               'absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-surface shadow-soft transition-transform',
-              enabled ? 'translate-x-[22px]' : 'translate-x-0',
+              enabled ? 'translate-x-[18px]' : 'translate-x-0',
             )}
             aria-hidden="true"
           />

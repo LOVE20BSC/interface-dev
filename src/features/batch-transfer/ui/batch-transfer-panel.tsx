@@ -287,13 +287,31 @@ export function BatchTransferPanel({
     gasOk;
 
   // 智能资产保护 (owner 2026-11-16): ON intercepts a batch that names any known
-  // address-book contract; turning the switch off is the only way to force it. A
-  // merely-unknown contract recipient never blocks, it only warns.
-  const knownRows = parse.rows.flatMap((row) => {
-    const label = knownContractLabelOf(row.address);
-    return label === undefined ? [] : [{ line: row.line, label }];
+  // address-book contract; turning the switch off is the only way to force it.
+  // OFF skips the address-book half entirely — known rows degrade to the generic
+  // bytecode warning below, with no naming, no row-by-row callout and no block.
+  // 任意合约（有 bytecode）在两种状态都只警告、不拦截。
+  const knownByLine = new Map<number, string>(
+    assetProtection.enabled
+      ? parse.rows.flatMap((row) => {
+          const label = knownContractLabelOf(row.address);
+          return label === undefined ? [] : [[row.line, label] as const];
+        })
+      : [],
+  );
+  // One merged list for both prompts: a known row (with its address-book name) and
+  // any other contract row (bytecode, no name) live in the same block, in line order.
+  const protectionRows = parse.rows.flatMap<{
+    readonly line: number;
+    readonly label: string | undefined;
+  }>((row, index) => {
+    const label = knownByLine.get(row.line);
+    if (label !== undefined) return [{ line: row.line, label }];
+    return hasCode[index] === true ? [{ line: row.line, label: undefined }] : [];
   });
-  const knownBlocked = assetProtection.enabled && knownRows.length > 0;
+  const knownCount = knownByLine.size;
+  const knownBlocked = knownCount > 0;
+  const otherContractCount = protectionRows.length - knownCount;
   // 默认使用长期授权 (owner 2026-11-16): the approvals-page switch. Amount decision
   // lives in the transaction hook (send time); here it only drives copy.
   const { enabled: useUnlimitedApproval } = useUnlimitedApprovalPreference();
@@ -354,8 +372,6 @@ export function BatchTransferPanel({
     setGasInput(String(mode === 'native' ? BATCH_GAS_DEFAULT_NATIVE : BATCH_GAS_DEFAULT_TOKEN));
     tx.clearError();
   };
-
-  const contractRows = parse.rows.filter((_, index) => hasCode[index] === true);
 
   const itemTokens = new Map<string, TransferToken>();
   const toItem = (entry: TransferToken): TokenPickerItem => {
@@ -725,7 +741,40 @@ export function BatchTransferPanel({
           ) : null}
         </div>
 
-        {contractRows.length > 0 ? (
+        {/* 智能资产保护 + 合约收款方：合并成一个块（owner 2026-11-16）。
+            开关开启且命中已知合约：拦截，标题点明协议合约/其它合约的行数，逐行点名
+            （已知合约带地址簿名字），CTA 禁用原因只写一条；其它合约行也列在同一块里。
+            开关关闭：地址簿半边完全不出现，命中已知合约的行按「有 bytecode 的合约」
+            落到下面的通用警告（不与已知合约块并存）。 */}
+        {knownBlocked ? (
+          <div
+            role="alert"
+            data-testid="batch-transfer-known-contract"
+            className="rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
+          >
+            <p className="flex items-start gap-1.5 font-semibold text-warning">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              {copy.assetProtection.batchBlockedTitle(knownCount, otherContractCount)}
+            </p>
+            <ul className="mt-1 space-y-0.5 text-foreground/80">
+              {protectionRows.map((row) => (
+                <li
+                  key={`contract-${row.line}`}
+                  data-testid={
+                    row.label !== undefined
+                      ? `batch-transfer-known-line-${row.line}`
+                      : `batch-transfer-contract-line-${row.line}`
+                  }
+                >
+                  {row.label !== undefined
+                    ? copy.assetProtection.batchKnownLine(row.line, row.label)
+                    : copy.assetProtection.batchContractLine(row.line)}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-foreground/80">{copy.assetProtection.batchBlockedBody}</p>
+          </div>
+        ) : protectionRows.length > 0 ? (
           <div
             role="status"
             data-testid="batch-transfer-contract-warning"
@@ -736,33 +785,6 @@ export function BatchTransferPanel({
               {copy.batchTransfer.contractWarningTitle}
             </p>
             <p className="mt-1 text-foreground/80">{copy.batchTransfer.contractWarningBody}</p>
-          </div>
-        ) : null}
-
-        {knownRows.length > 0 ? (
-          <div
-            role={knownBlocked ? 'alert' : 'status'}
-            data-testid="batch-transfer-known-contract"
-            className="rounded-2xl border border-warning/40 bg-warning-soft/60 p-3 text-xs leading-5"
-          >
-            <p className="flex items-start gap-1.5 font-semibold text-warning">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              {knownBlocked
-                ? copy.assetProtection.batchBlockedTitle
-                : copy.assetProtection.knownTitle(knownRows[0]!.label)}
-            </p>
-            <ul className="mt-1 space-y-0.5 text-foreground/80">
-              {knownRows.map((row) => (
-                <li key={`known-${row.line}`} data-testid={`batch-transfer-known-line-${row.line}`}>
-                  {copy.assetProtection.batchKnownLine(row.line, row.label)}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-1 text-foreground/80">
-              {knownBlocked
-                ? copy.assetProtection.batchBlockedBody
-                : copy.assetProtection.offSubmitNote}
-            </p>
           </div>
         ) : null}
 

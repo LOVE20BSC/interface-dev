@@ -14,7 +14,8 @@ import { BatchTransferPanel } from '@/features/batch-transfer/ui/batch-transfer-
 
 const SELF = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 
-const { catalogState, balanceState, txState } = vi.hoisted(() => ({
+const { catalogState, balanceState, txState, codesState } = vi.hoisted(() => ({
+  codesState: { value: [] as boolean[] },
   catalogState: {
     value: {
       nativeToken: {
@@ -110,7 +111,7 @@ vi.mock('@/features/batch-transfer/model/use-batch-recipient-balances', () => ({
 }));
 
 vi.mock('@/features/batch-transfer/model/use-batch-recipient-codes', () => ({
-  useBatchRecipientCodes: () => [],
+  useBatchRecipientCodes: () => codesState.value,
 }));
 
 vi.mock('@/features/batch-transfer/model/use-batch-transaction', () => ({
@@ -132,6 +133,9 @@ function renderPanel(): void {
 beforeEach(() => {
   // 智能资产保护 is a device preference; every test starts from the shipped default (on).
   window.localStorage.clear();
+  // No recipient reads bytecode by default; tests that need the generic contract
+  // warning set the per-row flags themselves.
+  codesState.value = [];
   catalogState.value.nativeToken = {
     kind: 'native',
     address: undefined,
@@ -199,20 +203,46 @@ describe('BatchTransferPanel 智能资产保护（owner 2026-11-16）', () => {
     fillBatch(`${PAIR} 0.1`);
 
     const panel = screen.getByTestId('batch-transfer-known-contract');
-    expect(panel).toHaveTextContent('有收款方是已知合约地址，智能资产保护已拦截');
+    expect(panel).toHaveTextContent('有 1 行是协议合约，智能资产保护已拦截');
     expect(panel).toHaveTextContent('第 1 行：这是「交易对」合约地址');
     expect(screen.getByTestId('batch-transfer-submit')).toBeDisabled();
   });
 
-  it('falls back to a warning and allows the batch once the switch is off', () => {
+  it('merges the known and generic contract prompts into one block', () => {
+    const token = ADDRESSES.tokenAddress as string;
+    // Row 1 = 地址簿已知合约（交易对），row 2 = 有 bytecode 的任意合约。
+    codesState.value = [true, true];
+    renderPanel();
+    fillBatch(`${PAIR} 0.1\n${token} 0.2`);
+
+    const merged = screen.getByTestId('batch-transfer-known-contract');
+    expect(merged).toHaveTextContent(
+      '有 1 行是协议合约、1 行是其它合约地址，智能资产保护已拦截',
+    );
+    expect(screen.getByTestId('batch-transfer-known-line-1')).toHaveTextContent(
+      '第 1 行：这是「交易对」合约地址',
+    );
+    expect(screen.getByTestId('batch-transfer-contract-line-2')).toHaveTextContent(
+      '第 2 行：这是一个合约地址',
+    );
+    // 合并成一块：通用合约警告不与它并存。
+    expect(screen.queryByTestId('batch-transfer-contract-warning')).toBeNull();
+    expect(screen.getByTestId('batch-transfer-submit')).toBeDisabled();
+  });
+
+  it('falls back to the generic contract warning once the switch is off', () => {
+    // 开关关闭后已知合约不再被点名；它按「有 bytecode 的任意合约」落到通用警告。
+    codesState.value = [true];
     renderPanel();
     fillBatch(`${PAIR} 0.1`);
     expect(screen.getByTestId('batch-transfer-submit')).toBeDisabled();
 
     fireEvent.click(screen.getByTestId('asset-protection-toggle'));
-    const panel = screen.getByTestId('batch-transfer-known-contract');
-    expect(panel).toHaveTextContent('这是「交易对」合约地址');
-    expect(panel).toHaveTextContent('智能资产保护已关闭，可以继续提交。');
+    // 已知合约块完全消失（不再出现「这是交易对合约」），只剩通用警告。
+    expect(screen.queryByTestId('batch-transfer-known-contract')).toBeNull();
+    expect(screen.getByTestId('batch-transfer-contract-warning')).toHaveTextContent(
+      '有收款方是合约地址',
+    );
     expect(screen.getByTestId('batch-transfer-submit')).toBeEnabled();
   });
 

@@ -1,6 +1,8 @@
 {
   "identity": {"uuid": "47d39b07-9d74-4077-8a12-8ab9280ea25d"},
   "tasks": {
+    "20261115-2009-356e-收口-dev-首屏-bundle-压回-161-kb-内-status-截图计数": {"category": "基建", "created": "2026-11-15 20:09:45", "creator": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "creator_name": "tester", "finished": null, "owner": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "owner_name": "tester", "started": "2026-11-15 20:10:16", "status": "doing", "tags": ["bundle", "门禁"], "title": "收口：dev 首屏 bundle 压回 161 kB 内 + STATUS 截图计数核对", "updated": "2026-11-15 20:10:16", "worklog": "worklog/202611/15-2009-356e-收口-dev-首屏-bundle-压回-161-kb-内-status-截图计数.md"},
+    "20261115-2009-8334-资产保护收口-关闭仅跳过已知合约检测-批量提示合并-开关滑块统一": {"category": "整改", "created": "2026-11-15 20:09:45", "creator": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "creator_name": "tester", "finished": null, "owner": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "owner_name": "tester", "started": "2026-11-15 20:10:16", "status": "doing", "tags": ["资产保护", "批量转账"], "title": "资产保护收口：关闭仅跳过已知合约检测、批量提示合并、开关滑块统一", "updated": "2026-11-15 20:10:16", "worklog": "worklog/202611/15-2009-8334-资产保护收口-关闭仅跳过已知合约检测-批量提示合并-开关滑块统一.md"}
   },
   "version": "20261022000000"
 }

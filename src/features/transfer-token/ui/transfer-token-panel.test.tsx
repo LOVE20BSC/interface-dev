@@ -278,7 +278,7 @@ describe('TransferTokenPanel 按地址', () => {
     expect(submitButton()).toBeDisabled();
   });
 
-  it('keeps the known-contract acknowledgement once 智能资产保护 is turned off', () => {
+  it('skips only the known-contract half once 智能资产保护 is turned off', () => {
     renderPanel();
     fillAmount('0.1');
     fillRecipient(PAIR);
@@ -288,13 +288,18 @@ describe('TransferTokenPanel 按地址', () => {
       'aria-checked',
       'false',
     );
-    expect(screen.getByText('这是「交易对」合约地址')).toBeVisible();
-    expect(submitButton()).toBeDisabled();
-
-    fireEvent.click(screen.getByTestId('transfer-known-ack'));
+    // 关闭 = 只跳过已知合约检测：已知合约块与勾选都不再出现……
+    expect(screen.queryByTestId('transfer-protection')).toBeNull();
+    expect(screen.queryByTestId('transfer-known-ack')).toBeNull();
+    // ……同一地址按任意合约（有 bytecode）只警告，不再拦截。
+    expect(screen.getByTestId('transfer-contract-warning')).toHaveTextContent(
+      '这个地址是一个合约',
+    );
     expect(submitButton()).toBeEnabled();
-    // Turning protection back on re-blocks the same recipient, even when ticked.
+
+    // Turning protection back on re-blocks the same recipient.
     fireEvent.click(screen.getByTestId('asset-protection-toggle'));
+    expect(screen.getByTestId('transfer-protection')).toBeVisible();
     expect(submitButton()).toBeDisabled();
   });
 

@@ -7,9 +7,11 @@ import { isSameAddress } from '@/shared/lib/format';
  *
  * One question: what does this recipient address mean?
  *  - a known address-book protocol contract → asset protection intercepts it
- *    when the 智能资产保护 switch is on (and it is called out when off);
- *  - any other address with bytecode → a visible warning, never a block (the
- *    user may be sending on purpose);
+ *    while the 智能资产保护 switch is on. Turning the switch off skips the
+ *    address-book half entirely (the same address then falls through to the
+ *    bytecode check below), so nothing is blocked or named as 「X 合约」;
+ *  - any address with bytecode → a visible warning, never a block (the user may
+ *    be sending on purpose);
  *  - a plain wallet (or an unsettled bytecode read) → nothing to say.
  *
  * The bytecode half is read by the UI (it needs an RPC); this module owns the
@@ -75,7 +77,7 @@ export function knownContractLabelOf(recipient: string): string | undefined {
 /**
  * - known: the recipient is a protocol/address-book contract → 智能资产保护
  *   intercepts it while the switch is on;
- * - contract: any other address with bytecode → warn once (no block);
+ * - contract: any address with bytecode → warn once (no block);
  * - plain: an EOA (or the bytecode read has not settled yet) → no warning.
  */
 export type RecipientProtection =
@@ -87,15 +89,31 @@ export type RecipientProtection =
     }
   | { readonly kind: 'contract'; readonly address: HexAddress };
 
+export interface RecipientProtectionOptions {
+  /**
+   * Whether the address book is consulted at all / 智能资产保护 switch state.
+   * - true (default): a known address-book contract is reported as `known`, so
+   *   the pages intercept it (and the batch page names it row by row);
+   * - false (owner 2026-11-16 「关闭只跳过已知合约检测」): the address book is
+   *   never read. A known address is treated exactly like any other address:
+   *   bytecode still warns, but there is no 「这是 X 合约」 naming, no block and
+   *   no acknowledgement checkbox.
+   */
+  readonly detectKnown?: boolean;
+}
+
 export function decideRecipientProtection(
   recipient: string,
   hasBytecode: boolean | undefined,
+  options: RecipientProtectionOptions = {},
 ): RecipientProtection {
   const trimmed = recipient.trim();
   if (!/^0x[0-9a-fA-F]{40}$/.test(trimmed)) return { kind: 'plain' };
-  const labelKey = knownContractLabelKey(trimmed);
-  if (labelKey !== undefined) {
-    return { kind: 'known', address: trimmed as HexAddress, labelKey };
+  if (options.detectKnown ?? true) {
+    const labelKey = knownContractLabelKey(trimmed);
+    if (labelKey !== undefined) {
+      return { kind: 'known', address: trimmed as HexAddress, labelKey };
+    }
   }
   if (hasBytecode === true) return { kind: 'contract', address: trimmed as HexAddress };
   return { kind: 'plain' };

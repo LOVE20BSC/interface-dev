@@ -57,6 +57,31 @@ describe('decideRecipientProtection', () => {
     expect(decideRecipientProtection(OTHER, true)).toEqual({ kind: 'contract', address: OTHER });
   });
 
+  it('skips the address book entirely when 智能资产保护 is off (detectKnown: false)', () => {
+    // A known address-book contract is no longer named or intercepted: it falls
+    // through to the generic bytecode warning like any other contract…
+    expect(decideRecipientProtection(PAIR, true, { detectKnown: false })).toEqual({
+      kind: 'contract',
+      address: PAIR,
+    });
+    // …and stays silent until the bytecode read settles, exactly like a wallet.
+    expect(decideRecipientProtection(PAIR, undefined, { detectKnown: false })).toEqual({
+      kind: 'plain',
+    });
+    expect(decideRecipientProtection(PAIR, false, { detectKnown: false })).toEqual({
+      kind: 'plain',
+    });
+    // The other checks are unaffected by the switch.
+    expect(decideRecipientProtection(OTHER, true, { detectKnown: false })).toEqual({
+      kind: 'contract',
+      address: OTHER,
+    });
+    expect(decideRecipientProtection(OTHER, false, { detectKnown: false })).toEqual({
+      kind: 'plain',
+    });
+    expect(decideRecipientProtection('', true, { detectKnown: false })).toEqual({ kind: 'plain' });
+  });
+
   it('stays silent for a plain wallet and for an unsettled/absent bytecode read', () => {
     expect(decideRecipientProtection(OTHER, false)).toEqual({ kind: 'plain' });
     expect(decideRecipientProtection(OTHER, undefined)).toEqual({ kind: 'plain' });
