@@ -1079,6 +1079,8 @@ export const copy = {
         `实际进池 ${a} ${aSymbol} + ${b} ${bSymbol}`,
       quoteMin: (a: string, aSymbol: string, b: string, bSymbol: string) =>
         `最少进池 ${a} ${aSymbol} + ${b} ${bSymbol}`,
+      /** Hub 路径（协议 2026-11-15 起）只保护流动性凭证数量，不再给两侧最少进池。 */
+      quoteMinLiquidity: (amount: string) => `至少获得 ${amount} 流动性凭证`,
       quoteFirstMint: (price: string, token: string, native: string) =>
         `第一次建池：1 ${native} = ${price} ${token}`,
       quoteErrorTitle: '这一笔暂时算不出来。',

@@ -13,7 +13,7 @@ import { ACCOUNTS, connect, installWallet } from './wallet-stub';
  * Owner 2026-11-14 的交互重做也在这里验收：
  * - 添加区是「智能模式」开关（默认开）：开 = 只填一侧或两侧都填、Hub 自动配平；
  *   关 = 改一侧按池子比例自动填另一侧（只读联动），走 Router。
- * - 输入后只显示「预计获得 X 流动性凭证」，swap 段 / 实进池 / 最少进池收在默认
+ * - 输入后只显示「预计获得 X 流动性凭证」，swap 段 / 实进池 / 至少获得的流动性凭证收在默认
  *   折叠的「详情」里；「已为网络手续费预留」只在点过「全部」原生币后出现。
  * - 撤出按 **LP 数量** 输入，25/50/75/100% 只是快捷填充；只显示「预计收到约 X + Y」。
  * - 社区流动性查询只给全局数据（交易对地址可复制、两侧储备、LP 总量、双向价格）。
@@ -265,7 +265,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
         '实际进池 54,983.491651 TestLOVE20 + 18.32783 ETH',
       );
       await expect(page.getByTestId('liquidity-quote-min')).toHaveText(
-        '最少进池 54,708.574193 TestLOVE20 + 18.236191 ETH',
+        '至少获得 998.562028 流动性凭证',
       );
 
       await approveThenSubmit(page, 'liquidity-add-approve', 'liquidity-add-submit');
@@ -328,7 +328,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
         '实际进池 9,294.150182 TestLOVE20 + 5.111782 ETH',
       );
       await expect(page.getByTestId('liquidity-quote-min')).toHaveText(
-        '最少进池 9,247.679431 TestLOVE20 + 5.086223 ETH',
+        '至少获得 216.862145 流动性凭证',
       );
 
       // 「已为网络手续费预留」只在点过「全部」原生币之后出现。

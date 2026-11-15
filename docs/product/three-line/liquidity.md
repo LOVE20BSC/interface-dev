@@ -7,6 +7,8 @@
 > 三条线相互独立：§1 只用「初始状态快照 + 页面输入 + Uniswap V2 恒定乘积 / Hub 配平公式」手算（Python，整数 `isqrt` 向下取整）；§2 只用 `cast`/viem 直接打链；§3 只读页面文字。三线同一用例的数值必须完全相等。
 >
 > **`quoteLp` / `quoteLpWithNative` 不是理论线**：它们只是合约侧 view，出现在 §2 作为交叉核对；§1 的 `amountToSwap` / `amountOutFromSwap` / `expectedLiquidity` 由 §1.2 的闭式公式独立推导。
+>
+> **2026-11-15 协议升级（core `3f71379` / periphery `172190a` / anvil `89937a3`）**：Hub 的 `addLiquidityWithNative` / `addLiquidityWithToken` 把两侧的 `amountTokenMin/amountNativeMin`（或 `amountAMin/amountBMin`）合并成一个 **`minLiquidity`（最少获得的流动性凭证）**；`quoteLp*` 不再返回 `suggestedAmountAMin/suggestedAmountBMin`。地址零漂移，理论线的 `t/y/pA/pB/uA/uB/L` 一个 wei 都没变，**只有「最少额」的口径变了**：Hub 路径 `minLiquidity = L × (10000 − bps) / 10000` 向下取整，Router 路径仍是两侧 `usable × (10000 − bps) / 10000`。
 
 ## §0 环境与初始状态
 
@@ -39,7 +41,7 @@ anvil 固定账户（mnemonic `test test … junk`），本页用到：
 
 - 金额一律走 `shared/lib/format.ts` 的 `formatTokenAmount`：整数部分千分位、小数最多 **6** 位、只截断不四舍五入、去掉末尾 0；未知显示 `—`。
 - 百分比走 `formatPercent`：最多 **2** 位、截断。LP 份额百分比 = `我的 LP / totalSupply × 100`（`totalSupply` 含永久锁定的 1000，分子不含）。
-- 页面上的「最多可接受的价格变化」（滑点容忍度）默认 **0.5%**，`min = quote × (10000 − bps) / 10000` 向下取整。
+- 页面上的「最多可接受的价格变化」（滑点容忍度）默认 **0.5%**。Hub 路径：`minLiquidity = expectedLiquidity × (10000 − bps) / 10000` 向下取整（两侧最少进池数量不再上链）；Router 路径：两侧各 `min = usable × (10000 − bps) / 10000` 向下取整。
 - 交易 deadline 默认 **20 分钟**（`now + 1200s`）；页面不显示 deadline 文本，只在高级信息里写「20 分钟内有效」。
 
 ## §1 理论线（手算，先于实现）
@@ -85,7 +87,7 @@ t = ( sqrt( R_A²·(1 + f)² + 4·f·R_A·a ) − R_A·(1 + f) ) / (2·f)
 ### 用例 A（正常路径 1，Hub 单边社区代币）
 
 - 账户 #4 `0x15d3…6A65`；添加页「一键单边」，只填社区代币 `100000 TestLOVE20 = 100000000000000000000000 wei`，原生币侧留空。
-- Hub 调用：`addLiquidityWithToken({tokenA: TestLOVE20, tokenB: TestWETH, amountADesired: 1e23, amountBDesired: 0, amountAMin, amountBMin, to: #4, deadline})`；先 `approve(Hub, 1e23)`。
+- Hub 调用：`addLiquidityWithToken({tokenA: TestLOVE20, tokenB: TestWETH, amountADesired: 1e23, amountBDesired: 0, minLiquidity, to: #4, deadline})`；先 `approve(Hub, 1e23)`。
 
 | 量 | 公式 | 理论值（wei） | 页面文本 |
 | --- | --- | --- | --- |
@@ -95,10 +97,9 @@ t = ( sqrt( R_A²·(1 + f)² + 4·f·R_A·a ) − R_A·(1 + f) ) / (2·f)
 | `pB` | `y` | `18327830550642964289` | 进入池子 `18.32783 ETH` |
 | `uA` / `uB` | `_optimalAmounts` | `54983491651928892868391` / `18327830550642964289` | — |
 | `L` | `min(uA·S/R_A', uB·S/R_B')` | `1003579928576458381352` | 预计获得 `1,003.579928` LP |
-| `suggestedAmountAMin` | `uA` | `54983491651928892868391` | — |
-| `suggestedAmountBMin` | `uB` | `18327830550642964289` | — |
-| 提交时 `amountAMin` | `uA×(10000−50)/10000` | `54708574193669248404049` | 最少进入 `54,708.574193 TestLOVE20` |
-| 提交时 `amountBMin` | `uB×9950/10000` | `18236191397889749467` | 最少进入 `18.236191 ETH` |
+| 提交时 `minLiquidity` | `L×9950/10000` | `998562028933576089445` | 至少获得 `998.562028` 流动性凭证 |
+
+> `quoteLpWithNative` 不再返回两侧的 `suggested*Min`（协议 2026-11-15）；表格里原有 `suggestedAmountAMin/BMin` 两行随之删除——它们本来只是 `uA/uB` 的别名，不是可提交的参数。
 | 加池后 `R_A'` | `(R_A + t) + pA = R_A + a`（swap 在注资前发生，注资后这次输入全部进了池子） | `300000000000000000000000` | — |
 | 加池后 `R_B'` | `(R_B − y) + pB = R_B`（单边只进一侧，WETH 侧净变化 0） | `100000000000000000000` | — |
 | 加池后 `S'` | `S + L` | `5475715883576037774170` | — |
@@ -110,7 +111,7 @@ t = ( sqrt( R_A²·(1 + f)² + 4·f·R_A·a ) − R_A·(1 + f) ) / (2·f)
 ### 用例 B（正常路径 2，Hub 单边原生币，非整千数量）
 
 - 账户 #5 `0x9965…A4dc`；只填原生币 `10 ETH = 10000000000000000000 wei`，社区代币侧留空。
-- Hub 调用：`addLiquidityWithNative({tokenAddress: TestLOVE20, amountTokenDesired: 0, amountTokenMin, amountNativeMin, to: #5, deadline})`，`value = 1e19`。
+- Hub 调用：`addLiquidityWithNative({tokenAddress: TestLOVE20, amountTokenDesired: 0, minLiquidity, to: #5, deadline})`，`value = 1e19`。
 
 | 量 | 公式 | 理论值（wei） | 页面文本 |
 | --- | --- | --- | --- |
@@ -119,8 +120,7 @@ t = ( sqrt( R_A²·(1 + f)² + 4·f·R_A·a ) − R_A·(1 + f) ) / (2·f)
 | `pA` | `y` | `9294150182873894419011` | 进入池子 `9,294.150182 TestLOVE20` |
 | `pB` | `b − t` | `5111782600580641931` | 进入池子 `5.111782 ETH` |
 | `L` | `min(uA·S/R_A', uB·S/R_B')` | `217951904694344577682` | 预计获得 `217.951904` LP |
-| `amountAMin` | `uA×9950/10000` | `9247679431959524946915` | 最少进入 `9,247.679431 TestLOVE20` |
-| `amountBMin` | `uB×9950/10000` | `5086223687577738720` | 最少进入 `5.086223 ETH` |
+| 提交时 `minLiquidity` | `L×9950/10000` | `216862145170872854793` | 至少获得 `216.862145` 流动性凭证 |
 | 加池后 `R_A'` | `(R_A − y) + uA`，`uA = usableAmountA` | `200000000000000000000000`（单边原生只进 WETH 侧；代币净变化 0） | — |
 | 加池后 `R_B'` | `(R_B + t) + uB` | `109999999999999999999`（= `R_B + 10 ETH − 1 wei`） | — |
 | 我的份额 | `L / (S + L)` | `4.647075…%` | 我的占比 `4.64%` |
@@ -189,25 +189,26 @@ export PATH="/Users/BigPolarBear/.foundry/bin:/Users/BigPolarBear/.nvm/versions/
 VERIFY_RPC=http://127.0.0.1:8568 node scripts/verify/liquidity-contract.mjs
 ```
 
-2026-11-14 07:02 首次实测、07:44 复跑 **45/45 PASS**（退出码 0）。用例 A/B/C/D/E/G 各自独立快照：A 与 C 在脚本内先加后撤（同一快照），B/D/E/G 各自从 §0 起跑。
+2026-11-14 07:02 首次实测、07:44 复跑 **45/45 PASS**（退出码 0）。2026-11-15 08:22 协议升级（`minLiquidity` 口径）后在本轮 live 链（`PORT=8555`，`make bootstrap` 新导出）上重跑仍是 **45/45 PASS**（退出码 0），A/B/C/D/E 的交易哈希与上一轮逐字相同（地址零漂移 → 交易序列可复现）。用例 A/B/C/D/E/G 各自独立快照：A 与 C 在脚本内先加后撤（同一快照），B/D/E/G 各自从 §0 起跑。
 
 | 用例 | 链上交易 / 读取 | 合约值（wei） | 与理论值差值 |
 | --- | --- | --- | --- |
 | 初始状态 | `pair.getReserves` / `totalSupply` | `200000000000000000000000` / `100000000000000000000` / `4472135954999579392818` | 0 |
 | A 报价（交叉核对） | `Hub.quoteLpWithNative(TestLOVE20, 1e23, 0)` | `amountToSwap=45016508348071107131609`、`amountOut=18327830550642964289`、`pA=54983491651928892868391`、`pB=18327830550642964289`、`expectedLiquidity=1003579928576458381352` | 0（quote 与 §1.2 闭式公式逐 wei 相等） |
-| A 加池 | tx `0x9ef351e243566768a2ef7229749f2848cd6b6f0f7a32afd999e5c7084a7d4de8`（`addLiquidityWithToken`） | 储备 `300000000000000000000000` / `100000000000000000000`；`totalSupply=5475715883576037774170`；我的 LP `1003579928576458381352`；代币扣款 `100000000000000000000000` | 0 |
+| A 加池 | tx `0x9ef351e243566768a2ef7229749f2848cd6b6f0f7a32afd999e5c7084a7d4de8`（`addLiquidityWithToken`，`minLiquidity=998562028933576089445`） | 储备 `300000000000000000000000` / `100000000000000000000`；`totalSupply=5475715883576037774170`；我的 LP `1003579928576458381352`；代币扣款 `100000000000000000000000` | 0 |
 | B 报价（交叉核对） | `Hub.quoteLpWithNative(TestLOVE20, 0, 1e19)` | `amountToSwap=4888217399419358069`、`amountOut=9294150182873894419011`、`expectedLiquidity=217951904694344577682` | 0 |
-| B 加池 | tx `0xeda8a6c8d0f2a18f546583a838dfab4d3d24f8e851277dc822771d44611ef427`（`addLiquidityWithNative`） | 储备 `200000000000000000000000` / `109999999999999999999`；我的 LP `217951904694344577682`；代币余额不变 | 0（含 1 wei 退款） |
+| B 加池 | tx `0xeda8a6c8d0f2a18f546583a838dfab4d3d24f8e851277dc822771d44611ef427`（`addLiquidityWithNative`，`minLiquidity=216862145170872854793`） | 储备 `200000000000000000000000` / `109999999999999999999`；我的 LP `217951904694344577682`；代币余额不变 | 0（含 1 wei 退款） |
 | C 加池后状态 | tx `0x9ef3…4de8` 后读取 | `totalSupply=5475715883576037774170`、储备 `300000000000000000000000` / `100000000000000000000` | 0 |
 | C 撤出 100% | tx `0x07766be3e6503b9e1dfe4887920a8d649ec9460f752d1088f372570da0982ab5`（`removeLiquidityETH`） | 收到 `54983491651928892866980` / `18327830550642964288`；储备 `245016508348071107133020` / `81672169449357035712`；`totalSupply=4472135954999579392818`；我的 LP `0` | 0 |
 | D 双币加池 | tx `0xbfae239b938a7b401253074f1c79bb735d719578756335a5ff6a6d101a5b7b11`（`addLiquidityETH`） | 我的 LP `22360679774997896964`；储备 `201000000000000000000000` / `100500000000000000000`；`totalSupply=4494496634774577289782` | 0 |
-| E 空池单边被拒 | `eth_call Hub.addLiquidityWithToken(TestX, WETH, 1, 0, 0, 0, …)` | revert `PairWithoutLiquidity`（前端据此降级为两侧都填） | 0 |
+| E 空池单边被拒 | `eth_call Hub.addLiquidityWithToken({tokenA: TestX, tokenB: WETH, amountADesired: 1, amountBDesired: 0, minLiquidity: 0, to: #8, deadline})` | revert `PairWithoutLiquidity`（前端据此降级为两侧都填） | 0 |
 | E 首次建池 | 测试代币 `0x95bd8d42f30351685e96c62eddc0d0613bf9a87a`（`WETH9Configurable("TestX","TestX")`，由 #8 部署并 `deposit 100 ETH`）；tx `0xfc39eb59438b6aba9bb713bb7fbc06e986f5fe0c0ad1c853961365212678d2cb`（`addLiquidityETH`） | 我的 LP `999999999999999000`；`totalSupply=1000000000000000000`；储备 `100000000000000000000` / `10000000000000000` | 0 |
 | G 最少额过高 | `addLiquidityETH(TestLOVE20, 1e21, 800000000000000000001, 0, …, value 4e17)` | 交易回滚（`INSUFFICIENT_A_AMOUNT`）；储备 `200000000000000000000000` / `100000000000000000000`、`totalSupply=4472135954999579392818`、我的代币余额均不变 | 0 |
 
 补充事实（供复核）：
 
-- 标准 Uniswap V2 的 `_addLiquidity` 只在「B 侧成为约束」的分支检查 `amountAMin`（`require(amountAOptimal >= amountAMin)`）。用例 G 因此把 native 期望设成 `4e17`，让 A 侧被截到 `8e20` 再触发回滚；这也是页面提交时把两侧最少额都按滑点算出来的理由（不能只依赖一侧）。
+- 标准 Uniswap V2 的 `_addLiquidity` 只在「B 侧成为约束」的分支检查 `amountAMin`（`require(amountAOptimal >= amountAMin)`）。用例 G 因此把 native 期望设成 `4e17`，让 A 侧被截到 `8e20` 再触发回滚；这也是 **Router 路径**页面提交时把两侧最少额都按滑点算出来的理由（不能只依赖一侧）。
+- **Hub 路径的最少额保护换了位置**（协议 2026-11-15）：`addLiquidity*` 不再收两侧 `amountMin`，而是在 `_addLiquidity` 里铸完 LP 后检查 `liquidity >= minLiquidity`（不足 revert `InsufficientLiquidity(liquidity, minLiquidity)`）。所以用例 A/B 提交的 `minLiquidity` 是 `L×9950/10000`，而不是两侧数量——两侧被 swap 配平后的 `uA/uB` 仍由 Hub 自己算，用户只需要声明「我至少接受多少流动性凭证」。
 - Hub 的 `expectedLiquidity` 交叉核对与本文件 §1.2 的 `min(uA·S/R_A', uB·S/R_B')` 完全一致，说明本部署 `SWAP_FEE_FOR_PROTOCOL_RATIO=0`（无协议费铸造），`S` 就是 pair `totalSupply()`。
 - 测试代币是 `dex` 的 `WETH9Configurable` 编译产物（`../dex/out/WETH9Configurable.sol/WETH9Configurable.json`），脚本/前端线都只读它，不写 sibling 仓。
 
@@ -220,18 +221,16 @@ export PATH="/Users/BigPolarBear/.foundry/bin:/Users/BigPolarBear/.nvm/versions/
 E2E_PORT=4185 E2E_ANVIL_RPC=http://127.0.0.1:8576 pnpm e2e --grep "流动性"
 ```
 
-2026-11-14 13:04 实测 **7 passed (1.3m)**（退出码 0，`build` + `vite preview` 由套件自己跑；12:21 的首轮也是 7 passed (1.5m)，12:21 的 16 张截图被 13:04 这轮覆盖成最终版）。owner
-2026-11-14 09:30 的交互重做（智能模式 / 详情折叠 / 按 LP 数量撤出 / 查询页只留全局数据）就验收在这
-7 个用例里；下面的字符串是重做之后的页面契约。
+2026-11-14 13:04 实测 **7 passed (1.3m)**；2026-11-15 08:25 协议升级后在本轮 live 链
+（`E2E_ANVIL_RPC=http://127.0.0.1:8555`）跑 **14 passed (1.8m，退出码 0)**，`build` + `vite preview`
+由套件自己跑，16 张流动性截图（`liquidity-{add,mine,withdraw,empty}-{light,dark}-{mobile,desktop}.png`）
+在同一轮覆盖成最终版。owner 2026-11-14 09:30 的交互重做（智能模式 / 详情折叠 / 按 LP 数量撤出 /
+查询页只留全局数据）就验收在这 14 个用例里；下面的字符串是重做之后的页面契约。
 
 > **2026-11-14 20:xx：QA 10 条缺陷（`docs/product/reviews/liquidity.md`）已修，§3 的 spec 新增
 > 用例 G/H/I/J/K/L/M 与 D2/D6/D7 断言（连续两笔再授权、未知社区、切社区、零地址、页签往返、
-> 原生单边授权、0/1 wei）。本轮 e2e 与 16 张截图**尚未重跑**：`../core@00113ae` 给
-> `IStake.stakeLiquidity` 加了第 6 参，`../periphery/LOVE20Hub.sol` / `../anvil/script/SeedFlow.s.sol`
-> 仍是旧调用 → 现在任何端口 `make bootstrap` 都编译失败；等合约侧同步稳定后由 Lead 统一跑
-> `E2E_PORT=4195 E2E_ANVIL_RPC=http://127.0.0.1:8593 pnpm e2e --grep "流动性"` 并覆盖截图。**
-> 期间能用单测/组件测试验证的（D2/D3/D6/D7/D8/D10 与 D1 的再授权状态机、D4/D5 的页面状态）
-> 已在 `src/features/liquidity-pool/**/*.test.*` 落地（38 passed）。
+> 原生单边授权、0/1 wei）。当时因合约侧 `stakeLiquidity` 加第 6 参导致 bootstrap 编译失败，
+> e2e 与截图暂缓；2026-11-15 协议同步完成（anvil `89937a3`）后已在 8555 live 链补跑，见上一段。**
 
 **交互口径（每条都对应表里的字符串）**
 
@@ -242,8 +241,8 @@ E2E_PORT=4185 E2E_ANVIL_RPC=http://127.0.0.1:8576 pnpm e2e --grep "流动性"
     **只读**；点一下那一侧的输入框就改成由它来驱动另一侧。这一笔走 Router `addLiquidityETH`。
     空池（首次建池）没有比例可依，两侧都必须填，由两个数量决定初始价格。
   - Hub 缺失 / 空池时智能模式不可用，自动降级到 Router 两侧都填，并在页面写明原因（用例 E）。
-- 输入后页面只留一行 **`预计获得 X 流动性凭证`**；`其中 … 会先换成 …`、`实际进池 …`、`最少进池 …`、
-  `第一次建池：1 ETH = …` 全部收在**默认折叠**的「详情」里（`liquidity-details-toggle` → `liquidity-details`）。
+- 输入后页面只留一行 **`预计获得 X 流动性凭证`**；`其中 … 会先换成 …`、`实际进池 …`、`至少获得 … 流动性凭证`
+  （Hub 路径；Router 路径仍是 `最少进池 A + B`）、`第一次建池：1 ETH = …` 全部收在**默认折叠**的「详情」里（`liquidity-details-toggle` → `liquidity-details`）。
 - `已为网络手续费预留约 0.001 ETH。` 只在用户点过原生币的「全部」之后出现；之后手改数量或改由另一侧
   联动，提示立即消失。
 - 撤出输入 **LP 数量**（不是百分比）：25 / 50 / 75 / 100% 只是快捷按钮，点一下把对应比例的 LP 数量填进
@@ -277,10 +276,10 @@ E2E_PORT=4185 E2E_ANVIL_RPC=http://127.0.0.1:8576 pnpm e2e --grep "流动性"
 
 | 用例 | spec | 页面显示的具体字符串（逐字） | 与理论线差值 |
 | --- | --- | --- | --- |
-| A 智能模式单边社区代币报价 | `用例 A + C` | 默认可见：`预计获得 1,003.579928 流动性凭证`；点开详情：`其中 45,016.508348 TestLOVE20 会先换成 18.32783 ETH。` / `实际进池 54,983.491651 TestLOVE20 + 18.32783 ETH` / `最少进池 54,708.574193 TestLOVE20 + 18.236191 ETH` | 0 |
+| A 智能模式单边社区代币报价 | `用例 A + C` | 默认可见：`预计获得 1,003.579928 流动性凭证`；点开详情：`其中 45,016.508348 TestLOVE20 会先换成 18.32783 ETH。` / `实际进池 54,983.491651 TestLOVE20 + 18.32783 ETH` / `至少获得 998.562028 流动性凭证` | 0 |
 | A 加池后 | 同上 | `1,003.579928`（我的流动性凭证）/ `18.32%`（我的占比） | 0 |
 | C 按 LP 数量撤出 100% | 同上 | 100% 按钮把 `1003.579928` 填进 LP 数量输入框（展示截断 6 位，交易用完整 `1003579928576458381352`）→ `预计收到约 54,983.491651 TestLOVE20 + 18.32783 ETH`；手输 `1003.579928576458381352` 得到同一行；回执 `已撤出 54,983.491651 TestLOVE20 + 18.32783 ETH` → 关闭后回到「你还没有这个池子的流动性。」 | 0 |
-| B 智能模式单边原生币 | `用例 B` | `预计获得 217.951904 流动性凭证`；详情：`其中 4.888217 ETH 会先换成 9,294.150182 TestLOVE20。` / `实际进池 9,294.150182 TestLOVE20 + 5.111782 ETH` / `最少进池 9,247.679431 TestLOVE20 + 5.086223 ETH`；我的占比 `4.64%` / 我的凭证 `217.951904`；点「全部」后 `已为网络手续费预留约 0.001 ETH。` | 0 |
+| B 智能模式单边原生币 | `用例 B` | `预计获得 217.951904 流动性凭证`；详情：`其中 4.888217 ETH 会先换成 9,294.150182 TestLOVE20。` / `实际进池 9,294.150182 TestLOVE20 + 5.111782 ETH` / `至少获得 216.862145 流动性凭证`；我的占比 `4.64%` / 我的凭证 `217.951904`；点「全部」后 `已为网络手续费预留约 0.001 ETH。` | 0 |
 | D 智能模式关（只读联动） | `用例 D` | 只填 `1000 TestLOVE20` → 原生币框自动变 `0.5` 且 `readonly`；点原生币框改 `0.25` → 社区代币框自动变 `500`；详情 `实际进池 1,000 TestLOVE20 + 0.5 ETH` / `预计获得 22.360679 流动性凭证` / `最少进池 995 TestLOVE20 + 0.4975 ETH`；我的凭证 `22.360679` | 0 |
 | E 空池 + 首次建池 | `用例 E` | `这个代币还没有流动性池。` / `智能模式暂时用不了：这个代币还没有池子，第一次建池只能两侧都填。` / 详情 `第一次建池：1 ETH = 10,000 TestX` / `预计获得 0.999999 流动性凭证`；建池后查询页 `100 TestX`、`0.01 ETH`、`1 ETH ≈ 10,000 TestX`、`1 TestX ≈ 0.0001 ETH`、交易对地址 `title` 为 40 位地址 | 0 |
 | F 边界门禁 | `边界` | `TestLOVE20 不够，还差 1`、`请输入有效的金额。`、`自定义值需要在 0.01% 到 50% 之间。（0.01%–50%）`（关闭设置弹层后仍在 `liquidity-slippage-error` 可见）；主按钮（授权或确认形态）全程 disabled，链上没有交易 | 0（不发交易） |
@@ -309,10 +308,11 @@ E2E_PORT=4185 E2E_ANVIL_RPC=http://127.0.0.1:8576 pnpm e2e --grep "流动性"
 | A `amountOutFromSwap` | `18327830550642964289` | `18327830550642964289` | `18.32783` | ✅ |
 | A prepared / usable | `54983491651928892868391` / `18327830550642964289` | quote 同左；加池后储备 `3e23` / `1e20` | `54,983.491651` / `18.32783` | ✅ |
 | A `expectedLiquidity` | `1003579928576458381352` | LP 余额 `1003579928576458381352`；`totalSupply` `5475715883576037774170` | `1,003.579928` | ✅ |
-| A 最少进池 | `54708574193669248404049` / `18236191397889749467` | 交易用同一组 `amountAMin/BMin`，成功 | `54,708.574193` / `18.236191` | ✅ |
+| A `minLiquidity` | `998562028933576089445` | 交易用同一 `minLiquidity`，成功（LP 实际 `1003579928576458381352`） | `至少获得 998.562028 流动性凭证` | ✅ |
 | A 我的份额 | `18.327830…%` | `LP / totalSupply = 18.3278%` | `18.32%`（我的流动性）| ✅ |
 | B `amountToSwap` / `amountOut` | `4888217399419358069` / `9294150182873894419011` | quote 同左 | `4.888217` / `9,294.150182` | ✅ |
 | B `expectedLiquidity` | `217951904694344577682` | LP 余额同左 | `217.951904` | ✅ |
+| B `minLiquidity` | `216862145170872854793` | 交易用同一 `minLiquidity`，成功 | `至少获得 216.862145 流动性凭证` | ✅ |
 | B 加池后储备 | `R_B + 10 ETH − 1 wei = 109999999999999999999` | `109999999999999999999` | —（查询页显示 `1.1e20` 量级） | ✅ |
 | B 我的份额 | `4.647075…%` | `4.6470…%` | `4.64%` | ✅ |
 | C 按 LP 数量撤出 100% | `54983491651928892866980` / `18327830550642964288` | 到账同左；储备 `245016508348071107133020` / `81672169449357035712`；`totalSupply` 回到 `S` | 100% 快捷按钮回填 `1003.579928`（展示截断；内部 `1003579928576458381352`）→ `预计收到约 54,983.491651` + `18.32783` | ✅ |

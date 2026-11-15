@@ -45,7 +45,7 @@
 
 - 每个页面至少覆盖：**正常路径 2 个**（含 1 个非整数金额/非整百比例）、**边界 2 个**（余额不足/输入为 0/最大按钮）、**失败回滚 1 个**（交易 revert 后状态不变），批量转账另加**多行混合**（合法行 + 非法行）与**重复地址**，流动性池另加**首次建池（空储备）**与**按比例撤出**。
 - 每个用例写清：初始状态 → 输入 → 交易的中间量（如 swap 段实际消耗、LP 精度损失、手续费）→ 终态。
-- 舍入：金额输入按 `decimals` 向下截断；LP 最小流动性 1000 被永久锁定；Uniswap V2 手续费 0.30%（本地 dex `SWAP_FEE_FOR_LP_RATIO=3000000000000000`、协议费 0）；Hub 报价 `quoteLp` 返回 `expectedLiquidity` 与 `suggested*Min`。
+- 舍入：金额输入按 `decimals` 向下截断；LP 最小流动性 1000 被永久锁定；Uniswap V2 手续费 0.30%（本地 dex `SWAP_FEE_FOR_LP_RATIO=3000000000000000`、协议费 0）；Hub 报价 `quoteLp` 返回 `expectedLiquidity`（2026-11-15 协议升级后不再返回 `suggested*Min`；Hub 最少额改为 `minLiquidity`，见 [three-line/liquidity.md](three-line/liquidity.md)）。
 - 理论线不得写「以链上为准」；若发现合约实现与标准公式不同，**先记录差异**（可能是合约缺陷 → `docs/contract-issues/`），不是改预期值。
 
 ## 与门禁的关系

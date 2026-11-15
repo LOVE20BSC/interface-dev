@@ -57,9 +57,9 @@ const routerAbi = parseAbi([
   'function removeLiquidityETH(address,uint256,uint256,uint256,address,uint256) returns (uint256,uint256)',
 ]);
 const hubAbi = parseAbi([
-  'function addLiquidityWithToken((address tokenA,address tokenB,uint256 amountADesired,uint256 amountBDesired,uint256 amountAMin,uint256 amountBMin,address to,uint256 deadline) params) returns (uint256)',
-  'function addLiquidityWithNative((address tokenAddress,uint256 amountTokenDesired,uint256 amountTokenMin,uint256 amountNativeMin,address to,uint256 deadline) params) payable returns (uint256)',
-  'function quoteLpWithNative(address,uint256,uint256) view returns ((bool hasLiquidity,bool willSwap,address swapTokenIn,address swapTokenOut,uint256 amountToSwap,uint256 amountOutFromSwap,uint256 preparedAmountA,uint256 preparedAmountB,uint256 usableAmountA,uint256 usableAmountB,uint256 expectedLiquidity,uint256 suggestedAmountAMin,uint256 suggestedAmountBMin))',
+  'function addLiquidityWithToken((address tokenA,address tokenB,uint256 amountADesired,uint256 amountBDesired,uint256 minLiquidity,address to,uint256 deadline) params) returns (uint256)',
+  'function addLiquidityWithNative((address tokenAddress,uint256 amountTokenDesired,uint256 minLiquidity,address to,uint256 deadline) params) payable returns (uint256)',
+  'function quoteLpWithNative(address,uint256,uint256) view returns ((bool hasLiquidity,bool willSwap,address swapTokenIn,address swapTokenOut,uint256 amountToSwap,uint256 amountOutFromSwap,uint256 preparedAmountA,uint256 preparedAmountB,uint256 usableAmountA,uint256 usableAmountB,uint256 expectedLiquidity))',
 ]);
 const factoryAbi = parseAbi(['function getPair(address,address) view returns (address)']);
 const weth9Abi = parseAbi([
@@ -83,8 +83,8 @@ const A = {
   preparedA: 54983491651928892868391n,
   preparedB: 18327830550642964289n,
   liquidity: 1003579928576458381352n,
-  minA: 54708574193669248404049n,
-  minB: 18236191397889749467n,
+  // 协议 2026-11-15 起 Hub 只收 minLiquidity = expectedLiquidity × 9950/10000 向下取整
+  minLiquidity: 998562028933576089445n,
   reserveTokenAfter: 300000000000000000000000n,
   reserveNativeAfter: 100000000000000000000n,
   totalSupplyAfter: 5475715883576037774170n,
@@ -97,8 +97,7 @@ const B = {
   preparedA: 9294150182873894419011n,
   preparedB: 5111782600580641931n,
   liquidity: 217951904694344577682n,
-  minA: 9247679431959524946915n,
-  minB: 5086223687577738720n,
+  minLiquidity: 216862145170872854793n,
 };
 // 用例 C：A 之后 100% 撤出（储备已含这次注资：3e23 / 1e20）
 const C = {
@@ -269,8 +268,7 @@ async function main() {
               tokenB: WETH,
               amountADesired: A.tokenIn,
               amountBDesired: 0n,
-              amountAMin: A.minA,
-              amountBMin: A.minB,
+              minLiquidity: A.minLiquidity,
               to: ACCOUNT_4,
               deadline: DEADLINE,
             },
@@ -309,8 +307,7 @@ async function main() {
             {
               tokenAddress: TOKEN,
               amountTokenDesired: 0n,
-              amountTokenMin: B.minA,
-              amountNativeMin: B.minB,
+              minLiquidity: B.minLiquidity,
               to: ACCOUNT_5,
               deadline: DEADLINE,
             },
@@ -341,8 +338,7 @@ async function main() {
               tokenB: WETH,
               amountADesired: A.tokenIn,
               amountBDesired: 0n,
-              amountAMin: A.minA,
-              amountBMin: A.minB,
+              minLiquidity: A.minLiquidity,
               to: ACCOUNT_4,
               deadline: DEADLINE,
             },
@@ -430,8 +426,7 @@ async function main() {
                 tokenB: WETH,
                 amountADesired: 1n,
                 amountBDesired: 0n,
-                amountAMin: 0n,
-                amountBMin: 0n,
+                minLiquidity: 0n,
                 to: ACCOUNT_8,
                 deadline: DEADLINE,
               },

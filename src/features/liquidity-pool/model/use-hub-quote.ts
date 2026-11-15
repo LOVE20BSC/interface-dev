@@ -7,8 +7,10 @@ import type { HexAddress } from '@/config/networks';
  *
  * 报价只在「一键单边」且池子已有流动性时使用：`amountTokenDesired` 或
  * `amountNativeDesired` 有一个为 0 就是单边输入。页面把 quote 的
- * `prepared/usable/expectedLiquidity/suggested*Min` 显示给用户，提交时用
- * `usable × (1 − 滑点)` 作为最少进池数量。
+ * `prepared/usable/expectedLiquidity` 显示给用户，提交时用
+ * `expectedLiquidity × (1 − 滑点)`（向下取整）作为最少获得的流动性凭证
+ * `minLiquidity`——协议自 2026-11-15 起 `addLiquidity*` 只收 `minLiquidity`，
+ * quote 也不再返回两侧的 `suggested*Min`（见 `docs/product/three-line/liquidity.md`）。
  *
  * 注意：报价不是理论线（见 docs/product/three-line/liquidity.md）。它同时是
  * 页面显示的数据源和「Hub 是否支持这一笔」的判定：报价失败就降级到两侧都填。
@@ -34,8 +36,6 @@ export interface HubQuoteFields {
   readonly usableAmountA: bigint;
   readonly usableAmountB: bigint;
   readonly expectedLiquidity: bigint;
-  readonly suggestedAmountAMin: bigint;
-  readonly suggestedAmountBMin: bigint;
 }
 
 export interface UseHubQuoteOptions {

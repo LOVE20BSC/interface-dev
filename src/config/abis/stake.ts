@@ -318,6 +318,88 @@ export const stakeAbi = [
   },
   {
     type: 'function',
+    name: 'govVotes',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'round',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'memberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'increasePromisedWaitingPhases',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'memberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'promisedWaitingPhases',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [
+      {
+        name: 'govVotesAdded',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'lastMajorStakeRound',
+    inputs: [
+      {
+        name: '',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'liquidityTokenAmount',
     inputs: [
       {
@@ -468,6 +550,11 @@ export const stakeAbi = [
         type: 'uint256',
         internalType: 'uint256',
       },
+      {
+        name: 'deadline',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
     outputs: [
       {
@@ -507,6 +594,11 @@ export const stakeAbi = [
         type: 'uint256',
         internalType: 'uint256',
       },
+      {
+        name: 'deadline',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
     ],
     outputs: [
       {
@@ -530,6 +622,78 @@ export const stakeAbi = [
         name: 'tokenAddress',
         type: 'address',
         internalType: 'address',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'totalGovVotes',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'round',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'totalGovVotesAdded',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'round',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'totalGovVotesRemoved',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'round',
+        type: 'uint256',
+        internalType: 'uint256',
       },
     ],
     outputs: [
@@ -688,78 +852,6 @@ export const stakeAbi = [
   },
   {
     type: 'function',
-    name: 'totalValidGovVotes',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'round',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'totalValidGovVotesAdded',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'round',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'totalValidGovVotesRemoved',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'round',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'unstake',
     inputs: [
       {
@@ -807,35 +899,6 @@ export const stakeAbi = [
   },
   {
     type: 'function',
-    name: 'validGovVotes',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'round',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'memberId',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     name: 'withdraw',
     inputs: [
       {
@@ -845,6 +908,11 @@ export const stakeAbi = [
       },
       {
         name: 'memberId',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'deadline',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -935,7 +1003,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'totalValidGovVotes',
+        name: 'totalGovVotes',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1136,13 +1204,56 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'totalValidGovVotes',
+        name: 'totalGovVotes',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
       },
       {
         name: 'totalWithdrawableLp',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+    ],
+    anonymous: false,
+  },
+  {
+    type: 'event',
+    name: 'PromisedWaitingPhasesIncreased',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        indexed: true,
+        internalType: 'address',
+      },
+      {
+        name: 'memberId',
+        type: 'uint256',
+        indexed: true,
+        internalType: 'uint256',
+      },
+      {
+        name: 'round',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'previous',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'promisedWaitingPhases',
+        type: 'uint256',
+        indexed: false,
+        internalType: 'uint256',
+      },
+      {
+        name: 'govVotesAdded',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1312,7 +1423,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'totalValidGovVotes',
+        name: 'totalGovVotes',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1373,7 +1484,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'totalValidGovVotes',
+        name: 'totalGovVotes',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1402,6 +1513,38 @@ export const stakeAbi = [
       },
       {
         name: 'allowed',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'DeadlineExpired',
+    inputs: [
+      {
+        name: 'deadline',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'InexactTokenTransfer',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'expected',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'received',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -1439,6 +1582,22 @@ export const stakeAbi = [
       },
       {
         name: 'maxPhases',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'MergeWaitingPeriodNotElapsed',
+    inputs: [
+      {
+        name: 'currentRound',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'mergeAfter',
         type: 'uint256',
         internalType: 'uint256',
       },

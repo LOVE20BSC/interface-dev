@@ -55,7 +55,7 @@ export interface AddLiquidityPanelProps {
  *
  * - **智能模式开（默认）**：两侧都可自由填写，只填一侧也行；Hub 报价把这一笔自动
  *   配平（先用一部分换成另一侧再一起进池），页面只显示「预计获得 X 流动性凭证」，
- *   swap 段 / 实进池 / 最少进池收在默认折叠的「详情」里。
+ *   swap 段 / 实进池 / 至少获得的流动性凭证收在默认折叠的「详情」里。
  * - **智能模式关**：用户在哪一侧输入，另一侧就按池子比例自动填好并变成只读，用户
  *   不用自己算比例；这一笔由 Router `addLiquidityETH` 按比例进场。
  *   池子还没有储备（首次建池）时没有比例可依，两侧都必须填、决定初始价格。
@@ -116,9 +116,9 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
     tokenAllowanceRouter.refetch();
     /**
      * QA: a mined add moves the pool ratio, so the Hub quote — and the
-     * `suggested*Min`/`usable*` numbers the next submit derives from it — must be
+     * `expectedLiquidity`/`usable*` numbers the next submit derives from it — must be
      * re-read. Without this the second consecutive add sent the previous quote's
-     * minimums and the Hub reverted `InsufficientAmountA`.
+     * `minLiquidity` and the Hub reverted `InsufficientLiquidity`.
      */
     quoteRefetchRef.current();
   };
@@ -187,10 +187,17 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
   const usableToken = hubPath && quote.data !== undefined ? quote.data.usableAmountA : plan.amountA;
   const usableNative =
     hubPath && quote.data !== undefined ? quote.data.usableAmountB : plan.amountB;
-  const minToken = applySlippageDown(usableToken, bps);
-  const minNative = applySlippageDown(usableNative, bps);
   const expectedLiquidity =
     hubPath && quote.data !== undefined ? quote.data.expectedLiquidity : plan.liquidity;
+  /**
+   * 两条路径的最少额口径不同（协议 2026-11-15 升级后）：
+   * - Hub：`addLiquidity*` 只收 `minLiquidity`（最少获得的流动性凭证），按
+   *   `expectedLiquidity × (1 − 滑点)` 向下取整；两侧的最少进池数量不再上链。
+   * - Router：`addLiquidityETH` 仍按两侧的数量最小值保护，用 `usable × (1 − 滑点)`。
+   */
+  const minToken = applySlippageDown(usableToken, bps);
+  const minNative = applySlippageDown(usableNative, bps);
+  const minLiquidity = applySlippageDown(expectedLiquidity, bps);
 
   const firstMint = !hubPath && plan.firstMint;
   const firstMintPrice =
@@ -398,8 +405,7 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
               {
                 tokenAddress: token.address,
                 amountTokenDesired: tokenAmount,
-                amountTokenMin: minToken,
-                amountNativeMin: minNative,
+                minLiquidity,
                 to: account,
                 deadline,
               },
@@ -425,8 +431,7 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
                 tokenB: wrapped.address,
                 amountADesired: tokenAmount,
                 amountBDesired: nativeAmount,
-                amountAMin: minToken,
-                amountBMin: minNative,
+                minLiquidity,
                 to: account,
                 deadline,
               },
@@ -725,12 +730,16 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
                     )}
                   </p>
                   <p className="text-muted" data-testid="liquidity-quote-min">
-                    {copy.liquidity.add.quoteMin(
-                      formatTokenAmount(minToken, token.decimals),
-                      token.symbol,
-                      formatTokenAmount(minNative, native.decimals),
-                      native.symbol,
-                    )}
+                    {hubPath
+                      ? copy.liquidity.add.quoteMinLiquidity(
+                          formatTokenAmount(minLiquidity, 18),
+                        )
+                      : copy.liquidity.add.quoteMin(
+                          formatTokenAmount(minToken, token.decimals),
+                          token.symbol,
+                          formatTokenAmount(minNative, native.decimals),
+                          native.symbol,
+                        )}
                   </p>
                 </div>
               ) : null}

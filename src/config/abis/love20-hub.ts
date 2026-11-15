@@ -142,12 +142,7 @@ export const love20HubAbi = [
             internalType: 'uint256',
           },
           {
-            name: 'amountTokenMin',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
-          {
-            name: 'amountNativeMin',
+            name: 'minLiquidity',
             type: 'uint256',
             internalType: 'uint256',
           },
@@ -203,12 +198,7 @@ export const love20HubAbi = [
             internalType: 'uint256',
           },
           {
-            name: 'amountAMin',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
-          {
-            name: 'amountBMin',
+            name: 'minLiquidity',
             type: 'uint256',
             internalType: 'uint256',
           },
@@ -320,16 +310,6 @@ export const love20HubAbi = [
             type: 'uint256',
             internalType: 'uint256',
           },
-          {
-            name: 'suggestedAmountAMin',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
-          {
-            name: 'suggestedAmountBMin',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
         ],
       },
     ],
@@ -413,16 +393,6 @@ export const love20HubAbi = [
           },
           {
             name: 'expectedLiquidity',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
-          {
-            name: 'suggestedAmountAMin',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
-          {
-            name: 'suggestedAmountBMin',
             type: 'uint256',
             internalType: 'uint256',
           },
@@ -537,16 +507,6 @@ export const love20HubAbi = [
             type: 'uint256',
             internalType: 'uint256',
           },
-          {
-            name: 'suggestedTokenAmountMin',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
-          {
-            name: 'suggestedParentAmountMin',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
         ],
       },
     ],
@@ -658,16 +618,6 @@ export const love20HubAbi = [
             type: 'uint256',
             internalType: 'uint256',
           },
-          {
-            name: 'suggestedTokenAmountMin',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
-          {
-            name: 'suggestedParentAmountMin',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
         ],
       },
     ],
@@ -693,12 +643,7 @@ export const love20HubAbi = [
             internalType: 'uint256',
           },
           {
-            name: 'tokenAmountMin',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
-          {
-            name: 'parentTokenAmountMin',
+            name: 'minLiquidityShares',
             type: 'uint256',
             internalType: 'uint256',
           },
@@ -759,12 +704,7 @@ export const love20HubAbi = [
             internalType: 'uint256',
           },
           {
-            name: 'tokenAmountMin',
-            type: 'uint256',
-            internalType: 'uint256',
-          },
-          {
-            name: 'parentTokenAmountMin',
+            name: 'minLiquidityShares',
             type: 'uint256',
             internalType: 'uint256',
           },
@@ -1053,15 +993,20 @@ export const love20HubAbi = [
   },
   {
     type: 'error',
-    name: 'InsufficientAmountA',
+    name: 'InexactTokenTransfer',
     inputs: [
       {
-        name: 'amount',
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'expected',
         type: 'uint256',
         internalType: 'uint256',
       },
       {
-        name: 'minAmount',
+        name: 'received',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -1069,15 +1014,15 @@ export const love20HubAbi = [
   },
   {
     type: 'error',
-    name: 'InsufficientAmountB',
+    name: 'InsufficientLiquidity',
     inputs: [
       {
-        name: 'amount',
+        name: 'liquidity',
         type: 'uint256',
         internalType: 'uint256',
       },
       {
-        name: 'minAmount',
+        name: 'minLiquidity',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -1085,31 +1030,15 @@ export const love20HubAbi = [
   },
   {
     type: 'error',
-    name: 'InsufficientParentTokenAmount',
+    name: 'InsufficientLiquidityShares',
     inputs: [
       {
-        name: 'amount',
+        name: 'shares',
         type: 'uint256',
         internalType: 'uint256',
       },
       {
-        name: 'minAmount',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'InsufficientTokenAmount',
-    inputs: [
-      {
-        name: 'amount',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'minAmount',
+        name: 'minShares',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -1187,6 +1116,22 @@ export const love20HubAbi = [
         name: 'tokenB',
         type: 'address',
         internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'PromisedWaitingPhasesMismatch',
+    inputs: [
+      {
+        name: 'requested',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'current',
+        type: 'uint256',
+        internalType: 'uint256',
       },
     ],
   },
