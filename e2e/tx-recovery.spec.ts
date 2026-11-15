@@ -210,7 +210,7 @@ test(
     await expect(recovery.getByRole('button', { name: '重新提交' })).toBeVisible();
     await expect(approve).toBeEnabled({ timeout: 10_000 });
     // No explorer link on anvil (the environment package has none).
-    await expect(recovery.getByRole('link', { name: '在区块链浏览器查看' })).toHaveCount(0);
+    await expect(recovery.getByRole('link', { name: '在区块浏览器查看' })).toHaveCount(0);
 
     // Screenshot the whole recovery card (its actions must not hide behind the
     // fixed primary-action dock on a 390×844 phone).

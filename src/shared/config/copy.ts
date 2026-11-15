@@ -119,7 +119,7 @@ export const copy = {
     parent: '父币',
     child: '子币',
     notWired: '未接入',
-    switchHint: '切换社区不会切换网络，也不会刷新页面。',
+    switchHint: '切换社区不会切换网络。',
     menuTitle: '代币社区',
     chipAria: (symbol: string) => `当前代币社区 ${symbol}，打开社区菜单`,
     searchLabel: '按 symbol 搜索代币社区',
@@ -138,7 +138,7 @@ export const copy = {
     /** Shared honest line for an environment whose address book has no MemberNFT. */
     notDeployedTitle: '这个环境还没有部署身份 NFT 合约',
     notDeployedBody: '这里暂时不能铸造身份 NFT。',
-    unconfiguredBody: '地址簿里还没有 MemberNFT 或种子 core 合约。填充部署地址后会自动读取。',
+    unconfiguredBody: '部署地址还没有填。',
     truncated: '这个钱包持有的身份 NFT 较多，这里只显示前 100 个。',
     emptyBody: '每个身份 NFT 都是一个独立的身份。铸造后可以参与社区治理与行动。',
     selectedLabel: '当前身份 NFT',

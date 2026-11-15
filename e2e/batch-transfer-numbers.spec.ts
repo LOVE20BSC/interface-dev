@@ -490,7 +490,7 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
       { timeout: 30_000 },
     );
     await expect(page.getByTestId('batch-transfer-receipt-residual-allowance')).toHaveText(
-      `链上还保留 0.000002 ${SYMBOL} 的授权，可到「代币授权」页撤销。`,
+      `还留着 0.000002 ${SYMBOL} 的授权，可到「代币授权」页撤销。`,
     );
   });
 

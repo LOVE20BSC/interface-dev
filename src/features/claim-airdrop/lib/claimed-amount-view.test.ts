@@ -16,7 +16,8 @@ describe('claimedAmountView', () => {
     });
     expect(view.hasAmount).toBe(true);
     expect(view.title).toBe('已铸造 5 LOVE20');
-    expect(view.body).toBe(copy.airdrop.claimed.amountNote);
+    // 2026-11-15 文案瘦身：金额本身就是结果，不再解释它从哪读出来。
+    expect(view.body).toBeUndefined();
   });
 
   it('never invents a number when the amount is undefined', () => {

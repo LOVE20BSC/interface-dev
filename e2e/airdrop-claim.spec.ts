@@ -401,9 +401,9 @@ test('airdrop: already claimed on-chain shows the real minted amount, not a loca
   const title = page.getByTestId('airdrop-claimed-title');
   await expect(title).toBeVisible({ timeout: 20_000 });
   await expect(title).toHaveText(expectedTitle);
-  await expect(page.getByTestId('airdrop-claimed-body')).toHaveText(
-    '金额来自链上这笔交易的记录，不依赖本机缓存。',
-  );
+  // 2026-11-15 文案瘦身：S6 只给结果（已铸造 X + 哈希 + 浏览器链接），
+  // 不再解释金额从哪读出来（旧句「金额来自链上这笔交易的记录…」已删）。
+  await expect(page.getByTestId('airdrop-claimed-body')).toHaveCount(0);
   // The old 「这台设备没有留下这次的铸造记录」 dead end must be gone.
   await expect(page.getByText('这台设备没有留下这次的铸造记录', { exact: false })).toHaveCount(0);
   await expect(page.getByTestId('airdrop-receipt-amount')).toHaveCount(0);

@@ -65,9 +65,9 @@ function ReceiptBody({ receipt, totalShare, onDismiss }: AirdropReceiptProps) {
         >
           {amountLine}
         </p>
-        <p className="mt-1 text-xs leading-5 text-muted">
-          {amountKnown ? copy.airdrop.receipt.amountNote : copy.airdrop.receipt.amountUnknown}
-        </p>
+        {amountKnown ? null : (
+          <p className="mt-1 text-xs leading-5 text-muted">{copy.airdrop.receipt.amountUnknown}</p>
+        )}
       </div>
 
       <dl className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3 text-sm">

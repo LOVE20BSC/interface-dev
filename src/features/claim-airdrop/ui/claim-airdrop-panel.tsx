@@ -301,9 +301,9 @@ export function ClaimAirdropPanel({
         <CardTitle data-testid="airdrop-claimed-title">{view.title}</CardTitle>
         {claimedAmount.isLoading ? (
           <Skeleton className="mt-2 h-4 w-52" />
-        ) : (
+        ) : view.body !== undefined ? (
           <CardDescription data-testid="airdrop-claimed-body">{view.body}</CardDescription>
-        )}
+        ) : null}
         {localHash !== undefined ? (
           <p className="mt-3 text-xs leading-5 text-muted">
             <span

@@ -20,7 +20,9 @@ export interface ClaimedAmountViewInput {
 export interface ClaimedAmountView {
   readonly hasAmount: boolean;
   readonly title: string;
-  readonly body: string;
+  /** Only the unknown-amount branch has something to add; with an amount the
+   *  title is the whole answer (no data-source small print). */
+  readonly body?: string;
 }
 
 export function claimedAmountView(input: ClaimedAmountViewInput): ClaimedAmountView {
@@ -29,7 +31,6 @@ export function claimedAmountView(input: ClaimedAmountViewInput): ClaimedAmountV
     return {
       hasAmount: true,
       title: copy.airdrop.claimed.amountLine(formatTokenAmount(amount, decimals), symbol),
-      body: copy.airdrop.claimed.amountNote,
     };
   }
   return {
