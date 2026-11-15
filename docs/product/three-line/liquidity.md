@@ -9,6 +9,8 @@
 > **`quoteLp` / `quoteLpWithNative` 不是理论线**：它们只是合约侧 view，出现在 §2 作为交叉核对；§1 的 `amountToSwap` / `amountOutFromSwap` / `expectedLiquidity` 由 §1.2 的闭式公式独立推导。
 >
 > **2026-11-15 协议升级（core `3f71379` / periphery `172190a` / anvil `89937a3`）**：Hub 的 `addLiquidityWithNative` / `addLiquidityWithToken` 把两侧的 `amountTokenMin/amountNativeMin`（或 `amountAMin/amountBMin`）合并成一个 **`minLiquidity`（最少获得的流动性凭证）**；`quoteLp*` 不再返回 `suggestedAmountAMin/suggestedAmountBMin`。地址零漂移，理论线的 `t/y/pA/pB/uA/uB/L` 一个 wei 都没变，**只有「最少额」的口径变了**：Hub 路径 `minLiquidity = L × (10000 − bps) / 10000` 向下取整，Router 路径仍是两侧 `usable × (10000 − bps) / 10000`。
+>
+> **2026-11-15 第三轮 bump（core `b8950bc` / periphery `fc6ed10` / action `b05600c` / group-chat `fbec477` / anvil `5be5af0`）**：ABI 面只有 `LOVE20Hub.DeadlineExpired` 从 `(blockTimestamp, deadline)` 收窄为 `(deadline)`，地址、导出参数、以及 §1 的理论值与 `minLiquidity` 口径**一个 wei 都没变**；合约线 `VERIFY_RPC=http://127.0.0.1:8555 node scripts/verify/liquidity-contract.mjs` 复跑仍 **45/45 PASS**（A/B/C/D/E/G 逐字相同），全量 e2e 两遍 130/130。
 
 ## §0 环境与初始状态
 

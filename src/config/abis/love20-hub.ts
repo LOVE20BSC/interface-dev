@@ -969,11 +969,6 @@ export const love20HubAbi = [
     name: 'DeadlineExpired',
     inputs: [
       {
-        name: 'blockTimestamp',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
         name: 'deadline',
         type: 'uint256',
         internalType: 'uint256',
