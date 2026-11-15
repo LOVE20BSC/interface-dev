@@ -1,8 +1,6 @@
 {
   "identity": {"uuid": "47d39b07-9d74-4077-8a12-8ab9280ea25d"},
   "tasks": {
-    "20261115-1613-2a73-代币授权-默认长期授权偏好真正作用于各页-approve-且按钮体现长期授权": {"category": "整改", "created": "2026-11-15 16:13:39", "creator": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "creator_name": "tester", "finished": null, "owner": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "owner_name": "tester", "started": "2026-11-15 16:15:23", "status": "doing", "tags": ["代币授权", "长期授权"], "title": "代币授权：默认长期授权偏好真正作用于各页 approve 且按钮体现长期授权", "updated": "2026-11-15 16:15:23", "worklog": "worklog/202611/15-1613-2a73-代币授权-默认长期授权偏好真正作用于各页-approve-且按钮体现长期授权.md"},
-    "20261115-1613-922c-流动性池-对齐旧库-love20tkm-流动性页的结构与交互": {"category": "整改", "created": "2026-11-15 16:13:39", "creator": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "creator_name": "tester", "finished": null, "owner": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "owner_name": "tester", "started": "2026-11-15 16:15:22", "status": "doing", "tags": ["流动性池", "对齐旧库"], "title": "流动性池：对齐旧库 LOVE20TKM 流动性页的结构与交互", "updated": "2026-11-15 16:15:22", "worklog": "worklog/202611/15-1613-922c-流动性池-对齐旧库-love20tkm-流动性页的结构与交互.md"}
   },
   "version": "20261022000000"
 }
