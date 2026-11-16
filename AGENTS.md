@@ -15,6 +15,7 @@ LOVE20BSC 协议前端的 **dev 变体**：纯静态、移动优先、无后端�
 
 | # | 读什么 | 什么时候必须读 |
 | --- | --- | --- |
+| 0 | [docs/engineering/agent-role.md](docs/engineering/agent-role.md) | **你是接手这个项目的总负责人**（拆活 / 派活 / 复核 / 对 owner 汇报）时；只做单一子任务不用读 |
 | 1 | 本文件 | 开工前 |
 | 2 | [GLOSSARY.md](GLOSSARY.md) | **写任何中文文案前**（六条纪律 + 术语表） |
 | 3 | [m0-ux-spec.md](docs/product/m0-ux-spec.md) §0 设计原则 + §4 横切交互规范 | 动任何页面/交互前 |
@@ -54,7 +55,7 @@ LOVE20BSC 协议前端的 **dev 变体**：纯静态、移动优先、无后端�
 ## 3. 提交前必跑
 
 ```bash
-pnpm check          # typecheck + lint + 单测（799 条），pre-commit 钩子自动调这个
+pnpm check          # typecheck + lint + 单测（801 条），pre-commit 钩子自动调这个
 pnpm build          # 包体门禁（scripts/check-bundle.mjs）+ 404.html + build-id
 pnpm e2e            # 全量 Playwright（152 条，约 10 分钟；自己起/复用 8555 链）
 ```
