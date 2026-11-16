@@ -31,6 +31,11 @@ export const airdropDistributorAbi = [
         type: 'uint256',
         internalType: 'uint256',
       },
+      {
+        name: 'genesisSnapshotUri',
+        type: 'string',
+        internalType: 'string',
+      },
     ],
     stateMutability: 'nonpayable',
   },

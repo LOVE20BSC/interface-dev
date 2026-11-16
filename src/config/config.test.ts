@@ -88,9 +88,15 @@ describe('deployment documents', () => {
     const amount = '500000000000000000000000000';
     expect(airdrop?.totalClaimedAmount).toBe(amount);
     expect(airdrop?.remainingAmount).toBe(amount);
-    // This older export predates the constructor URI parameter.
-    expect(airdrop?.snapshotUri).toBe('');
-    expect(airdrop?.intendedSnapshotUri).toMatch(/^http:\/\//);
+    expect(airdrop?.snapshotUri).toBe(
+      'https://love20bsc.github.io/core/script/network/anvil31337_dev/airdrop.json',
+    );
+    expect(airdrop?.intendedSnapshotUri).toBe(airdrop?.snapshotUri);
+    const legacy = parseDeployment({
+      ...devJson,
+      airdropDistributor: { ...devJson.airdropDistributor, snapshotUri: '' },
+    });
+    expect(legacy.airdropDistributor?.snapshotUri).toBe('');
   });
 
   it('rejects malformed airdropDistributor metadata', () => {
