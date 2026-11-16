@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
@@ -202,6 +202,41 @@ describe('i18n discipline', () => {
         (hit) => `${file.relative}:${hit.line}: ${hit.text}`,
       ),
     );
+    expect(violations).toEqual([]);
+  });
+});
+
+/**
+ * Agent entry points. `AGENTS.md` is the one document an AI coding agent is
+ * guaranteed to load (Codex/DSH read it natively; CLAUDE.md, Copilot and Cursor
+ * get a shim). Keeping the shims pointer-only means a rule has exactly one home,
+ * so the four files cannot drift into four different truths.
+ */
+describe('agent entry points', () => {
+  const ROOT = process.cwd();
+  const readEntry = (relative: string): string => readFileSync(resolve(ROOT, relative), 'utf8');
+  const lineCount = (text: string): number => text.split('\n').length;
+  const SHIMS = ['CLAUDE.md', '.github/copilot-instructions.md', '.cursor/rules/love20.mdc'];
+  const STANDARDS = 'docs/engineering/frontend-standards.md';
+
+  it('keeps AGENTS.md as the single rule page, pointing at the standards doc', () => {
+    expect(existsSync(resolve(ROOT, 'AGENTS.md'))).toBe(true);
+    const agents = readEntry('AGENTS.md');
+    expect(agents).toContain(STANDARDS);
+    expect(existsSync(resolve(ROOT, STANDARDS))).toBe(true);
+    expect(lineCount(agents)).toBeLessThanOrEqual(160);
+  });
+
+  it('keeps every per-tool shim a short pointer instead of a copy of the rules', () => {
+    const violations = SHIMS.flatMap((shim) => {
+      if (!existsSync(resolve(ROOT, shim))) return [`${shim}: missing`];
+      const text = readEntry(shim);
+      const found: string[] = [];
+      if (!text.includes('AGENTS.md')) found.push(`${shim}: does not point at AGENTS.md`);
+      if (lineCount(text) > 30) found.push(`${shim}: ${lineCount(text)} lines, keep it <=30`);
+      if (text.includes('十条硬规则')) found.push(`${shim}: copies the rules, keep it a pointer`);
+      return found;
+    });
     expect(violations).toEqual([]);
   });
 });

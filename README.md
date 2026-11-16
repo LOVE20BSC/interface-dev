@@ -5,8 +5,12 @@ application skeleton: the shell, routing, three-environment injection, identity/
 context, error copy layer and the pure domain round axes are in place. **It contains no real
 deployment addresses and deliberately shows `未配置` / `未接入` everywhere instead of fake data.**
 
-Read the decisions in `docs/adr/0001..0003`, `docs/product/m0-scope.md` and `GLOSSARY.md`
-before changing architecture or user-facing wording.
+Read the decisions in [docs/adr/0001..0003](docs/adr/), [docs/product/m0-scope.md](docs/product/m0-scope.md)
+and [GLOSSARY.md](GLOSSARY.md) before changing architecture or user-facing wording.
+
+**开始写代码前先读 [AGENTS.md](AGENTS.md)**（人和 AI 代理的统一入口）：必读顺序、十条硬规则、
+提交前命令、以及「遇到什么问题上哪份文档」。开发规范正文在
+[docs/engineering/frontend-standards.md](docs/engineering/frontend-standards.md)。
 
 ## Stack
 
@@ -24,11 +28,39 @@ pnpm dev            # http://127.0.0.1:5173
 pnpm typecheck
 pnpm lint
 pnpm test
+pnpm check          # typecheck + lint + test（pre-commit 钩子跑的就是这个）
 pnpm build          # typecheck + vite build + 404.html + bundle gate
 pnpm preview        # http://127.0.0.1:4173
 pnpm e2e            # Playwright, requires browsers; runs `vite preview`
+pnpm hooks:install  # 一次性：把 git 钩子指向仓库内的 .githooks/（见 §开发规范）
 pnpm gen:errors     # regenerate src/config/errors.generated.ts
 ```
+
+## 开发规范（人或 AI 代理都从这里进）
+
+规则只有一个出处：根目录 [AGENTS.md](AGENTS.md)（必读顺序 / 十条硬规则 / 命令 / 文档路由）
+和规范正文 [docs/engineering/frontend-standards.md](docs/engineering/frontend-standards.md)
+（分层与门禁 / 文案 / 数据与错误 / 组件与 UI / 测试 / 发布 / 已知坑）。
+`CLAUDE.md`、`.github/copilot-instructions.md`、`.cursor/rules/love20.mdc` 是**只写指针的 shim**，
+由 `src/architecture.test.ts` 强制（必须指向 `AGENTS.md` 且 ≤30 行），避免规则多处漂移。
+
+| 主题 | 文档 |
+| --- | --- |
+| 术语与中文纪律 | [GLOSSARY.md](GLOSSARY.md) |
+| 交互规格（设计原则、授权阶梯、pending 三态、nonce 口径） | [docs/product/m0-ux-spec.md](docs/product/m0-ux-spec.md) |
+| 三线校验（读链上数值的页面必须有） | [docs/product/three-line-verification.md](docs/product/three-line-verification.md) |
+| 文案审查口径 | [docs/product/copy-audit.md](docs/product/copy-audit.md) |
+| e2e 的链隔离硬边界与 harness 守卫 | [e2e/README.md](e2e/README.md) |
+| 技术决策（不可回退） | [docs/adr/](docs/adr/) |
+| 已知合约缺陷（不绕过、不硬编码） | [docs/contract-issues/](docs/contract-issues/) |
+| 交付与验收状态 | [docs/STATUS.md](docs/STATUS.md) |
+
+### Pre-commit 门禁
+
+`pnpm hooks:install` 把本 clone 的 `core.hooksPath` 指向仓库内的 `.githooks/`（git 配置不入库，
+换机器要重跑一次）。钩子调 `pnpm check`（typecheck + lint + 单测），**不跑** `pnpm build` 与
+`pnpm e2e`（慢、要链）。只改文档的提交自动跳过；逃生口 `SKIP_PRE_COMMIT=1 git commit …`
+（用过请在提交信息里说明）。CI 仍是最终底线，钩子只是把反馈提前。
 
 `pnpm build` also runs `scripts/check-bundle.mjs`, which:
 
@@ -181,7 +213,9 @@ and a separate `awaiting-phase-end` state models the current round’s mint. Bou
 
 ## i18n readiness (discipline now, library later)
 
-所有用户可见文案在 `copy.ts`；组件内禁止中文字面量，由测试/ESLint 门禁强制；句子用参数化模板；格式化走 `format.*` 并显式传 locale。
+所有用户可见文案在 `copy.ts`；组件内禁止中文字面量，由测试门禁强制（`src/architecture.test.ts`
+扫 `src/**` 的 CJK 字面量；ESLint 没有这条规则，见 [frontend-standards](docs/engineering/frontend-standards.md) §3）；
+句子用参数化模板；格式化走 `format.*` 并显式传 locale。
 Concretely: `src/architecture.test.ts` («keeps every CJK string literal inside copy.ts or the generated
 error copy») fails the build if a Chinese string literal appears in `src/**` outside
 `shared/config/copy.ts` and the generated error registry (test files are exempt). Reusable

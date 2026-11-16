@@ -13,6 +13,8 @@
     "preview": "vite preview",
     "test": "node scripts/gen-build-id.mjs && vitest run",
     "test:watch": "vitest",
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "hooks:install": "node scripts/install-hooks.mjs",
     "lint": "eslint . --max-warnings=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

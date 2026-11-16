@@ -1,0 +1,36 @@
+#!/bin/sh
+# Pre-commit gate: exactly the three fast checks CI runs before it builds
+# (`pnpm typecheck`, `pnpm lint`, `pnpm test` — see .github/workflows/deploy.yml).
+#
+# Deliberately NOT included: `pnpm e2e` (needs a bootstrapped anvil chain on :8555,
+# ~10 minutes) and `pnpm build` (the bundle budget stays a CI/local build gate).
+#
+# Install once per clone (the setting is local git config, never committed):
+#     pnpm hooks:install
+# Escape hatch, use deliberately and say why in the commit message:
+#     SKIP_PRE_COMMIT=1 git commit ...
+set -eu
+
+if [ "${SKIP_PRE_COMMIT:-0}" = "1" ]; then
+  echo "pre-commit: skipped (SKIP_PRE_COMMIT=1)" >&2
+  exit 0
+fi
+
+# Docs-only commits (台账/ADR/截图/spec 文本) skip the ~60 s gate; anything that can
+# change runtime behaviour, the test harness or the toolchain runs it.
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -n "$staged" ] || exit 0
+if ! printf '%s\n' "$staged" | grep -Eq '^(src/|tests/|e2e/|scripts/|\.github/|index\.html|package\.json|pnpm-lock\.yaml|tsconfig[^/]*\.json|vite\.config\.ts|vitest\.config\.ts|playwright\.config\.ts|eslint\.config\.js|\.prettierrc\.json)'; then
+  echo "pre-commit: no source/tooling files staged — skipping typecheck/lint/test" >&2
+  exit 0
+fi
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "pre-commit: pnpm is not on PATH, cannot run the gate." >&2
+  echo "  activate it (nvm/corepack) and retry, or commit with SKIP_PRE_COMMIT=1" >&2
+  echo "  if you accept that CI becomes the only gate for this commit." >&2
+  exit 1
+fi
+
+echo "pre-commit: pnpm check (typecheck + lint + unit tests)…" >&2
+pnpm -s check
