@@ -1,6 +1,7 @@
 {
   "identity": {"uuid": "47d39b07-9d74-4077-8a12-8ab9280ea25d"},
   "tasks": {
+    "20261116-1438-c467-社区流动性查询-按旧库-tkm-布局重做并支持查询任意地址的流动性": {"category": "整改", "created": "2026-11-16 14:38:14", "creator": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "creator_name": "tester", "finished": null, "owner": "47d39b07-9d74-4077-8a12-8ab9280ea25d", "owner_name": "tester", "started": "2026-11-16 14:38:56", "status": "doing", "tags": ["流动性池", "查询", "对齐旧库"], "title": "社区流动性查询：按旧库 TKM 布局重做并支持查询任意地址的流动性", "updated": "2026-11-16 14:38:56", "worklog": "worklog/202611/16-1438-c467-社区流动性查询-按旧库-tkm-布局重做并支持查询任意地址的流动性.md"}
   },
   "version": "20261022000000"
 }

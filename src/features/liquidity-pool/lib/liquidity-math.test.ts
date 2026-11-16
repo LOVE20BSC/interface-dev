@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addressLpPosition,
   applySlippageDown,
   integerSqrt,
   liquidityMinted,
@@ -269,5 +270,46 @@ describe('priceChangePercent（旧库「添加后价格」的涨跌幅）', () =
     expect(
       priceChangePercent({ quote: 0n, base: RESERVE_NATIVE }, { quote: 1n, base: 1n }),
     ).toBeUndefined();
+  });
+});
+
+describe('addressLpPosition（任意地址查询的 LP 折算）', () => {
+  it('初始池 · 质押合约的 LP：份额 99.99%，可兑换 199,999.999999 + 99.999999', () => {
+    // 三线 §3 用例 Q：初始状态质押合约持有 totalSupply − 1000（永久锁定）。
+    const position = addressLpPosition(
+      4_472_135_954_999_579_391_818n,
+      TOTAL_SUPPLY,
+      RESERVE_TOKEN,
+      RESERVE_NATIVE,
+    );
+    expect(position).toBeDefined();
+    expect(position?.lpAmount).toBe(4_472_135_954_999_579_391_818n);
+    expect(position?.sharePercent).toBe(99.9999);
+    // LP × reserve / totalSupply，整数除法向下取整（与撤出报价同一个 planWithdraw）。
+    expect(position?.amountToken).toBe(199_999_999_999_999_999_955_278n);
+    expect(position?.amountNative).toBe(99_999_999_999_999_999_977n);
+  });
+
+  it('用例 A 建仓后：1003.579928 LP → 18.3278% 份额与两侧折算', () => {
+    const position = addressLpPosition(
+      1_003_579_928_576_458_381_352n,
+      5_475_715_883_576_037_774_170n,
+      300_000_000_000_000_000_000_000n,
+      RESERVE_NATIVE,
+    );
+    expect(position?.sharePercent).toBe(18.3278);
+    expect(position?.amountToken).toBe(54_983_491_651_928_892_866_980n);
+    expect(position?.amountNative).toBe(18_327_830_550_642_964_288n);
+  });
+
+  it('没有持仓：0 LP → 0 份额与 0 两侧折算（页面渲染「没有 LP 代币」）', () => {
+    const position = addressLpPosition(0n, TOTAL_SUPPLY, RESERVE_TOKEN, RESERVE_NATIVE);
+    expect(position?.sharePercent).toBe(0);
+    expect(position?.amountToken).toBe(0n);
+    expect(position?.amountNative).toBe(0n);
+  });
+
+  it('totalSupply 为 0（空池）没有可折算的分母', () => {
+    expect(addressLpPosition(1n, 0n, RESERVE_TOKEN, RESERVE_NATIVE)).toBeUndefined();
   });
 });

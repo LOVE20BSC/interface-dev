@@ -76,7 +76,11 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
   const wrappedAddress = catalog.wrappedToken?.address ?? configuredAddress('weth');
 
   const [tab, setTab] = useState<LiquidityTab>('add');
-  const [customToken, setCustomToken] = useState<LiquidityToken | undefined>(undefined);
+  /**
+   * 页内选中的代币覆盖态：自定义地址解析结果，或查询页签的「社区代币」下拉。
+   * 两者都是「换池子」，共用一份状态——三个页签永远看同一个池子。
+   */
+  const [pickedToken, setPickedToken] = useState<LiquidityToken | undefined>(undefined);
   const [slippagePercent, setSlippagePercent] = useState(DEFAULT_SLIPPAGE_PERCENT);
   const [customSlippage, setCustomSlippage] = useState(String(DEFAULT_SLIPPAGE_PERCENT));
   const [customSlippageError, setCustomSlippageError] = useState<string | undefined>(undefined);
@@ -91,7 +95,7 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
   // 自定义地址解析成功后接管选择：地址输入就是「换到另一个池子」。
   /* eslint-disable react-hooks/set-state-in-effect -- resolved custom token is external chain data */
   useEffect(() => {
-    if (catalog.custom.token !== undefined) setCustomToken(catalog.custom.token);
+    if (catalog.custom.token !== undefined) setPickedToken(catalog.custom.token);
   }, [catalog.custom.token]);
 
   // QA D5（P2）：右上角切社区后，之前选的「自定义代币」不能继续覆盖新社区——否则
@@ -100,7 +104,7 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
   useEffect(() => {
     if (symbolRef.current === symbol) return;
     symbolRef.current = symbol;
-    setCustomToken(undefined);
+    setPickedToken(undefined);
     clearCustomRef.current();
   }, [symbol]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -126,7 +130,7 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
    * 完成但读不到（unknown / error）时不能拿 TestLOVE20 顶替，要显示「读不到这个社区」。
    */
   const token =
-    customToken ??
+    pickedToken ??
     communityToken ??
     (community.status === 'loading' ? catalog.communityTokens[0] : undefined);
   const native = catalog.nativeToken;
@@ -154,6 +158,16 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
     }
     setCustomSlippageError(undefined);
     setSlippagePercent(parsed);
+  };
+
+  /**
+   * 查询页签的「社区代币」下拉：选目录里的代币就换池子，并清掉自定义地址
+   * （两者互斥，否则抬头会一直挂着「自定义」标记）。custom.token 变 undefined
+   * 时上面的 effect 是 no-op，不会把刚选中的社区代币冲掉。
+   */
+  const handleSelectToken = (next: LiquidityToken) => {
+    setPickedToken(next);
+    if (next.kind !== 'custom') clearCustomRef.current();
   };
 
   if (router === undefined || factory === undefined || wrappedAddress === undefined) {
@@ -197,7 +211,9 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
       </div>
 
       {token !== undefined ? (
-        <LiquidityTokenBar catalog={catalog} selected={token} />
+        /* 查询页签的选代币归「选择交易对」卡里的社区代币下拉，抬头只留紧凑的
+           「换个代币地址」入口，避免同屏两份选择器（owner 2026-11-16）。 */
+        <LiquidityTokenBar catalog={catalog} selected={token} compact={tab === 'query'} />
       ) : null}
 
       {token === undefined ? (
@@ -232,7 +248,14 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
         )
       ) : !isConnected || isWrongChain ? (
         tab === 'query' ? (
-          <PoolQueryPanel token={token} native={native} pool={pool} onGoAdd={() => setTab('add')} />
+          <PoolQueryPanel
+            token={token}
+            target={catalog.wrappedToken}
+            pool={pool}
+            catalog={catalog}
+            isConnected={isConnected}
+            onSelectToken={handleSelectToken}
+          />
         ) : (
           <StateCard
             title={
@@ -285,9 +308,11 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
           <div hidden={tab !== 'query'}>
             <PoolQueryPanel
               token={token}
-              native={native}
+              target={catalog.wrappedToken}
               pool={pool}
-              onGoAdd={() => setTab('add')}
+              catalog={catalog}
+              isConnected={isConnected}
+              onSelectToken={handleSelectToken}
             />
           </div>
         </>

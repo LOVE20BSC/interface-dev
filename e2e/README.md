@@ -114,3 +114,5 @@ automine=true 而不是套件默认的 interval mining），后续 spec 的交�
 ## 产物
 
 失败时 trace 在 `test-results/`；通过的用例会把 390×844 截图写进 `docs/product/screenshots/`（可用作验收证据）。
+
+空投的独立理论、合约线与前端线见 [空投三线校验](../docs/product/three-line/airdrop.md)：`scripts/verify/airdrop-contract.mjs` 与 `e2e/airdrop-numbers.spec.ts` 各覆盖 8 例，使用专用 8566 链；包括非整数金额、轮次/余额边界、重复铸造、真实失败回滚及本地快照零 Pages 请求，并保存浅深主题的手机/桌面截图。

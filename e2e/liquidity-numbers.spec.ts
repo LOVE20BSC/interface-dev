@@ -16,12 +16,15 @@ import { ACCOUNTS, connect, installWallet } from './wallet-stub';
  * - 输入后只显示「预计获得 X 流动性凭证」，swap 段 / 实进池 / 至少获得的流动性凭证收在默认
  *   折叠的「详情」里；「已为网络手续费预留」只在点过「全部」原生币后出现。
  * - 撤出按 **LP 数量** 输入，25/50/75/100% 只是快捷填充；只显示「预计收到约 X + Y」。
- * - 社区流动性查询只给全局数据（交易对地址可复制、两侧储备、LP 总量、双向价格）。
+ * - 社区流动性查询按旧库 TKM 的四块布局：选择交易对（社区代币下拉 + WETH 只读 + LP
+ *   代币地址）→ 交易对统计（LP 总量 / 两侧总量 / 价格 + 方向切换）→ 查询地址（默认
+ *   当前钱包、三态按钮、重置、未连接提示）→ 查询结果（任意地址的 LP 数量 / 份额 /
+ *   可兑换两币数量；纯 view，未连接钱包也能查）。
  *
  * 断言只读页面文字；链上夹具只依赖 clean bootstrap 的固定初始状态。每个用例自己
  * 取一次 anvil 快照、结束时回滚，所以用例之间互不影响（追加流动性会改储备，不能
  * 靠「账户不重叠」隔离）。用例 E 在快照内用 dex 的 WETH9Configurable 部署一个
- * 没有 pair 的测试代币，用来验证「首次建池」与「这个代币还没有流动性池」。
+ * 没有 pair 的测试代币，用来验证「首次建池」与查询页的「未找到流动性池」。
  *
  * 本 spec 末尾同时产出 390×844 / 1280×800 × 浅色/深色 的验收截图。
  */
@@ -38,8 +41,16 @@ const deployment = JSON.parse(
     tokenAddress: `0x${string}`;
     launch: `0x${string}`;
     mint: `0x${string}`;
+    stake: `0x${string}`;
+    pair: `0x${string}`;
   };
 };
+
+/**
+ * 初始状态里唯一持有 LP 的地址（质押合约持 totalSupply − 1000，1000 永久锁在
+ * pair 地址）。用它当「任意地址查询」的确定性样本：读数 = 池子初始储备按份额折算。
+ */
+const STAKE = deployment.addresses.stake;
 
 const RPC_URL = process.env.E2E_ANVIL_RPC ?? 'http://127.0.0.1:8555';
 /** launchToken takes a 6-byte uppercase symbol; the dev chain prefixes `Test`. */
@@ -456,10 +467,16 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       await page.getByTestId('liquidity-custom-add').click();
       await expect(page.getByTestId('liquidity-token')).toContainText(TEST_X, { timeout: 20_000 });
 
-      // 空池：查询页先明确说「还没有流动性池」。
+      // 空池：查询页四块都在，卡 1 没有 LP 地址、卡 2 说交易对不存在、卡 4 说未找到池子。
       await page.getByTestId('liquidity-tab-query').click();
+      await expect(page.getByTestId('liquidity-query-target')).toHaveText('TestWETH');
+      await expect(page.getByTestId('liquidity-query-pair-missing')).toBeVisible({
+        timeout: 20_000,
+      });
+      await expect(page.getByTestId('liquidity-query-stats-empty')).toHaveText('交易对不存在');
+      await expect(page.getByTestId('liquidity-query-empty')).toContainText('未找到流动性池');
       await expect(page.getByTestId('liquidity-query-empty')).toContainText(
-        '这个代币还没有流动性池。',
+        'TestX-TestWETH 交易对不存在',
       );
 
       await page.getByTestId('liquidity-tab-add').click();
@@ -484,17 +501,26 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       });
       await page.getByRole('button', { name: '好的' }).click();
 
-      // 建池后查询页只给全局数据：两侧储备 + 双向价格，没有「我的占比」。
+      // 建池后：卡 2 的 LP 总量 / 两侧总量 / 价格方向切换。
       await page.getByTestId('liquidity-tab-query').click();
-      await expect(page.getByTestId('liquidity-query-reserve-token')).toHaveText('100 TestX', {
+      await expect(page.getByTestId('liquidity-query-supply')).toHaveText('1', {
         timeout: 20_000,
       });
-      await expect(page.getByTestId('liquidity-query-reserve-native')).toHaveText('0.01 ETH');
-      await expect(page.getByTestId('liquidity-query-price')).toHaveText('1 ETH ≈ 10,000 TestX');
-      await expect(page.getByTestId('liquidity-query-price-reverse')).toHaveText(
-        '1 TestX ≈ 0.0001 ETH',
+      await expect(page.getByTestId('liquidity-query-total-token')).toHaveText('100');
+      await expect(page.getByTestId('liquidity-query-total-target')).toHaveText('0.01');
+      await expect(page.getByTestId('liquidity-query-price')).toHaveText(
+        '1 TestWETH = 10,000 TestX',
       );
-      await expect(page.getByTestId('liquidity-query-share')).toHaveCount(0);
+      await page.getByTestId('liquidity-query-price-toggle').click();
+      await expect(page.getByTestId('liquidity-query-price')).toHaveText(
+        '1 TestX = 0.0001 TestWETH',
+      );
+      await page.getByTestId('liquidity-query-price-toggle').click();
+      // 卡 4：默认地址是当前钱包（#8 刚建池）→ LP 0.999999 / 99.99% / 两币折算。
+      await expect(page.getByTestId('liquidity-query-lp')).toHaveText('0.999999');
+      await expect(page.getByTestId('liquidity-query-share')).toHaveText('99.99%');
+      await expect(page.getByTestId('liquidity-query-convertible-token')).toHaveText('99.999999');
+      await expect(page.getByTestId('liquidity-query-convertible-target')).toHaveText('0.009999');
       // 交易对地址可点击复制（完整地址 + title 用于核对）。
       await expect(page.getByTestId('liquidity-query-pair')).toHaveAttribute(
         'title',
@@ -670,7 +696,7 @@ test.describe('流动性池 QA 缺陷回归（D1/D2/D4/D5/D6/D7/D8/D9/D10）', (
       });
       await expect(page.getByTestId('liquidity-token')).not.toContainText('自定义');
       await page.getByTestId('liquidity-tab-query').click();
-      await expect(page.getByTestId('liquidity-query-empty')).toContainText('还没有流动性池', {
+      await expect(page.getByTestId('liquidity-query-empty')).toContainText('未找到流动性池', {
         timeout: 20_000,
       });
     }),
@@ -744,8 +770,104 @@ test.describe('流动性池 QA 缺陷回归（D1/D2/D4/D5/D6/D7/D8/D9/D10）', (
 });
 
 /**
+ * 社区流动性查询（owner 2026-11-16）：按旧库 LOVE20TKM 的四块布局重做，并支持
+ * 查询任意地址的流动性（纯 view，未连接钱包也能查，不签任何交易）。
+ *
+ * 样本：#5（NATIVE_ONLY）没有 LP → 「该地址没有 LP」态；质押合约 `STAKE` 持有
+ * totalSupply − 1000 → LP 数量 / 份额 / 两币折算的确定性数字（三线 §3 用例 Q）。
+ */
+test.describe('社区流动性查询（旧库四块布局 + 任意地址）', () => {
+  test(
+    '用例 N：默认地址、交易对统计、价格方向、无 LP 态、任意地址查询与重置',
+    withChainSnapshot(async (page) => {
+      await openLiquidity(page, NATIVE_ONLY);
+      await page.getByTestId('liquidity-tab-query').click();
+
+      // 卡 1：目标代币只读 WETH；LP 代币地址就是首币池的 pair（可点击复制）。
+      await expect(page.getByTestId('liquidity-query-target')).toHaveText('TestWETH', {
+        timeout: 20_000,
+      });
+      await expect(page.getByTestId('liquidity-query-pair')).toHaveAttribute(
+        'title',
+        deployment.addresses.pair,
+      );
+
+      // 卡 3：默认填当前钱包地址并自动查过一次 → 按钮是「重新查询」。
+      await expect(page.getByTestId('liquidity-query-address')).toHaveValue(NATIVE_ONLY);
+      await expect(page.getByTestId('liquidity-query-submit')).toHaveText('重新查询');
+
+      // 卡 2：初始池统计（LP 总数量 / 两侧总数量）。
+      await expect(page.getByTestId('liquidity-query-supply')).toHaveText('4,472.135954');
+      await expect(page.getByTestId('liquidity-query-total-token')).toHaveText('200,000');
+      await expect(page.getByTestId('liquidity-query-total-target')).toHaveText('100');
+      await expect(page.getByTestId('liquidity-query-price')).toHaveText(
+        '1 TestWETH = 2,000 TestLOVE20',
+      );
+      // 方向切换。
+      await page.getByTestId('liquidity-query-price-toggle').click();
+      await expect(page.getByTestId('liquidity-query-price')).toHaveText(
+        '1 TestLOVE20 = 0.0005 TestWETH',
+      );
+
+      // 卡 4：#5 在这个池子里没有 LP。
+      await expect(page.getByTestId('liquidity-query-no-lp')).toHaveText(
+        '该地址在此交易对中，没有 LP 代币',
+      );
+
+      // 任意地址：质押合约持有 totalSupply − 1000 → 4,472.135954 LP / 99.99%。
+      await page.getByTestId('liquidity-query-address').fill(STAKE);
+      await expect(page.getByTestId('liquidity-query-submit')).toHaveText('查询');
+      await page.getByTestId('liquidity-query-submit').click();
+      await expect(page.getByTestId('liquidity-query-lp')).toHaveText('4,472.135954');
+      await expect(page.getByTestId('liquidity-query-share')).toHaveText('99.99%');
+      // 可兑换两币 = LP × reserve / totalSupply（向下取整）。
+      await expect(page.getByTestId('liquidity-query-convertible-token')).toHaveText(
+        '199,999.999999',
+      );
+      await expect(page.getByTestId('liquidity-query-convertible-target')).toHaveText('99.999999');
+
+      // 重置：清空输入、收起结果卡，按钮回到「查询」。
+      await page.getByTestId('liquidity-query-reset').click();
+      await expect(page.getByTestId('liquidity-query-address')).toHaveValue('');
+      await expect(page.getByTestId('liquidity-query-result')).toHaveCount(0);
+      await expect(page.getByTestId('liquidity-query-submit')).toHaveText('查询');
+    }),
+  );
+
+  test(
+    '用例 O：未连接钱包也能查任意地址；非法地址即时给原因并禁用提交',
+    withChainSnapshot(async (page) => {
+      // 只注入钱包，不点「连接」：查询是纯 view。
+      await installWallet(page, NATIVE_ONLY);
+      await page.goto(`/liquidity${QUERY}`);
+      await page.getByTestId('liquidity-tab-query').click();
+      await expect(page.getByTestId('liquidity-query-disconnected')).toHaveText(
+        '⚠️ 未连接钱包，请手动输入要查询的地址',
+      );
+      // 没有钱包地址可填，输入框是空的。
+      await expect(page.getByTestId('liquidity-query-address')).toHaveValue('');
+
+      // 非法地址：即时提示 + 提交禁用，不发读链。
+      await page.getByTestId('liquidity-query-address').fill('0x1234');
+      await expect(page.getByTestId('liquidity-query-address-error')).toHaveText(
+        '这不是一个有效的地址，需要 0x 开头的 40 位地址。',
+      );
+      await expect(page.getByTestId('liquidity-query-submit')).toBeDisabled();
+
+      // 任意地址查询。
+      await page.getByTestId('liquidity-query-address').fill(STAKE);
+      await page.getByTestId('liquidity-query-submit').click();
+      await expect(page.getByTestId('liquidity-query-lp')).toHaveText('4,472.135954', {
+        timeout: 20_000,
+      });
+      await expect(page.getByTestId('liquidity-query-share')).toHaveText('99.99%');
+    }),
+  );
+});
+
+/**
  * 验收截图：390×844 与 1280×800、浅色与深色，覆盖
- * 添加态（智能模式 + 报价折叠）/ 我的流动性 / 按 LP 数量撤出 / 空池提示。
+ * 添加态（智能模式 + 报价折叠）/ 我的流动性 / 按 LP 数量撤出 / 社区流动性查询。
  */
 test.describe('流动性池 验收截图', () => {
   const VIEWPORTS = [
@@ -771,12 +893,12 @@ test.describe('流动性池 验收截图', () => {
     await connect(page);
   }
 
-  async function shoot(page: Page, name: string): Promise<void> {
+  async function shoot(page: Page, name: string, fullPage = false): Promise<void> {
     mkdirSync(SHOTS, { recursive: true });
     await page.screenshot({
       path: resolve(SHOTS, `liquidity-${name}.png`),
       animations: 'disabled',
-      fullPage: false,
+      fullPage,
     });
   }
 
@@ -823,21 +945,21 @@ test.describe('流动性池 验收截图', () => {
   );
 
   test(
-    '空池提示',
+    '社区流动性查询（四块布局 + 任意地址结果）',
     withChainSnapshot(async (page) => {
-      const testToken = await deployTestToken();
       for (const viewport of VIEWPORTS) {
         for (const theme of THEMES) {
-          await prepare(page, FIRST_MINT, theme, viewport.width, viewport.height);
-          await page.getByTestId('liquidity-custom-toggle').click();
-          await page.getByTestId('liquidity-custom-address').fill(testToken);
-          await page.getByTestId('liquidity-custom-add').click();
-          await expect(page.getByTestId('liquidity-token')).toContainText(TEST_X, {
+          await prepare(page, NATIVE_ONLY, theme, viewport.width, viewport.height);
+          await page.getByTestId('liquidity-tab-query').click();
+          await page.getByTestId('liquidity-query-address').fill(STAKE);
+          await page.getByTestId('liquidity-query-submit').click();
+          await expect(page.getByTestId('liquidity-query-lp')).toHaveText('4,472.135954', {
             timeout: 20_000,
           });
-          await page.getByTestId('liquidity-tab-query').click();
-          await expect(page.getByTestId('liquidity-query-empty')).toBeVisible({ timeout: 20_000 });
-          await shoot(page, `empty-${theme}-${viewport.key}`);
+          // 四块一屏放不下（390×844 / 1280×800 都放不下）：这一态用整页截图，
+          // 让「选择交易对 / 交易对统计 / 查询地址 / 查询结果」四块落在同一张验收图里。
+          await page.evaluate(() => window.scrollTo({ top: 0 }));
+          await shoot(page, `query-${theme}-${viewport.key}`, true);
         }
       }
     }),

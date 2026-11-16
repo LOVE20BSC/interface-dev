@@ -153,6 +153,37 @@ export function sharePercent(lpBalance: bigint, totalSupply: bigint): number | u
   return Number((lpBalance * 1_000_000n) / totalSupply) / 10_000;
 }
 
+/**
+ * 任意地址的 LP 持仓折算（社区流动性查询的「该地址 LP 情况 / 可兑换代币数量」）：
+ * 份额 = `LP / totalSupply`，两币数量 = `LP × reserve / totalSupply`（向下取整）。
+ *
+ * 与撤出报价共用 `sharePercent` / `planWithdraw`，所以「查询到的可兑换数量」与
+ * 「撤出这么多 LP 会收到」永远一致。`totalSupply` 为 0（没有池子/空池）时没有
+ * 可折算的分母，返回 undefined，调用方渲染「未找到流动性池」。
+ */
+export interface AddressLpPosition {
+  readonly lpAmount: bigint;
+  readonly sharePercent: number | undefined;
+  readonly amountToken: bigint;
+  readonly amountNative: bigint;
+}
+
+export function addressLpPosition(
+  lpAmount: bigint,
+  totalSupply: bigint,
+  reserveToken: bigint,
+  reserveNative: bigint,
+): AddressLpPosition | undefined {
+  if (totalSupply <= 0n || lpAmount < 0n) return undefined;
+  const plan = planWithdraw(lpAmount, totalSupply, reserveToken, reserveNative);
+  return {
+    lpAmount,
+    sharePercent: sharePercent(lpAmount, totalSupply),
+    amountToken: plan.amountA,
+    amountNative: plan.amountB,
+  };
+}
+
 /** 数量 × (1 − 滑点)，向下取整；滑点为 0 时原样返回。 */
 export function applySlippageDown(amount: bigint, slippageBps: number): bigint {
   const bounded = Math.min(Math.max(0, Math.round(slippageBps)), 9_999);

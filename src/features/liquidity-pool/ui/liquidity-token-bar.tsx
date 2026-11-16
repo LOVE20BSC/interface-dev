@@ -17,9 +17,15 @@ import { Button } from '@/shared/ui/button';
 export interface LiquidityTokenBarProps {
   readonly catalog: LiquidityCatalog;
   readonly selected: LiquidityToken | undefined;
+  /**
+   * 查询页签（owner 2026-11-16）：选代币归「选择交易对」卡里的社区代币下拉，
+   * 抬头文字不再重复；只保留右侧紧凑的「换个代币地址」入口（自定义代币
+   * 只看不在 Launch 目录里的池子，e2e 的 TestX 用例依赖它）。
+   */
+  readonly compact?: boolean;
 }
 
-export function LiquidityTokenBar({ catalog, selected }: LiquidityTokenBarProps) {
+export function LiquidityTokenBar({ catalog, selected, compact = false }: LiquidityTokenBarProps) {
   const [open, setOpen] = useState(false);
   const custom = catalog.custom;
 
@@ -34,27 +40,37 @@ export function LiquidityTokenBar({ catalog, selected }: LiquidityTokenBarProps)
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-[11px] leading-4 text-muted">{copy.liquidity.tokenLabel}</p>
-          <p
-            className="truncate text-sm font-semibold text-foreground"
-            data-testid="liquidity-token"
-          >
-            {selected?.symbol ?? copy.liquidity.query.none}
-            {selected?.kind === 'custom' ? (
-              <span className="ml-1.5 text-[11px] font-normal text-muted">
-                {copy.liquidity.customBadge}
-              </span>
-            ) : null}
-          </p>
-        </div>
+      <div
+        className={cn(
+          'flex flex-wrap items-center justify-between gap-2',
+          compact ? 'justify-end' : 'rounded-2xl border border-line bg-surface px-4 py-3',
+        )}
+      >
+        {compact ? null : (
+          <div className="min-w-0">
+            <p className="text-[11px] leading-4 text-muted">{copy.liquidity.tokenLabel}</p>
+            <p
+              className="truncate text-sm font-semibold text-foreground"
+              data-testid="liquidity-token"
+            >
+              {selected?.symbol ?? copy.liquidity.query.none}
+              {selected?.kind === 'custom' ? (
+                <span className="ml-1.5 text-[11px] font-normal text-muted">
+                  {copy.liquidity.customBadge}
+                </span>
+              ) : null}
+            </p>
+          </div>
+        )}
         <button
           type="button"
           data-testid="liquidity-custom-toggle"
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className={cn(
+            'inline-flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+            compact && 'ml-auto',
+          )}
         >
           {open ? copy.liquidity.customCollapse : copy.liquidity.customTitle}
           <ChevronDown
