@@ -12,7 +12,7 @@ const variant = resolveVariant(import.meta.env.VITE_ENV, import.meta.env.MODE);
 
 /**
  * Build-time environment package. Data only: no component may branch on
- * `import.meta.env` or on the variant. Divergence lives in deployments/*.json.
+ * `import.meta.env` or on the variant. Divergence lives in network/<network>/network.json.
  */
 export const APP_ENV: AppEnvironment = Object.freeze({
   variant,

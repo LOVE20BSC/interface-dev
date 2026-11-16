@@ -12,7 +12,7 @@ import { expect, type Page } from '@playwright/test';
  */
 
 const deployment = JSON.parse(
-  readFileSync(resolve(process.cwd(), 'src/config/deployments/anvil31337_dev.json'), 'utf8'),
+  readFileSync(resolve(process.cwd(), 'src/config/network/anvil31337_dev/network.json'), 'utf8'),
 ) as {
   chainId: number;
   rpcUrls: string[];

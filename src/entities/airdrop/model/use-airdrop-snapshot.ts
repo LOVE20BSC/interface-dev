@@ -1,11 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AIRDROP_SNAPSHOT_PATH } from '@/config/airdrop';
+import { useCallback, useEffect, useState } from 'react';
+import { loadBundledAirdropSnapshot } from '@/config/airdrop';
 import type { HexAddress } from '@/config/networks';
-import {
-  selectAirdropSnapshotSource,
-  type AirdropSnapshot,
-  type AirdropSnapshotSource,
-} from '@/domain/airdrop-snapshot';
+import type { AirdropSnapshot } from '@/domain/airdrop-snapshot';
 import {
   loadAirdropSnapshot,
   resetAirdropSnapshotCache,
@@ -21,10 +17,9 @@ export interface AirdropSnapshotState {
 
 export interface AirdropSnapshotOptions {
   readonly enabled: boolean;
-  /** `airdropInfo(token).snapshotUri`; empty for the genesis token by design (CI-017). */
   readonly snapshotUri: string | null | undefined;
+  readonly merkleRoot: string | undefined;
   readonly tokenAddress: HexAddress | undefined;
-  /** Deployment genesis token: its on-chain URI is empty by design (CI-017). */
   readonly genesisTokenAddress: HexAddress | undefined;
 }
 
@@ -35,29 +30,9 @@ interface SnapshotData {
   readonly attempt: number;
 }
 
-function sourceKeyOf(source: AirdropSnapshotSource | null): string | null {
-  if (source === null) return null;
-  if (source.kind === 'uri') return `uri:${source.url}`;
-  if (source.kind === 'bundle') return `bundle:${source.path}`;
-  return 'none';
-}
-
-/**
- * Resolves and loads the snapshot document for one token (spec §3.4).
- *
- * The URI comes from the caller's single `airdropInfo(token)` read. Two sources
- * coexist:
- *   - a non-empty `snapshotUri` (future Launch tokens);
- *   - the build-time bundled JSON for the genesis token, whose URI is empty by
- *     design (CI-017). An empty URI is therefore NOT an error for genesis.
- * The document is still untrusted here: callers compare its root with
- * `airdropInfo(token).merkleRoot` before reading any share or proof.
- *
- * Starts after the first paint; until it resolves the home page shows no
- * eligibility placeholder. While no wallet is connected nothing is fetched.
- */
+/** Loads the bundled genesis snapshot first; only a missing or mismatched file needs the URI. */
 export function useAirdropSnapshot(options: AirdropSnapshotOptions): AirdropSnapshotState {
-  const { enabled, snapshotUri, tokenAddress, genesisTokenAddress } = options;
+  const { enabled, snapshotUri, merkleRoot, tokenAddress, genesisTokenAddress } = options;
   const [data, setData] = useState<SnapshotData>({
     status: 'idle',
     snapshot: null,
@@ -71,29 +46,20 @@ export function useAirdropSnapshot(options: AirdropSnapshotOptions): AirdropSnap
     genesisTokenAddress !== undefined &&
     tokenAddress.toLowerCase() === genesisTokenAddress.toLowerCase();
 
-  const source = useMemo<AirdropSnapshotSource | null>(
-    () =>
-      snapshotUri === undefined
-        ? null
-        : selectAirdropSnapshotSource({
-            snapshotUri,
-            bundledPath: AIRDROP_SNAPSHOT_PATH,
-            isGenesis,
-          }),
-    [isGenesis, snapshotUri],
-  );
-
-  const sourceKey = sourceKeyOf(source);
-  const canLoad = enabled && tokenAddress !== undefined && source !== null;
+  const sourceKey = JSON.stringify([tokenAddress, merkleRoot, snapshotUri, isGenesis]);
+  const canLoad = enabled && tokenAddress !== undefined && merkleRoot !== undefined;
 
   // The fetch result is an external system; this effect only mirrors it into state.
   useEffect(() => {
-    if (!canLoad || source === null || source.kind === 'none') return;
+    if (!canLoad || merkleRoot === undefined) return;
     let active = true;
-    if (attempt > 0) resetAirdropSnapshotCache();
     // No synchronous setState here: a mismatched sourceKey/attempt already
     // renders as loading, and the async result is the only external fact.
-    void loadAirdropSnapshot(source).then((result) => {
+    void loadAirdropSnapshot({
+      merkleRoot,
+      snapshotUri,
+      bundled: isGenesis ? loadBundledAirdropSnapshot : null,
+    }).then((result) => {
       if (!active) return;
       setData({
         status: result.status === 'loaded' ? 'loaded' : result.status,
@@ -105,7 +71,7 @@ export function useAirdropSnapshot(options: AirdropSnapshotOptions): AirdropSnap
     return () => {
       active = false;
     };
-  }, [attempt, canLoad, source, sourceKey]);
+  }, [attempt, canLoad, isGenesis, merkleRoot, snapshotUri, sourceKey]);
 
   const retry = useCallback(() => {
     if (!enabled) return;
@@ -116,12 +82,9 @@ export function useAirdropSnapshot(options: AirdropSnapshotOptions): AirdropSnap
   if (!enabled || tokenAddress === undefined) {
     return { status: 'idle', snapshot: null, retry };
   }
-  if (source === null) {
+  if (merkleRoot === undefined) {
     // The caller's `airdropInfo` read has not resolved yet.
     return { status: 'loading', snapshot: null, retry };
-  }
-  if (source.kind === 'none') {
-    return { status: 'unavailable', snapshot: null, retry };
   }
   if (data.sourceKey !== sourceKey || data.attempt !== attempt) {
     return { status: 'loading', snapshot: null, retry };

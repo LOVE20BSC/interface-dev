@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import devJson from './deployments/anvil31337_dev.json';
-import testJson from './deployments/bscTestnet_test.json';
-import prodJson from './deployments/bscMainnet_prod.json';
+import devJson from './network/anvil31337_dev/network.json';
+import testJson from './network/bscTestnet_test/network.json';
+import prodJson from './network/bscMainnet_prod/network.json';
 import { parseDeployment, isHexAddress } from './deployments/types';
 import { DEPLOYMENT_FILES, resolveVariant } from './variant';
 import {
@@ -29,9 +29,9 @@ describe('variant resolution', () => {
   });
 
   it('maps every variant to exactly one address book file', () => {
-    expect(DEPLOYMENT_FILES.dev).toBe('anvil31337_dev.json');
-    expect(DEPLOYMENT_FILES.test).toBe('bscTestnet_test.json');
-    expect(DEPLOYMENT_FILES.prod).toBe('bscMainnet_prod.json');
+    expect(DEPLOYMENT_FILES.dev).toBe('anvil31337_dev/network.json');
+    expect(DEPLOYMENT_FILES.test).toBe('bscTestnet_test/network.json');
+    expect(DEPLOYMENT_FILES.prod).toBe('bscMainnet_prod/network.json');
   });
 });
 
@@ -88,7 +88,7 @@ describe('deployment documents', () => {
     const amount = '500000000000000000000000000';
     expect(airdrop?.totalClaimedAmount).toBe(amount);
     expect(airdrop?.remainingAmount).toBe(amount);
-    // Genesis URI is empty by design (CI-017); the intent is only bootstrap metadata.
+    // This older export predates the constructor URI parameter.
     expect(airdrop?.snapshotUri).toBe('');
     expect(airdrop?.intendedSnapshotUri).toMatch(/^http:\/\//);
   });

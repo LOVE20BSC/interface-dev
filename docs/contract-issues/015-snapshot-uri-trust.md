@@ -2,7 +2,7 @@
 
 - 严重级别：**Medium**
 - 影响模块：空投铸造（`/airdrop`）
-- 状态：Open（设计取舍待定）
+- 状态：本地优先已实现；远端回退的可用性风险仍适用
 - 关联文件：`core/src/distributor/AirdropDistributor.sol`、`core/src/interfaces/distributor/IAirdropDistributor.sol`（`updateSnapshotUri` / `airdropInfo(...).snapshotUri` / `SnapshotUriEmpty` / `SnapshotUriTooLong` / `NotSnapshotUriUpdater`）
 
 ## 现象
@@ -14,7 +14,7 @@ function updateSnapshotUri(address tokenAddress, string calldata snapshotUri) ex
 function airdropInfo(address tokenAddress) external view returns (AirdropInfo memory); // .snapshotUri
 ```
 
-前端要拿到 `share` + `proof` 就必须**在运行时去取这个 URI 指向的 JSON**。带来三个新问题：
+前端优先使用本网络随构建打包的创世快照，只有本地失效时才访问 URI；后续 Launch 代币通过 URI 发现快照。远端访问仍有三个问题：
 
 1. **信任**：URI 可被 launcher 修改（`AirdropSnapshotUriUpdated`），服务端也可能悄悄改内容。合约本身只校验 `proof` 对 `airdropInfo(token).merkleRoot` 成立，所以用户资产安全；但界面上的「预计可得」会随 URI 内容而变，**前端必须用链上 root 校验快照 root，不一致就拒绝使用该快照**，否则界面可能长期显示错误金额。
 2. **可用性**：URI 若是普通对象存储/HTTP 站点，可能被 CORS 拒绝、被墙或失效；静态站没有后端，只能给「资格暂时读不到 + 重试」。
@@ -22,10 +22,10 @@ function airdropInfo(address tokenAddress) external view returns (AirdropInfo me
 
 ## 前端应对（已写入影响分析）
 
-- 快照来源顺序：链上 URI → （仅 dev/e2e）随构建打包的同名快照 → 失败态；两条来源都**必须**校验 `keccak(merkleRoot)` 与链上一致。
-- 「预计可得」在 root 校验失败时不显示数字（只显示「资格暂时读不到」），避免误导。
-- 若未来 URI 需要鉴权/签名，建议合约侧增加快照哈希（`snapshotHash`）随 URI 一起登记，前端可直接比对内容哈希而不只是 root。
+- 创世快照来源顺序：当前网络内置快照 → 本地缺失、损坏或 root 不一致时回退链上 HTTP(S) URI → 失败态，适用于所有前端环境。两条来源都比较文件 `merkleRoot` 与链上值；匹配本地文件时不发远端请求。
+- 「预计可得」须由链上 `claimableAmount` 使用当前钱包的 share/proof 校验后给出；root 校验失败时不显示数字（只显示「资格暂时读不到」）。前端不重建整棵树，比较声明的 root 不能单独证明整份 JSON 完整。
+- 完整快照的证明与份额总和在生成、同步和发布阶段校验；运行时远端缺项或失联仍可能影响可用性，但不能凭伪造证明获得代币。
 
 ## 建议
 
-短期按上面的前端兜底实现；中期请合约侧考虑在 `updateSnapshotUri` 时同时登记 `bytes32 snapshotContentHash`（内容哈希）或直接把快照根与内容哈希绑定，让「链上 URI + 链下内容」的组合可验证。
+采用本地优先、root 比较与链上钱包证明校验的方案；远端回退失败时保留错误态和重试。当前方案不新增快照内容哈希或更新权限。

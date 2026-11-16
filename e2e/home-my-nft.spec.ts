@@ -35,7 +35,7 @@ const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
 // 地址簿已知合约（交易对）：转让抽屉的 智能资产保护 拦截对象。
 const PAIR = (
   JSON.parse(
-    readFileSync(resolve(process.cwd(), 'src/config/deployments/anvil31337_dev.json'), 'utf8'),
+    readFileSync(resolve(process.cwd(), 'src/config/network/anvil31337_dev/network.json'), 'utf8'),
   ) as { addresses: { pair: string } }
 ).addresses.pair;
 
@@ -232,7 +232,7 @@ test('home: a non-eligible account never sees the airdrop reminder', async ({ pa
   await installWallet(page, ACCOUNTS.withIdentity); // claimed its share during seeding
   await seedIdentity(page, ACCOUNTS.withIdentity, '1');
   const snapshotLoaded = page.waitForResponse(
-    (response) => response.url().includes('/airdrop/anvil31337_dev.json'),
+    (response) => /\/assets\/airdrop-[^/]+\.js$/.test(response.url()),
     { timeout: 20_000 },
   );
   await page.goto('/');

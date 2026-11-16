@@ -26,7 +26,7 @@ pnpm e2e:reset-chain
 ```
 
 首次运行会执行 `make -C ../anvil bootstrap PORT=8555`（约 1 分钟，地址与提交的
-`src/config/deployments/anvil31337_dev.json` 相同——clean bootstrap 从 deployer nonce 0 开始，
+`src/config/network/anvil31337_dev/network.json` 相同——clean bootstrap 从 deployer nonce 0 开始，
 端口不影响地址）。之后每次 `pnpm e2e` 检测到 8555 已有完整部署就直接复用。
 
 `playwright.config.ts` 的 `webServer` 会先跑 `pnpm build`（`VITE_ENV=dev`）再起 preview；它会把本次解析出的 RPC 作为 `VITE_ANVIL_RPC` 烘进构建，页面里的 viem 和 spec 的直连 RPC 因此永远指向同一条链。本地默认允许复用已有 preview，但复用前会先校验 build id（见下节「Harness guards」）；CI 总是重新构建，`E2E_REUSE_PREVIEW=0` 可强制重启本地 preview。其它可选环境变量：`E2E_PORT`（默认 4173）、`E2E_BASE_PATH`（默认 `/`）。

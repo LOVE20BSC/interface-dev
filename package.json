@@ -22,6 +22,7 @@
     "e2e:reset-chain": "node scripts/e2e-chain.mjs --reset-chain --ensure-only",
     "gen:errors": "node scripts/gen-errors.mjs",
     "sync:anvil": "node scripts/sync-anvil.mjs",
+    "sync:network": "node scripts/sync-network.mjs",
     "abis:check": "node scripts/check-abis.mjs",
     "release-to": "node scripts/release-to.mjs",
     "release-to-interface-test": "node scripts/release-to.mjs interface-test",

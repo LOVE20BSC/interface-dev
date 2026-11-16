@@ -17,7 +17,7 @@
 //      as VITE_ANVIL_RPC, so the page and the specs talk to the same chain.
 //
 // `make bootstrap` on :8555 deploys from deployer nonce 0 exactly like a fresh :8545 bootstrap, so
-// the committed dev address book (src/config/deployments/anvil31337_dev.json) is reused unchanged.
+// the committed dev address book (src/config/network/anvil31337_dev/network.json) is reused unchanged.
 // The anvil repo keeps runtime state per port (`.anvil/8555/`), so the two chains never share a pid
 // file or log; `make stop PORT=8555` cannot stop the developer's chain.
 //
@@ -62,7 +62,7 @@ const DEFAULT_E2E_TX_DEADLINE_MS = '4000';
 /** Short probe for "is something alive on :8555?", so a wedged port fails in seconds, not minutes. */
 const LIVENESS_PROBE_TIMEOUT_MS = 3_000;
 const MAKE_TIMEOUT_MS = 10 * 60_000;
-const DEPLOYMENT_FILE = resolve(ROOT, 'src/config/deployments/anvil31337_dev.json');
+const DEPLOYMENT_FILE = resolve(ROOT, 'src/config/network/anvil31337_dev/network.json');
 
 /** Hostnames that mean "this machine"; only these can be the developer's personal chain. */
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '0.0.0.0']);
@@ -479,7 +479,7 @@ async function bootstrapSuiteChain() {
     fatal(
       `bootstrap finished but the committed address book is not deployed on ${DEFAULT_SUITE_RPC}:`,
       ...missing.map((entry) => `  missing code: ${entry}`),
-      'A clean bootstrap must reproduce src/config/deployments/anvil31337_dev.json exactly.',
+      'A clean bootstrap must reproduce src/config/network/anvil31337_dev/network.json exactly.',
       'Do not hand-edit that file: fix the params/deploy scripts, or run `pnpm sync:anvil` if the',
       'deployment legitimately changed.',
     );

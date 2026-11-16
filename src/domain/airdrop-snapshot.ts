@@ -99,16 +99,11 @@ export function findSnapshotEntry(
   return snapshot.byAccount.get(account.toLowerCase()) ?? null;
 }
 
-export interface ChainSnapshotBinding {
-  readonly chainId: number;
-  readonly merkleRoot: string;
-}
-
 /**
  * The document root must equal the root registered for this token on chain
- * (`airdropInfo(token).merkleRoot`). This is the one check that makes a bundled or
- * remotely fetched JSON trustworthy: the contract verifies every proof against
- * that same root, so a mismatch can only mean the wrong file.
+ * (`airdropInfo(token).merkleRoot`). This selects the document; claimableAmount
+ * still verifies the wallet's proof. sourceChainId describes the snapshot's
+ * provenance, which can differ from the chain where tokens are claimed.
  */
 export function snapshotRootMatches(
   snapshot: AirdropSnapshot,
@@ -116,59 +111,6 @@ export function snapshotRootMatches(
 ): boolean {
   if (merkleRoot === null || merkleRoot === undefined) return false;
   return snapshot.merkleRoot.toLowerCase() === merkleRoot.toLowerCase();
-}
-
-/**
- * The snapshot is only trusted when it was produced for this chain and its root
- * equals the root baked into the deployed AirdropDistributor.
- */
-export function snapshotMatchesChain(
-  snapshot: AirdropSnapshot,
-  binding: ChainSnapshotBinding,
-): boolean {
-  if (snapshot.sourceChainId !== binding.chainId) return false;
-  return snapshotRootMatches(snapshot, binding.merkleRoot);
-}
-
-export type AirdropSnapshotSource =
-  | { readonly kind: 'bundle'; readonly path: string }
-  | { readonly kind: 'uri'; readonly url: string }
-  | { readonly kind: 'none' };
-
-export interface AirdropSnapshotSourceInput {
-  /** `airdropInfo(token).snapshotUri`; empty for the genesis token by design (CI-017). */
-  readonly snapshotUri: string | null | undefined;
-  /** Build-time bundled genesis snapshot path, or null in variants that ship none. */
-  readonly bundledPath: string | null;
-  readonly isGenesis: boolean;
-}
-
-/**
- * Which document to load for a token (spec §3.4):
- *   - a non-empty on-chain URI wins (future Launch tokens);
- *   - the genesis token has no URI by design, so it uses the bundled JSON;
- *   - an empty URI for any other token means "no snapshot source" (not a number).
- * A non-http(s) URI is rejected rather than fed to fetch.
- */
-export function selectAirdropSnapshotSource(
-  input: AirdropSnapshotSourceInput,
-): AirdropSnapshotSource {
-  const uri = typeof input.snapshotUri === 'string' ? input.snapshotUri.trim() : '';
-  if (uri.length > 0) {
-    try {
-      const parsed = new URL(uri);
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-        return { kind: 'uri', url: parsed.toString() };
-      }
-    } catch {
-      // fall through to none
-    }
-    return { kind: 'none' };
-  }
-  if (input.isGenesis && input.bundledPath !== null) {
-    return { kind: 'bundle', path: input.bundledPath };
-  }
-  return { kind: 'none' };
 }
 
 export function isAirdropEligible(input: {

@@ -1,5 +1,5 @@
-import type { AirdropSnapshot, AirdropSnapshotSource } from '@/domain/airdrop-snapshot';
-import { parseAirdropSnapshot } from '@/domain/airdrop-snapshot';
+import type { AirdropSnapshot } from '@/domain/airdrop-snapshot';
+import { parseAirdropSnapshot, snapshotRootMatches } from '@/domain/airdrop-snapshot';
 
 export type SnapshotLoadResult =
   | { readonly status: 'loaded'; readonly snapshot: AirdropSnapshot }
@@ -13,41 +13,43 @@ interface CachedLoad {
 
 let cached: CachedLoad | null = null;
 
-function requestUrl(source: AirdropSnapshotSource): string {
-  if (source.kind === 'uri') return source.url;
-  if (source.kind === 'bundle') {
-    return `${import.meta.env.BASE_URL}${source.path.replace(/^\//, '')}`;
-  }
-  throw new Error('cannot load an empty snapshot source');
+interface SnapshotSource {
+  readonly merkleRoot: string;
+  readonly snapshotUri: string | null | undefined;
+  readonly bundled: (() => Promise<unknown>) | null;
 }
 
-/**
- * Lazily fetches the merkle snapshot as a static same-origin file (genesis,
- * bundled at build time) or from the launcher-registered on-chain URI (future
- * Launch tokens, CI-015). The document is never trusted until the caller
- * compares its root with the on-chain `airdropInfo(token).merkleRoot`.
- *
- * It is deliberately NOT a bundled import: the home page must render identity,
- * balance and entries before this request starts (UX spec §3.1). Retry drops the
- * cached promise so a failed chunk can be re-requested.
- */
-export function loadAirdropSnapshot(source: AirdropSnapshotSource): Promise<SnapshotLoadResult> {
-  if (source.kind === 'none') return Promise.resolve({ status: 'unavailable' });
-  const key = source.kind === 'uri' ? source.url : `bundle:${source.path}`;
+async function load(source: SnapshotSource): Promise<SnapshotLoadResult> {
+  let local: SnapshotLoadResult = { status: 'unavailable' };
+  if (source.bundled !== null) {
+    try {
+      const snapshot = parseAirdropSnapshot(await source.bundled());
+      local = snapshot === null ? { status: 'error' } : { status: 'loaded', snapshot };
+      if (snapshot !== null && snapshotRootMatches(snapshot, source.merkleRoot)) return local;
+    } catch {
+      local = { status: 'error' };
+    }
+  }
+
+  const uri = source.snapshotUri?.trim() ?? '';
+  if (uri.length === 0) return local;
+  try {
+    const url = new URL(uri);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return local;
+    const response = await fetch(url.toString());
+    if (!response.ok) return { status: 'error' };
+    const snapshot = parseAirdropSnapshot(await response.json());
+    return snapshot === null ? { status: 'error' } : { status: 'loaded', snapshot };
+  } catch {
+    return { status: 'error' };
+  }
+}
+
+// The on-chain root participates in the cache key so redeployments cannot reuse stale eligibility.
+export function loadAirdropSnapshot(source: SnapshotSource): Promise<SnapshotLoadResult> {
+  const key = JSON.stringify([source.merkleRoot, source.snapshotUri, source.bundled !== null]);
   if (cached !== null && cached.key === key) return cached.promise;
-
-  const url = requestUrl(source);
-  const promise: Promise<SnapshotLoadResult> = fetch(url)
-    .then(async (response) => {
-      if (!response.ok) throw new Error(`snapshot HTTP ${response.status}`);
-      return (await response.json()) as unknown;
-    })
-    .then((raw): SnapshotLoadResult => {
-      const snapshot = parseAirdropSnapshot(raw);
-      return snapshot === null ? { status: 'error' } : { status: 'loaded', snapshot };
-    })
-    .catch((): SnapshotLoadResult => ({ status: 'error' }));
-
+  const promise = load(source);
   cached = { key, promise };
   return promise;
 }

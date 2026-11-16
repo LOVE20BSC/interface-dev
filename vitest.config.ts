@@ -8,7 +8,7 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@deployments': fileURLToPath(
-        new URL('./src/config/deployments/anvil31337_dev.json', import.meta.url),
+        new URL('./src/config/network/anvil31337_dev/network.json', import.meta.url),
       ),
     },
   },

@@ -27,11 +27,17 @@ export const DEPLOYMENT_FILE = resolve(ANVIL_EXPORT_DIR, 'deployments', `${PROFI
 export const ABIS_DIR = resolve(ANVIL_EXPORT_DIR, 'abis');
 export const AIRDROP_FILE = resolve(ANVIL_EXPORT_DIR, 'airdrop', `${PROFILE}.json`);
 
-export const FRONTEND_DEPLOYMENT_FILE = resolve(ROOT, 'src/config/deployments/anvil31337_dev.json');
+export const FRONTEND_DEPLOYMENT_FILE = resolve(
+  ROOT,
+  'src/config/network/anvil31337_dev/network.json',
+);
 export const FRONTEND_ABIS_DIR = resolve(ROOT, 'src/config/abis');
 export const FRONTEND_INDEX_FILE = resolve(FRONTEND_ABIS_DIR, 'index.ts');
 export const FRONTEND_MANIFEST_FILE = resolve(FRONTEND_ABIS_DIR, 'manifest.json');
-export const FRONTEND_AIRDROP_FILE = resolve(ROOT, 'public/airdrop/anvil31337_dev.json');
+export const FRONTEND_AIRDROP_FILE = resolve(
+  ROOT,
+  'src/config/network/anvil31337_dev/airdrop.json',
+);
 
 const PRETTIER_CONFIG = (await resolveConfig(resolve(ROOT, 'src/config/abis/index.ts'))) ?? {};
 
@@ -95,7 +101,7 @@ const REPO_ABIS = {
   tools: ['BatchTransfer'],
 };
 
-const ADDRESS_KEYS = {
+export const ADDRESS_KEYS = {
   tokenAddress: 'LOVE20_TOKEN_ADDRESS',
   memberNFT: 'MEMBER_NFT_ADDRESS',
   stake: 'STAKE_ADDRESS',
@@ -343,11 +349,6 @@ export function buildAddressBook(exportData, existing) {
     ...existing,
     chainId: exportData.chainId,
     rpcUrls: [exportData.rpcUrl],
-    // The environment package itself states the rule, so a hand-edited copy is obviously wrong.
-    notes:
-      '地址簿由 pnpm sync:anvil 从 anvil/export/deployments/anvil31337_dev.json 生成，勿手改；' +
-      '地址始终跟随 clean bootstrap 的部署，不用地址簿反推 nonce。rpc 指向 8545：本机唯一规范链。' +
-      'defaultSymbol 是 URL 种子，链上 symbol() 为准。',
     deployment: {
       ...(typeof existing.deployment === 'object' && existing.deployment !== null
         ? existing.deployment
@@ -379,7 +380,7 @@ function nodeHash(left, right) {
   return keccak256(`${a}${b.slice(2)}`);
 }
 
-function verifyMerkle(snapshot, expectedRoot) {
+export function verifyMerkle(snapshot, expectedRoot) {
   const entries = snapshot.entries;
   if (!Array.isArray(entries) || entries.length === 0) {
     fail('airdrop snapshot has no entries');
@@ -391,6 +392,7 @@ function verifyMerkle(snapshot, expectedRoot) {
   }
 
   const totalShare = BigInt(snapshot.totalShare);
+  if (totalShare !== 10n ** 18n) fail('airdrop totalShare must equal 1e18');
   const sum = entries.reduce((acc, entry) => acc + BigInt(entry.share), 0n);
   if (sum !== totalShare) {
     fail(`airdrop snapshot shares sum to ${sum} but totalShare is ${totalShare}`);
@@ -405,8 +407,13 @@ function verifyMerkle(snapshot, expectedRoot) {
       `airdrop snapshot merkleRoot ${root} disagrees with export airdrop.merkleRoot ${expectedRoot}`,
     );
   }
+  const accounts = new Set();
   for (const entry of entries) {
     requireAddress(entry.account, 'airdrop entry account');
+    const account = entry.account.toLowerCase();
+    if (accounts.has(account)) fail(`duplicate airdrop account: ${entry.account}`);
+    accounts.add(account);
+    if (BigInt(entry.share) <= 0n) fail('airdrop share must be positive');
     if (!Array.isArray(entry.proof)) fail(`airdrop entry ${entry.account} has no proof array`);
     let computed = leafHash(entry.account, entry.share);
     for (const sibling of entry.proof) {

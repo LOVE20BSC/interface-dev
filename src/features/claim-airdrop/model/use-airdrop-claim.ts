@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useAccount, useBlockNumber, useChainId, useReadContract, useReadContracts } from 'wagmi';
 import { airdropDistributorAbi, phaseAbi } from '@/config/abis';
-import { configuredAddress, type HexAddress } from '@/config/networks';
+import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
 import {
   selectAirdropClaimState,
   type AirdropClaimErrorKind,
@@ -18,7 +18,7 @@ import {
 import { formatSharePercent } from '@/domain/airdrop-share';
 import {
   findSnapshotEntry,
-  snapshotMatchesChain,
+  snapshotRootMatches,
   type AirdropSnapshotEntry,
 } from '@/domain/airdrop-snapshot';
 import { useAirdropSnapshot } from '@/entities/airdrop/model/use-airdrop-snapshot';
@@ -96,6 +96,7 @@ export function useAirdropClaim(): AirdropClaimState {
   const snapshotState = useAirdropSnapshot({
     enabled: account !== undefined,
     snapshotUri: info?.snapshotUri,
+    merkleRoot: info?.merkleRoot,
     tokenAddress,
     genesisTokenAddress,
   });
@@ -104,7 +105,8 @@ export function useAirdropClaim(): AirdropClaimState {
   const rootMatches =
     snapshot !== null &&
     info !== null &&
-    snapshotMatchesChain(snapshot, { chainId, merkleRoot: info.merkleRoot });
+    chainId === NETWORK.chainId &&
+    snapshotRootMatches(snapshot, info.merkleRoot);
 
   const entry = useMemo(
     () => (rootMatches && snapshot !== null ? findSnapshotEntry(snapshot, account) : null),
@@ -232,8 +234,7 @@ export function useAirdropClaim(): AirdropClaimState {
     snapshotState.status === 'idle'
       ? 'loading'
       : (snapshotState.status as 'loading' | 'loaded' | 'error' | 'unavailable');
-  const rootStatus =
-    infoState.status === 'error' ? 'error' : info === null ? 'loading' : 'loaded';
+  const rootStatus = infoState.status === 'error' ? 'error' : info === null ? 'loading' : 'loaded';
 
   let selection = selectAirdropClaimState({
     connected: account !== undefined,

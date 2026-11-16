@@ -195,9 +195,9 @@
 **已移除（2026-11-11 / 2026-11-12）**：三个常驻入口行（我的 NFT / 空投铸造 / 兑换代币，已在 `/apps`）；首页细行与其上的余额（问候取代；余额去 §3.7）；独立的身份卡；旧的「现在没有需要你处理的事。」空态句；页脚「开源文档」链接与「技术详情」折叠（2026-11-12，改由 `/about` 承担）。首页不再按 LOVE20 余额不足追加提醒，也不出现「无需操作」静默态之外的额外说明。
 
 **快照加载与提醒卡显隐**
-- 空投快照 JSON 是**首屏渲染之后才 `import()` 的懒加载 chunk**：问候与无身份提醒先可用，快照数据就绪后空投提醒卡原地出现；**不预留占位、不显示骨架、不阻塞问候**。
+- 当前网络内置的空投快照 JSON 是**首屏渲染之后才 `import()` 的懒加载 chunk**；本地 root 与链上一致时不请求远端，本地缺失、损坏或 root 不一致时回退链上 HTTP(S) URI。问候与无身份提醒先可用，快照数据就绪后空投提醒卡原地出现；**不预留占位、不显示骨架、不阻塞问候**。
 - 快照未就绪 → 不显示空投提醒卡；钱包不满足资格 → 不显示卡，也不写「无资格」。
-- chunk 读取失败 → 不显示空投提醒卡；首页保持干净（不额外造一行错误文案）。
+- 本地失效且远端回退仍失败 → 不显示空投提醒卡；首页保持干净（不额外造一行错误文案）。
 
 **实心按钮**：一屏最多一个实心按钮。只有第一张出现的提醒卡提供它：无身份卡与「未选择身份 NFT」卡互斥、都在空投卡之前，所以有任一张时它用实心、空投卡用描边；只有空投卡时它是实心。未连接时实心按钮是「连接钱包」。问候永远不是实心按钮。
 
@@ -321,8 +321,8 @@
 **数据源与快照（2026-11-12 起）**
 - 合约是 `AirdropDistributor`（地址簿 `airdropDistributor`，`/about` 标签「空投分发器」）。`claim(tokenAddress, share, proof)` 只付给 `msg.sender`，**没有 account 参数**；账户永远是当前连接的钱包。
 - 报价与状态：`claimableAmount(token, account, share, proof)`、`isClaimed(token, account)`、`claimedAmount(token, account)`（一次 `eth_call`，不再扫事件）。每 token 的根、轮次、份额与池额全部来自**一次** `airdropInfo(token)`：`merkleRoot`、`claimableFromRound`、`snapshotUri`、`totalClaimedShare`、`totalRemainingShare`、`totalClaimedAmount`、`remainingAmount`；`TOTAL_SHARE()` 仍是链上常量。
-- 快照来源：**创世代币**的 `airdropInfo(genesisToken).snapshotUri` 由合约保证永久为空（[CI-017](../contract-issues/017-genesis-snapshot-uri-locked.md)），所以用构建内置的 `public/airdrop/<variant>.json`；使用前必须核对文档 `merkleRoot` 与链上 `airdropInfo(genesisToken).merkleRoot` **完全相等**，不一致按 S2「空投资格暂时读不到」+「重试」处理，绝不显示数字。空 URI 对创世**不是错误**。
-- **后续 Launch 的代币**：沿用同一套代码，优先从链上 `airdropInfo(token).snapshotUri` 拉取 JSON（仅接受 http(s)），同样先用 `airdropInfo(token).merkleRoot` 校验 root；失败态可重试。
+- 快照来源：**创世代币**优先懒加载构建内置的 `src/config/network/<network>/airdrop.json`，文件 root 与链上 `airdropInfo(genesisToken).merkleRoot` 一致即使用，不请求远端。本地缺失、损坏或 root 不一致时，回退链上 HTTP(S) URI；远端也须比较 root。新部署在构造期写入本网络 Pages URI，此后不可修改；旧部署可能仍为空 URI，本地匹配时照常可用（[CI-017](../contract-issues/017-genesis-snapshot-uri-locked.md)）。两种来源均不可用时按 S2「空投资格暂时读不到」+「重试」处理，不显示数字。
+- **后续 Launch 的代币**：沿用同一套加载器，通过链上 `airdropInfo(token).snapshotUri` 获取 JSON（仅接受 HTTP(S)），同样比较文件 root 与链上值。前端不重建整棵树；当前钱包的 share/proof 由链上 `claimableAmount` 校验，失败态可重试。完整快照的证明与份额总和在生成、同步和发布阶段预检。
 - **轮次门槛**：`Phase.currentPhase() < airdropInfo(token).claimableFromRound` 时 `claim` 会回滚 `ClaimRoundNotReached`。此时页面显示独立门槛态（见 S5-G），不显示金额、不出现「空投铸造」。等待时间只用「剩余区块 × 观测秒/块」估算成「约 X 分钟」（`observations(0,2,true)`，不足两条时退回 `TARGET_SECONDS / currentPhaseBlocks`），**不得显示绝对时间戳**。
 
 **区块顺序**
@@ -355,7 +355,7 @@
 - 未到 `claimableFromRound` 时用户看到「还没到可铸造轮次」+「约 X 分钟」，页面上没有铸造按钮、没有金额、没有绝对时间。
 - 铸造成功后金额应来自本笔交易回执（`AirdropClaimed.amount`），刷新后仍显示「已铸造 {X} LOVE20」；换浏览器、清缓存后用同一钱包打开，数量必须一致。
 - 已铸造但换设备打开时，仍应显示真实的已铸造数量（读 `claimedAmount`），不得编造金额、也不得把本机缓存当成链上事实。
-- 内置创世快照的 root 与链上不一致时，页面显示「空投资格暂时读不到」+「重试」，**不显示任何份额或金额**；创世 URI 为空本身不产生错误。
+- 内置创世快照 root 不匹配时先回退 URI；回退后仍不可用或 root 不匹配时，页面显示「空投资格暂时读不到」+「重试」，**不显示任何份额或金额**。旧部署的空 URI 不妨碍使用匹配的本地快照。
 
 ### 3.5 兑换代币
 
@@ -788,7 +788,7 @@ owner 原话：「设置使用此身份 NFT 的时候，有一个过渡动画，
 
 ## §6 M0 验收脚本大纲
 
-**前置**：`vite preview --base=/<repo>/` 跑构建产物（不是 dev server）；Playwright + 注入型测试钱包（EIP-1193 stub + 本地私钥签名）；链 = 本地 anvil 31337，`make bootstrap` 起链并 seed：首币池注入 **200,000 LOVE20 + 100 WETH**（`SEED_LIQUIDITY_TOKEN_AMOUNT=2e23`、`SEED_LIQUIDITY_PARENT_TOKEN_AMOUNT=1e20`，见 ADR-0004）；dev 的地址与 ABI 只读 `anvil/export/deployments/anvil31337_dev.json` 与 `anvil/export/abis/*.json`（前端消费副本 `src/config/deployments/anvil31337_dev.json`）。fixture 的 anvil 0–9 号账户都在快照内（0–4 已铸造，5–9 有份额未铸造），所以主流程必须用**不在快照内**的新私钥（先从一个 anvil 账户转一点原生币（anvil：ETH）作 gas）。GitHub owner 与仓库名已定（`LOVE20BSC/interface-dev` / `interface-test` / `interface`，见 ADR-0002 §4），环境变体由 CI 按仓库名关键字选择（含 `dev` → dev，否则含 `test` → test，否则 prod；`vars.VITE_ENV` 可覆盖），发布命令为 `pnpm release-to <target>`（ADR-0002 §4）；**只有里程碑最终排期〔待定〕**。`--base` 由 CI 变量注入，脚本不得硬编码。
+**前置**：`vite preview --base=/<repo>/` 跑构建产物（不是 dev server）；Playwright + 注入型测试钱包（EIP-1193 stub + 本地私钥签名）；链 = 本地 anvil 31337，`make bootstrap` 起链并 seed：首币池注入 **200,000 LOVE20 + 100 WETH**（`SEED_LIQUIDITY_TOKEN_AMOUNT=2e23`、`SEED_LIQUIDITY_PARENT_TOKEN_AMOUNT=1e20`，见 ADR-0004）；dev 的地址与 ABI 只读 `anvil/export/deployments/anvil31337_dev.json` 与 `anvil/export/abis/*.json`（前端消费副本 `src/config/network/anvil31337_dev/network.json`）。fixture 的 anvil 0–9 号账户都在快照内（0–4 已铸造，5–9 有份额未铸造），所以主流程必须用**不在快照内**的新私钥（先从一个 anvil 账户转一点原生币（anvil：ETH）作 gas）。GitHub owner 与仓库名已定（`LOVE20BSC/interface-dev` / `interface-test` / `interface`，见 ADR-0002 §4），环境变体由 CI 按仓库名关键字选择（含 `dev` → dev，否则含 `test` → test，否则 prod；`vars.VITE_ENV` 可覆盖），发布命令为 `pnpm release-to <target>`（ADR-0002 §4）；**只有里程碑最终排期〔待定〕**。`--base` 由 CI 变量注入，脚本不得硬编码。
 
 1. **打开 `/` → 未连接 → 连接**：未连接态 = 左侧社区标识 + 问候「你好」+「连接钱包」；底部 5 tab 可见；治理/行动占位页显示「即将上线」、一句说明与「回首页」，无空白、无半成品表单。点「连接钱包」→ 左侧标识隐藏、药丸变为两区，URL 补上 `?symbol=<首币>`。
 2. **无身份 NFT → 铸造身份 NFT**：首页问候为「你好」，提醒流显示「你还没有身份 NFT」+「铸造身份 NFT」。点「铸造身份 NFT」→ `/mint`。「我的」页不再有身份 NFT 卡片（2026-11-14 移除，§3.7），不重复这个入口。

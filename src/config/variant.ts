@@ -4,9 +4,9 @@ export type EnvVariant = (typeof VARIANTS)[number];
 
 /** One build variant maps to exactly one address book file. */
 export const DEPLOYMENT_FILES: Readonly<Record<EnvVariant, string>> = Object.freeze({
-  dev: 'anvil31337_dev.json',
-  test: 'bscTestnet_test.json',
-  prod: 'bscMainnet_prod.json',
+  dev: 'anvil31337_dev/network.json',
+  test: 'bscTestnet_test/network.json',
+  prod: 'bscMainnet_prod/network.json',
 });
 
 const MODE_TO_VARIANT: Readonly<Record<string, EnvVariant>> = Object.freeze({

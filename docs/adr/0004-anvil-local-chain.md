@@ -59,7 +59,7 @@ vendored 的 Airdrop（来自 `LOVE20TKM/burn`）没有实现 `ILaunchDistributo
 
 - **地址只认 JSON 的 `addresses` / `contracts`**；任何文档表格、README 示例、聊天记录里的地址都不算来源。
 - **兄弟仓提交的 `script/network/anvil31337_dev/addresses.*.params` 永不读取**：它们与本地实际部署不一致，且彼此互相矛盾（README §4 已记录）。
-- **地址永远由部署派生**：`make bootstrap` → `pnpm sync:anvil` → 提交生成物。`scripts/sync-anvil.mjs` 一次性写 `src/config/deployments/anvil31337_dev.json`、`src/config/abis/*.ts`、`src/config/abis/manifest.json` 与 `public/airdrop/anvil31337_dev.json`；脚本可重复执行，第二次只打印 `unchanged`。
+- **地址永远由部署派生**：`make bootstrap` → `pnpm sync:anvil` → 提交生成物。`scripts/sync-anvil.mjs` 一次性写 `src/config/network/anvil31337_dev/network.json`、`src/config/abis/*.ts`、`src/config/abis/manifest.json` 与 `src/config/network/anvil31337_dev/airdrop.json`；脚本可重复执行，第二次只打印 `unchanged`。
 - **禁止手改地址/Nonce**：不手工 pin 地址，不 `anvil_setNonce`，不为了“让链匹配地址簿”改部署顺序。地址簿跟随部署，不是部署跟随地址簿。结构性偏移（本仓没有）只能作为 `params/anvil31337_dev/*.params` 的显式参数。
 - **`manifest.json` 是 ADR-0002 §3 的落点**：每个来源仓（core/action/group-chat/libs，另加 dex/anvil）的 git HEAD、anvil 导出块高/时间、每个合约的 ABI 条目数与生成模块清单。`pnpm abis:check` 在存在 `../anvil/export` 时重新生成并逐字节比对，缺失时明确跳过（CI 没有兄弟仓）。
 - **确定性证明**（两次输出必须同 hash）：

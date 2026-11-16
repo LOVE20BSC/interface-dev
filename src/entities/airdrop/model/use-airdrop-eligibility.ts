@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import { useAccount, useChainId, useReadContracts } from 'wagmi';
 import { airdropDistributorAbi } from '@/config/abis';
-import { configuredAddress } from '@/config/networks';
+import { NETWORK, configuredAddress } from '@/config/networks';
 import {
   findSnapshotEntry,
   isAirdropEligible,
-  snapshotMatchesChain,
+  snapshotRootMatches,
 } from '@/domain/airdrop-snapshot';
 import { useAirdropInfo } from '@/entities/airdrop/model/use-airdrop-info';
 import { useAirdropSnapshot } from '@/entities/airdrop/model/use-airdrop-snapshot';
@@ -35,7 +35,7 @@ export interface AirdropEligibility {
  * ∧ claimableAmount(token,wallet,share,proof) > 0.
  *
  * The snapshot document is trusted only after its merkleRoot matches
- * `airdropInfo(token).merkleRoot` (and it belongs to this chain). One
+ * `airdropInfo(token).merkleRoot` and the wallet uses the configured chain. One
  * `airdropInfo` read also supplies the snapshot URI, so eligibility no longer
  * needs a separate root/URI getter. A mismatch disables the card instead of
  * showing a wrong answer.
@@ -53,6 +53,7 @@ export function useAirdropEligibility(): AirdropEligibility {
   const snapshotState = useAirdropSnapshot({
     enabled: account !== undefined,
     snapshotUri: info?.snapshotUri,
+    merkleRoot: info?.merkleRoot,
     tokenAddress,
     genesisTokenAddress,
   });
@@ -61,7 +62,8 @@ export function useAirdropEligibility(): AirdropEligibility {
   const rootMatches =
     snapshot !== null &&
     info !== null &&
-    snapshotMatchesChain(snapshot, { chainId, merkleRoot: info.merkleRoot });
+    chainId === NETWORK.chainId &&
+    snapshotRootMatches(snapshot, info.merkleRoot);
 
   const entry = useMemo(
     () => (rootMatches && snapshot !== null ? findSnapshotEntry(snapshot, account) : null),

@@ -86,7 +86,7 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
         '@deployments': fileURLToPath(
-          new URL(`./src/config/deployments/${deploymentFile}`, import.meta.url),
+          new URL(`./src/config/network/${deploymentFile}`, import.meta.url),
         ),
       },
     },

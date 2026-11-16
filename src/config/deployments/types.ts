@@ -57,7 +57,7 @@ export interface AirdropDistributorDeployment {
   readonly totalRemainingShare: string;
   readonly totalClaimedAmount: string;
   readonly remainingAmount: string;
-  /** Empty for the genesis token (CI-017); http(s) for launched tokens. */
+  /** Older deployments may have an empty genesis URI. */
   readonly snapshotUri: string;
   readonly intendedSnapshotUri: string;
   readonly snapshotFile: string;
@@ -92,6 +92,7 @@ export interface DeploymentConfig {
   /** Present for the anvil dev book; test/prod stay address-only until deployed. */
   readonly airdropDistributor?: AirdropDistributorDeployment;
   readonly addresses: AddressBook;
+  readonly params: Readonly<Record<string, string>>;
 }
 
 const ADDRESS_KEYS = [
@@ -156,7 +157,7 @@ function string(value: unknown, label: string): string {
 }
 
 /**
- * Validates a src/config/deployments/<variant>.json import.
+ * Validates a src/config/network/<network>/network.json import.
  * Throws at module load (build or first paint) on malformed data: a wrong address
  * book is worse than a failed build.
  */
@@ -200,6 +201,11 @@ export function parseDeployment(input: unknown, expectedVariant?: EnvVariant): D
   }
 
   const brand = record(root.brand, 'brand');
+  const params: Record<string, string> = {};
+  for (const [key, value] of Object.entries(record(root.params ?? {}, 'params'))) {
+    if (typeof value !== 'string') throw new Error(`deployment: params.${key} must be a string`);
+    params[key] = value;
+  }
   const addresses = record(root.addresses, 'addresses');
   const parsedAddresses = {} as Record<keyof AddressBook, HexAddress>;
   for (const key of ADDRESS_KEYS) {
@@ -286,5 +292,6 @@ export function parseDeployment(input: unknown, expectedVariant?: EnvVariant): D
     },
     ...(airdropDistributor !== undefined ? { airdropDistributor } : {}),
     addresses: parsedAddresses,
+    params,
   };
 }

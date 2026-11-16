@@ -34,3 +34,4 @@ blob-report/
 !.vscode/extensions.json
 .idea/
 *.log
+.account

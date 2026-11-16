@@ -3,8 +3,6 @@ import {
   findSnapshotEntry,
   isAirdropEligible,
   parseAirdropSnapshot,
-  selectAirdropSnapshotSource,
-  snapshotMatchesChain,
   snapshotRootMatches,
 } from './airdrop-snapshot';
 
@@ -54,22 +52,6 @@ describe('parseAirdropSnapshot', () => {
   });
 });
 
-describe('snapshotMatchesChain', () => {
-  const snapshot = parseAirdropSnapshot(fixture);
-
-  it('accepts only the exact chain and root', () => {
-    if (snapshot === null) throw new Error('fixture must parse');
-    expect(snapshotMatchesChain(snapshot, { chainId: 31337, merkleRoot: ROOT })).toBe(true);
-    expect(
-      snapshotMatchesChain(snapshot, {
-        chainId: 31337,
-        merkleRoot: `0x${'ef'.repeat(32)}`,
-      }),
-    ).toBe(false);
-    expect(snapshotMatchesChain(snapshot, { chainId: 97, merkleRoot: ROOT })).toBe(false);
-  });
-});
-
 describe('snapshotRootMatches', () => {
   const snapshot = parseAirdropSnapshot(fixture);
 
@@ -80,46 +62,6 @@ describe('snapshotRootMatches', () => {
     expect(snapshotRootMatches(snapshot, `0x${'ef'.repeat(32)}`)).toBe(false);
     expect(snapshotRootMatches(snapshot, null)).toBe(false);
     expect(snapshotRootMatches(snapshot, undefined)).toBe(false);
-  });
-});
-
-describe('selectAirdropSnapshotSource', () => {
-  const BUNDLE = 'airdrop/anvil31337_dev.json';
-
-  it('uses the bundled genesis JSON when the on-chain URI is empty (CI-017)', () => {
-    expect(
-      selectAirdropSnapshotSource({ snapshotUri: '', bundledPath: BUNDLE, isGenesis: true }),
-    ).toEqual({ kind: 'bundle', path: BUNDLE });
-    expect(
-      selectAirdropSnapshotSource({ snapshotUri: '   ', bundledPath: BUNDLE, isGenesis: true }),
-    ).toEqual({ kind: 'bundle', path: BUNDLE });
-  });
-
-  it('does not treat an empty URI as an error for genesis, but has no source for other tokens', () => {
-    expect(
-      selectAirdropSnapshotSource({ snapshotUri: '', bundledPath: BUNDLE, isGenesis: false }),
-    ).toEqual({ kind: 'none' });
-    expect(
-      selectAirdropSnapshotSource({ snapshotUri: '', bundledPath: null, isGenesis: true }),
-    ).toEqual({ kind: 'none' });
-  });
-
-  it('prefers a launcher-registered http(s) URI', () => {
-    expect(
-      selectAirdropSnapshotSource({
-        snapshotUri: 'https://example.com/airdrop.json',
-        bundledPath: BUNDLE,
-        isGenesis: true,
-      }),
-    ).toEqual({ kind: 'uri', url: 'https://example.com/airdrop.json' });
-  });
-
-  it('rejects malformed or non-http URIs instead of fetching them', () => {
-    for (const uri of ['not a url', 'ipfs://cid', 'javascript:alert(1)', '/relative.json']) {
-      expect(
-        selectAirdropSnapshotSource({ snapshotUri: uri, bundledPath: BUNDLE, isGenesis: true }),
-      ).toEqual({ kind: 'none' });
-    }
   });
 });
 

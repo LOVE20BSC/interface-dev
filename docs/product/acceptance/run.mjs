@@ -40,10 +40,10 @@ const ONLY = new Set(
 );
 
 const deployment = JSON.parse(
-  readFileSync(resolve(ROOT, 'src/config/deployments/anvil31337_dev.json'), 'utf8'),
+  readFileSync(resolve(ROOT, 'src/config/network/anvil31337_dev/network.json'), 'utf8'),
 );
 const snapshot = JSON.parse(
-  readFileSync(resolve(ROOT, 'public/airdrop/anvil31337_dev.json'), 'utf8'),
+  readFileSync(resolve(ROOT, 'src/config/network/anvil31337_dev/airdrop.json'), 'utf8'),
 );
 
 const RPC = process.env.ACCEPTANCE_RPC_URL ?? deployment.rpcUrls[0] ?? 'http://127.0.0.1:8545';
@@ -53,7 +53,7 @@ const NATIVE = deployment.nativeCurrency.symbol;
 const A = deployment.addresses;
 const TOKEN = A.firstTokenAddress;
 const MEMBER_NFT = A.memberNFT;
-const AIRDROP = A.airdrop;
+const AIRDROP = A.airdropDistributor;
 const LAUNCH = A.launch;
 const FACTORY = A.factory;
 const ROUTER = A.router;

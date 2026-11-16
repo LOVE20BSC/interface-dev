@@ -76,9 +76,9 @@ test; else prod; ADR-0002 §5), and `vars.VITE_ENV` overrides it. A fork whose n
 
 | variant | file                                          | chain                                   |
 | ------- | --------------------------------------------- | --------------------------------------- |
-| `dev`   | `src/config/deployments/anvil31337_dev.json`  | 31337 (anvil)                           |
-| `test`  | `src/config/deployments/bscTestnet_test.json` | 97 (placeholder; ADR leaves 97/56 open) |
-| `prod`  | `src/config/deployments/bscMainnet_prod.json` | 56                                      |
+| `dev`   | `src/config/network/anvil31337_dev/network.json`  | 31337 (anvil)                           |
+| `test`  | `src/config/network/bscTestnet_test/network.json` | 97 (placeholder; ADR leaves 97/56 open) |
+| `prod`  | `src/config/network/bscMainnet_prod/network.json` | 56                                      |
 
 The dev book is filled from the local chain; test/prod remain zero-address stubs (no deployment
 exists yet). The address book has an explicit slot for every ADR-0002 contract
@@ -87,10 +87,26 @@ multicall3, airdrop, …) plus `phase`.
 
 **To fill the dev book:** from a clean chain run `make -C ../anvil stop`, `make -C ../anvil clean` and
 `make -C ../anvil bootstrap`, then `pnpm sync:anvil`. That single command writes the address book,
-`src/config/abis/*.ts`, `src/config/abis/manifest.json` and `public/airdrop/anvil31337_dev.json`
+`src/config/abis/*.ts`, `src/config/abis/manifest.json` and `src/config/network/anvil31337_dev/airdrop.json`
 from `../anvil/export`; never hand-edit the generated files and never adjust a deployer nonce to
 match an old book. `pnpm abis:check` re-generates and compares when the sibling export exists.
 Missing or zero addresses are treated as “not configured” by `isConfiguredAddress()`.
+
+Each `src/config/network/<network>/` contains its `network.json` (addresses and public
+parameters) and, once available, `airdrop.json`. Run
+`pnpm sync:network ../core/script/network/<network>` to read the original public parameters,
+address files and snapshot directly. The command never reads `.account` and verifies every
+Merkle proof before writing either frontend file; the anvil command above also syncs ABIs.
+`sync:network` owns public `params` and its notes; `sync:anvil` preserves those fields while
+updating deployment data. `abis:check` still checks addresses, deployment metadata, ABIs and snapshot.
+Additional module addresses belong in core's network directory as `addresses.*.params`.
+
+The frontend loads the bundled genesis snapshot on demand and compares its root with
+`airdropInfo(token).merkleRoot`. A match needs no request to GitHub Pages. A missing, invalid
+or mismatched local snapshot falls back to the on-chain HTTP(S) URI; wallet proofs are still
+verified with `claimableAmount`. Snapshot `sourceChainId` describes provenance and may differ
+from the destination chain. Older deployments with an empty URI can still use a matching local
+snapshot. Changes are developed in `interface-dev-dsh`, then manually promoted to test and prod.
 
 Brand and community labels use the current community token's on-chain `symbol()`
 (`entities/community-token`). When no community is selected or known, the label is

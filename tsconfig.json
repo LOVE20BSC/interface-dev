@@ -10,6 +10,7 @@
     "types": ["vite/client"],
     "allowImportingTsExtensions": false,
     "resolveJsonModule": true,
+    "allowJs": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
@@ -26,9 +27,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@deployments": ["src/config/deployments/anvil31337_dev.json"]
+      "@deployments": ["src/config/network/anvil31337_dev/network.json"]
     }
   },
-  "include": ["src", "e2e", "playwright.config.ts"],
+  "include": ["src", "tests", "e2e", "playwright.config.ts"],
   "exclude": ["dist", "node_modules"]
 }
