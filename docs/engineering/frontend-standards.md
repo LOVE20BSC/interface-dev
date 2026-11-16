@@ -597,7 +597,7 @@ expected: (amount: string, symbol: string) => `预计可铸造空投 ${amount} $
 | LP | 「流动性凭证」/「份额」 | LP 代币、算力、积分 | `GLOSSARY.md:129`；`copy-pages.ts:1098` |
 | 激励 | 「激励」/「铸造激励」 | 奖励、收益、空投奖励 | `GLOSSARY.md:91`、`:161-163` |
 | 授权 | 「授权」 | approve、allowance、批准 | `GLOSSARY.md:122` |
-| 轮次等待 | 「约 X 分钟」 | 时间片数字、Phase、绝对解锁时间 | `GLOSSARY.md:75`；`copy-pages.ts:284` |
+| 轮次等待 | 「约 X 分钟」 | 阶段数字（`Phase`）、绝对解锁时间 | `GLOSSARY.md:75`；`copy-pages.ts:284` |
 
 **反例 / 正例**（空投动作）：
 
@@ -617,7 +617,7 @@ cta: '立即铸造', title: '已铸造',
 | `formatTokenAmount` | 所有展示的代币数量 | 整数分组、小数**截断**（不四舍五入）、最多 6 位 | `format.ts:139-151`、`:23-24` |
 | `formatVisibleTokenAmount` | 会真正移动的金额（批量转账/回执/前后余额） | 非零但会被显示规则抹成 `0` 时渲染 `< 0.000001` | `format.ts:166-197` |
 | `formatPercent` / `formatRate` | 费率、百分比、兑换比率 | 最多 2 位；`minimumFractionDigits` 只给固定预置标签 | `format.ts:199-215`、`:224-252` |
-| `formatPhase` | 高级视图里的轮次/时间片 | 不加千分位 | `format.ts:254-260` |
+| `formatPhase` | 高级视图里的轮次/阶段 | 不加千分位 | `format.ts:254-260` |
 | `UNKNOWN` / `DEFAULT_LOCALE` | 未知值 / 默认语言 | `'—'` / `'zh-CN'` | `format.ts:19-21` |
 
 `locale` 规则：**每个 locale 相关函数的签名都带 `locale` 参数（默认 `zh-CN`）**，调用点直接吃默认值；任何 `toLocaleString()`、`new Intl.*` 都只允许出现在 `format.ts` 内部（统计：`grep` 全仓，`shared/lib/format.ts` 之外 0 处）。
