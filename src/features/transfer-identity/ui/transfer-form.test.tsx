@@ -122,10 +122,7 @@ describe('TransferForm 智能资产保护（owner 2026-11-16）', () => {
   it('shares the same switch and default as 代币转账', () => {
     renderAddressForm();
     expect(screen.getByText('智能资产保护')).toBeVisible();
-    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute(
-      'aria-checked',
-      'true',
-    );
+    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute('aria-checked', 'true');
   });
 
   it('intercepts a known address-book contract while the switch is on', () => {

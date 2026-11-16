@@ -545,7 +545,6 @@ export function MintIdentityPanel({
             ) : null}
           </div>
         ) : null}
-
       </section>
     </div>
   );

@@ -5,10 +5,7 @@ import { copy } from '@/shared/config/copy-pages';
 import { EmptyState } from '@/widgets/empty-state/empty-state';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
-import {
-  IdentityList,
-  type JustMintedIdentity,
-} from '@/features/select-identity/ui/identity-list';
+import { IdentityList, type JustMintedIdentity } from '@/features/select-identity/ui/identity-list';
 
 interface MintHandoffState {
   readonly mintedMemberId?: unknown;
@@ -74,10 +71,7 @@ export function MyNftPage() {
               data-testid="my-nft-just-minted-strip"
               className="rounded-2xl border border-success/20 bg-success-soft/60 px-3 py-2 text-sm text-success"
             >
-              {copy.pages.myNft.justMintedStrip(
-                justMinted.tokenId.toString(),
-                justMinted.name,
-              )}
+              {copy.pages.myNft.justMintedStrip(justMinted.tokenId.toString(), justMinted.name)}
             </p>
           ) : null}
           <IdentityList identity={identity} onRetry={identity.refetch} justMinted={justMinted} />

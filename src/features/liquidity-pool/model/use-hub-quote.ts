@@ -59,7 +59,9 @@ export function useHubQuote(options: UseHubQuoteOptions): HubQuoteResult {
     abi: love20HubAbi,
     functionName: 'quoteLpWithNative',
     args:
-      tokenAddress !== undefined ? [tokenAddress, amountTokenDesired, amountNativeDesired] : undefined,
+      tokenAddress !== undefined
+        ? [tokenAddress, amountTokenDesired, amountNativeDesired]
+        : undefined,
     query: { enabled: canQuote },
   });
 

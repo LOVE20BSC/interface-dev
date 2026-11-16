@@ -1,6 +1,10 @@
 import { copy } from '@/shared/config/copy-pages';
 import { isUserRejection, toUserMessage } from '@/shared/lib/errors';
-import { isTxSendNonceError, isTxStaleBlockError, txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
+import {
+  isTxSendNonceError,
+  isTxStaleBlockError,
+  txSendRecoveryKind,
+} from '@/shared/lib/tx-send-errors';
 
 /**
  * Send-time failure translation for 批量转账 (pure, no React, no chain).

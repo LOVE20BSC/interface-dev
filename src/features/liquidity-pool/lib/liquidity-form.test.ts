@@ -91,7 +91,13 @@ describe('addSideIssue（QA D6/D7）', () => {
 });
 
 describe('poolNoticeKind（QA D3）', () => {
-  const ready = { smartMode: true, hubConfigured: true, hasLiquidity: true, isLoading: false, isError: false };
+  const ready = {
+    smartMode: true,
+    hubConfigured: true,
+    hasLiquidity: true,
+    isLoading: false,
+    isError: false,
+  };
 
   it('never claims the pool is empty while it is still loading', () => {
     expect(poolNoticeKind({ ...ready, hasLiquidity: false, isLoading: true })).toBe('loading');

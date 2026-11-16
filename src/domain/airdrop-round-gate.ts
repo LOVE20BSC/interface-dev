@@ -89,8 +89,7 @@ export function estimateRoundWait(input: RoundWaitEstimateInput): RoundWaitEstim
   if (secondsPerBlock === null || !Number.isFinite(secondsPerBlock) || secondsPerBlock <= 0) {
     return null;
   }
-  const remainingBlocks =
-    targetStartBlock > currentBlock ? targetStartBlock - currentBlock : 0n;
+  const remainingBlocks = targetStartBlock > currentBlock ? targetStartBlock - currentBlock : 0n;
   const seconds = Number(remainingBlocks) * secondsPerBlock;
   const minutes = Math.max(1, Math.ceil(seconds / 60));
   return { remainingBlocks, minutes };

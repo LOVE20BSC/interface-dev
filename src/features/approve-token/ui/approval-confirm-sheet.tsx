@@ -1,9 +1,6 @@
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import type {
-  ApprovalMode,
-  ApprovalTxError,
-} from '@/features/approve-token/lib/approval-types';
+import type { ApprovalMode, ApprovalTxError } from '@/features/approve-token/lib/approval-types';
 import { Button } from '@/shared/ui/button';
 import { Sheet } from '@/shared/ui/sheet';
 

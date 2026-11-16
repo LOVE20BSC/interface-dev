@@ -29,15 +29,7 @@ export type AppCategoryKey = 'token' | 'identity' | 'about' | 'settings';
 
 /** Icon keys are stable data; the page maps them to lucide components. */
 export type AppIconKey =
-  | 'gift'
-  | 'identity'
-  | 'swap'
-  | 'send'
-  | 'liquidity'
-  | 'batch'
-  | 'shield'
-  | 'book'
-  | 'palette';
+  'gift' | 'identity' | 'swap' | 'send' | 'liquidity' | 'batch' | 'shield' | 'book' | 'palette';
 
 export type AppRoute =
   | '/airdrop'

@@ -62,10 +62,7 @@ const hubAbi = parseAbi([
   'function quoteLpWithNative(address,uint256,uint256) view returns ((bool hasLiquidity,bool willSwap,address swapTokenIn,address swapTokenOut,uint256 amountToSwap,uint256 amountOutFromSwap,uint256 preparedAmountA,uint256 preparedAmountB,uint256 usableAmountA,uint256 usableAmountB,uint256 expectedLiquidity))',
 ]);
 const factoryAbi = parseAbi(['function getPair(address,address) view returns (address)']);
-const weth9Abi = parseAbi([
-  'function deposit() payable',
-  'function withdraw(uint256)',
-]);
+const weth9Abi = parseAbi(['function deposit() payable', 'function withdraw(uint256)']);
 
 const client = createTestClient({ mode: 'anvil', transport: http(RPC) }).extend(publicActions);
 
@@ -216,14 +213,16 @@ async function deployTestToken(name, symbol) {
       'deployTestToken: 找不到 WETH9Configurable/WETH9 的编译产物（先 make -C ../anvil bootstrap）',
     );
   }
-  const constructorInputs =
-    artifact.abi.find((item) => item.type === 'constructor')?.inputs ?? [];
+  const constructorInputs = artifact.abi.find((item) => item.type === 'constructor')?.inputs ?? [];
   const encodedArgs =
     constructorInputs.length === 2
       ? encodeAbiParameters(parseAbiParameters('string, string'), [name, symbol]).slice(2)
       : '';
   console.log(`[E] deploy artifact ${path}`);
-  const { receipt } = await send({ from: ACCOUNT_8, data: `${artifact.bytecode.object}${encodedArgs}` });
+  const { receipt } = await send({
+    from: ACCOUNT_8,
+    data: `${artifact.bytecode.object}${encodedArgs}`,
+  });
   if (receipt.contractAddress === undefined || receipt.contractAddress === null) {
     throw new Error('deployTestToken: 部署没有返回合约地址');
   }
@@ -409,7 +408,11 @@ async function main() {
         data: encodeFunctionData({ abi: weth9Abi, functionName: 'deposit' }),
       });
       check('E 测试代币余额', E.amountToken, await tokenBalance(testToken, ACCOUNT_8));
-      check('E 建池前存在空 pair', '0x0000000000000000000000000000000000000000', await read(FACTORY, factoryAbi, 'getPair', [testToken, WETH]));
+      check(
+        'E 建池前存在空 pair',
+        '0x0000000000000000000000000000000000000000',
+        await read(FACTORY, factoryAbi, 'getPair', [testToken, WETH]),
+      );
 
       // 空池时 Hub 单边必须拒绝：页面据此降级为「两侧都填」。
       let hubReverted = false;
@@ -451,8 +454,16 @@ async function main() {
       });
       console.log(`[E] tx ${hash}`);
       const newPair = await read(FACTORY, factoryAbi, 'getPair', [testToken, WETH]);
-      check('E 我的 LP = sqrt(a·b) − 1000', E.liquidity, await read(newPair, pairAbi, 'balanceOf', [ACCOUNT_8]));
-      check('E totalSupply = sqrt(a·b)', E.totalSupply, await read(newPair, pairAbi, 'totalSupply'));
+      check(
+        'E 我的 LP = sqrt(a·b) − 1000',
+        E.liquidity,
+        await read(newPair, pairAbi, 'balanceOf', [ACCOUNT_8]),
+      );
+      check(
+        'E totalSupply = sqrt(a·b)',
+        E.totalSupply,
+        await read(newPair, pairAbi, 'totalSupply'),
+      );
       const [r0, r1] = await read(newPair, pairAbi, 'getReserves');
       const token0 = await read(newPair, pairAbi, 'token0');
       const isToken0 = token0.toLowerCase() === testToken.toLowerCase();
@@ -477,14 +488,7 @@ async function main() {
           data: encodeFunctionData({
             abi: routerAbi,
             functionName: 'addLiquidityETH',
-            args: [
-              TOKEN,
-              D.amountToken,
-              800000000000000000001n,
-              0n,
-              ACCOUNT_4,
-              DEADLINE,
-            ],
+            args: [TOKEN, D.amountToken, 800000000000000000001n, 0n, ACCOUNT_4, DEADLINE],
           }),
         }));
       } catch {

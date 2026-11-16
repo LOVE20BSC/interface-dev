@@ -1,12 +1,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page, type Route } from '@playwright/test';
-import {
-  decodeFunctionData,
-  decodeFunctionResult,
-  encodeFunctionResult,
-  parseAbi,
-} from 'viem';
+import { decodeFunctionData, decodeFunctionResult, encodeFunctionResult, parseAbi } from 'viem';
 import { anvilRpc, isolateChain } from './chain';
 import { connect, installWallet, RPC_URL } from './wallet-stub';
 
@@ -86,10 +81,7 @@ const MULTICALL3_ABI = parseAbi([
 /** Matches the app's endpoint with or without viem's normalized trailing slash. */
 const RPC_URL_PATTERN = new RegExp(`^${RPC_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/.*)?$`);
 
-async function failReadsWithSelector(
-  page: Page,
-  selector: string,
-): Promise<() => Promise<void>> {
+async function failReadsWithSelector(page: Page, selector: string): Promise<() => Promise<void>> {
   const target = selector.toLowerCase();
   const handler = async (route: Route): Promise<void> => {
     const raw = route.request().postData() ?? '';
@@ -248,15 +240,12 @@ async function fillBatch(page: Page, lines: readonly string[]): Promise<void> {
 test.describe('批量转账 前端线（理论线 §1）', () => {
   test('用例 C 一行非法：逐行定位错误并禁止提交', async ({ page }) => {
     await openBatch(page, NATIVE_SENDER);
-    await expect(page.getByTestId('batch-transfer-balance')).toHaveText(
-      `${NATIVE} 余额 10,000`,
-      { timeout: 20_000 },
-    );
+    await expect(page.getByTestId('batch-transfer-balance')).toHaveText(`${NATIVE} 余额 10,000`, {
+      timeout: 20_000,
+    });
 
     await fillBatch(page, [`${R5} 0.1`, R7, `${R8} abc`]);
-    await expect(page.getByTestId('batch-transfer-line-error-2')).toHaveText(
-      '第 2 行：缺少金额。',
-    );
+    await expect(page.getByTestId('batch-transfer-line-error-2')).toHaveText('第 2 行：缺少金额。');
     await expect(page.getByTestId('batch-transfer-line-error-3')).toHaveText(
       '第 3 行：金额格式不对。',
     );
@@ -305,9 +294,7 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
   });
 
-  test('用例 C3 智能资产保护：已知合约与任意合约同时命中时合并成一个提示块', async ({
-    page,
-  }) => {
+  test('用例 C3 智能资产保护：已知合约与任意合约同时命中时合并成一个提示块', async ({ page }) => {
     await openBatch(page, NATIVE_SENDER);
     await expect(page.getByTestId('asset-protection-toggle')).toHaveAttribute(
       'aria-checked',
@@ -338,10 +325,9 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     // D1：0 TestLOVE20 的钱包输入 1。
     await openBatch(page, OUTSIDER);
     await useTokenMode(page);
-    await expect(page.getByTestId('batch-transfer-balance')).toHaveText(
-      `${SYMBOL} 余额 0`,
-      { timeout: 20_000 },
-    );
+    await expect(page.getByTestId('batch-transfer-balance')).toHaveText(`${SYMBOL} 余额 0`, {
+      timeout: 20_000,
+    });
     await fillBatch(page, [`${R2} 1`]);
     await expect(page.getByTestId('batch-transfer-insufficient')).toHaveText(
       `${SYMBOL} 不够，还差 1`,
@@ -350,19 +336,11 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
 
     // D2：原生币 10,000 − 0.001 预留，4 行 × 2500.125 = 10,000.5。
     await openBatch(page, NATIVE_SENDER);
-    await expect(page.getByTestId('batch-transfer-balance')).toHaveText(
-      `${NATIVE} 余额 10,000`,
-      { timeout: 20_000 },
-    );
-    await fillBatch(page, [
-      `${R5} 2500.125`,
-      `${R7} 2500.125`,
-      `${R8} 2500.125`,
-      `${R9} 2500.125`,
-    ]);
-    await expect(page.getByTestId('batch-transfer-total')).toHaveText(
-      `合计 10,000.5 ${NATIVE}`,
-    );
+    await expect(page.getByTestId('batch-transfer-balance')).toHaveText(`${NATIVE} 余额 10,000`, {
+      timeout: 20_000,
+    });
+    await fillBatch(page, [`${R5} 2500.125`, `${R7} 2500.125`, `${R8} 2500.125`, `${R9} 2500.125`]);
+    await expect(page.getByTestId('batch-transfer-total')).toHaveText(`合计 10,000.5 ${NATIVE}`);
     await expect(page.getByTestId('batch-transfer-insufficient')).toHaveText(
       `${NATIVE} 不够，还差 0.501`,
     );
@@ -392,10 +370,9 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
 
   test('用例 A 原生：重复地址先标行号并阻止提交，删掉重复行后 4 行逐行到账', async ({ page }) => {
     await openBatch(page, NATIVE_SENDER);
-    await expect(page.getByTestId('batch-transfer-balance')).toHaveText(
-      `${NATIVE} 余额 10,000`,
-      { timeout: 20_000 },
-    );
+    await expect(page.getByTestId('batch-transfer-balance')).toHaveText(`${NATIVE} 余额 10,000`, {
+      timeout: 20_000,
+    });
 
     // 第 4 行与第 1 行同地址：不再静默合并，标出「与第 1 行重复」并阻止提交。
     await fillBatch(page, [
@@ -406,9 +383,7 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
       `${R9} 0.000001`,
     ]);
     await expect(page.getByTestId('batch-transfer-summary')).toHaveText('5 行，4 个收款方');
-    await expect(page.getByTestId('batch-transfer-total')).toHaveText(
-      `合计 0.450001 ${NATIVE}`,
-    );
+    await expect(page.getByTestId('batch-transfer-total')).toHaveText(`合计 0.450001 ${NATIVE}`);
     await expect(page.getByTestId('batch-transfer-duplicate-4')).toHaveText(
       '第 4 行：与第 1 行重复，这一行先不计入，请删掉其中一行。',
     );
@@ -416,10 +391,9 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
 
     // 提交前预余额（理论线 §0 快照）：重复行不是收款方，只有 4 行。
     for (const index of [0, 1, 2, 3]) {
-      await expect(page.getByTestId(`batch-transfer-row-balance-${index}`)).toHaveText(
-        '10,000',
-        { timeout: 20_000 },
-      );
+      await expect(page.getByTestId(`batch-transfer-row-balance-${index}`)).toHaveText('10,000', {
+        timeout: 20_000,
+      });
     }
     await expect(page.getByTestId('batch-transfer-row-amount-0')).toHaveText(`0.1 ${NATIVE}`);
 
@@ -475,9 +449,7 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     );
 
     await fillBatch(page, [`${R5} 1.5`, `${R2} 0.5`, `${R7} 0.000002`]);
-    await expect(page.getByTestId('batch-transfer-total')).toHaveText(
-      `合计 2.000002 ${SYMBOL}`,
-    );
+    await expect(page.getByTestId('batch-transfer-total')).toHaveText(`合计 2.000002 ${SYMBOL}`);
     await expect(page.getByTestId('batch-transfer-allowance')).toHaveText(
       `已允许批量转账合约使用 0 / 本次需要 2.000002 ${SYMBOL}`,
       { timeout: 20_000 },
@@ -526,9 +498,7 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
       '0x0000000000000000000000000000000000002001 0.0000001',
       '0x0000000000000000000000000000000000002002 0.0000002',
     ]);
-    await expect(page.getByTestId('batch-transfer-total')).toHaveText(
-      `合计 < 0.000001 ${NATIVE}`,
-    );
+    await expect(page.getByTestId('batch-transfer-total')).toHaveText(`合计 < 0.000001 ${NATIVE}`);
     await expect(page.getByTestId('batch-transfer-row-amount-0')).toHaveText(
       `< 0.000001 ${NATIVE}`,
     );
@@ -556,9 +526,7 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await fillBatch(page, [`${R5} 1,000`, `${R7} 2,500.5`]);
 
     await expect(page.getByTestId('batch-transfer-line-errors')).toHaveCount(0);
-    await expect(page.getByTestId('batch-transfer-total')).toHaveText(
-      `合计 3,500.5 ${NATIVE}`,
-    );
+    await expect(page.getByTestId('batch-transfer-total')).toHaveText(`合计 3,500.5 ${NATIVE}`);
     await expect(page.getByTestId('batch-transfer-row-amount-0')).toHaveText(`1,000 ${NATIVE}`);
     await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
   });
@@ -600,10 +568,9 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('batch-transfer-total')).toHaveText(`合计 2 ${SYMBOL}`);
     await submit.click();
 
-    await expect(page.getByTestId('batch-transfer-receipt-total')).toHaveText(
-      `2 ${SYMBOL}`,
-      { timeout: 30_000 },
-    );
+    await expect(page.getByTestId('batch-transfer-receipt-total')).toHaveText(`2 ${SYMBOL}`, {
+      timeout: 30_000,
+    });
     await expect(page.getByTestId('batch-transfer-receipt-residual-allowance')).toHaveText(
       `还留着 0.000002 ${SYMBOL} 的授权，可到「代币授权」页撤销。`,
     );
@@ -730,9 +697,7 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
 
     // 别的账户在提交前给第 1 个收款方转 1 ETH：页面上的旧读数因此过时。
-    await anvilRpc('eth_sendTransaction', [
-      { from: R2, to: RECEIVER, value: '0xde0b6b3a7640000' },
-    ]);
+    await anvilRpc('eth_sendTransaction', [{ from: R2, to: RECEIVER, value: '0xde0b6b3a7640000' }]);
     await anvilRpc('anvil_mine', [1]);
     await expect
       .poll(async () => anvilRpc<string>('eth_getBalance', [RECEIVER, 'latest']))
@@ -757,10 +722,9 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await page.getByTestId('batch-transfer-submit').click();
 
     // 回执的「到账前」= 刷新后的 1（不是提交前的旧 0）；差额仍精确等于承诺金额。
-    await expect(page.getByTestId('batch-transfer-receipt-total')).toHaveText(
-      `0.6 ${NATIVE}`,
-      { timeout: 30_000 },
-    );
+    await expect(page.getByTestId('batch-transfer-receipt-total')).toHaveText(`0.6 ${NATIVE}`, {
+      timeout: 30_000,
+    });
     await expect(page.getByTestId('batch-transfer-receipt-row-0')).toContainText('1 → 1.5');
     await expect(page.getByTestId('batch-transfer-receipt-delta-0')).toHaveText('+0.5');
     await expect(page.getByTestId('batch-transfer-receipt-row-1')).toContainText('0 → 0.1');

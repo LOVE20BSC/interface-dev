@@ -48,7 +48,10 @@ describe('buildBatchAudit', () => {
 describe('summarizeBatchAudit', () => {
   it('is verified only when every row arrived exactly', () => {
     const audit = buildBatchAudit(
-      [{ address: A, amount: 5n }, { address: B, amount: 7n }],
+      [
+        { address: A, amount: 5n },
+        { address: B, amount: 7n },
+      ],
       [0n, 0n],
       [5n, 7n],
     );
@@ -62,7 +65,10 @@ describe('summarizeBatchAudit', () => {
 
   it('is unverified as soon as one row could not be read (D1: never claim 每一行都已到账)', () => {
     const audit = buildBatchAudit(
-      [{ address: A, amount: 5n }, { address: B, amount: 7n }],
+      [
+        { address: A, amount: 5n },
+        { address: B, amount: 7n },
+      ],
       [0n, 0n],
       [5n, undefined],
     );

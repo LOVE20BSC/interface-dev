@@ -226,9 +226,7 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('transfer-protection')).toHaveCount(0);
     await expect(page.getByTestId('transfer-known-ack')).toHaveCount(0);
     await expect(page.getByTestId('transfer-contract-warning')).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId('transfer-contract-warning')).toContainText(
-      '这个地址是一个合约',
-    );
+    await expect(page.getByTestId('transfer-contract-warning')).toContainText('这个地址是一个合约');
     await expect(page.getByTestId('transfer-submit')).toBeEnabled();
 
     // 任意有 bytecode 但不是地址簿条目的合约：只警告、不拦截（开关开启时同样）。
@@ -317,9 +315,12 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
   test('用例 E 按身份 NFT 收款：#2 → Testdev-member-1 的 owner', async ({ page }) => {
     await openTransfer(page, IDENTITY_SENDER);
     await selectToken(page, SYMBOL);
-    await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 99,999,099.999639 ${SYMBOL}`, {
-      timeout: 20_000,
-    });
+    await expect(page.getByTestId('transfer-balance')).toHaveText(
+      `余额 99,999,099.999639 ${SYMBOL}`,
+      {
+        timeout: 20_000,
+      },
+    );
 
     await selectRecipientMode(page, 'member');
     await page.getByTestId('transfer-recipient').fill('#2');
@@ -352,9 +353,12 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('transfer-receipt-recipient')).toHaveText(IDENTITY_2_OWNER);
 
     await page.getByRole('button', { name: '好的' }).click();
-    await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 99,999,097.499639 ${SYMBOL}`, {
-      timeout: 20_000,
-    });
+    await expect(page.getByTestId('transfer-balance')).toHaveText(
+      `余额 99,999,097.499639 ${SYMBOL}`,
+      {
+        timeout: 20_000,
+      },
+    );
   });
 
   test('用例 F 收款方模式按模式校验：ID 只收编号，名字模式按名字解析', async ({ page }) => {

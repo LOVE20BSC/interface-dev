@@ -63,9 +63,7 @@ describe('resolveMemberNameByName', () => {
     const memberName = vi.spyOn(reader, 'memberName');
     const ownerOf = vi.spyOn(reader, 'ownerOf');
 
-    await expect(
-      resolveMemberNameByName('  TESTDEV-mEmBeR-1  ', SELF, reader),
-    ).resolves.toEqual({
+    await expect(resolveMemberNameByName('  TESTDEV-mEmBeR-1  ', SELF, reader)).resolves.toEqual({
       status: 'ok',
       memberId: 2n,
       name: 'Testdev-member-1',

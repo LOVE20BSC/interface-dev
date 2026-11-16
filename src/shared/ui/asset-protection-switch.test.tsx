@@ -45,10 +45,7 @@ describe('AssetProtectionSwitch 智能资产保护', () => {
   it('starts OFF when this device already chose off', () => {
     window.localStorage.setItem(ASSET_PROTECTION_STORAGE_KEY, '0');
     render(<AssetProtectionSwitch />);
-    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute(
-      'aria-checked',
-      'false',
-    );
+    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute('aria-checked', 'false');
   });
 
   it('cannot be toggled while the page is busy', () => {

@@ -87,8 +87,7 @@ export function summarizeBatchAudit(rows: readonly BatchAuditRow[]): BatchAuditS
     else if (row.status !== 'matched') mismatchRows += 1;
   }
   return {
-    outcome:
-      unknownRows > 0 ? 'unverified' : mismatchRows > 0 ? 'anomaly' : 'verified',
+    outcome: unknownRows > 0 ? 'unverified' : mismatchRows > 0 ? 'anomaly' : 'verified',
     unknownRows,
     mismatchRows,
   };

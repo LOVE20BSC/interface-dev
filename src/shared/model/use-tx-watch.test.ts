@@ -277,7 +277,8 @@ describe('useTxWatch · replaced 判定（P2）', () => {
     let receiptFails = true;
     const receipt = { status: 'success' as const, transactionHash: HASH, logs: [] };
     const fake = makeClient({
-      receipt: () => (receiptFails ? Promise.reject(new Error('rpc hiccup')) : Promise.resolve(receipt)),
+      receipt: () =>
+        receiptFails ? Promise.reject(new Error('rpc hiccup')) : Promise.resolve(receipt),
       tx: () => Promise.resolve({ nonce: 3, from: WALLET }),
       nonce: (args) => Promise.resolve(args?.blockTag === 'pending' ? 3 : 4),
       block: () =>

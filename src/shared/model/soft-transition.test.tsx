@@ -76,7 +76,9 @@ describe('useSoftTransition', () => {
   });
 
   it('applies the change immediately with prefers-reduced-motion', () => {
-    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => media(query.includes('reduce')));
+    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) =>
+      media(query.includes('reduce')),
+    );
     const { result } = renderHook(() => useSoftTransition(), { wrapper });
     const change = vi.fn();
 

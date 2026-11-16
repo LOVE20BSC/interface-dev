@@ -74,7 +74,8 @@ const CARD = 'rounded-3xl border border-line bg-surface p-5 shadow-soft';
 /** 右侧留出代币徽标的位置（旧库把代币符号放在输入框右端）。 */
 const INPUT =
   'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated pl-3 pr-24 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20';
-const INPUT_LINKED = 'cursor-default border-dashed bg-elevated/60 text-muted focus:border-line focus:ring-0';
+const INPUT_LINKED =
+  'cursor-default border-dashed bg-elevated/60 text-muted focus:border-line focus:ring-0';
 const BADGE =
   'pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-foreground';
 const QUICK_BUTTON =

@@ -9,11 +9,7 @@ import { isSameAddress } from '@/shared/lib/format';
  */
 export type IdentityInputMode = 'address' | 'member' | 'name';
 
-export const IDENTITY_INPUT_MODES: readonly IdentityInputMode[] = [
-  'address',
-  'member',
-  'name',
-];
+export const IDENTITY_INPUT_MODES: readonly IdentityInputMode[] = ['address', 'member', 'name'];
 
 export const IDENTITY_MODE_LABELS: Readonly<Record<IdentityInputMode, string>> = {
   address: copy.transfer.modeAddress,

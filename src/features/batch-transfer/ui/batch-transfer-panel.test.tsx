@@ -207,10 +207,7 @@ describe('BatchTransferPanel 智能资产保护（owner 2026-11-16）', () => {
   it('shares the same switch and default as 代币转账', () => {
     renderPanel();
     expect(screen.getByText('智能资产保护')).toBeVisible();
-    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute(
-      'aria-checked',
-      'true',
-    );
+    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute('aria-checked', 'true');
   });
 
   it('intercepts a batch that names a known address-book contract while on', () => {
@@ -231,9 +228,7 @@ describe('BatchTransferPanel 智能资产保护（owner 2026-11-16）', () => {
     fillBatch(`${PAIR} 0.1\n${token} 0.2`);
 
     const merged = screen.getByTestId('batch-transfer-known-contract');
-    expect(merged).toHaveTextContent(
-      '有 1 行是协议合约、1 行是其它合约地址，智能资产保护已拦截',
-    );
+    expect(merged).toHaveTextContent('有 1 行是协议合约、1 行是其它合约地址，智能资产保护已拦截');
     expect(screen.getByTestId('batch-transfer-known-line-1')).toHaveTextContent(
       '第 1 行：这是「交易对」合约地址',
     );

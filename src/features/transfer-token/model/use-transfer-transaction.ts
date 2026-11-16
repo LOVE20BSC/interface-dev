@@ -268,7 +268,10 @@ export function useTransferTransaction(onConfirmed: () => void): TransferTransac
    * state so the same body serves a first submit, a lost-hash retry and a
    * replacement.
    */
-  const signAttempt = async (attempt: TransferAttempt, nonce: number | undefined): Promise<void> => {
+  const signAttempt = async (
+    attempt: TransferAttempt,
+    nonce: number | undefined,
+  ): Promise<void> => {
     const hash = await send(attempt.request, nonce);
     const settledNonce = nonce ?? attempt.nonce;
     // Persist before waiting (D1): the hash is the only thing that cannot be

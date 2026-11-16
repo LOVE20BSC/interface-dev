@@ -286,10 +286,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
       return;
     }
     setRouteLoadingTimedOut(false);
-    const timer = window.setTimeout(
-      () => setRouteLoadingTimedOut(true),
-      ROUTE_LOADING_TIMEOUT_MS,
-    );
+    const timer = window.setTimeout(() => setRouteLoadingTimedOut(true), ROUTE_LOADING_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
   }, [routeStatus, routeRetryKey]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -940,7 +937,6 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
             </p>
           ) : null}
         </div>
-
       </div>
 
       {route !== null ? (

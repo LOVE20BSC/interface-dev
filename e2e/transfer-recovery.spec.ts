@@ -156,9 +156,7 @@ test('D7 慢 RPC：链上名字未返回前身份确认块不出现、不能勾�
   await expect(page.getByTestId('transfer-identity-name-reading')).toBeVisible({
     timeout: 10_000,
   });
-  await expect(page.getByTestId('transfer-identity-name-reading')).toHaveText(
-    '正在读取身份名字…',
-  );
+  await expect(page.getByTestId('transfer-identity-name-reading')).toHaveText('正在读取身份名字…');
   await expect(page.getByTestId('transfer-identity-summary')).toHaveCount(0);
   await expect(page.getByTestId('transfer-identity-ack')).toHaveCount(0);
   await expect(page.getByTestId('transfer-submit')).toBeDisabled();
@@ -200,7 +198,9 @@ test('D3 余额读取失败：主按钮禁用并说明「余额暂时读不到�
   await fillTransfer(page, '0.1', RECIPIENT);
 
   await expect(page.getByTestId('transfer-submit')).toBeDisabled();
-  await expect(page.getByTestId('transfer-submit-note')).toContainText('余额暂时读不到，稍后重试。');
+  await expect(page.getByTestId('transfer-submit-note')).toContainText(
+    '余额暂时读不到，稍后重试。',
+  );
   await shot(page, 'transfer-d3-balance-unreadable.png');
 });
 
@@ -291,9 +291,11 @@ test('D2 恢复卡：主按钮禁用并说明，只能从卡里「重新提交�
   // 真正能继续的是恢复卡里的「重新提交」：它带链上 nonce 重发并成功出回执。
   const balanceBefore = await tokenBalance(RECIPIENT);
   await page.getByTestId('tx-watch-recovery').getByRole('button', { name: '重新提交' }).click();
-  await expect.poll(() => stubState(page).then((state) => state.sends.length), {
-    timeout: 30_000,
-  }).toBe(sendsBefore + 1);
+  await expect
+    .poll(() => stubState(page).then((state) => state.sends.length), {
+      timeout: 30_000,
+    })
+    .toBe(sendsBefore + 1);
   await expect(page.getByTestId('transfer-receipt-amount')).toHaveText(`0.1 ${SYMBOL}`, {
     timeout: 30_000,
   });

@@ -108,7 +108,12 @@ function tokenOf(value: unknown): TransferToken | null {
   const symbol = typeof value.symbol === 'string' ? value.symbol : '';
   const decimals = value.decimals;
   if (kind === undefined || symbol.length === 0 || symbol.length > 64) return null;
-  if (typeof decimals !== 'number' || !Number.isInteger(decimals) || decimals < 0 || decimals > 36) {
+  if (
+    typeof decimals !== 'number' ||
+    !Number.isInteger(decimals) ||
+    decimals < 0 ||
+    decimals > 36
+  ) {
     return null;
   }
   if (kind === 'native') return { kind, address: undefined, symbol, decimals };

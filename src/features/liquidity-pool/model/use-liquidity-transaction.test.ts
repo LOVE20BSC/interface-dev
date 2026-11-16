@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cache } from '@/shared/lib/cache';
 import { copy } from '@/shared/config/copy-pages';
 import type { ResubmitSnapshot } from '@/shared/lib/tx-resubmit';
-import type { ApproveRequest, LiquidityCall } from '@/features/liquidity-pool/model/use-liquidity-transaction';
+import type {
+  ApproveRequest,
+  LiquidityCall,
+} from '@/features/liquidity-pool/model/use-liquidity-transaction';
 import {
   createLiquidityScope,
   readStoredLiquidity,
@@ -56,7 +59,8 @@ vi.mock('@/shared/model/use-tx-watch', () => ({
   useTxWatch: (options: { hash: `0x${string}` | null; walletAction?: boolean }) => {
     const receipt = options.hash !== null ? mock.receipts.get(options.hash) : undefined;
     return {
-      status: options.hash === null ? (options.walletAction === true ? 'wallet' : 'idle') : 'pending',
+      status:
+        options.hash === null ? (options.walletAction === true ? 'wallet' : 'idle') : 'pending',
       hash: options.hash,
       receipt: receipt ?? null,
       submittedNonce: undefined,
@@ -90,14 +94,7 @@ const CALL: LiquidityCall = {
     },
   ],
   functionName: 'removeLiquidityETH',
-  args: [
-    '0x5FbDB2315678afecb367f032d93F642f64180aa3',
-    1000n,
-    1n,
-    2n,
-    ACCOUNT,
-    1_700_000_600n,
-  ],
+  args: ['0x5FbDB2315678afecb367f032d93F642f64180aa3', 1000n, 1n, 2n, ACCOUNT, 1_700_000_600n],
 };
 
 const NOTE = { title: '撤出完成', detail: '已取回 0.5 ETH' };

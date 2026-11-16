@@ -17,17 +17,19 @@ const OTHER = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
 
 /** Chain reads the hook issues, keyed by the contract function name. */
 function stubChain(): void {
-  readContract.mockImplementation(async (call: { functionName: string; args: readonly unknown[] }) => {
-    const name = call.args[0];
-    if (call.functionName === 'memberId') {
-      return name === 'Testdev-member-1' ? 2n : name === 'Testdev-member-2' ? 3n : 0n;
-    }
-    if (call.functionName === 'memberName') {
-      return call.args[0] === 2n ? 'Testdev-member-1' : 'Testdev-member-2';
-    }
-    if (call.functionName === 'ownerOf') return OTHER;
-    throw new Error(`unexpected call ${call.functionName}`);
-  });
+  readContract.mockImplementation(
+    async (call: { functionName: string; args: readonly unknown[] }) => {
+      const name = call.args[0];
+      if (call.functionName === 'memberId') {
+        return name === 'Testdev-member-1' ? 2n : name === 'Testdev-member-2' ? 3n : 0n;
+      }
+      if (call.functionName === 'memberName') {
+        return call.args[0] === 2n ? 'Testdev-member-1' : 'Testdev-member-2';
+      }
+      if (call.functionName === 'ownerOf') return OTHER;
+      throw new Error(`unexpected call ${call.functionName}`);
+    },
+  );
 }
 
 function callCount(functionName: string): number {
@@ -70,8 +72,9 @@ describe('useMemberNameRecipient', () => {
       vi.advanceTimersByTime(1);
     });
     expect(callCount('memberId')).toBe(1);
-    expect(readContract.mock.calls.map(([call]) => (call as { functionName: string }).functionName))
-      .toEqual(['memberId', 'memberName', 'ownerOf']);
+    expect(
+      readContract.mock.calls.map(([call]) => (call as { functionName: string }).functionName),
+    ).toEqual(['memberId', 'memberName', 'ownerOf']);
     expect(result.current).toMatchObject({
       status: 'ok',
       memberId: 2n,

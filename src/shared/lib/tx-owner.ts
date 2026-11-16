@@ -32,10 +32,7 @@ export function isSameTxOwner(a: TxOwner, b: TxOwner): boolean {
 }
 
 /** Human-readable owner check guard: `undefined` when unknown, else a boolean. */
-export function isSameTxOwnerOrUnknown(
-  a: TxOwner | undefined,
-  b: TxOwner | undefined,
-): boolean {
+export function isSameTxOwnerOrUnknown(a: TxOwner | undefined, b: TxOwner | undefined): boolean {
   if (a === undefined || b === undefined) return false;
   return isSameTxOwner(a, b);
 }

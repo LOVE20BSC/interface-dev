@@ -78,7 +78,9 @@ const HEX_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 
 /** A hex address that is set, i.e. not the deployment's explicit zero placeholder. */
 export function isConfiguredAddressValue(value: string | null | undefined): value is string {
-  return typeof value === 'string' && HEX_ADDRESS.test(value) && value.toLowerCase() !== ZERO_ADDRESS;
+  return (
+    typeof value === 'string' && HEX_ADDRESS.test(value) && value.toLowerCase() !== ZERO_ADDRESS
+  );
 }
 
 export interface AboutAddressRow {

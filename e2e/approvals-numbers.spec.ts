@@ -114,13 +114,10 @@ async function openApprovals(page: Page): Promise<void> {
   });
 }
 
-
 /** Built-in TestWETH from the committed dev address book (D4 uses its address). */
 const WETH = '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9';
 
-const RPC_ABORT_PATTERN = new RegExp(
-  `^${ANVIL_RPC.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
-);
+const RPC_ABORT_PATTERN = new RegExp(`^${ANVIL_RPC.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
 
 /**
  * D2: the shared wallet stub has no "user rejects" knob, so the spec patches the

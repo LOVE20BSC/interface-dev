@@ -28,14 +28,20 @@ import {
   nativeBatchAvailable,
   parseBatchGas,
 } from '@/features/batch-transfer/lib/batch-gas';
-import { buildBatchReceipt, type BatchReceiptRecord } from '@/features/batch-transfer/lib/batch-receipt';
+import {
+  buildBatchReceipt,
+  type BatchReceiptRecord,
+} from '@/features/batch-transfer/lib/batch-receipt';
 import {
   allowanceReadState,
   balanceLineState,
   balanceReadBlocksSubmit,
 } from '@/features/batch-transfer/lib/batch-read-state';
 import type { BatchMode, BatchRequest } from '@/features/batch-transfer/lib/batch-types';
-import { useBatchAllowance, useBatchAllowanceReader } from '@/features/batch-transfer/model/use-batch-allowance';
+import {
+  useBatchAllowance,
+  useBatchAllowanceReader,
+} from '@/features/batch-transfer/model/use-batch-allowance';
 import {
   useBatchAddresses,
   useBatchBalanceReader,
@@ -205,8 +211,7 @@ export function BatchTransferPanel({
     mode === 'native'
       ? nativeBatchAvailable(balance.balance, parse.rows.length, gasValue)
       : balance.balance;
-  const insufficient =
-    parse.total > 0n && available !== undefined && parse.total > available;
+  const insufficient = parse.total > 0n && available !== undefined && parse.total > available;
   const shortfall = insufficient && available !== undefined ? parse.total - available : undefined;
 
   // D2: an unread allowance is its own state; only a real value may say
@@ -227,19 +232,16 @@ export function BatchTransferPanel({
    * D8: the sender balance is unknown while the batch is non-empty — the page
    * cannot tell whether the batch is affordable, so it must not let it through.
    */
-  const balanceUnknown = balanceReadBlocksSubmit(
-    parse.total,
-    balance.balance,
-    balance.isLoading,
-  );
+  const balanceUnknown = balanceReadBlocksSubmit(parse.total, balance.balance, balance.isLoading);
   /** D9: token mode with no resolved token must not label a native balance. */
-  const tokenUnresolved = balanceLineState({
-    mode,
-    tokenResolved: token !== undefined,
-    isLoading: balance.isLoading,
-    isError: balance.isError,
-    balance: balance.balance,
-  }) === 'unknownToken';
+  const tokenUnresolved =
+    balanceLineState({
+      mode,
+      tokenResolved: token !== undefined,
+      isLoading: balance.isLoading,
+      isError: balance.isError,
+      balance: balance.balance,
+    }) === 'unknownToken';
 
   const tx = useBatchTransaction({
     onApproved: () => {
@@ -286,13 +288,7 @@ export function BatchTransferPanel({
   const rowsValid =
     parse.rows.length > 0 && parse.errors.length === 0 && parse.duplicates.length === 0;
   const baseValid =
-    ready &&
-    !busy &&
-    rowsValid &&
-    !insufficient &&
-    !balanceUnknown &&
-    !tokenUnresolved &&
-    gasOk;
+    ready && !busy && rowsValid && !insufficient && !balanceUnknown && !tokenUnresolved && gasOk;
 
   // 智能资产保护 (owner 2026-11-16): ON intercepts a batch that names any known
   // address-book contract; turning the switch off is the only way to force it.
@@ -367,9 +363,7 @@ export function BatchTransferPanel({
   const switchMode = (next: BatchMode) => {
     if (next === mode) return;
     setMode(next);
-    setGasInput(
-      String(next === 'native' ? BATCH_GAS_DEFAULT_NATIVE : BATCH_GAS_DEFAULT_TOKEN),
-    );
+    setGasInput(String(next === 'native' ? BATCH_GAS_DEFAULT_NATIVE : BATCH_GAS_DEFAULT_TOKEN));
     tx.clearError();
     // D6: switching asset family re-enables the read hooks; refetch explicitly so
     // a transient read failure recovers without a full page reload.
@@ -589,7 +583,9 @@ export function BatchTransferPanel({
 
           {mode === 'token' ? (
             <div className="mt-2 flex items-center justify-between gap-2">
-              <span className="text-xs font-medium text-muted">{copy.batchTransfer.tokenLabel}</span>
+              <span className="text-xs font-medium text-muted">
+                {copy.batchTransfer.tokenLabel}
+              </span>
               <TokenPicker
                 optionTestIdPrefix="batch-transfer"
                 triggerTestId="batch-transfer-token"
@@ -641,10 +637,7 @@ export function BatchTransferPanel({
               >
                 {copy.batchTransfer.balanceUnknown}
               </p>
-              <RetryButton
-                testId="batch-transfer-balance-retry"
-                onClick={balance.refetch}
-              />
+              <RetryButton testId="batch-transfer-balance-retry" onClick={balance.refetch} />
             </div>
           ) : showBalanceRetry ? (
             <RetryButton
@@ -742,7 +735,10 @@ export function BatchTransferPanel({
               className="mt-1.5 text-xs leading-5 text-danger-strong"
               data-testid="batch-transfer-insufficient"
             >
-              {copy.batchTransfer.insufficient(symbol, formatVisibleTokenAmount(shortfall, decimals))}
+              {copy.batchTransfer.insufficient(
+                symbol,
+                formatVisibleTokenAmount(shortfall, decimals),
+              )}
             </p>
           ) : null}
           {mode === 'native' && insufficient ? (
@@ -832,10 +828,7 @@ export function BatchTransferPanel({
                 >
                   {copy.batchTransfer.allowanceUnknown}
                 </p>
-                <RetryButton
-                  testId="batch-transfer-allowance-retry"
-                  onClick={allowance.refetch}
-                />
+                <RetryButton testId="batch-transfer-allowance-retry" onClick={allowance.refetch} />
               </div>
             ) : parse.total > 0n && allowance.value !== undefined ? (
               <p
@@ -851,9 +844,7 @@ export function BatchTransferPanel({
               </p>
             ) : null}
             {needsApproval ? (
-              <p className="mt-1 text-[11px] leading-4 text-muted">
-                {copy.approve.note(symbol)}
-              </p>
+              <p className="mt-1 text-[11px] leading-4 text-muted">{copy.approve.note(symbol)}</p>
             ) : null}
           </div>
         ) : null}

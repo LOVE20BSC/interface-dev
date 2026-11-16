@@ -249,10 +249,7 @@ export function useLiquidityTransaction(onConfirmed: () => void): LiquidityTrans
   }, [mainReceipt, pendingMain, scope]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const signCall = async (
-    call: LiquidityCall,
-    nonce: number | undefined,
-  ): Promise<`0x${string}`> =>
+  const signCall = async (call: LiquidityCall, nonce: number | undefined): Promise<`0x${string}`> =>
     writeContractAsync({
       address: call.address,
       abi: call.abi,
@@ -316,7 +313,10 @@ export function useLiquidityTransaction(onConfirmed: () => void): LiquidityTrans
     }
   };
 
-  const run = async (call: LiquidityCall, note: { title: string; detail?: string }): Promise<void> => {
+  const run = async (
+    call: LiquidityCall,
+    note: { title: string; detail?: string },
+  ): Promise<void> => {
     if (account === undefined || submittingRef.current || isHydrating) return;
     if (pendingMain !== null || receipt !== null) return;
     const attempt: MainAttempt = {
@@ -433,10 +433,7 @@ export function useLiquidityTransaction(onConfirmed: () => void): LiquidityTrans
           setError({ message: copy.txWatch.nonceUnavailable });
           return;
         }
-        await signAttempt(
-          { ...attempt, nonce: decision.nonce },
-          decision.nonce,
-        );
+        await signAttempt({ ...attempt, nonce: decision.nonce }, decision.nonce);
       } catch (cause) {
         setError({ message: describeLiquidityError(cause, ERROR_CONTEXT) });
       } finally {

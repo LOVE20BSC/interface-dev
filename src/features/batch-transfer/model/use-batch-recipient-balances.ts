@@ -126,6 +126,8 @@ export function useBatchBalanceReader(): BatchBalanceReader {
 }
 
 /** Stable list of unique recipient addresses for the read hooks above. */
-export function useBatchAddresses(rows: readonly { readonly address: HexAddress }[]): readonly HexAddress[] {
+export function useBatchAddresses(
+  rows: readonly { readonly address: HexAddress }[],
+): readonly HexAddress[] {
   return useMemo(() => rows.map((row) => row.address), [rows]);
 }

@@ -58,93 +58,95 @@ const ROUTE = {
   displayPath: ['ETH', 'TestLOVE20'],
 };
 
-const { pairState, catalogState, txState, quoteState, balanceState, routeState } = vi.hoisted(() => ({
-  routeState: {
-    value: {
-      status: 'ready',
-      route: null as unknown,
-      allPairs: [] as unknown[],
-      failingHopLabel: undefined as string | undefined,
-      retry: () => {},
-    },
-  },
-  pairState: {
-    value: {
-      status: 'ready',
-      from: undefined as unknown,
-      to: undefined as unknown,
-      unknownSide: undefined as unknown,
-      rawFrom: 'ETH',
-      rawTo: 'TestLOVE20',
-      selectFrom: () => {},
-      selectTo: () => {},
-      swapDirection: () => {},
-    },
-  },
-  catalogState: {
-    value: {
-      communityTokens: [] as unknown[],
-      searchResults: [] as unknown[],
-      searchStatus: 'idle',
-      search: '',
-      setSearch: () => {},
-      total: 0n,
-      isLoading: false,
-      isError: false,
-      hasMore: false,
-      loadMore: () => {},
-      refetch: () => {},
-    },
-  },
-  txState: {
-    value: {
-      approveStage: 'idle',
-      swapStage: 'idle',
-      isApproved: false,
-      approvedAmount: null as bigint | null,
-      receipt: null as unknown,
-      pendingHash: null as `0x${string}` | null,
-      pendingKind: null as unknown,
-      error: null as unknown,
-      isHydrating: false,
-      watch: {
-        hash: null,
-        status: 'idle',
-        isStuck: false,
-        remainingSeconds: 0,
-        refresh: () => {},
+const { pairState, catalogState, txState, quoteState, balanceState, routeState } = vi.hoisted(
+  () => ({
+    routeState: {
+      value: {
+        status: 'ready',
+        route: null as unknown,
+        allPairs: [] as unknown[],
+        failingHopLabel: undefined as string | undefined,
+        retry: () => {},
       },
-      resubmit: () => {},
-      approve: () => {},
-      execute: async () => {},
-      clearReceipt: () => {},
-      clearError: () => {},
     },
-  },
-  quoteState: {
-    value: {
-      amountOut: undefined as bigint | undefined,
-      quotedAt: undefined as number | undefined,
-      ageSeconds: 0,
-      remainingSeconds: 30,
-      isExpired: false,
-      isLoading: false,
-      isFetching: false,
-      isError: false,
-      errorMessage: null as string | null,
-      refetch: async () => undefined,
+    pairState: {
+      value: {
+        status: 'ready',
+        from: undefined as unknown,
+        to: undefined as unknown,
+        unknownSide: undefined as unknown,
+        rawFrom: 'ETH',
+        rawTo: 'TestLOVE20',
+        selectFrom: () => {},
+        selectTo: () => {},
+        swapDirection: () => {},
+      },
     },
-  },
-  balanceState: {
-    value: {
-      balance: (10n ** 18n) as bigint | undefined,
-      allowance: undefined as bigint | undefined,
-      isLoading: false,
-      isError: false,
-      refetch: () => {},
+    catalogState: {
+      value: {
+        communityTokens: [] as unknown[],
+        searchResults: [] as unknown[],
+        searchStatus: 'idle',
+        search: '',
+        setSearch: () => {},
+        total: 0n,
+        isLoading: false,
+        isError: false,
+        hasMore: false,
+        loadMore: () => {},
+        refetch: () => {},
+      },
     },
-  },
-}));
+    txState: {
+      value: {
+        approveStage: 'idle',
+        swapStage: 'idle',
+        isApproved: false,
+        approvedAmount: null as bigint | null,
+        receipt: null as unknown,
+        pendingHash: null as `0x${string}` | null,
+        pendingKind: null as unknown,
+        error: null as unknown,
+        isHydrating: false,
+        watch: {
+          hash: null,
+          status: 'idle',
+          isStuck: false,
+          remainingSeconds: 0,
+          refresh: () => {},
+        },
+        resubmit: () => {},
+        approve: () => {},
+        execute: async () => {},
+        clearReceipt: () => {},
+        clearError: () => {},
+      },
+    },
+    quoteState: {
+      value: {
+        amountOut: undefined as bigint | undefined,
+        quotedAt: undefined as number | undefined,
+        ageSeconds: 0,
+        remainingSeconds: 30,
+        isExpired: false,
+        isLoading: false,
+        isFetching: false,
+        isError: false,
+        errorMessage: null as string | null,
+        refetch: async () => undefined,
+      },
+    },
+    balanceState: {
+      value: {
+        balance: (10n ** 18n) as bigint | undefined,
+        allowance: undefined as bigint | undefined,
+        isLoading: false,
+        isError: false,
+        refetch: () => {},
+      },
+    },
+  }),
+);
 
 vi.mock('wagmi', () => ({
   useAccount: () => ({ address: SELF }),
@@ -247,7 +249,6 @@ describe('SwapTokenPanel 精度字样', () => {
   });
 });
 
-
 /**
  * R8（owner 2026-11-16）：`selectSwapScreenState` 会返回 `route-loading`，但面板没有
  * 这个分支 —— route 为 null 时直接落最终表单，到账显示 —、报价请求根本不发
@@ -286,7 +287,6 @@ describe('SwapTokenPanel · route-loading（R8）', () => {
     }
   });
 });
-
 
 /**
  * 默认使用长期授权 (owner 2026-11-16): 兑换页的授权按钮必须读同一个设备偏好，

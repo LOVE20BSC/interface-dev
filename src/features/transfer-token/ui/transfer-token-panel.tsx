@@ -23,10 +23,7 @@ import { ActionStack } from '@/shared/ui/action-stack';
 import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shared/ui/token-picker';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import { useAssetProtection } from '@/shared/lib/use-asset-protection';
-import {
-  decideRecipientProtection,
-  knownContractLabel,
-} from '@/shared/lib/recipient-protection';
+import { decideRecipientProtection, knownContractLabel } from '@/shared/lib/recipient-protection';
 import {
   maxTransferAmount,
   parseTransferAmount,
@@ -521,10 +518,7 @@ export function TransferTokenPanel({
 
           {identityMode && identityReady && identity.memberId !== null ? (
             <IdentityRecipientCard
-              title={copy.transfer.identityTitle(
-                identity.memberId.toString(),
-                identity.name ?? '',
-              )}
+              title={copy.transfer.identityTitle(identity.memberId.toString(), identity.name ?? '')}
               recipientLabel={copy.transfer.receiptTo}
               address={identity.address ?? ''}
               addressLabel={copy.transfer.receiptTo}

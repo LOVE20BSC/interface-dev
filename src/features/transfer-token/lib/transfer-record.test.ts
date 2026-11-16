@@ -75,7 +75,12 @@ describe('transfer-record 在途交易持久化（D1/D4）', () => {
     };
     writeStoredTransfer(SCOPE, native);
     const stored = readStoredTransfer(SCOPE);
-    expect(stored?.token).toEqual({ kind: 'native', address: undefined, symbol: 'ETH', decimals: 18 });
+    expect(stored?.token).toEqual({
+      kind: 'native',
+      address: undefined,
+      symbol: 'ETH',
+      decimals: 18,
+    });
     expect(stored?.recipientLabel).toBeUndefined();
   });
 

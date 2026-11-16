@@ -23,10 +23,7 @@ const REQUEST: BatchRequest = {
 
 describe('buildBatchReceipt', () => {
   it('keeps the chain facts and the audit rows', () => {
-    const record = buildBatchReceipt(HASH, REQUEST, [
-      1500000000000000000n,
-      500000000000000000n,
-    ]);
+    const record = buildBatchReceipt(HASH, REQUEST, [1500000000000000000n, 500000000000000000n]);
 
     expect(record.total).toBe(2000000000000000000n);
     expect(record.rows.map((row) => row.status)).toEqual(['matched', 'matched']);

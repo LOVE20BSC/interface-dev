@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  allowanceReadState,
-  balanceLineState,
-  balanceReadBlocksSubmit,
-} from './batch-read-state';
+import { allowanceReadState, balanceLineState, balanceReadBlocksSubmit } from './batch-read-state';
 
 describe('allowanceReadState (D2)', () => {
   it('never reports ready/need while the allowance is unread', () => {
@@ -31,9 +27,9 @@ describe('allowanceReadState (D2)', () => {
   });
 
   it('only says need / ready from a real value', () => {
-    expect(
-      allowanceReadState({ mode: 'token', total: 10n, allowance: 0n, isLoading: false }),
-    ).toBe('need');
+    expect(allowanceReadState({ mode: 'token', total: 10n, allowance: 0n, isLoading: false })).toBe(
+      'need',
+    );
     expect(
       allowanceReadState({ mode: 'token', total: 10n, allowance: 10n, isLoading: false }),
     ).toBe('ready');

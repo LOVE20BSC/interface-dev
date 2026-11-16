@@ -10,6 +10,9 @@ docs
 src/config/errors.generated.ts
 src/config/build-id.generated.ts
 
+# 外部工具维护的任务台账（worklog 由脚本写入表头），格式化会被工具改回，见规范 §11.2 D1
+ledger
+
 # Read-only product inputs (do not reformat)
 GLOSSARY.md
 docs

@@ -18,10 +18,7 @@ export interface LiquidityErrorContext {
  * 加池/撤出的错误翻译：每个分支都给出「为什么」与「下一步」，不把
  * revert 选择器、gas、nonce 或原始 RPC 报文带进页面。
  */
-export function describeLiquidityError(
-  cause: unknown,
-  context: LiquidityErrorContext,
-): string {
+export function describeLiquidityError(cause: unknown, context: LiquidityErrorContext): string {
   if (isUserRejection(cause)) return copy.liquidity.errors.rejected;
   if (isTxSendNonceError(cause)) return copy.txWatch.bodies.nonceGap;
   if (isTxStaleBlockError(cause)) return copy.txWatch.staleBlock;
@@ -30,7 +27,11 @@ export function describeLiquidityError(
   if (message.includes('insufficient funds') || message.includes('exceeds balance')) {
     return copy.liquidity.errors.insufficientFunds(context.nativeSymbol);
   }
-  if (message.includes('pairwithoutliquidity') || message.includes('pair_missing') || message.includes('pairmissing')) {
+  if (
+    message.includes('pairwithoutliquidity') ||
+    message.includes('pair_missing') ||
+    message.includes('pairmissing')
+  ) {
     return copy.liquidity.errors.emptyPool;
   }
   if (message.includes('deadlineexpired') || message.includes('expired')) {

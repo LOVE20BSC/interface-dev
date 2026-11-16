@@ -26,9 +26,7 @@ export interface ApprovalTokenCatalog {
  * Returns `undefined` while the community directory is still loading, which is
  * what tells the page to wait instead of locking in a fallback.
  */
-export function pickDefaultApprovalToken(
-  catalog: ApprovalTokenCatalog,
-): TransferToken | undefined {
+export function pickDefaultApprovalToken(catalog: ApprovalTokenCatalog): TransferToken | undefined {
   if (catalog.communityLoading) return undefined;
   return catalog.communityTokens[0] ?? catalog.wrappedToken ?? catalog.lpToken;
 }

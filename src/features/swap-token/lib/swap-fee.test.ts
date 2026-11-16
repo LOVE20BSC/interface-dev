@@ -33,9 +33,9 @@ describe('swap fee from Stake ratios', () => {
   });
 
   it('B2: adds both ratios (0.65% + 0.15% → 0.80)', () => {
-    expect(
-      computeSwapFee(ratios(6_500_000_000_000_000n, 1_500_000_000_000_000n))?.percent,
-    ).toBe('0.80');
+    expect(computeSwapFee(ratios(6_500_000_000_000_000n, 1_500_000_000_000_000n))?.percent).toBe(
+      '0.80',
+    );
   });
 
   it('formats without a float round-trip (0.29% must not become 0.28)', () => {
@@ -51,7 +51,9 @@ describe('swap fee from Stake ratios', () => {
 
   it('D: profiles that violate Stake invariants → undefined, never a number', () => {
     // lp + proto would consume the whole amount (contract: SwapFeeRatiosConsumeTheWholeAmount).
-    expect(computeSwapFee(ratios(600_000_000_000_000_000n, 500_000_000_000_000_000n))).toBeUndefined();
+    expect(
+      computeSwapFee(ratios(600_000_000_000_000_000n, 500_000_000_000_000_000n)),
+    ).toBeUndefined();
     expect(computeSwapFee(ratios(0n, 0n))).toBeUndefined();
     expect(computeSwapFee(ratios(0n, SWAP_FEE_RATIO_SCALE))).toBeUndefined();
     // Below one hundredth of a percent there is nothing honest to print.

@@ -119,11 +119,7 @@ export function parseBatchText(text: string, options: ParseBatchOptions): BatchP
     const tokens = raw.split(SEPARATOR_RE).filter((token) => token.length > 0);
     const addressToken = tokens[0];
     let amountToken = tokens.length === 2 ? tokens[1] : undefined;
-    if (
-      tokens.length > 2 &&
-      addressToken !== undefined &&
-      ADDRESS_RE.test(addressToken)
-    ) {
+    if (tokens.length > 2 && addressToken !== undefined && ADDRESS_RE.test(addressToken)) {
       // D4: accept `地址 1,000` / `地址 2,500.5` (thousands separators).
       amountToken = recoverGroupedAmount(raw, addressToken);
     }

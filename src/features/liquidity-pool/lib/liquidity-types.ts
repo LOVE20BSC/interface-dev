@@ -43,10 +43,7 @@ export function sameAddress(a: string | undefined, b: string | undefined): boole
  * 把链上 token0/token1 顺序的储备重排成 (社区代币, 原生币/包装原生币)。
  * token 顺序由 factory 决定，页面永远不假设 token0 就是社区代币。
  */
-export function reservesFor(
-  snapshot: PoolSnapshot,
-  tokenAddress: HexAddress,
-): PoolReserves {
+export function reservesFor(snapshot: PoolSnapshot, tokenAddress: HexAddress): PoolReserves {
   if (sameAddress(snapshot.token0, tokenAddress)) {
     return { reserveToken: snapshot.reserve0, reserveNative: snapshot.reserve1 };
   }

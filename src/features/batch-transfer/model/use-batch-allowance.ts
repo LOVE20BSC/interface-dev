@@ -29,8 +29,7 @@ export function useBatchAllowance(
     address: tokenAddress,
     abi: love20TokenAbi,
     functionName: 'allowance',
-    args:
-      owner !== undefined && spender !== undefined ? [owner, spender] : undefined,
+    args: owner !== undefined && spender !== undefined ? [owner, spender] : undefined,
     query: {
       enabled:
         enabled && tokenAddress !== undefined && owner !== undefined && spender !== undefined,

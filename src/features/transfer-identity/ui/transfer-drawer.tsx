@@ -8,10 +8,7 @@ import {
   type IdentityInputMode,
 } from '@/shared/lib/identity-input';
 import { useAssetProtection } from '@/shared/lib/use-asset-protection';
-import {
-  decideRecipientProtection,
-  knownContractLabel,
-} from '@/shared/lib/recipient-protection';
+import { decideRecipientProtection, knownContractLabel } from '@/shared/lib/recipient-protection';
 import { AssetProtectionSwitch } from '@/shared/ui/asset-protection-switch';
 import { Button } from '@/shared/ui/button';
 import { CopyableAddress } from '@/shared/ui/copyable-address';

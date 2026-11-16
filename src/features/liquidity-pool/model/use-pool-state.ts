@@ -39,7 +39,8 @@ export interface UsePoolStateOptions {
 export function usePoolState(options: UsePoolStateOptions): PoolStateResult {
   const { tokenAddress, nativeAddress, account, enabled } = options;
   const factory = configuredAddress('factory');
-  const canReadPair = enabled && factory !== undefined && tokenAddress !== undefined && nativeAddress !== undefined;
+  const canReadPair =
+    enabled && factory !== undefined && tokenAddress !== undefined && nativeAddress !== undefined;
 
   const pairLookup = useReadContract({
     address: factory,
@@ -65,7 +66,12 @@ export function usePoolState(options: UsePoolStateOptions): PoolStateResult {
     if (account === undefined) return base;
     return [
       ...base,
-      { address: pairAddress, abi: uniswapV2PairAbi, functionName: 'balanceOf' as const, args: [account] },
+      {
+        address: pairAddress,
+        abi: uniswapV2PairAbi,
+        functionName: 'balanceOf' as const,
+        args: [account],
+      },
     ];
   }, [account, pairAddress]);
 

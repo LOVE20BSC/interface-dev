@@ -58,29 +58,37 @@ const STORED: StoredBatch = {
   recordedAt: 1_700_000_000_000,
 };
 
-const { writeMock, simulateMock, pendingNonceMock, snapshotMock, refreshSpy, watchState, approvedSpy, confirmedSpy } =
-  vi.hoisted(() => ({
-    writeMock: vi.fn(),
-    simulateMock: vi.fn(),
-    pendingNonceMock: vi.fn(),
-    snapshotMock: vi.fn(),
-    refreshSpy: vi.fn(),
-    approvedSpy: vi.fn(),
-    confirmedSpy: vi.fn(),
-    watchState: {
-      value: {
-        status: 'idle',
-        hash: null as string | null,
-        receipt: null as unknown,
-        submittedNonce: undefined as number | undefined,
-        remainingMs: 0,
-        remainingSeconds: 0,
-        isStuck: false,
-        isSettled: false,
-        refresh: () => {},
-      },
+const {
+  writeMock,
+  simulateMock,
+  pendingNonceMock,
+  snapshotMock,
+  refreshSpy,
+  watchState,
+  approvedSpy,
+  confirmedSpy,
+} = vi.hoisted(() => ({
+  writeMock: vi.fn(),
+  simulateMock: vi.fn(),
+  pendingNonceMock: vi.fn(),
+  snapshotMock: vi.fn(),
+  refreshSpy: vi.fn(),
+  approvedSpy: vi.fn(),
+  confirmedSpy: vi.fn(),
+  watchState: {
+    value: {
+      status: 'idle',
+      hash: null as string | null,
+      receipt: null as unknown,
+      submittedNonce: undefined as number | undefined,
+      remainingMs: 0,
+      remainingSeconds: 0,
+      isStuck: false,
+      isSettled: false,
+      refresh: () => {},
     },
-  }));
+  },
+}));
 
 vi.mock('wagmi', () => ({
   useAccount: () => ({ address: SELF }),

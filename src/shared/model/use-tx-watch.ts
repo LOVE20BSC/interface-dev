@@ -267,8 +267,7 @@ export function useTxWatch(options: UseTxWatchOptions): TxWatch {
       }
 
       const observation: TxWatchObservation = {
-        receipt:
-          receiptRead.kind === 'mined' ? { status: receiptRead.receipt.status } : null,
+        receipt: receiptRead.kind === 'mined' ? { status: receiptRead.receipt.status } : null,
         tx,
         walletNonce,
         walletPendingNonce: walletNonces.pending,

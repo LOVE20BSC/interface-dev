@@ -1,4 +1,9 @@
-import { love20HubAbi, love20TokenAbi, uniswapV2PairAbi, uniswapV2Router02Abi } from '@/config/abis';
+import {
+  love20HubAbi,
+  love20TokenAbi,
+  uniswapV2PairAbi,
+  uniswapV2Router02Abi,
+} from '@/config/abis';
 import { ZERO_ADDRESS, type HexAddress } from '@/config/networks';
 import { cache, type CacheScope } from '@/shared/lib/cache';
 import type { Abi } from 'viem';
@@ -39,7 +44,12 @@ const MAX_ARGS_DEPTH = 4;
  * (address + function name + args), so the ABI is looked up here again instead of
  * being stored: a record can never smuggle an arbitrary contract interface.
  */
-const CALL_ABIS: readonly Abi[] = [love20HubAbi, uniswapV2Router02Abi, uniswapV2PairAbi, love20TokenAbi];
+const CALL_ABIS: readonly Abi[] = [
+  love20HubAbi,
+  uniswapV2Router02Abi,
+  uniswapV2PairAbi,
+  love20TokenAbi,
+];
 
 export function createLiquidityScope(chainId: number, wallet: string): CacheScope {
   return { chainId, contractAddress: ZERO_ADDRESS, wallet };
@@ -95,10 +105,14 @@ function serializeDeep(value: unknown): unknown {
   return value;
 }
 
-function deserializeDeep(value: unknown, depth = 0): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+function deserializeDeep(
+  value: unknown,
+  depth = 0,
+): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
   if (depth > MAX_ARGS_DEPTH) return { ok: false };
   if (typeof value === 'string') return value.length <= 512 ? { ok: true, value } : { ok: false };
-  if (typeof value === 'number') return Number.isFinite(value) ? { ok: true, value } : { ok: false };
+  if (typeof value === 'number')
+    return Number.isFinite(value) ? { ok: true, value } : { ok: false };
   if (typeof value === 'boolean' || value === null) return { ok: true, value };
   if (Array.isArray(value)) {
     if (value.length > 64) return { ok: false };

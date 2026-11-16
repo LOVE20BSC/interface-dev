@@ -40,8 +40,7 @@ function identity(overrides: Partial<MemberIdentityState> = {}): MemberIdentityS
 
 function renderPage(
   entry:
-    | string
-    | { readonly pathname: string; readonly state?: unknown } = '/my-nft?symbol=TestLOVE20',
+    string | { readonly pathname: string; readonly state?: unknown } = '/my-nft?symbol=TestLOVE20',
 ): void {
   render(
     <MemoryRouter initialEntries={[entry]}>

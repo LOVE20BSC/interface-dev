@@ -15,7 +15,11 @@ const HOOKS_DIR = '.githooks';
 const hookFile = resolve(root, HOOKS_DIR, 'pre-commit');
 
 const git = (args) =>
-  execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  execFileSync('git', args, {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
 
 function fail(message) {
   console.error(`[hooks] ${message}`);

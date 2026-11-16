@@ -88,9 +88,7 @@ function check(label, expected, actual) {
       suffix = '';
     }
   }
-  console.log(
-    `${pass ? 'PASS' : 'FAIL'} ${label}: expected=${expected} actual=${actual}${suffix}`,
-  );
+  console.log(`${pass ? 'PASS' : 'FAIL'} ${label}: expected=${expected} actual=${actual}${suffix}`);
 }
 
 async function ethBalance(address) {
@@ -172,7 +170,8 @@ function approveData(amount) {
 function contractErrorName(error) {
   const seen = new Set();
   const walk = (value, depth) => {
-    if (depth > 6 || value === null || typeof value !== 'object' || seen.has(value)) return undefined;
+    if (depth > 6 || value === null || typeof value !== 'object' || seen.has(value))
+      return undefined;
     seen.add(value);
     const data = value.data;
     if (data !== null && typeof data === 'object' && typeof data.errorName === 'string') {
@@ -217,13 +216,13 @@ async function main() {
   const snapshot = await client.snapshot();
   try {
     // ── §0 初始状态快照 ─────────────────────────────────────────────────────
-    check('§0 BATCH_TRANSFER 有 bytecode', true, (await client.getCode({ address: BATCH_TRANSFER })) !== undefined);
-    check('§0 #1 TestLOVE20 初始余额', 99799100000000000000000000n, await tokenBalance(ACCOUNT_1));
     check(
-      '§0 allowance(#1 → BatchTransfer) 初始值',
-      0n,
-      await allowance(ACCOUNT_1),
+      '§0 BATCH_TRANSFER 有 bytecode',
+      true,
+      (await client.getCode({ address: BATCH_TRANSFER })) !== undefined,
     );
+    check('§0 #1 TestLOVE20 初始余额', 99799100000000000000000000n, await tokenBalance(ACCOUNT_1));
+    check('§0 allowance(#1 → BatchTransfer) 初始值', 0n, await allowance(ACCOUNT_1));
     check('§0 #5 ETH 初始余额', 10000000000000000000000n, await ethBalance(ACCOUNT_5));
     check('§0 #6 ETH 初始余额', 10000000000000000000000n, await ethBalance(ACCOUNT_6));
     check('§0 #9 ETH 初始余额', 10000000000000000000000n, await ethBalance(ACCOUNT_9));
@@ -237,7 +236,11 @@ async function main() {
       1000000000000n, // #9 0.000001
     ];
     const aTotal = 450001000000000000n;
-    check('A 合计 = Σ amounts', 450001000000000000n, aAmounts.reduce((sum, value) => sum + value, 0n));
+    check(
+      'A 合计 = Σ amounts',
+      450001000000000000n,
+      aAmounts.reduce((sum, value) => sum + value, 0n),
+    );
     const aBefore = await nativeBalances(aRecipients);
     check('A §0 #5 预余额', 10000000000000000000000n, aBefore[0]);
     check('A §0 #6 发送前 ETH', 10000000000000000000000n, await ethBalance(ACCOUNT_6));
@@ -261,7 +264,11 @@ async function main() {
     check('A #8 终态', 10000150000000000000000n, aAfter[2]);
     check('A #9 到账额', aAmounts[3], aAfter[3] - aBefore[3]);
     check('A #9 终态', 10000000001000000000000n, aAfter[3]);
-    check('A 发送方扣款 = 合计 + fee', aTotal + feeA, 10000000000000000000000n - (await ethBalance(ACCOUNT_6)));
+    check(
+      'A 发送方扣款 = 合计 + fee',
+      aTotal + feeA,
+      10000000000000000000000n - (await ethBalance(ACCOUNT_6)),
+    );
 
     const eventA = eventOf(txA.receipt, batchAbi, 'NativeBatchTransferred');
     check('A 事件 totalAmount', aTotal, eventA?.totalAmount);
@@ -271,7 +278,11 @@ async function main() {
     const bRecipients = [ACCOUNT_5, ACCOUNT_2, ACCOUNT_7];
     const bAmounts = [1500000000000000000n, 500000000000000000n, 2000000000000n];
     const bTotal = 2000002000000000000n;
-    check('B 合计 = Σ amounts', 2000002000000000000n, bAmounts.reduce((sum, value) => sum + value, 0n));
+    check(
+      'B 合计 = Σ amounts',
+      2000002000000000000n,
+      bAmounts.reduce((sum, value) => sum + value, 0n),
+    );
     const bTokenBefore = await tokenBalance(ACCOUNT_1);
     check('B §0 #1 TestLOVE20 预余额', 99799100000000000000000000n, bTokenBefore);
     const bRecipientBefore = await erc20Balances(bRecipients);
@@ -429,9 +440,13 @@ async function main() {
   }
 
   console.log('');
-  console.log(`[batch-transfer-contract] ${results.length - failures}/${results.length} checks passed`);
+  console.log(
+    `[batch-transfer-contract] ${results.length - failures}/${results.length} checks passed`,
+  );
   if (failures > 0) {
-    console.error(`[batch-transfer-contract] FAIL: ${failures} mismatch(es) against the theory line`);
+    console.error(
+      `[batch-transfer-contract] FAIL: ${failures} mismatch(es) against the theory line`,
+    );
     process.exit(1);
   }
   console.log('[batch-transfer-contract] ALL CHECKS PASSED (theory line §1 ↔ chain)');

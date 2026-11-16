@@ -196,10 +196,10 @@ function serializeRequest(request: BatchRequest): Record<string, unknown> {
     rows: request.rows.map((row) => ({ address: row.address, amount: row.amount.toString() })),
     total: request.total.toString(),
     gasLimit: request.gasLimit,
-    preBalances: request.preBalances.map((value) => (value === undefined ? null : value.toString())),
-    recipientHasCode: request.recipientHasCode.map((value) =>
-      value === undefined ? null : value,
+    preBalances: request.preBalances.map((value) =>
+      value === undefined ? null : value.toString(),
     ),
+    recipientHasCode: request.recipientHasCode.map((value) => (value === undefined ? null : value)),
   };
 }
 

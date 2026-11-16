@@ -55,9 +55,9 @@ describe('swap screen state selector', () => {
   });
 
   it('ignores a stale timeout flag once the route is ready', () => {
-    expect(selectSwapScreenState({ ...base, routeStatus: 'ready', routeLoadingTimedOut: true })).toBe(
-      'ready',
-    );
+    expect(
+      selectSwapScreenState({ ...base, routeStatus: 'ready', routeLoadingTimedOut: true }),
+    ).toBe('ready');
   });
 
   it('waits on the pair metadata before route loading', () => {

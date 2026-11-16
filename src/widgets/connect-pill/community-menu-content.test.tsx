@@ -22,11 +22,7 @@ function searchState(overrides: Partial<CommunitySymbolSearch> = {}): CommunityS
 
 function renderMenu(onSwitch = vi.fn(), onNavigate = vi.fn()) {
   render(
-    <CommunityMenuContent
-      currentSymbol="TestLOVE20"
-      onSwitch={onSwitch}
-      onNavigate={onNavigate}
-    />,
+    <CommunityMenuContent currentSymbol="TestLOVE20" onSwitch={onSwitch} onNavigate={onNavigate} />,
   );
   return { onSwitch, onNavigate };
 }
@@ -102,11 +98,7 @@ describe('CommunityMenuContent symbol 搜索', () => {
     ] as const) {
       search.mockReturnValue(searchState({ query: 'zz', status }));
       const view = render(
-        <CommunityMenuContent
-          currentSymbol="TestLOVE20"
-          onSwitch={vi.fn()}
-          onNavigate={vi.fn()}
-        />,
+        <CommunityMenuContent currentSymbol="TestLOVE20" onSwitch={vi.fn()} onNavigate={vi.fn()} />,
       );
       expect(screen.getByTestId('community-search-results')).toHaveTextContent(text);
       view.unmount();

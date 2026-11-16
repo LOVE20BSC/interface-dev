@@ -35,7 +35,10 @@ export function LiquidityReceiptSheet({ record, onDismiss }: LiquidityReceiptShe
           <span className="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-full bg-success-soft text-success">
             <Check className="h-5 w-5" aria-hidden="true" />
           </span>
-          <p className="mt-2 text-base font-medium text-foreground" data-testid="liquidity-receipt-title">
+          <p
+            className="mt-2 text-base font-medium text-foreground"
+            data-testid="liquidity-receipt-title"
+          >
             {record.title}
           </p>
           {record.detail !== undefined ? (

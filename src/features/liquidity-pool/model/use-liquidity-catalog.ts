@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react';
 import { useBytecode, useReadContracts } from 'wagmi';
 import { love20TokenAbi } from '@/config/abis';
 import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
-import { useSwapCatalog, type SwapTokenSearchStatus } from '@/features/swap-token/model/use-swap-catalog';
+import {
+  useSwapCatalog,
+  type SwapTokenSearchStatus,
+} from '@/features/swap-token/model/use-swap-catalog';
 import { useWrappedNative } from '@/features/swap-token/model/use-wrapped-native';
 import type { LiquidityToken } from '@/features/liquidity-pool/lib/liquidity-types';
 
@@ -57,11 +60,13 @@ function toLiquidityToken(token: {
   };
 }
 
-function mapTokens(tokens: readonly {
-  readonly address: HexAddress | undefined;
-  readonly symbol: string;
-  readonly decimals: number | undefined;
-}[]): LiquidityToken[] {
+function mapTokens(
+  tokens: readonly {
+    readonly address: HexAddress | undefined;
+    readonly symbol: string;
+    readonly decimals: number | undefined;
+  }[],
+): LiquidityToken[] {
   return tokens.flatMap((token) => {
     const mapped = toLiquidityToken(token);
     return mapped === undefined ? [] : [mapped];
@@ -139,7 +144,12 @@ function useCustomToken(candidate: string | undefined): CustomTokenState {
   // 自定义代币对象必须稳定：页面把它当 effect 依赖，每次渲染新建对象会让
   // setState 触发下一次渲染，形成无限循环（选自定义代币后页面卡死）。
   const token = useMemo((): LiquidityToken | undefined => {
-    if (status !== 'ok' || address === undefined || symbol === undefined || decimals === undefined) {
+    if (
+      status !== 'ok' ||
+      address === undefined ||
+      symbol === undefined ||
+      decimals === undefined
+    ) {
       return undefined;
     }
     return { kind: 'custom', address, symbol, decimals };
@@ -174,10 +184,19 @@ export function useLiquidityCatalog(): LiquidityCatalog {
   );
 
   const wrappedToken = useMemo((): LiquidityToken | undefined => {
-    if (wrapped.address === undefined || wrapped.symbol === undefined || wrapped.decimals === undefined) {
+    if (
+      wrapped.address === undefined ||
+      wrapped.symbol === undefined ||
+      wrapped.decimals === undefined
+    ) {
       return undefined;
     }
-    return { kind: 'wrapped', address: wrapped.address, symbol: wrapped.symbol, decimals: wrapped.decimals };
+    return {
+      kind: 'wrapped',
+      address: wrapped.address,
+      symbol: wrapped.symbol,
+      decimals: wrapped.decimals,
+    };
   }, [wrapped.address, wrapped.decimals, wrapped.symbol]);
 
   return {

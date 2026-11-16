@@ -50,7 +50,8 @@ export function isBatchGasOverBlock(recipientCount: number, gasLimit: number): b
  * this only decides whether 「合计」 still fits and how much is missing.
  */
 export function nativeBatchReserve(recipientCount: number, gasLimit: number): bigint {
-  const dynamic = BigInt(Math.max(0, recipientCount)) * BigInt(Math.max(0, gasLimit)) * GAS_PRICE_ASSUMPTION_WEI;
+  const dynamic =
+    BigInt(Math.max(0, recipientCount)) * BigInt(Math.max(0, gasLimit)) * GAS_PRICE_ASSUMPTION_WEI;
   return dynamic > NATIVE_FEE_RESERVE_WEI ? dynamic : NATIVE_FEE_RESERVE_WEI;
 }
 

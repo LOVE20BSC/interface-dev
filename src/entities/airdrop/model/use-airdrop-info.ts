@@ -43,9 +43,10 @@ export function useAirdropInfo(options: UseAirdropInfoOptions): AirdropInfoState
     query: { enabled },
   });
 
-  const info = useMemo(() => (read.data === undefined ? null : toAirdropInfo(read.data)), [
-    read.data,
-  ]);
+  const info = useMemo(
+    () => (read.data === undefined ? null : toAirdropInfo(read.data)),
+    [read.data],
+  );
 
   let status: AirdropInfoStatus;
   if (!enabled) {

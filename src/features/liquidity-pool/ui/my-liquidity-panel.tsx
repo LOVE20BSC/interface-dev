@@ -52,8 +52,7 @@ const INPUT =
   'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated pl-3 pr-28 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20';
 const BADGE =
   'pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-foreground';
-const QUICK_BUTTON =
-  'rounded-full border px-3 py-1 text-xs font-medium';
+const QUICK_BUTTON = 'rounded-full border px-3 py-1 text-xs font-medium';
 
 /**
  * 我的流动性：读 pair 的 `balanceOf` / `totalSupply`，**按 LP 数量**撤出（owner
@@ -64,8 +63,7 @@ const QUICK_BUTTON =
  * 「最多可撤出」整行删除。
  */
 export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
-  const { token, native, pool, slippagePercent, customSlippageError, onGoAdd, isConnected } =
-    props;
+  const { token, native, pool, slippagePercent, customSlippageError, onGoAdd, isConnected } = props;
   const { address: account } = useAccount();
   // 默认使用长期授权 (owner 2026-11-16): same device preference as /approvals;
   // off → exact LP amount (unchanged), on → maxUint256 + 长期授权 copy.
@@ -134,8 +132,7 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
 
   // QA D8：数量为 0 时这一笔不需要 LP 授权，不能显示成「已授权」。
   const approval = approvalNeed(lpToWithdraw, lpAllowance.value);
-  const needsApproval =
-    snapshot !== undefined && router !== undefined && approval === 'required';
+  const needsApproval = snapshot !== undefined && router !== undefined && approval === 'required';
 
   const canSubmit =
     isConnected &&

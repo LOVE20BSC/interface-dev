@@ -31,7 +31,9 @@ const VIEWPORTS = [
 const THEMES = ['light', 'dark'] as const;
 
 async function shot(page: Page, name: string, theme: string, viewport: string): Promise<void> {
-  await page.screenshot({ path: resolve(SHOTS, `global-actions-${name}-${theme}-${viewport}.png`) });
+  await page.screenshot({
+    path: resolve(SHOTS, `global-actions-${name}-${theme}-${viewport}.png`),
+  });
 }
 
 async function seedTheme(page: Page, theme: 'light' | 'dark'): Promise<void> {

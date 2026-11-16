@@ -13,7 +13,10 @@ import {
 } from '@/shared/model/use-tx-watch';
 import { decideResubmit } from '@/shared/lib/tx-resubmit';
 import { isSameTxOwner, type TxOwner } from '@/shared/lib/tx-owner';
-import { describeBatchError, type BatchErrorMessage } from '@/features/batch-transfer/lib/batch-errors';
+import {
+  describeBatchError,
+  type BatchErrorMessage,
+} from '@/features/batch-transfer/lib/batch-errors';
 import {
   clearStoredBatch,
   createBatchScope,
@@ -86,9 +89,7 @@ interface PendingBatch {
  * the chain and either replaces the same nonce or stops when the batch already
  * landed.
  */
-export function useBatchTransaction(
-  options: UseBatchTransactionOptions,
-): BatchTransactionState {
+export function useBatchTransaction(options: UseBatchTransactionOptions): BatchTransactionState {
   const { address: account } = useAccount();
   const chainId = useChainId();
   const batchTransfer = configuredAddress('batchTransfer');
@@ -207,10 +208,7 @@ export function useBatchTransaction(
     recipientHasCode: request.recipientHasCode,
   });
 
-  const sendApprove = async (
-    request: BatchRequest,
-    nonce?: number,
-  ): Promise<`0x${string}`> => {
+  const sendApprove = async (request: BatchRequest, nonce?: number): Promise<`0x${string}`> => {
     if (request.tokenAddress === undefined || batchTransfer === undefined) {
       throw new Error('batch transfer configuration unavailable');
     }
@@ -221,10 +219,7 @@ export function useBatchTransaction(
       address: request.tokenAddress,
       abi: love20TokenAbi,
       functionName: 'approve',
-      args: [
-        batchTransfer,
-        decideApproveAmount(readUnlimitedApprovalPreference(), request.total),
-      ],
+      args: [batchTransfer, decideApproveAmount(readUnlimitedApprovalPreference(), request.total)],
       ...(nonce !== undefined ? { nonce } : {}),
     });
   };

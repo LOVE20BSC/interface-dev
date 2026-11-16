@@ -36,9 +36,7 @@ interface BalanceMockState {
 }
 
 const { identityState, catalogState, submitMock, txState, balanceState } = vi.hoisted(() => {
-  const submitMock = vi.fn(
-    (_request: unknown) => new Promise<void>(() => {}),
-  );
+  const submitMock = vi.fn((_request: unknown) => new Promise<void>(() => {}));
   return {
     identityState: {
       value: {
@@ -204,9 +202,7 @@ describe('TransferTokenPanel 布局与余额（owner 2026-11-16 布局）', () =
     expect(screen.queryByText('代币')).toBeNull();
     const amount = screen.getByTestId('transfer-amount');
     const balance = screen.getByTestId('transfer-balance');
-    expect(
-      amount.compareDocumentPosition(balance) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(amount.compareDocumentPosition(balance) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(balance).toHaveTextContent('余额 10,000 ETH');
     expect(balance.className).toContain('text-muted');
     expect(screen.queryByText(/精度/)).toBeNull();
@@ -266,10 +262,7 @@ describe('TransferTokenPanel 按地址', () => {
     fillAmount('0.1');
     fillRecipient(PAIR);
 
-    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute(
-      'aria-checked',
-      'true',
-    );
+    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByTestId('transfer-protection')).toBeVisible();
     expect(screen.getByText('智能资产保护已拦截：这是「交易对」合约地址')).toBeVisible();
     // The interception offers no page-level checkbox: the only way forward is the
@@ -284,17 +277,12 @@ describe('TransferTokenPanel 按地址', () => {
     fillRecipient(PAIR);
 
     fireEvent.click(screen.getByTestId('asset-protection-toggle'));
-    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute(
-      'aria-checked',
-      'false',
-    );
+    expect(screen.getByTestId('asset-protection-toggle')).toHaveAttribute('aria-checked', 'false');
     // 关闭 = 只跳过已知合约检测：已知合约块与勾选都不再出现……
     expect(screen.queryByTestId('transfer-protection')).toBeNull();
     expect(screen.queryByTestId('transfer-known-ack')).toBeNull();
     // ……同一地址按任意合约（有 bytecode）只警告，不再拦截。
-    expect(screen.getByTestId('transfer-contract-warning')).toHaveTextContent(
-      '这个地址是一个合约',
-    );
+    expect(screen.getByTestId('transfer-contract-warning')).toHaveTextContent('这个地址是一个合约');
     expect(submitButton()).toBeEnabled();
 
     // Turning protection back on re-blocks the same recipient.

@@ -13,13 +13,7 @@ const OPTIONS = { decimals: 18, self: SELF, batchContract: BATCH as `0x${string}
 describe('parseBatchText', () => {
   it('parses the five-line native fixture and flags the duplicate line instead of merging', () => {
     const result = parseBatchText(
-      [
-        `${A} 0.1`,
-        `${B}, 0.2`,
-        `${C} 0.15`,
-        `${A} 0.05`,
-        `${D} 0.000001`,
-      ].join('\n'),
+      [`${A} 0.1`, `${B}, 0.2`, `${C} 0.15`, `${A} 0.05`, `${D} 0.000001`].join('\n'),
       OPTIONS,
     );
 
@@ -93,10 +87,7 @@ describe('parseBatchText', () => {
   });
 
   it('rejects scientific notation, negative numbers and full-width digits', () => {
-    const result = parseBatchText(
-      [`${A} 1e3`, `${A} -1`, `${A} １`].join('\n'),
-      OPTIONS,
-    );
+    const result = parseBatchText([`${A} 1e3`, `${A} -1`, `${A} １`].join('\n'), OPTIONS);
 
     expect(result.errors.map((error) => error.reason)).toEqual([
       'invalidAmount',

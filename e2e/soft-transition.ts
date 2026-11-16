@@ -43,9 +43,7 @@ export async function recordSoftTransition(page: Page): Promise<void> {
 }
 
 export async function transitionPhases(page: Page): Promise<string[]> {
-  return page.evaluate(
-    () => (window as unknown as TransitionProbe).__l20Transitions ?? [],
-  );
+  return page.evaluate(() => (window as unknown as TransitionProbe).__l20Transitions ?? []);
 }
 
 /** Waits until the click produced a full fade-out → fade-in cycle. */
@@ -62,8 +60,7 @@ export async function expectSoftTransition(page: Page): Promise<void> {
 export async function expectBusyButtonDuringTransition(page: Page): Promise<void> {
   await expect
     .poll(
-      async () =>
-        page.evaluate(() => (window as unknown as TransitionProbe).__l20Busy ?? false),
+      async () => page.evaluate(() => (window as unknown as TransitionProbe).__l20Busy ?? false),
       { timeout: 5_000, intervals: [20, 50, 100] },
     )
     .toBe(true);
@@ -78,12 +75,14 @@ export async function expectBusyButtonDuringTransition(page: Page): Promise<void
  */
 export async function freezePageFadeAtMidpoint(page: Page): Promise<number> {
   return page.evaluate(() => {
-    const animations = document.getAnimations().filter(
-      (animation): animation is CSSAnimation =>
-        animation instanceof CSSAnimation &&
-        (animation.animationName === 'l20-page-leave' ||
-          animation.animationName === 'l20-page-enter'),
-    );
+    const animations = document
+      .getAnimations()
+      .filter(
+        (animation): animation is CSSAnimation =>
+          animation instanceof CSSAnimation &&
+          (animation.animationName === 'l20-page-leave' ||
+            animation.animationName === 'l20-page-enter'),
+      );
     for (const animation of animations) {
       animation.pause();
       animation.currentTime = animation.animationName === 'l20-page-leave' ? 90 : 100;
