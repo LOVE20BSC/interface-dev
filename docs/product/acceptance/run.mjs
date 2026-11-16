@@ -902,9 +902,9 @@ async function step8(browser) {
   try {
     await connect(page);
     await goto(page, '/');
-    const card = page.locator('section[aria-labelledby="airdrop-eligibility-title"]');
+    const card = page.locator('section[aria-labelledby="home-reminder-airdrop"]');
     await waitVisible(card, 60_000, 'home eligibility card');
-    await waitText(page, '你参与了销毁活动，获得空投铸造资格', { timeout: 20_000 });
+    await waitText(page, '你有空投资格', { timeout: 20_000 });
     const cardText = (await card.innerText()).replaceAll('\n', ' | ');
     const homeShot = await shot(page, '08-home-airdrop-eligible.png');
     // The home eligibility card's link is 「空投铸造」 (copy.home.mintAirdrop); it

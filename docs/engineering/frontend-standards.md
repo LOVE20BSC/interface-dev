@@ -1543,6 +1543,7 @@ git config --get core.hooksPath           # 应输出 .githooks
 | 提交前门禁不存在（无 husky、无 `.githooks/`），所有门禁只在 CI 或"人记得跑"时生效 | 落地 pre-commit（§9.2）：`.githooks/pre-commit` + `scripts/install-hooks.mjs` + `pnpm check`；不引依赖 |
 | 任务书曾把 `src/` 说成「九层」，实际是 8 个层目录（`src/test/` 是测试装配、被门禁排除） | 本规范按 8 层写（§2.1），`src/test/` 单列说明 |
 | `src/*.ts` 根文件不在架构测试的分层扫描范围内（做钩子联调时踩到：把违规文件放在 `src/` 根目录，门禁不报） | 记录为已知限制（§3.11）。根目录目前只有 `main.tsx`/`index.css`/`vite-env.d.ts`，风险低；新增业务文件**不得**放在 `src/` 根 |
+| `docs/product/acceptance/run.mjs` 的 step8 仍在等死组件的旧文案「你参与了销毁活动，获得空投铸造资格」与旧选择器 `aria-labelledby="airdrop-eligibility-title"`（该组件 2026-11-17 已删，现役是 `src/pages/home/airdrop-reminder.tsx`） | 改为现役文案「你有空投资格」与选择器 `home-reminder-airdrop`。这条是「陌生 AI 入职演练」按本规范读完后当场指出的「文档写 A、代码做 B」 |
 
 ### 11.2 需要 owner 拍板
 
