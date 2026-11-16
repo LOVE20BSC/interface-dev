@@ -7,7 +7,7 @@
 
 ## 现象
 
-行动层与核心层的“我能铸多少”视图，在**未铸造**状态下不是读一个已经定死的数，而是用**当前时刻**的治理质押状态和**当前时刻**的激励池余量重新算一遍：
+行动合约与核心合约的“我能铸多少”视图，在**未铸造**状态下不是读一个已经定死的数，而是用**当前时刻**的治理质押状态和**当前时刻**的激励池余量重新算一遍：
 
 - **LP 行动**：上限用 `IPhase.currentPhase()` 的治理票比例；如果那一刻社区总治理票为 0，直接返回“铸 0、烧掉全部”。
 - **链群服务**：owner 部分的上限同样用**当前** phase 的治理票比例，超出的部分记成 `ownerBurned`。
@@ -89,7 +89,7 @@ function rewardAvailable(address tokenAddress) public view returns (uint256) {
 }
 ```
 
-行动层的 `memberReward` 也走这条：`GroupActionExecutor.memberReward` → `IActionTarget.actionReward` → `Mint.proposalRewardByProposalId`（`action/src/GroupActionExecutor.sol:667-669`）。
+行动合约的 `memberReward` 也走这条：`GroupActionExecutor.memberReward` → `IActionTarget.actionReward` → `Mint.proposalRewardByProposalId`（`action/src/GroupActionExecutor.sol:667-669`）。
 
 ## 对前端的影响
 
@@ -103,7 +103,7 @@ function rewardAvailable(address tokenAddress) public view returns (uint256) {
 
 1. **把影响结果的状态在“轮次结算点”快照下来**，读路径只读快照。最小实现：在 `mintActionReward` / `mintProposalReward`（即本轮第一次结算）时，把当时的 `totalValidGovVotes` / `validGovVotes(memberId)` 或直接算出的 `govRatioCap` 写进 `(token, actionId, round, memberId)` 的存储，`memberReward` 优先返回快照值。LP 已有 `_mintedGovRatioByMemberId` 这个字段（`LpExecutor.sol:68-69`），只需**提前到验证/结算轮写入**，而不是铸造时写。
 2. **让返回值带“是否会被销毁”与“为什么是 0”**：`memberReward` 应返回 `(mintAmount, burnAmount, minted, bool capped)`；`GroupServiceExecutor` 的两个视图 `memberReward`（`GroupServiceExecutor.sol:284-309`）与 `serviceRewardByMemberId`（`238-282`）对同一笔结算给出不同的拆解，而 `SettlementCause`（`NoEligibleWeight` / `PoolEmpty`）**两个视图都不返回**——前端拿不到“为什么是 0”。建议合并成一个返回 `(mintAmount, burnAmount, minted, cause)` 的视图。
-3. **核心层**：若本轮未 prepare，视图不要用 `rewardAvailable()` 现算，而是返回 `(0, false, prepared=false)`，强制先 prepare；prepare 之后的金额才是稳定的（这条与 CI-002 是同一处改动）。
+3. **核心合约**：若本轮未 prepare，视图不要用 `rewardAvailable()` 现算，而是返回 `(0, false, prepared=false)`，强制先 prepare；prepare 之后的金额才是稳定的（这条与 CI-002 是同一处改动）。
 4. 如果“按领取时刻的治理比例”是**有意的经济设计**（惩罚不质押的参与者），那也必须在接口层把这件事说出来：加 `function rewardBasisRound(address tokenAddress, uint256 actionId, uint256 round) external view returns (uint256)`，让前端能显示“本金额按第 N 轮治理比例计算”。
 
 ## 临时前端绕过方案

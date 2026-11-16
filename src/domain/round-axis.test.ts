@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   governanceMintWindow,
   RoundAxis,
-  layerStages,
+  kindStages,
   roundOffsets,
-  ROUND_LAYERS,
+  ROUND_KINDS,
   ROUND_STAGES,
   stageOrder,
   stageRound,
-  type RoundLayer,
+  type RoundKind,
   type RoundStage,
   type StageRoundResult,
 } from './round-axis';
@@ -166,17 +166,17 @@ describe('phase validation', () => {
   });
 });
 
-describe('layerStages', () => {
-  it('returns only stages that exist for the layer', () => {
-    expect(layerStages('lp', 1).map((entry) => entry.stage)).toEqual(['vote', 'join', 'mint']);
-    expect(layerStages('governance', 1).map((entry) => entry.stage)).toEqual(['vote', 'mint']);
-    expect(layerStages('group-service', 1)).toHaveLength(4);
+describe('kindStages', () => {
+  it('returns only stages that exist for the kind', () => {
+    expect(kindStages('lp', 1).map((entry) => entry.stage)).toEqual(['vote', 'join', 'mint']);
+    expect(kindStages('governance', 1).map((entry) => entry.stage)).toEqual(['vote', 'mint']);
+    expect(kindStages('group-service', 1)).toHaveLength(4);
   });
 
-  it('covers every layer/stage combination without throwing', () => {
-    for (const layer of ROUND_LAYERS) {
+  it('covers every kind/stage combination without throwing', () => {
+    for (const kind of ROUND_KINDS) {
       for (const phase of [1, 2, 3, 4]) {
-        const results = layerStages(layer, phase);
+        const results = kindStages(kind, phase);
         expect(results.length).toBeGreaterThan(0);
         for (const result of results) {
           expect(['open', 'awaiting-phase-end', 'not-started', 'not-applicable']).toContain(
@@ -199,13 +199,13 @@ describe('type-level contract', () => {
     }
   });
 
-  it('exposes every layer and stage as constants', () => {
-    expect(ROUND_LAYERS).toEqual(['governance', 'lp', 'group-action', 'group-service']);
+  it('exposes every kind and stage as constants', () => {
+    expect(ROUND_KINDS).toEqual(['governance', 'lp', 'group-action', 'group-service']);
     expect(ROUND_STAGES).toEqual(['vote', 'join', 'verify', 'mint']);
-    const layer: RoundLayer = 'lp';
+    const kind: RoundKind = 'lp';
     const stage: RoundStage = 'mint';
-    expect(stageRound(layer, stage, 3).status).toBe('open');
-    expect(RoundAxis.stage(layer, stage, 3).status).toBe('open');
+    expect(stageRound(kind, stage, 3).status).toBe('open');
+    expect(RoundAxis.stage(kind, stage, 3).status).toBe('open');
     expect(RoundAxis.governanceMintWindow(2)).toEqual({ status: 'open', round: 1 });
   });
 });

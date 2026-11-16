@@ -15,7 +15,7 @@
 | **空数组 + 0** | `ActionTarget.memberIdsByActionId`、`ActionTarget.isJoinedByRound` |
 | **静默 0** | `LpExecutor.joinedAmountByActionId/ByMemberId`、`GroupServiceExecutor.joinedAmountByActionId/ByMemberId`、各 `memberReward` |
 
-`CONTEXT.md:28` 明确规定的是**回滚**：“结果小于 `1` 表示该阶段尚未开始，查询回滚而不返回 `0`”。行动层两个返回空/0 的实现直接违反这条。
+`CONTEXT.md:28` 明确规定的是**回滚**：“结果小于 `1` 表示该阶段尚未开始，查询回滚而不返回 `0`”。行动合约两个返回空/0 的实现直接违反这条。
 
 另有一处更细的偏差：`Stake._checkRoundStarted` 只拦 `round > currentRound`，`round = 0` 不进回滚分支，会一路读到历史索引返回 0（`RoundHistoryUint256.value(0)` 无键时返回 0）。
 

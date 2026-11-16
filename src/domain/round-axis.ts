@@ -1,5 +1,8 @@
 /**
- * Phase → Round axes for every protocol layer.
+ * Phase → Round axes for the four round kinds（治理轮 / LP 行动轮 / 链群行动轮 / 链群服务轮）。
+ *
+ * 一个阶段(Phase)是全局时钟的一格；一个轮次(Round)是把相邻几格串起来的流水线。
+ * 第 X 轮的各环节分别落在阶段 X、X+1、X+2、X+3（环节数量按轮次类型不同）。
  *
  * Facts (matt-gov/CONTEXT.md, quoted in .research/domain-model.md §3):
  *   currentPhase = p
@@ -16,15 +19,15 @@
  * Pure TypeScript. No React, no window, no chain SDKs.
  */
 
-export const ROUND_LAYERS = ['governance', 'lp', 'group-action', 'group-service'] as const;
-export type RoundLayer = (typeof ROUND_LAYERS)[number];
+export const ROUND_KINDS = ['governance', 'lp', 'group-action', 'group-service'] as const;
+export type RoundKind = (typeof ROUND_KINDS)[number];
 
 export const ROUND_STAGES = ['vote', 'join', 'verify', 'mint'] as const;
 export type RoundStage = (typeof ROUND_STAGES)[number];
 
 export interface OpenStageRound {
   readonly status: 'open';
-  readonly layer: RoundLayer;
+  readonly kind: RoundKind;
   readonly stage: RoundStage;
   readonly phase: number;
   readonly offset: number;
@@ -34,7 +37,7 @@ export interface OpenStageRound {
 
 export interface AwaitingPhaseEndStageRound {
   readonly status: 'awaiting-phase-end';
-  readonly layer: 'governance';
+  readonly kind: 'governance';
   readonly stage: 'mint';
   readonly phase: number;
   readonly offset: 0;
@@ -45,7 +48,7 @@ export interface AwaitingPhaseEndStageRound {
 
 export interface NotStartedStageRound {
   readonly status: 'not-started';
-  readonly layer: RoundLayer;
+  readonly kind: RoundKind;
   readonly stage: RoundStage;
   readonly phase: number;
   readonly offset: number;
@@ -58,7 +61,7 @@ export interface NotStartedStageRound {
 
 export interface NotApplicableStageRound {
   readonly status: 'not-applicable';
-  readonly layer: RoundLayer;
+  readonly kind: RoundKind;
   readonly stage: RoundStage;
   readonly phase: number;
   readonly reason: 'stage-does-not-exist';
@@ -67,12 +70,12 @@ export interface NotApplicableStageRound {
 export type StageRoundResult =
   OpenStageRound | AwaitingPhaseEndStageRound | NotStartedStageRound | NotApplicableStageRound;
 
-interface LayerAxis {
+interface KindAxis {
   readonly offsets: Partial<Readonly<Record<RoundStage, number>>>;
   readonly stagesWithoutUserAction: readonly RoundStage[];
 }
 
-const AXES: Readonly<Record<RoundLayer, LayerAxis>> = Object.freeze({
+const AXES: Readonly<Record<RoundKind, KindAxis>> = Object.freeze({
   governance: Object.freeze({
     offsets: Object.freeze({ vote: 0, mint: 0 }),
     stagesWithoutUserAction: [] as readonly RoundStage[],
@@ -92,7 +95,7 @@ const AXES: Readonly<Record<RoundLayer, LayerAxis>> = Object.freeze({
   }),
 });
 
-export const STAGE_ORDER: Readonly<Record<RoundLayer, readonly RoundStage[]>> = Object.freeze({
+export const STAGE_ORDER: Readonly<Record<RoundKind, readonly RoundStage[]>> = Object.freeze({
   governance: ['vote', 'mint'],
   lp: ['vote', 'join', 'mint'],
   'group-action': ['vote', 'join', 'verify', 'mint'],
@@ -107,18 +110,18 @@ export function assertPhase(phase: number): void {
   }
 }
 
-function requiresUserAction(layer: RoundLayer, stage: RoundStage): boolean {
-  return !AXES[layer].stagesWithoutUserAction.includes(stage);
+function requiresUserAction(kind: RoundKind, stage: RoundStage): boolean {
+  return !AXES[kind].stagesWithoutUserAction.includes(stage);
 }
 
-/** Stage order, with stages that do not exist in this layer removed. */
-export function stageOrder(layer: RoundLayer): readonly RoundStage[] {
-  return STAGE_ORDER[layer];
+/** Stage order, with stages that do not exist in this kind removed. */
+export function stageOrder(kind: RoundKind): readonly RoundStage[] {
+  return STAGE_ORDER[kind];
 }
 
 /** The offset table as data, for advanced views/tests. Never mutate the returned copy. */
-export function roundOffsets(layer: RoundLayer): Readonly<Partial<Record<RoundStage, number>>> {
-  return AXES[layer].offsets;
+export function roundOffsets(kind: RoundKind): Readonly<Partial<Record<RoundStage, number>>> {
+  return AXES[kind].offsets;
 }
 
 /**
@@ -130,13 +133,13 @@ export function roundOffsets(layer: RoundLayer): Readonly<Partial<Record<RoundSt
  *   stageRound('governance', 'mint', 4)
  *     // { status: 'awaiting-phase-end', round: 4, opensAtPhase: 5, ... }
  */
-export function stageRound(layer: RoundLayer, stage: RoundStage, phase: number): StageRoundResult {
+export function stageRound(kind: RoundKind, stage: RoundStage, phase: number): StageRoundResult {
   assertPhase(phase);
 
-  if (layer === 'governance' && stage === 'mint') {
+  if (kind === 'governance' && stage === 'mint') {
     return {
       status: 'awaiting-phase-end',
-      layer,
+      kind,
       stage,
       phase,
       offset: 0,
@@ -146,11 +149,11 @@ export function stageRound(layer: RoundLayer, stage: RoundStage, phase: number):
     };
   }
 
-  const offset = AXES[layer].offsets[stage];
+  const offset = AXES[kind].offsets[stage];
   if (offset === undefined) {
     return {
       status: 'not-applicable',
-      layer,
+      kind,
       stage,
       phase,
       reason: 'stage-does-not-exist',
@@ -161,30 +164,30 @@ export function stageRound(layer: RoundLayer, stage: RoundStage, phase: number):
   if (round < 1) {
     return {
       status: 'not-started',
-      layer,
+      kind,
       stage,
       phase,
       offset,
       computedRound: round,
       opensAtPhase: offset + 1,
-      requiresUserAction: requiresUserAction(layer, stage),
+      requiresUserAction: requiresUserAction(kind, stage),
     };
   }
 
   return {
     status: 'open',
-    layer,
+    kind,
     stage,
     phase,
     offset,
     round,
-    requiresUserAction: requiresUserAction(layer, stage),
+    requiresUserAction: requiresUserAction(kind, stage),
   };
 }
 
-/** All stages of a layer, including not-applicable entries. */
-export function layerStages(layer: RoundLayer, phase: number): readonly StageRoundResult[] {
-  return STAGE_ORDER[layer].map((stage) => stageRound(layer, stage, phase));
+/** All stages of a kind, including not-applicable entries. */
+export function kindStages(kind: RoundKind, phase: number): readonly StageRoundResult[] {
+  return STAGE_ORDER[kind].map((stage) => stageRound(kind, stage, phase));
 }
 
 export type GovernanceMintWindow =
@@ -210,7 +213,7 @@ export function governanceMintWindow(phase: number): GovernanceMintWindow {
  */
 export const RoundAxis = Object.freeze({
   stage: stageRound,
-  stages: layerStages,
+  stages: kindStages,
   order: stageOrder,
   offsets: roundOffsets,
   governanceMintWindow,

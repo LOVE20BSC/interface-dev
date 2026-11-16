@@ -14,7 +14,7 @@
 - **视图路径** `proposalRewardByProposalId`（未 prepare 时）；
 - **写路径** `prepareRewardIfNeeded`、`mintProposalReward`。
 
-行动层的每个“可铸金额”最终都走这条路径（`ActionTarget.actionReward → Mint.proposalRewardByProposalId`），所以它不是冷门接口，而是**行动激励报价的唯一入口**。
+行动合约的每个“可铸金额”最终都走这条路径（`ActionTarget.actionReward → Mint.proposalRewardByProposalId`），所以它不是冷门接口，而是**行动激励报价的唯一入口**。
 
 ## 证据
 

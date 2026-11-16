@@ -85,7 +85,7 @@ function mintMemberRewards(
 }
 ```
 
-行动层唯一的按成员索引是**当前加入集合**，退出即删，拿不到历史：
+行动合约唯一的按成员索引是**当前加入集合**，退出即删，拿不到历史：
 
 ```
 // action/src/ActionTarget.sol:233-242
@@ -124,7 +124,7 @@ function actionIdsByMemberId(address tokenAddress, uint256 memberId, uint256 off
        external view returns (uint256[] memory rounds, uint256[] memory voteRewards, uint256[] memory boostRewards, bool[] memory minted);
    ```
    前端一次调用拿到“可铸/已铸/金额”，`mintGovRewards` 的入参也从这里来。
-3. 行动层同理：`ActionTarget` 增加 `joinedRoundsByMemberId(tokenAddress, memberId, ...)`（按 `registerJoinState` 记录，`clearJoinState` 不删历史），或在 `ExecutorBase` 增加 `memberRewardRounds(tokenAddress, actionId, memberId, ...)`。
+3. 行动合约同理：`ActionTarget` 增加 `joinedRoundsByMemberId(tokenAddress, memberId, ...)`（按 `registerJoinState` 记录，`clearJoinState` 不删历史），或在 `ExecutorBase` 增加 `memberRewardRounds(tokenAddress, actionId, memberId, ...)`。
 4. 若这轮只想做一件事：**先做第 1 条**。M0 只承诺身份与铸造，但 `votedRoundsByMemberId` 是 M1 所有“我的激励”页面的地基，且是纯加法。
 
 ## 临时前端绕过方案
