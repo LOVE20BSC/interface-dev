@@ -1218,6 +1218,7 @@ const restoreAnchorFocus = (event: Event) => {
 | 命名 | `<page>-<state>-<theme>-<viewport>.png` | `e2e/transfer-numbers.spec.ts:484,501,524,544`（`form-light-mobile.png` 等） |
 | 主题怎么切 | 写 `love20:theme` 后**真实加载一次**，断言 `html[data-theme]` | `e2e/transfer-numbers.spec.ts:450-459` |
 | 用途 | 验收证据，不是装饰：三线文档 §3 与 STATUS 都指向具体文件名 | `docs/STATUS.md:35`（逐前缀计数）、`three-line/batch-transfer.md:206`（「截图 12 张已刷新」） |
+| **每次重跑都会改写文件字节** | 同一次改动、同一套 UI，重跑全量 e2e 后仍有 ~65 张 PNG 因渲染噪声字节变化（差几十到几百字节，肉眼无差）。**提交前先看 `git status docs/product/screenshots/`**：UI 没变就把这些 PNG 从暂存区撤掉，别让 65 个二进制混进一个格式/文档提交（见 §10.11） | 2026-11-17 实测：`git diff --stat` 显示 65 个 `Bin N -> M bytes`，`0 insertions` |
 
 ### 7.10 断言纪律：禁止宽松匹配
 
@@ -1524,6 +1525,13 @@ git config --get core.hooksPath           # 应输出 .githooks
 - **根因**：`pnpm run` 的 `--` 会被原样转发到脚本参数里；`scripts/e2e-chain.mjs` 只剥自己的 `--ensure-only` / `--reset-chain`，其余参数原样透传，于是 `--` 也进了 Playwright 的参数数组，过滤失效。
 - **正确写法**：直接 `pnpm e2e --grep "流动性"`，不加 `--`。
 - **证据**：`ledger/worklog/202611/16-1438-c467-社区流动性查询-按旧库-tkm-布局重做并支持查询任意地址的流动性.md:78-79`（原文记录了这次踩坑与正确写法）。
+
+### 10.11 重跑 e2e 会改写截图字节，容易误带进提交
+
+- **现象**：只跑了一次全量 e2e 做验证，`git status` 里冒出 65 个 `docs/product/screenshots/*.png`；一个本该「只改文档/格式」的提交因此混进 65 个二进制文件。
+- **根因**：截图由 e2e 幂等覆盖写，但渲染噪声（子像素抗锯齿、字体 hinting）让同画面的 PNG 每次字节都不同——不是 UI 变化。
+- **正确写法**：提交前 `git status docs/product/screenshots/`；**只有 UI 真的变了才暂存这些 PNG**，否则 `git restore --staged docs/product/screenshots`（工作区文件留着无妨，它已被 `.gitignore` 之外的仓库跟踪，下次 e2e 再刷新）。
+- **证据**：2026-11-17 全仓格式化验证跑完后，`git diff --stat HEAD~1 HEAD -- docs/product/screenshots` = 65 files changed, **0 insertions**, 全是 `Bin 65897 -> 65816 bytes` 这类字节差。
 
 ---
 
