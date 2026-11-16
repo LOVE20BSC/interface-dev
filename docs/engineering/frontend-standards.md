@@ -158,7 +158,7 @@
 | G4 | CJK 文案范围 | `src/architecture.test.ts:158-163,198-206`（仅测试） | `pnpm test` | 通 |
 | G5 | TS 严格档 | `tsconfig.json:14-26`、`tsconfig.node.json:14-18` | `pnpm typecheck` | 通 |
 | G6 | type-only 导入 / 未使用变量 | `eslint.config.js:82-89` | `pnpm lint`（`verbatimModuleSyntax` 在 `pnpm typecheck` 二次兜底） | 通 |
-| G7 | 代码格式 | `.prettierrc.json:1-9`、`eslint.config.js:192` | `pnpm format:check`（**不在 CI**） | 见 3.8 |
+| G7 | 代码格式 | `.prettierrc.json:1-9`、`.prettierignore`、`eslint.config.js:192` | `pnpm check` 第一步（`pnpm format:check`） | 2026-11-17 起入门禁，见 3.8 |
 | G8 | 首屏包体预算 + 钱包 SDK 字节扫描 | `scripts/check-bundle.mjs:11-30,92-121` | `pnpm build` | 159.2/160 kB |
 | G9 | CI 顺序门禁 | `.github/workflows/deploy.yml:124-159` | GitHub Actions | — |
 | G10 | 提交前快速门禁 | `.githooks/pre-commit:36` → `pnpm check`（`package.json:16`） | `git commit` | 已落地并装在本 clone，见 §9.2、§11.1 |
@@ -410,7 +410,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 | `bracketSpacing` | `true` | `.prettierrc.json:8` |
 | `endOfLine` | `lf` | `.prettierrc.json:9` |
 | 与 ESLint 的关系 | `eslint-config-prettier` 关闭所有格式类 lint 规则（`eslint.config.js:5,192`） | 格式只由 Prettier 判定 |
-| 忽略 | `node_modules`、`dist*`、`coverage`、`pnpm-lock.yaml`、`.research`、`docs`、`errors.generated.ts`、`build-id.generated.ts`（`.prettierignore:1-11`；`:13-16` 是同一批「只读输入」的重复声明） | — |
+| 忽略 | `node_modules`、`dist*`、`coverage`、`pnpm-lock.yaml`、`.research`、`docs`、`errors.generated.ts`、`build-id.generated.ts`、`GLOSSARY.md`、**`ledger/`**（`.prettierignore:1-19`） | `ledger/` 由外部台账工具写表头，格式化会被工具改回，故永不参与 |
 
 **反例**
 
@@ -423,7 +423,7 @@ const opts = { a: 1 }
 `pnpm format:check` 失败（双引号、缺分号、缺尾逗号）。
 **正确写法**：`const label = '连接钱包';` / `const opts = { a: 1, };`
 
-**这条不是 CI 门禁**：`.github/workflows/deploy.yml:124-159` 只跑 typecheck / lint / test / build；`package.json:16` 的 `check` 也不含 `format:check`；`.githooks/pre-commit:36` 同样只跑 `pnpm check`。格式目前靠编辑器与本地 `pnpm format:check`；是否升级为门禁见 §11.2 D1（待 owner 决定）。
+**2026-11-17 起它是门禁（owner 选 A，见 §11.2 D1）**：`package.json` 的 `check` 现在是 `format:check → typecheck → lint → test`，所以 `pnpm check` 与 pre-commit 钩子都会拦；CI 的 `check` job 也加了独立的 `pnpm format:check` 步（`.github/workflows/deploy.yml`）。执行方式：先全仓一次性格式化（独立 `chore(format)` 提交，71 个文件、只动换行与缩进），再把门禁打开——**平时不要手工跑 `pnpm format` 之外的全仓写入**，只格式化自己改的文件即可。
 
 ### 3.9 首屏包体预算（G8）
 
@@ -461,14 +461,14 @@ const loadMintPage = () => import('@/pages/mint/mint-page');
 | job | 行号 | 步骤（顺序即失败顺序） |
 | --- | --- | --- |
 | `prepare` | `:50-122` | 按仓库名解析变体（含 `dev` → dev；含 `test` → test；否则 prod，`:74-83`），默认 base `/interface-dev/`、`/interface-test/`、`/`（`:88-96`），`vars.VITE_ENV` / `vars.VITE_BASE` / `vars.VITE_SITE_ORIGIN` 显式覆盖 |
-| `check` | `:124-159` | 拒绝被跟踪的 `.account`（`:130-135`）→ pnpm 11.5.1（`:137-139`）→ Node 24（`:141-144`）→ `pnpm install --frozen-lockfile`（`:146-147`）→ `pnpm typecheck`（`:149-150`）→ `pnpm lint`（`:152-153`）→ `pnpm test`（`:155-156`）→ `pnpm build`（`:158-159`） |
+| `check` | `:124-159` | 拒绝被跟踪的 `.account`（`:130-135`）→ pnpm 11.5.1（`:137-139`）→ Node 24（`:141-144`）→ `pnpm install --frozen-lockfile`（`:146-147`）→ `pnpm typecheck`（`:149-150`）→ `pnpm lint`（`:152-153`）→ `pnpm format:check`（2026-11-17 新增）→ `pnpm test`（`:155-156`）→ `pnpm build`（`:158-159`） |
 | `build` | `:161-199` | 再装一次 → `pnpm build`（`:182-187`，注入 `VITE_ENV`/`VITE_BASE`/`VITE_SITE_ORIGIN`）→ `configure-pages` → `upload-pages-artifact` |
 | `deploy` | `:201-214` | `deploy-pages`（`permissions: pages: write, id-token: write`） |
 
 CI 明确不做的两件事：
 
 - ABI 漂移门禁（`pnpm abis:check`）不在这个 workflow：注释 `:189-191` 说明该 checkout 没有 forge / 兄弟仓库。
-- 不跑 e2e、不跑 `format:check`。
+- 不跑 e2e（需要 anvil 链）。`format:check` 自 2026-11-17 起已在 `check` job 里，不再属于缺口。
 
 `pnpm build` 自身是一条 5 段链：`gen-build-id` → `pnpm typecheck` → `vite build` → `postbuild` → `check-bundle`（`package.json:12`）；所以「CI 的 build 步」= 类型 + 产物 + 404.html + 包体门禁。
 
@@ -480,7 +480,6 @@ CI 明确不做的两件事：
 | 相对路径越层只在测试里拦 | `eslint.config.js:28-33` 仅 `@/…`；`src/architecture.test.ts:82-88` | 依赖 `pnpm test`；只跑 lint 会漏 |
 | 测试文件里的相对路径越层两边都不拦 | ESLint 层规则含测试文件但只匹配 `@/…`（`:23,28-33`）；测试排除测试文件（`:51`） | 测试代码可绕过依赖方向，需自觉 |
 | `src/` 根文件与 `src/test/` 不受依赖规则 | `src/architecture.test.ts:52,58` | `main.tsx` 可 import 任意层（实际只 import `@/app`，`src/main.tsx:4-6`） |
-| 格式无门禁 | `.github/workflows/deploy.yml:124-159`；`package.json:16` | 见 3.8 |
 | 依赖黑白名单无机器校验 | `package.json:33-45` 无脚本校验；只有 `scripts/check-bundle.mjs:108-121` 扫钱包 SDK 字节 | 新增依赖只能靠 review + 包体实测 |
 | 构建配置里的中文不受 CJK 门禁约束 | `vite.config.ts:65`（`og:image:alt` 中文）；门禁只扫 `src/`（`src/architecture.test.ts:49-59`） | 属已知缺口（门禁只扫 `src/`），见 §11.3 S1 |
 
@@ -1352,7 +1351,7 @@ CI 走同一条链、多一步构建：Typecheck → Lint → Unit tests → Bui
 
 | 用途 | 脚本 |
 | --- | --- |
-| 门禁 | `check`（= typecheck + lint + test）、`typecheck`、`lint`、`test`、`format:check`（`prettier --check .`，不在 `check` 里，改动格式时手动跑） |
+| 门禁 | `check`（= **format:check** + typecheck + lint + test）、`typecheck`、`lint`、`test`、`format:check`（`prettier --check .`） |
 | 构建/预览 | `dev`、`build`、`preview` |
 | e2e | `e2e`、`e2e:ensure-chain`、`e2e:reset-chain` |
 | 生成/同步 | `gen:errors`、`sync:anvil`、`sync:network`、`abis:check` |
@@ -1549,7 +1548,7 @@ git config --get core.hooksPath           # 应输出 .githooks
 
 | # | 决定 | 现状 | 建议 |
 | --- | --- | --- | --- |
-| D1 | **Prettier 要不要变成门禁** | `pnpm format:check` 当前在 **118 个文件**上失败（47 md / 44 ts / 21 tsx / 3 mjs / 3 json）；CI 与钩子都不跑它，格式从来不是硬门槛 | 建议一次性全仓格式化（单独一个 `chore(format)` 提交，不含功能改动），之后把 `format:check` 加进 `pnpm check`。**代价**：那次提交会改动 ~118 个文件；**收益**：之后每次提交都干净，格式讨论永久消失。若选「维持现状」，则规范写明「不要跑全仓 `pnpm format`，只格式化自己改的文件」 |
+| D1 | **Prettier 要不要变成门禁** | **已决 2026-11-17：选 A**。一次性全仓格式化（71 个文件，`ledger/` 加入 `.prettierignore`）→ `format:check` 并入 `pnpm check` → CI 加独立步。现状：`pnpm format:check` 全绿，格式是 [门禁] | — |
 | D2 | **format:check / e2e 要不要进 CI** | CI 只有 typecheck / lint / test / build；e2e 需要 anvil 链（约 10 分钟） | e2e 进 CI 的成本是每次 10 分钟 + 起链脚本；当前选择是本地跑、CI 不跑。若 M1 开始并行开发，建议至少给 `main` 加一条 nightly e2e |
 | D3 | **三线校验端口是否强制钉死** | 规范钉 8566；实际任务里出现过 8569 / 8574（原因未记录） | 建议强制「换端口必须在三线文档 §0 写明本次端口与原因」，避免复现时对不上环境 |
 
@@ -1581,3 +1580,4 @@ git config --get core.hooksPath           # 应输出 .githooks
 | 日期 | 变更 | 决策 |
 | --- | --- | --- |
 | 2026-11-17 | 首版：新增入口 `AGENTS.md` + 3 个指针 shim + 本规范（11 章）+ `pnpm check` + pre-commit 钩子 + README 文档索引 | owner 选 A 档（完整规范 + 轻量 pre-commit） |
+| 2026-11-17 | **D1 执行**：`ledger/` 加入 `.prettierignore`；全仓一次性格式化（71 文件 / 522+ 556- 行，纯换行与缩进）；`format:check` 并入 `pnpm check` 与 CI `check` job；`pnpm format:check` 从 118 文件失败变为全绿 | owner 选 A（一次性付清 + 纳入门禁） |

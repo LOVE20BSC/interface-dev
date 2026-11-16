@@ -152,6 +152,12 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # Same gate as the local pre-commit hook (`pnpm check` starts with this).
+      # Added 2026-11-17 with the one-off repo-wide format commit (owner chose
+      # to make Prettier a real gate instead of a config nobody ran).
+      - name: Format check
+        run: pnpm format:check
+
       - name: Unit tests
         run: pnpm test
 

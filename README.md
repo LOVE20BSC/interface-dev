@@ -28,7 +28,7 @@ pnpm dev            # http://127.0.0.1:5173
 pnpm typecheck
 pnpm lint
 pnpm test
-pnpm check          # typecheck + lint + test（pre-commit 钩子跑的就是这个）
+pnpm check          # format:check + typecheck + lint + test（pre-commit 钩子跑的就是这个）
 pnpm build          # typecheck + vite build + 404.html + bundle gate
 pnpm preview        # http://127.0.0.1:4173
 pnpm e2e            # Playwright, requires browsers; runs `vite preview`
@@ -44,21 +44,21 @@ pnpm gen:errors     # regenerate src/config/errors.generated.ts
 `CLAUDE.md`、`.github/copilot-instructions.md`、`.cursor/rules/love20.mdc` 是**只写指针的 shim**，
 由 `src/architecture.test.ts` 强制（必须指向 `AGENTS.md` 且 ≤30 行），避免规则多处漂移。
 
-| 主题 | 文档 |
-| --- | --- |
-| 术语与中文纪律 | [GLOSSARY.md](GLOSSARY.md) |
-| 交互规格（设计原则、授权阶梯、pending 三态、nonce 口径） | [docs/product/m0-ux-spec.md](docs/product/m0-ux-spec.md) |
-| 三线校验（读链上数值的页面必须有） | [docs/product/three-line-verification.md](docs/product/three-line-verification.md) |
-| 文案审查口径 | [docs/product/copy-audit.md](docs/product/copy-audit.md) |
-| e2e 的链隔离硬边界与 harness 守卫 | [e2e/README.md](e2e/README.md) |
-| 技术决策（不可回退） | [docs/adr/](docs/adr/) |
-| 已知合约缺陷（不绕过、不硬编码） | [docs/contract-issues/](docs/contract-issues/) |
-| 交付与验收状态 | [docs/STATUS.md](docs/STATUS.md) |
+| 主题                                                     | 文档                                                                               |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 术语与中文纪律                                           | [GLOSSARY.md](GLOSSARY.md)                                                         |
+| 交互规格（设计原则、授权阶梯、pending 三态、nonce 口径） | [docs/product/m0-ux-spec.md](docs/product/m0-ux-spec.md)                           |
+| 三线校验（读链上数值的页面必须有）                       | [docs/product/three-line-verification.md](docs/product/three-line-verification.md) |
+| 文案审查口径                                             | [docs/product/copy-audit.md](docs/product/copy-audit.md)                           |
+| e2e 的链隔离硬边界与 harness 守卫                        | [e2e/README.md](e2e/README.md)                                                     |
+| 技术决策（不可回退）                                     | [docs/adr/](docs/adr/)                                                             |
+| 已知合约缺陷（不绕过、不硬编码）                         | [docs/contract-issues/](docs/contract-issues/)                                     |
+| 交付与验收状态                                           | [docs/STATUS.md](docs/STATUS.md)                                                   |
 
 ### Pre-commit 门禁
 
 `pnpm hooks:install` 把本 clone 的 `core.hooksPath` 指向仓库内的 `.githooks/`（git 配置不入库，
-换机器要重跑一次）。钩子调 `pnpm check`（typecheck + lint + 单测），**不跑** `pnpm build` 与
+换机器要重跑一次）。钩子调 `pnpm check`（格式 + typecheck + lint + 单测），**不跑** `pnpm build` 与
 `pnpm e2e`（慢、要链）。只改文档的提交自动跳过；逃生口 `SKIP_PRE_COMMIT=1 git commit …`
 （用过请在提交信息里说明）。CI 仍是最终底线，钩子只是把反馈提前。
 
