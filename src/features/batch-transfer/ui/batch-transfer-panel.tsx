@@ -274,6 +274,14 @@ export function BatchTransferPanel({
   // After an approve confirmation the allowance is re-read; keep the CTA disabled
   // until that read lands so the same total cannot be approved twice in a row.
   const approvalRefreshing = mode === 'token' && allowance.isFetching;
+  /**
+   * owner 2026-11-17: 预余额表的刷新就是基线刷新。While a refresh is in flight the
+   * numbers on screen are the previous read, so submitting would record a baseline
+   * that is no longer true — block it, exactly like `approvalRefreshing`.
+   * (`isLoading` is the first read, which has no numbers to protect and already
+   * leaves `values` undefined; only a re-read of an already-shown batch blocks.)
+   */
+  const balancesRefreshing = recipientBalances.isFetching && !recipientBalances.isLoading;
   // 重复地址不合并也不提交：解析器已排除重复行，这里把「有重复」也算进不可提交条件。
   const rowsValid =
     parse.rows.length > 0 && parse.errors.length === 0 && parse.duplicates.length === 0;
@@ -323,6 +331,7 @@ export function BatchTransferPanel({
     (mode === 'native' || (token?.address !== undefined && allowance.value !== undefined));
   const actionEnabled =
     !approvalRefreshing &&
+    !balancesRefreshing &&
     !knownBlocked &&
     (mode === 'token' && needsApproval ? canApprove : canBatch);
 
@@ -344,6 +353,8 @@ export function BatchTransferPanel({
   const submit = () => {
     // 智能资产保护 是硬门禁：即使 CTA 状态过期，也绝不把已知合约收款方发出去。
     if (knownBlocked) return;
+    // 基线必须等于表里当前读数：刷新还没落地就不提交（回执会拿错基线对比）。
+    if (balancesRefreshing) return;
     const request = buildRequest();
     if (request === undefined) return;
     if (mode === 'token' && needsApproval) {
@@ -935,7 +946,9 @@ export function BatchTransferPanel({
         </details>
       </Card>
 
-      {/* 区块 6：预余额核对（主按钮之后，提交前逐行核对用） */}
+      {/* 区块 6：预余额核对（主按钮之后，提交前逐行核对用）。
+          标题行常驻「刷新」；刷新中保留旧数字、禁用主按钮——刷新后的读数就是
+          提交时的转账前基线（owner 2026-11-17）。 */}
       <BatchEntryTable
         rows={parse.rows}
         balances={recipientBalances.values}
@@ -944,7 +957,9 @@ export function BatchTransferPanel({
         decimals={decimals}
         loading={recipientBalances.isLoading}
         error={recipientBalances.isError}
-        onRetry={recipientBalances.refetch}
+        refreshing={recipientBalances.isFetching}
+        refreshDisabled={busy}
+        onRefresh={recipientBalances.refetch}
       />
     </div>
   );

@@ -7,7 +7,15 @@ import type { BatchMode } from '@/features/batch-transfer/lib/batch-types';
 export interface BatchRecipientBalances {
   /** Aligned to the requested address array; `undefined` while loading/unreadable. */
   readonly values: readonly (bigint | undefined)[];
+  /** First read only: nothing has landed yet, so the numbers are still 「—」. */
   readonly isLoading: boolean;
+  /**
+   * Any read in flight, including a manual refresh (owner 2026-11-17). While this is
+   * true the numbers on screen may already be stale, so the table keeps showing the
+   * previous values and the panel blocks submission — the displayed values are the
+   * receipt's baseline and must be current at submit time.
+   */
+  readonly isFetching: boolean;
   readonly isError: boolean;
   readonly refetch: () => void;
 }
@@ -63,6 +71,7 @@ export function useBatchRecipientBalances(
   return {
     values: toValues(data, addresses.length),
     isLoading: addresses.length > 0 && active.isLoading,
+    isFetching: addresses.length > 0 && active.isFetching,
     isError: active.isError,
     refetch: () => {
       void active.refetch();

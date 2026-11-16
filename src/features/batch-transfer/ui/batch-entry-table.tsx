@@ -3,7 +3,6 @@ import { formatVisibleTokenAmount } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';
 import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { RefreshCw } from '@/shared/ui/icons';
-import { Skeleton } from '@/shared/ui/skeleton';
 import type { BatchParsedRow } from '@/features/batch-transfer/lib/batch-parse';
 
 export interface BatchEntryTableProps {
@@ -16,8 +15,11 @@ export interface BatchEntryTableProps {
   readonly decimals: number;
   readonly loading: boolean;
   readonly error: boolean;
-  /** D6: read failures are recoverable — the table offers a re-read action. */
-  readonly onRetry?: (() => void) | undefined;
+  /** A read is in flight (first read or a refresh): the button shows it and locks. */
+  readonly refreshing: boolean;
+  /** Submission is in flight: refreshing would race the baseline the receipt records. */
+  readonly refreshDisabled: boolean;
+  readonly onRefresh: () => void;
 }
 
 /**
@@ -27,6 +29,13 @@ export interface BatchEntryTableProps {
  * Repeated addresses are not rows at all — the panel lists them under the input
  * as 「与第 N 行重复」 and blocks submission until the user deletes one line.
  * Read failures render 「—」; nothing here is ever invented.
+ *
+ * owner 2026-11-17: the header carries a permanent 「刷新」 button that re-reads the
+ * whole batch. A refresh keeps the numbers that are already on screen (no flicker
+ * back to 「—」, no table skeleton); the panel blocks submission until it lands, so
+ * what the receipt records as the 「到账前」 baseline is exactly what the user saw.
+ * That same button is the D6 recovery path: a failed read leaves only the
+ * explanation line here, with one actionable control instead of two.
  */
 export function BatchEntryTable({
   rows,
@@ -36,15 +45,31 @@ export function BatchEntryTable({
   decimals,
   loading,
   error,
-  onRetry,
+  refreshing,
+  refreshDisabled,
+  onRefresh,
 }: BatchEntryTableProps) {
   if (rows.length === 0) return null;
 
   return (
     <div className="mt-3" data-testid="batch-transfer-rows">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium text-muted">{copy.batchTransfer.preBalanceTitle}</p>
-        {loading ? <Skeleton className="h-3 w-16" /> : null}
+        <p className="min-w-0 text-xs font-medium text-muted">
+          {copy.batchTransfer.preBalanceTitle}
+        </p>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="h-7 shrink-0 rounded-lg px-2 text-[11px]"
+          data-testid="batch-transfer-rows-refresh"
+          aria-label={copy.batchTransfer.preBalanceRefreshAria}
+          onClick={onRefresh}
+          disabled={refreshDisabled}
+          loading={refreshing}
+          leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
+        >
+          {copy.common.refresh}
+        </Button>
       </div>
       <div className="mt-1.5 overflow-hidden rounded-2xl border border-line">
         <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_6rem] gap-2 bg-elevated px-3 py-1.5 text-[11px] font-medium text-muted">
@@ -98,22 +123,12 @@ export function BatchEntryTable({
         </ul>
       </div>
       {error ? (
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <p className="min-w-0 text-[11px] leading-4 text-muted">
-            {copy.batchTransfer.preBalanceError}
-          </p>
-          {onRetry !== undefined ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              data-testid="batch-transfer-rows-retry"
-              onClick={onRetry}
-              leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
-            >
-              {copy.batchTransfer.retry}
-            </Button>
-          ) : null}
-        </div>
+        <p
+          className="mt-1.5 text-[11px] leading-4 text-muted"
+          data-testid="batch-transfer-rows-error"
+        >
+          {copy.batchTransfer.preBalanceError}
+        </p>
       ) : null}
     </div>
   );

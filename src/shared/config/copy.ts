@@ -115,9 +115,7 @@ export const copy = {
     identityInvalidated: '这个身份 NFT 已不属于当前钱包',
     chooseIdentityTitle: '还没有选择当前身份 NFT',
     chooseIdentityBody: '这个钱包持有身份 NFT。去「我的 NFT」选一个作为当前身份 NFT。',
-    eligibilityTitle: '你参与了销毁活动，获得空投铸造资格',
     mintAirdrop: '空投铸造',
-    eligibilityUnavailable: '空投资格暂时读不到',
     /** Reminder card 1: no identity yet. */
     reminderNoIdentityTitle: '你还没有身份 NFT',
     mintIdentity: '铸造身份 NFT',

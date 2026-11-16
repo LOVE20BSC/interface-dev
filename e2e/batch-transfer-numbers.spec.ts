@@ -7,7 +7,7 @@ import {
   encodeFunctionResult,
   parseAbi,
 } from 'viem';
-import { isolateChain } from './chain';
+import { anvilRpc, isolateChain } from './chain';
 import { connect, installWallet, RPC_URL } from './wallet-stub';
 
 /**
@@ -175,6 +175,54 @@ async function failReadsWithSelector(
   await page.route(RPC_URL_PATTERN, handler);
   return async () => {
     await page.unroute(RPC_URL_PATTERN, handler);
+  };
+}
+
+/**
+ * 刷新中的观感（owner 2026-11-17）：把 `nativeBalances` 的读按住不放，让页面停在
+ * 「刷新中」这个状态，用来断言按钮 `aria-busy`、旧数字不被抹成「—」、主按钮禁用。
+ * `release()` 之后请求照常发出，页面拿到新读数。没命中目标选择器的请求直接放行。
+ */
+async function holdReadsWithSelector(
+  page: Page,
+  selector: string,
+): Promise<{ release: () => Promise<void> }> {
+  const needle = selector.toLowerCase().replace(/^0x/, '');
+  let openGate!: () => void;
+  const gate = new Promise<void>((resolveGate) => {
+    openGate = resolveGate;
+  });
+  // Held handlers still owe one `route.continue()`. Unrouting while one is parked
+  // on the gate makes Playwright abort that route, and the resume then throws
+  // 「Route is already handled!」— which fails the test with a misleading error.
+  // (2026-11-17: flaked only in the full suite, where the resume/teardown race is
+  // easy to lose.) So release() waits for the parked handlers to finish.
+  let held = 0;
+  let idle!: () => void;
+  const whenIdle = new Promise<void>((resolveIdle) => {
+    idle = resolveIdle;
+  });
+  const handler = async (route: Route): Promise<void> => {
+    if (!(route.request().postData() ?? '').toLowerCase().includes(needle)) {
+      await route.continue();
+      return;
+    }
+    held += 1;
+    try {
+      await gate;
+      await route.continue();
+    } finally {
+      held -= 1;
+      if (held === 0) idle();
+    }
+  };
+  await page.route(RPC_URL_PATTERN, handler);
+  return {
+    release: async () => {
+      openGate();
+      if (held > 0) await whenIdle;
+      await page.unroute(RPC_URL_PATTERN, handler);
+    },
   };
 }
 
@@ -587,8 +635,11 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await connect(page);
     await fillBatch(page, [`${R5} 0.01`, `${R7} 0.02`]);
 
-    // 预余额读失败：行余额是 —（不是 0）+ 表下说明 + 「重新读取」；主按钮仍可提交。
-    await expect(page.getByTestId('batch-transfer-rows-retry')).toBeVisible({ timeout: 30_000 });
+    // 预余额读失败：行余额是 —（不是 0）+ 表下说明；恢复入口就是表头那个常驻「刷新」
+    // （owner 2026-11-17：读失败不再另起一个并列的「重新读取」按钮）。主按钮仍可提交。
+    await expect(page.getByTestId('batch-transfer-rows-error')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('batch-transfer-rows-refresh')).toBeEnabled();
+    await expect(page.getByTestId('batch-transfer-rows-retry')).toHaveCount(0);
     await expect(page.getByTestId('batch-transfer-row-balance-0')).toHaveText('—');
     await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
 
@@ -635,6 +686,89 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
       'need',
     );
     await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
+  });
+
+  // D6（owner 2026-11-17 改版）：预余额读失败的恢复入口就是表头那个常驻「刷新」，
+  // 表下只留说明文字 —— 不再并列第二个做同一件事的按钮。
+  test('用例 O 预余额读失败：常驻刷新就是恢复入口（D6）', async ({ page }) => {
+    await installWallet(page, NATIVE_SENDER);
+    // 只让 nativeBalances(0x93bdc1ab) 的读失败。
+    const restore = await failReadsWithSelector(page, '0x93bdc1ab');
+    await page.goto(`/batch-transfer${QUERY}`);
+    await connect(page);
+    await fillBatch(page, [`${R9} 0.01`]);
+
+    const refresh = page.getByTestId('batch-transfer-rows-refresh');
+    await expect(page.getByTestId('batch-transfer-rows-error')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('batch-transfer-row-balance-0')).toHaveText('—');
+    await expect(refresh).toBeEnabled();
+    await expect(page.getByTestId('batch-transfer-rows-retry')).toHaveCount(0);
+
+    // 解除注入后点同一个按钮自愈，不需要刷新整页。
+    await restore();
+    await refresh.click();
+    await expect(page.getByTestId('batch-transfer-row-balance-0')).not.toHaveText('—', {
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId('batch-transfer-rows-error')).toHaveCount(0);
+  });
+
+  // owner 2026-11-17：刷新后的读数就是提交时的转账前基线 —— 提交前有外部转入时，
+  // 刷新后的数字才是回执逐行差额的对比基准（没刷新会用旧基线，差额会被带偏成异常）。
+  test('用例 P 基线：刷新后的余额就是回执的「到账前」', async ({ page }) => {
+    // 两个全新地址：批处理开始前余额都是 0。
+    const RECEIVER = '0x0000000000000000000000000000000000003001';
+    const OTHER = '0x0000000000000000000000000000000000003002';
+    await openBatch(page, NATIVE_SENDER);
+    await fillBatch(page, [`${RECEIVER} 0.5`, `${OTHER} 0.1`]);
+
+    // 预余额读完成：两个地址都是 0，主按钮可提交。
+    await expect(page.getByTestId('batch-transfer-row-balance-0')).toHaveText('0', {
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId('batch-transfer-row-balance-1')).toHaveText('0');
+    await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
+
+    // 别的账户在提交前给第 1 个收款方转 1 ETH：页面上的旧读数因此过时。
+    await anvilRpc('eth_sendTransaction', [
+      { from: R2, to: RECEIVER, value: '0xde0b6b3a7640000' },
+    ]);
+    await anvilRpc('anvil_mine', [1]);
+    await expect
+      .poll(async () => anvilRpc<string>('eth_getBalance', [RECEIVER, 'latest']))
+      .toBe('0xde0b6b3a7640000');
+
+    // 刷新中：按钮 busy、主按钮禁用，旧数字（0）不闪回「—」。
+    const refresh = page.getByTestId('batch-transfer-rows-refresh');
+    const hold = await holdReadsWithSelector(page, '0x93bdc1ab');
+    await refresh.click();
+    await expect(refresh).toHaveAttribute('aria-busy', 'true');
+    await expect(page.getByTestId('batch-transfer-submit')).toBeDisabled();
+    await expect(page.getByTestId('batch-transfer-row-balance-0')).toHaveText('0');
+    await hold.release();
+
+    // 刷新落地：第 1 行 0 → 1，第 2 行仍是 0；主按钮恢复可提交。
+    await expect(page.getByTestId('batch-transfer-row-balance-0')).toHaveText('1', {
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId('batch-transfer-row-balance-1')).toHaveText('0');
+    await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
+
+    await page.getByTestId('batch-transfer-submit').click();
+
+    // 回执的「到账前」= 刷新后的 1（不是提交前的旧 0）；差额仍精确等于承诺金额。
+    await expect(page.getByTestId('batch-transfer-receipt-total')).toHaveText(
+      `0.6 ${NATIVE}`,
+      { timeout: 30_000 },
+    );
+    await expect(page.getByTestId('batch-transfer-receipt-row-0')).toContainText('1 → 1.5');
+    await expect(page.getByTestId('batch-transfer-receipt-delta-0')).toHaveText('+0.5');
+    await expect(page.getByTestId('batch-transfer-receipt-row-1')).toContainText('0 → 0.1');
+    await expect(page.getByTestId('batch-transfer-receipt-delta-1')).toHaveText('+0.1');
+    await expect(page.getByTestId('batch-transfer-receipt-atomic')).toHaveText(
+      '整批一起执行：上表每一行都已到账。',
+    );
+    await page.getByRole('button', { name: '好的' }).click();
   });
 });
 

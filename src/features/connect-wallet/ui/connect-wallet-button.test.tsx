@@ -62,7 +62,10 @@ describe('ConnectWalletButton', () => {
 
     fireEvent.click(button);
 
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    // The sheet is a lazy chunk: the default 1 s findBy timeout flakes when the
+    // whole suite runs the module graph in parallel (2026-11-17: seen failing at
+    // ~1.5 s with a healthy click). 5 s still fails loudly if it never opens.
+    expect(await screen.findByRole('dialog', undefined, { timeout: 5_000 })).toBeInTheDocument();
     expect(screen.getByText('没有检测到钱包')).toBeInTheDocument();
     expect(screen.getByText('你可以换一个入口打开本页。')).toBeInTheDocument();
     expect(

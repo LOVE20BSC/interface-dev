@@ -797,7 +797,8 @@ export const copy = {
     insufficient: (symbol: string, shortfall: string) => `${symbol} 不够，还差 ${shortfall}`,
     nativeGasNote: (symbol: string) => `需要预留一点 ${symbol} 支付网络手续费。`,
     preBalanceTitle: '收款方当前余额',
-    preBalanceLoading: '读取收款方余额中…',
+    /** owner 2026-11-17: the table header's permanent refresh action (D6 recovery too). */
+    preBalanceRefreshAria: '刷新收款方当前余额',
     preBalanceError: '收款方余额暂时读不到，提交后仍会逐行核对到账差额。',
     preBalanceHeaderRecipient: '收款方',
     preBalanceHeaderAmount: '金额',
@@ -840,7 +841,7 @@ export const copy = {
     receiptTotal: '合计转出',
     receiptRecipients: '收款方',
     receiptRecipientCount: (count: string) => `${count} 个收款方`,
-    receiptRowsNote: '下表逐行核对到账差额。',
+    receiptRowsNote: '下表按提交时的余额基线逐行核对到账差额。',
     receiptHeaders: {
       recipient: '收款方',
       amount: '金额',

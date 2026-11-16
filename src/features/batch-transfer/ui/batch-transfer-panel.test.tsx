@@ -14,8 +14,21 @@ import { BatchTransferPanel } from '@/features/batch-transfer/ui/batch-transfer-
 
 const SELF = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 
-const { catalogState, balanceState, txState, codesState } = vi.hoisted(() => ({
+const { catalogState, balanceState, txState, codesState, balancesState } = vi.hoisted(() => ({
   codesState: { value: [] as boolean[] },
+  /**
+   * 预余额读（owner 2026-11-17）：values 对齐表里的行；`isFetching` 覆盖「刷新中」，
+   * 与 `isLoading`（首读）分开，因为刷新时旧数字必须留在屏幕上。
+   */
+  balancesState: {
+    value: {
+      values: [] as readonly (bigint | undefined)[],
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      refetch: () => {},
+    },
+  },
   catalogState: {
     value: {
       nativeToken: {
@@ -101,12 +114,7 @@ vi.mock('@/features/batch-transfer/model/use-batch-allowance', () => ({
 
 vi.mock('@/features/batch-transfer/model/use-batch-recipient-balances', () => ({
   useBatchAddresses: () => [],
-  useBatchRecipientBalances: () => ({
-    values: [],
-    isLoading: false,
-    isError: false,
-    refetch: () => {},
-  }),
+  useBatchRecipientBalances: () => balancesState.value,
   useBatchBalanceReader: () => async () => [],
 }));
 
@@ -145,6 +153,13 @@ beforeEach(() => {
   balanceState.value = {
     balance: 10000000000000000000000n,
     isLoading: false,
+    isError: false,
+    refetch: () => {},
+  };
+  balancesState.value = {
+    values: [],
+    isLoading: false,
+    isFetching: false,
     isError: false,
     refetch: () => {},
   };
@@ -250,6 +265,88 @@ describe('BatchTransferPanel 智能资产保护（owner 2026-11-16）', () => {
     renderPanel();
     fillBatch('0x70997970C51812dc3A010C7d01b50e0d17dc79C8 0.1');
     expect(screen.queryByTestId('batch-transfer-known-contract')).toBeNull();
+    expect(screen.getByTestId('batch-transfer-submit')).toBeEnabled();
+  });
+});
+
+/**
+ * 预余额表常驻刷新（owner 2026-11-17）：表头「刷新」随时重读整批余额，刷新期间
+ * 保留已有数字、禁止提交；刷新后的读数就是提交时写进回执的「到账前」基线。
+ * 读失败时同一个按钮承担 D6 的恢复职责（表下只留错误说明，不再并列第二个按钮）。
+ */
+describe('BatchTransferPanel 预余额刷新（owner 2026-11-17）', () => {
+  const PLAIN = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+  const TEN_THOUSAND_ETH = 10_000n * 10n ** 18n;
+
+  function fillBatch(value: string): void {
+    fireEvent.change(screen.getByTestId('batch-transfer-input'), { target: { value } });
+  }
+
+  function setBalances(patch: Partial<(typeof balancesState)['value']>): void {
+    balancesState.value = { ...balancesState.value, ...patch };
+  }
+
+  it('表头按钮常驻，点它重新读取整批余额', () => {
+    const refetch = vi.fn();
+    setBalances({ values: [TEN_THOUSAND_ETH], refetch });
+    renderPanel();
+    fillBatch(`${PLAIN} 0.1`);
+
+    const refresh = screen.getByTestId('batch-transfer-rows-refresh');
+    // 读到余额时按钮也在（不是只有失败态才出现），可访问名点明刷的是什么。
+    expect(refresh).toBeVisible();
+    expect(refresh).toBeEnabled();
+    expect(refresh).toHaveAccessibleName('刷新收款方当前余额');
+
+    fireEvent.click(refresh);
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('刷新中保留已有数字、按钮 busy 且禁止提交', () => {
+    // 首读已完成（isLoading=false）后再刷新：旧读数必须留在屏幕上。
+    setBalances({ values: [TEN_THOUSAND_ETH], isFetching: true });
+    renderPanel();
+    fillBatch(`${PLAIN} 0.1`);
+
+    expect(screen.getByTestId('batch-transfer-row-balance-0')).toHaveTextContent('10,000');
+    expect(screen.queryByText('—')).toBeNull();
+    const refresh = screen.getByTestId('batch-transfer-rows-refresh');
+    expect(refresh).toHaveAttribute('aria-busy', 'true');
+    expect(refresh).toBeDisabled();
+    // 刷新未落地 → 基线不可信 → 主按钮禁用。
+    expect(screen.getByTestId('batch-transfer-submit')).toBeDisabled();
+  });
+
+  it('刷新落地后主按钮恢复可提交', () => {
+    setBalances({ values: [TEN_THOUSAND_ETH], isFetching: false });
+    renderPanel();
+    fillBatch(`${PLAIN} 0.1`);
+    expect(screen.getByTestId('batch-transfer-rows-refresh')).toBeEnabled();
+    expect(screen.getByTestId('batch-transfer-submit')).toBeEnabled();
+  });
+
+  it('交易进行中禁用刷新', () => {
+    txState.value = { ...txState.value, stage: 'pending' };
+    setBalances({ values: [TEN_THOUSAND_ETH] });
+    renderPanel();
+    fillBatch(`${PLAIN} 0.1`);
+
+    expect(screen.getByTestId('batch-transfer-rows-refresh')).toBeDisabled();
+  });
+
+  it('读失败：说明文字保留，同一个刷新按钮就是恢复入口（不并列第二个按钮）', () => {
+    setBalances({ values: [undefined], isError: true });
+    renderPanel();
+    fillBatch(`${PLAIN} 0.1`);
+
+    expect(screen.getByTestId('batch-transfer-row-balance-0')).toHaveTextContent('—');
+    expect(screen.getByTestId('batch-transfer-rows-error')).toHaveTextContent(
+      '收款方余额暂时读不到',
+    );
+    const refresh = screen.getByTestId('batch-transfer-rows-refresh');
+    expect(refresh).toBeEnabled();
+    expect(screen.queryByTestId('batch-transfer-rows-retry')).toBeNull();
+    // D6：读失败仍是可提交态（回执会明确写「核对不完整」），不被刷新按钮挤成阻断。
     expect(screen.getByTestId('batch-transfer-submit')).toBeEnabled();
   });
 });
