@@ -26,9 +26,9 @@
 
 推论：界面上不出现“项目方发放”“官方空投奖励”“某人给你发币”，也不把协议激励写成“领取 / claim / 一键领取”——那会把协议的**铸造**说成用户去**取**。发射者只是**指定接收地址**；`distributor` 的中心化与否只描述它后续的分配方式。空投合约的链上动作确实叫 `claim`，但界面仍统一写“空投铸造”，**不得**写成“领取空投”；“领取”只允许出现在引用合约原文的代码/接口说明里，不进入任何面向用户的文案（协议激励语境尤其禁止）。
 
-**3）`Phase` 与 `Round` 不得互为别名**（`naming-standards.md` §九，逐字）
+**3）`Phase` 与 `Round` 不得互为别名**（`naming-standards.md` §九，逐字；与 `matt-gov/CONTEXT.md` 已同步为「阶段」口径，见 2026-11-17）
 
-> `Phase` 与 `Round` 是本协议最容易写错的一对：`Phase` 是出块时间片（`currentPhase`、`promisedWaitingPhases`），`Round` 是治理轮（`currentRound`、`round`）。两者不互为别名，也不得用 `period`/`epoch` 代替任何一个。
+> `Phase` 与 `Round` 是本协议最容易写错的一对：`Phase` 是出块阶段（`currentPhase`、`promisedWaitingPhases`；界面统一写「阶段」，旧称「时间片」只在解释协议结构时用），`Round` 是治理轮（`currentRound`、`round`）。两者不互为别名，也不得用 `period`/`epoch` 代替任何一个。
 
 界面中文：`Phase` 统一写**阶段**（旧译「时间片」已废弃，只在解释协议结构时用）；`Round` 统一写**轮次**。业务上的「投票 / 加入 / 验证 / 铸造阶段」是**某一轮里按阶段划分的业务时间段**的具名说法，不是 `Phase` 的别名。
 
