@@ -103,12 +103,13 @@ export function useMemberIdentity(): MemberIdentityState {
     };
   }, [account, chainId, nft]);
 
+  const ownerReadEnabled = nft !== undefined && selectedTokenId !== null;
   const ownerRead = useReadContract({
     address: nft,
     abi: memberNftAbi,
     functionName: 'ownerOf',
     args: selectedTokenId !== null ? [selectedTokenId] : undefined,
-    query: { enabled: nft !== undefined && selectedTokenId !== null },
+    query: { enabled: ownerReadEnabled },
   });
 
   /* eslint-disable react-hooks/set-state-in-effect -- ownerOf is an external on-chain fact */
@@ -154,7 +155,10 @@ export function useMemberIdentity(): MemberIdentityState {
 
   const refetch = () => {
     enumeration.refetch();
-    ownerRead.refetch();
+    // refetch() ignores `enabled`: re-reading while nothing is selected encodes
+    // missing ownerOf args, and viem's AbiEncodingLengthMismatchError would then
+    // pin the whole list to its error card (owner 2026-11-17, right after a mint).
+    if (ownerReadEnabled) void ownerRead.refetch();
   };
 
   let status: MemberIdentityStatus;
@@ -162,15 +166,17 @@ export function useMemberIdentity(): MemberIdentityState {
     status = 'disconnected';
   } else if (enumeration.status === 'unconfigured') {
     status = 'unconfigured';
-  } else if (enumeration.status === 'error' || ownerRead.isError) {
+  } else if (enumeration.status === 'error' || (ownerReadEnabled && ownerRead.isError)) {
+    // A disabled ownerOf read must not error the list: only the enabled read is
+    // a real verdict on the current selection (a stale failure is not fatal).
     status = 'error';
   } else if (
     !hydrated ||
     enumeration.status === 'loading' ||
-    (selectedTokenId !== null && ownerRead.isLoading)
+    (ownerReadEnabled && ownerRead.isLoading)
   ) {
     status = 'loading';
-  } else if (selectedTokenId !== null && ownerRead.data !== undefined) {
+  } else if (ownerReadEnabled && ownerRead.data !== undefined) {
     status = isSameAddress(ownerRead.data, account) ? 'ready' : 'empty';
   } else if (enumeration.identities.length === 0) {
     status = 'empty';

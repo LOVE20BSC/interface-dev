@@ -250,13 +250,17 @@ export const copy = {
     },
   },
   /**
-   * 空投铸造 (UX spec §3.4). The action is always called 空投铸造 and the
+   * 空投铸造 (UX spec §3.4). The action is always called 空投铸造/铸造 and the
    * result 已铸造; the contract's `claim` name never reaches user-facing copy.
    * No string here may contain 领取 (GLOSSARY 文案纪律).
+   *
+   * Owner 2026-11-17: the status card's 「本次空投：{symbol}」 meta line is gone
+   * from every state (the token is now named on the eligible card's first line),
+   * the S5 card is two lines (share + unit, then the amount), the CTA says
+   * 「立即铸造」, and the rules fold is expanded by default with the full
+   * eligibility paragraph.
    */
   airdrop: {
-    meta: (symbol: string) => `本次空投：${symbol}`,
-    metaLoading: '本次空投：读取中…',
     states: {
       disconnectedTitle: '连接钱包后查看你的空投份额。',
       readErrorTitle: '空投数据暂时读不到',
@@ -278,14 +282,23 @@ export const copy = {
     roundGate: {
       title: '还没到可铸造轮次',
       wait: (minutes: string) => `约 ${minutes} 分钟`,
-      body: '轮次到了以后，这里会出现「空投铸造」。',
+      body: '轮次到了以后，这里会出现「立即铸造」。',
     },
     eligible: {
-      expectedLabel: '预计可得',
-      expected: (amount: string, symbol: string) => `预计可得 ${amount} ${symbol}`,
-      note: '按铸造时的池子余额与剩余份额计算，别人铸造后金额会变。',
-      share: (percent: string) => `你的份额 ${percent}`,
-      cta: '空投铸造',
+      /**
+       * Card line 1 (owner 2026-11-17): share and unit in one sentence. The
+       * share percent already carries `%` (domain/airdrop-share), so this must
+       * never append another one.
+       */
+      shareLine: (percent: string, symbol: string) =>
+        `我的份额 ${percent}，预计可铸造空投 ${symbol}：`,
+      /**
+       * Accessible name for card line 2. The amount is rendered without the
+       * symbol so the two lines never repeat it; this label restores the full
+       * sentence for screen readers.
+       */
+      expected: (amount: string, symbol: string) => `预计可铸造空投 ${amount} ${symbol}`,
+      cta: '立即铸造',
     },
     unavailable: {
       poolEmptyTitle: '你有一份空投，但空投池还没有代币。',
@@ -310,8 +323,13 @@ export const copy = {
     },
     rules: {
       summary: '规则',
-      genesis: (symbol: string) => `这次空投发的是首币 ${symbol}，和当前选择的社区无关。`,
-      snapshot: '份额来自销毁活动快照。',
+      /**
+       * Owner 2026-11-17, verbatim (no rewording, no added spaces). The trailing
+       * `link` below completes the paragraph after 「销毁活动：」.
+       */
+      body: '空投资格：从TKM链公平发射开始，参与或部分参与1年多的社群铸币实验，并参与资产销毁锁定活动的社群成员，基于每个人在每个社区的销毁锁定份额计算出本链创世代币的空投份额，具体份额计算规则详见销毁活动：',
+      /** Doubles as the link's visible text, so the accessible name matches it. */
+      link: 'https://love20tkm.github.io/interface/apps/burn/',
     },
     pending: {
       wallet: '铸造中…',

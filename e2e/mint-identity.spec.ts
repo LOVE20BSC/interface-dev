@@ -47,6 +47,7 @@ const RUN_ID = Math.random().toString(36).slice(2, 8);
 /** Dev builds block names without `Test`; the chain then stores them verbatim. */
 const BRANCH_NAME = `Teste2e-branch-${RUN_ID}`;
 const NEW_NAME = `Teste2e-mint-${RUN_ID}`;
+const HANDOFF_NAME = `Teste2e-handoff-${RUN_ID}`;
 const NON_TEST_NAME = `e2e-noprefix-${RUN_ID}`;
 /** anvil seed: params/anvil31337_dev/seed.params SEED_MEMBER_NAME_PREFIX=Testdev-member- */
 const SEEDED_NAME = 'Testdev-member-0';
@@ -379,6 +380,54 @@ test('mint: approve → mint produces a real receipt with MemberMinted data', as
   });
 
   console.log(`mint receipt: #${mintedMemberId} ${mintedName} tx=${mintedHash} burned=${burned}`);
+});
+
+test('my-nft: the list survives the refetch that follows the mint handoff', async ({ page }) => {
+  // Regression (owner 2026-11-17): 「好的」landed on /my-nft, the handoff effect
+  // refetched ownerOf() while nothing was selected, and the list flipped to
+  // 「身份 NFT 列表暂时读不到。」 1~2 s later (重试 re-ran the same refetch).
+  castSend('approve(address,uint256)', MEMBER_NFT, '0');
+  await installWallet(page, ACCOUNTS.funded);
+  await page.goto('/mint');
+  await connect(page);
+
+  const input = page.getByRole('textbox', { name: '给身份 NFT 起个名字' });
+  await expect(input).toBeVisible({ timeout: 15_000 });
+  await input.fill(HANDOFF_NAME);
+  await expect(page.getByText('✓ 可以用')).toBeVisible({ timeout: 10_000 });
+
+  const approveButton = page.getByTestId('mint-approve');
+  await expect(approveButton).toBeVisible({ timeout: 30_000 });
+  await approveButton.click();
+  await expect(approveButton).toContainText('已授权', { timeout: 30_000 });
+
+  const mintButton = page.getByRole('button', { name: '铸造身份 NFT' });
+  await expect(mintButton).toBeEnabled({ timeout: 30_000 });
+  await mintButton.click();
+  await expect(page.getByRole('heading', { name: '铸造成功' })).toBeVisible({ timeout: 30_000 });
+
+  const memberId = (await page.getByTestId('mint-receipt-member-id').innerText()).replace(
+    /[^0-9]/g,
+    '',
+  );
+  expect(memberId).toMatch(/^[0-9]+$/);
+  expect(castCall('memberName(uint256)(string)', memberId)).toBe(`"${HANDOFF_NAME}"`);
+
+  await page.getByRole('button', { name: '好的' }).click();
+  await expect(page).toHaveURL(/\/my-nft/, { timeout: 15_000 });
+
+  const identityList = page.getByRole('list', { name: '我的 NFT' });
+  await expect(identityList.getByText(HANDOFF_NAME, { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
+
+  // The list showed before the failure surfaced, so the assertion has to outlive
+  // the handoff refetch (React Query retry included), not race it.
+  await page.waitForTimeout(5_000);
+  await expect(page.getByText('身份 NFT 列表暂时读不到。')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '重试' })).toHaveCount(0);
+  await expect(identityList.getByText(HANDOFF_NAME, { exact: true })).toBeVisible();
+  await expect(identityList.getByTestId('identity-just-minted-row')).toContainText(`#${memberId}`);
 });
 
 test('my-nft: the freshly minted identity is listed on the next page', async ({ page }) => {

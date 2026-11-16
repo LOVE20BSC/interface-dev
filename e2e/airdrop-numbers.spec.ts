@@ -220,12 +220,35 @@ for (const sample of [
     await page.goto('/airdrop?symbol=NOT_A_REAL_COMMUNITY');
     await connect(page);
     const expected = page.getByTestId('airdrop-expected-amount');
-    await expect(expected.locator(':scope > span')).toHaveText(
-      ['预计可得', `${sample.text} TestLOVE20`],
+    // Owner 2026-11-17: the card is two lines — share sentence (with the unit)
+    // then the amount alone. The old meta line and the pool-balance note are
+    // gone from the whole page.
+    await expect(page.getByTestId('airdrop-share-percent')).toHaveText(
+      '我的份额 10%，预计可铸造空投 TestLOVE20：',
       { timeout: 20_000 },
     );
-    await expect(page.getByText('本次空投：TestLOVE20', { exact: true })).toBeVisible();
-    await expect(page.getByTestId('airdrop-share-percent')).toHaveText('你的份额 10%');
+    await expect(expected).toHaveText(sample.text);
+    // The symbol lives on line 1 only; repeating it beside the amount is a bug.
+    await expect(expected).not.toContainText('TestLOVE20');
+    await expect(page.getByText('本次空投：TestLOVE20', { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText('按铸造时的池子余额与剩余份额计算，别人铸造后金额会变。', { exact: true }),
+    ).toHaveCount(0);
+    // 规则 defaults to expanded (owner 2026-11-17) with the full paragraph.
+    const rules = page.getByTestId('airdrop-rules');
+    await expect(rules).toHaveJSProperty('open', true);
+    await expect(rules).toContainText(
+      '空投资格：从TKM链公平发射开始，参与或部分参与1年多的社群铸币实验，并参与资产销毁锁定活动的社群成员，基于每个人在每个社区的销毁锁定份额计算出本链创世代币的空投份额，具体份额计算规则详见销毁活动：',
+    );
+    const burnLink = rules.getByRole('link', {
+      name: 'https://love20tkm.github.io/interface/apps/burn/',
+      exact: true,
+    });
+    await expect(burnLink).toHaveAttribute(
+      'href',
+      'https://love20tkm.github.io/interface/apps/burn/',
+    );
+    await expect(burnLink).toHaveAttribute('target', '_blank');
 
     if (sample.topUp === 0n) {
       for (const viewport of [
@@ -238,16 +261,13 @@ for (const sample of [
           await page.reload();
           await connect(page);
           await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
-          await expect(expected.locator(':scope > span')).toHaveText(
-            ['预计可得', '100,000,000 TestLOVE20'],
-            { timeout: 20_000 },
-          );
+          await expect(expected).toHaveText('100,000,000', { timeout: 20_000 });
           await shot(page, `airdrop-numbers-${theme}-${viewport.name}.png`);
         }
       }
     }
 
-    await page.getByRole('button', { name: '空投铸造', exact: true }).click();
+    await page.getByRole('button', { name: '立即铸造', exact: true }).click();
     await expect(page.getByRole('heading', { name: '铸造成功' })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('airdrop-receipt-amount')).toHaveText(
       `${sample.text} TestLOVE20`,
@@ -272,7 +292,7 @@ for (const sample of [
     await page.getByRole('button', { name: '好的', exact: true }).click();
     const title = `已铸造 ${sample.text} TestLOVE20`;
     await expect(page.getByTestId('airdrop-claimed-title')).toHaveText(title, { timeout: 20_000 });
-    await expect(page.getByRole('button', { name: '空投铸造', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '立即铸造', exact: true })).toHaveCount(0);
     await page.reload();
     await expect(page.getByRole('heading', { name: '铸造成功' })).toHaveCount(0);
     await expect(page.getByTestId('airdrop-claimed-title')).toHaveText(title, { timeout: 20_000 });
@@ -306,7 +326,7 @@ test('airdrop: F already claimed shows the theoretical amount without a local re
   await expect(page.getByTestId('airdrop-claimed-body')).toHaveCount(0);
   await expect(page.getByTestId('airdrop-receipt-amount')).toHaveCount(0);
   await expect(page.getByTestId('airdrop-receipt-hash')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '空投铸造', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '立即铸造', exact: true })).toHaveCount(0);
   await page.reload();
   await expect(title).toHaveText('已铸造 100,000,000 TestLOVE20', { timeout: 20_000 });
 });
@@ -330,7 +350,7 @@ test('airdrop: C before the claim round has zero claimable amount and no mint ac
     timeout: 20_000,
   });
   await expect(page.getByTestId('airdrop-round-gate-wait')).toHaveText(/^约 \d+ 分钟$/);
-  await expect(page.getByRole('button', { name: '空投铸造', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '立即铸造', exact: true })).toHaveCount(0);
   await expect(page.getByTestId('airdrop-expected-amount')).toHaveCount(0);
 });
 
@@ -347,7 +367,7 @@ for (const sample of [
     await page.goto('/airdrop');
     await connect(page);
     await expect(page.getByText(sample.title, { exact: true })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole('button', { name: '空投铸造', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '立即铸造', exact: true })).toHaveCount(0);
     await expect(page.getByTestId('airdrop-expected-amount')).toHaveCount(0);
   });
 }
@@ -384,11 +404,10 @@ test('airdrop: G a real reverted transaction leaves every token amount and share
   await installWallet(page, CLAIMER);
   await page.goto('/airdrop');
   await connect(page);
-  await expect(page.getByTestId('airdrop-expected-amount').locator(':scope > span')).toHaveText(
-    ['预计可得', '100,000,000 TestLOVE20'],
-    { timeout: 20_000 },
-  );
-  await page.getByRole('button', { name: '空投铸造', exact: true }).click();
+  await expect(page.getByTestId('airdrop-expected-amount')).toHaveText('100,000,000', {
+    timeout: 20_000,
+  });
+  await page.getByRole('button', { name: '立即铸造', exact: true }).click();
   await expect(
     page.getByText('交易上链了，但没有成功。你的份额没有变化。', { exact: true }),
   ).toBeVisible({ timeout: 30_000 });
@@ -397,10 +416,7 @@ test('airdrop: G a real reverted transaction leaves every token amount and share
   expect(receipt.status).toBe('reverted');
   expect(receipt.logs).toHaveLength(0);
   await expectClaimState(CLAIMER);
-  await expect(page.getByTestId('airdrop-expected-amount').locator(':scope > span')).toHaveText([
-    '预计可得',
-    '100,000,000 TestLOVE20',
-  ]);
+  await expect(page.getByTestId('airdrop-expected-amount')).toHaveText('100,000,000');
   await expect(page.getByTestId('airdrop-receipt-amount')).toHaveCount(0);
   console.log(
     `G reverted tx=${failedHash}; pool=${POOL} wallet=0 claimedAmount=0 remainingShare=${REMAINING_SHARE}`,
@@ -421,5 +437,5 @@ test('airdrop: H a wallet outside the snapshot has zero claimable amount and a w
   });
   const swap = page.getByRole('link', { name: '用 ETH 兑换 TestLOVE20', exact: true });
   await expect(swap).toHaveAttribute('href', '/swap?symbol=TestLOVE20');
-  await expect(page.getByRole('button', { name: '空投铸造', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '立即铸造', exact: true })).toHaveCount(0);
 });

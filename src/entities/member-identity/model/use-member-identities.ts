@@ -41,12 +41,13 @@ export function useMemberIdentities(
   const memberNft = useMemberNftAddress();
   const nft = memberNft.address;
 
+  const balanceEnabled = nft !== undefined && wallet !== undefined;
   const balanceRead = useReadContract({
     address: nft,
     abi: memberNftAbi,
     functionName: 'balanceOf',
     args: wallet !== undefined ? [wallet] : undefined,
-    query: { enabled: nft !== undefined && wallet !== undefined },
+    query: { enabled: balanceEnabled },
   });
 
   const balance = balanceRead.data;
@@ -65,9 +66,10 @@ export function useMemberIdentities(
     }));
   }, [limitedCount, nft, wallet]);
 
+  const idsEnabled = idContracts.length > 0;
   const idsRead = useReadContracts({
     contracts: idContracts,
-    query: { enabled: idContracts.length > 0 },
+    query: { enabled: idsEnabled },
   });
 
   const tokenIds = useMemo(() => {
@@ -88,9 +90,10 @@ export function useMemberIdentities(
     }));
   }, [nft, tokenIds]);
 
+  const namesEnabled = nameContracts.length > 0;
   const namesRead = useReadContracts({
     contracts: nameContracts,
-    query: { enabled: nameContracts.length > 0 },
+    query: { enabled: namesEnabled },
   });
 
   const identities = useMemo<readonly MemberIdentity[]>(() => {
@@ -107,9 +110,12 @@ export function useMemberIdentities(
   }, [currentTokenId, namesRead.data, tokenIds]);
 
   const refetch = () => {
-    balanceRead.refetch();
-    idsRead.refetch();
-    namesRead.refetch();
+    // refetch() ignores `enabled` (same convention as use-batch-recipient-balances):
+    // waking a disabled read would only replay missing-arg noise on an empty wallet.
+    if (balanceEnabled) balanceRead.refetch();
+    if (idsEnabled) idsRead.refetch();
+    if (namesEnabled) namesRead.refetch();
+    // The resolver guards its own enabled flag.
     memberNft.refetch();
   };
 

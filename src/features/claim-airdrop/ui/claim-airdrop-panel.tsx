@@ -28,21 +28,19 @@ export interface ClaimAirdropPanelProps {
 const TEXT_LINK =
   'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
 
+/**
+ * Every state's card. Owner 2026-11-17 removed the 「本次空投：{symbol}」 meta
+ * line that used to open it on every state, so the card now starts with the
+ * state's own content.
+ */
 function StatusCard({
-  meta,
   busy = false,
   children,
 }: {
-  readonly meta: string;
   readonly busy?: boolean;
   readonly children: ReactNode;
 }) {
-  return (
-    <Card aria-busy={busy || undefined}>
-      <p className="text-xs font-medium text-muted">{meta}</p>
-      <div className="mt-3">{children}</div>
-    </Card>
-  );
+  return <Card aria-busy={busy || undefined}>{children}</Card>;
 }
 
 function CopyLinkButton() {
@@ -65,9 +63,9 @@ function CopyLinkButton() {
   );
 }
 
-function LoadingCard({ meta }: { readonly meta: string }) {
+function LoadingCard() {
   return (
-    <StatusCard meta={meta} busy>
+    <StatusCard busy>
       <div className="space-y-3">
         <Skeleton className="h-4 w-36" />
         <Skeleton className="h-8 w-3/5" />
@@ -102,7 +100,6 @@ export function ClaimAirdropPanel({
   });
 
   const symbol = claim.tokenSymbol;
-  const meta = symbol !== undefined ? copy.airdrop.meta(symbol) : copy.airdrop.metaLoading;
   // The swap fallback is pinned to the genesis token, never to ?symbol=.
   const swapHref = symbol !== undefined ? `/swap?symbol=${encodeURIComponent(symbol)}` : '/swap';
   const swapSymbol = symbol ?? UNKNOWN;
@@ -125,7 +122,7 @@ export function ClaimAirdropPanel({
 
   if (!isConnected) {
     return (
-      <StatusCard meta={meta}>
+      <StatusCard>
         <CardTitle>{copy.airdrop.states.disconnectedTitle}</CardTitle>
         <div className="mt-4 [&>button]:w-full sm:[&>button]:w-auto">{connectAction}</div>
       </StatusCard>
@@ -134,7 +131,7 @@ export function ClaimAirdropPanel({
 
   if (isWrongChain) {
     return (
-      <StatusCard meta={meta}>
+      <StatusCard>
         <CardDescription>{copy.airdrop.states.wrongChainBody}</CardDescription>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
           <Link to="/" className={buttonStyles('ghost', 'md', 'w-full sm:w-auto')}>
@@ -162,12 +159,12 @@ export function ClaimAirdropPanel({
   // 「好的」with the post-claim refetch still in flight: a loading card, never
   // the claim CTA again.
   if (receipt !== null && dismissedReceipt && receiptView === 'waiting') {
-    return <LoadingCard meta={meta} />;
+    return <LoadingCard />;
   }
 
   if (claim.status === 'unconfigured') {
     return (
-      <StatusCard meta={meta}>
+      <StatusCard>
         <CardTitle>{copy.airdrop.states.notDeployedTitle}</CardTitle>
         <CardDescription>{copy.airdrop.states.notDeployedBody}</CardDescription>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
@@ -180,13 +177,13 @@ export function ClaimAirdropPanel({
   }
 
   if (claim.status === 'loading') {
-    return <LoadingCard meta={meta} />;
+    return <LoadingCard />;
   }
 
   if (claim.status === 'error') {
     const isSnapshotError = claim.errorKind === 'snapshot';
     return (
-      <StatusCard meta={meta}>
+      <StatusCard>
         <CardTitle>
           {isSnapshotError
             ? copy.airdrop.states.snapshotErrorTitle
@@ -218,7 +215,7 @@ export function ClaimAirdropPanel({
     const minutes = claim.roundGate.minutes;
     return (
       <div className="space-y-4">
-        <StatusCard meta={meta}>
+        <StatusCard>
           <CardTitle data-testid="airdrop-round-gate-title">
             {copy.airdrop.roundGate.title}
           </CardTitle>
@@ -237,7 +234,7 @@ export function ClaimAirdropPanel({
             </Link>
           </div>
         </StatusCard>
-        <AirdropRules symbol={symbol} />
+        <AirdropRules />
       </div>
     );
   }
@@ -245,7 +242,7 @@ export function ClaimAirdropPanel({
   if (claim.status === 'ineligible') {
     return (
       <div className="space-y-4">
-        <StatusCard meta={meta}>
+        <StatusCard>
           <CardTitle>{copy.airdrop.states.ineligibleTitle}</CardTitle>
           <CardDescription>{copy.airdrop.states.ineligibleBody}</CardDescription>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
@@ -257,7 +254,7 @@ export function ClaimAirdropPanel({
             </Link>
           </div>
         </StatusCard>
-        <AirdropRules symbol={symbol} />
+        <AirdropRules />
       </div>
     );
   }
@@ -266,7 +263,7 @@ export function ClaimAirdropPanel({
     const unavailable = airdropUnavailableCopy(claim.reason ?? 'zero-amount');
     return (
       <div className="space-y-4">
-        <StatusCard meta={meta}>
+        <StatusCard>
           <CardTitle>{unavailable.title}</CardTitle>
           <CardDescription>{unavailable.body}</CardDescription>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
@@ -276,7 +273,7 @@ export function ClaimAirdropPanel({
             <CopyLinkButton />
           </div>
         </StatusCard>
-        <AirdropRules symbol={symbol} />
+        <AirdropRules />
         <Link to="/" className={TEXT_LINK}>
           {copy.airdrop.states.backHome}
         </Link>
@@ -297,7 +294,7 @@ export function ClaimAirdropPanel({
         ? `${NETWORK.blockExplorerUrl}/tx/${localHash}`
         : null;
     return (
-      <StatusCard meta={meta}>
+      <StatusCard>
         <CardTitle data-testid="airdrop-claimed-title">{view.title}</CardTitle>
         {claimedAmount.isLoading ? (
           <Skeleton className="mt-2 h-4 w-52" />
@@ -336,7 +333,10 @@ export function ClaimAirdropPanel({
     );
   }
 
-  // S5 可铸造: the only state with the 空投铸造 action.
+  // S5 可铸造: the only state with the 铸造 CTA. Owner 2026-11-17: the card is
+  // exactly two lines — the share sentence (which also names the unit, ending
+  // in 「：」) and the amount on its own emphasized line. The symbol is not
+  // repeated beside the amount; the aria-label restores the full sentence.
   const amountText =
     claim.claimableAmount !== undefined && claim.tokenDecimals !== undefined
       ? formatTokenAmount(claim.claimableAmount, claim.tokenDecimals)
@@ -357,22 +357,16 @@ export function ClaimAirdropPanel({
 
   return (
     <div className="space-y-4">
-      <StatusCard meta={meta}>
+      <StatusCard>
+        <p className="text-sm leading-6 break-words text-muted" data-testid="airdrop-share-percent">
+          {copy.airdrop.eligible.shareLine(claim.sharePercent ?? UNKNOWN, swapSymbol)}
+        </p>
         <p
-          className="font-semibold tracking-tight text-foreground"
+          className="mt-1 text-2xl leading-9 font-semibold tracking-tight break-words text-foreground"
           data-testid="airdrop-expected-amount"
           aria-label={copy.airdrop.eligible.expected(amountText, swapSymbol)}
         >
-          <span className="block text-sm font-medium text-muted">
-            {copy.airdrop.eligible.expectedLabel}
-          </span>
-          <span className="mt-0.5 block break-words text-2xl leading-9">
-            {amountText} <span className="text-base font-medium text-muted">{swapSymbol}</span>
-          </span>
-        </p>
-        <p className="mt-1 text-xs leading-5 text-muted">{copy.airdrop.eligible.note}</p>
-        <p className="mt-2 text-xs leading-5 text-muted" data-testid="airdrop-share-percent">
-          {copy.airdrop.eligible.share(claim.sharePercent ?? UNKNOWN)}
+          {amountText}
         </p>
       </StatusCard>
 
@@ -411,7 +405,7 @@ export function ClaimAirdropPanel({
         ) : null}
       </div>
 
-      <AirdropRules symbol={symbol} />
+      <AirdropRules />
     </div>
   );
 }

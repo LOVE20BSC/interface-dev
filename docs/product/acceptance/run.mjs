@@ -717,7 +717,7 @@ async function step5(browser) {
         'name available',
       );
       await waitText(page, '你还有空投份额可以铸造', { timeout: 60_000 });
-      const airdropCta = page.getByRole('link', { name: '铸造空投份额' });
+      const airdropCta = page.getByRole('link', { name: '空投铸造', exact: true });
       await waitVisible(airdropCta, 20_000, 'airdrop branch CTA');
       const href = await airdropCta.getAttribute('href');
       const screenshot = await shot(page, '05-mint-branch-airdrop.png');
@@ -728,7 +728,7 @@ async function step5(browser) {
       const branchText = (await page.locator('main').innerText()).replaceAll('\n', ' | ');
       evidence.push(
         screenshot,
-        `eligible wallet ${eligible}: branch copy contains 你还有空投份额可以铸造，CTA「铸造空投份额」，href=${href}`,
+        `eligible wallet ${eligible}: branch copy contains 你还有空投份额可以铸造，CTA「空投铸造」，href=${href}`,
         `branch context: ${branchText.slice(0, 260)}`,
       );
     } finally {
@@ -739,7 +739,7 @@ async function step5(browser) {
   if (!both) throw new Error('one branch did not render');
   return {
     status: 'PASS',
-    summary: '余额不足分流正确：无资格→兑换、有资格→铸造空投份额',
+    summary: '余额不足分流正确：无资格→兑换、有资格→空投铸造',
     evidence,
   };
 }
@@ -907,15 +907,62 @@ async function step8(browser) {
     await waitText(page, '你参与了销毁活动，获得空投铸造资格', { timeout: 20_000 });
     const cardText = (await card.innerText()).replaceAll('\n', ' | ');
     const homeShot = await shot(page, '08-home-airdrop-eligible.png');
-    await card.getByRole('link', { name: '铸造空投份额' }).click();
+    // The home eligibility card's link is 「空投铸造」 (copy.home.mintAirdrop); it
+    // was not renamed on 2026-11-17 — only the /airdrop CTA was.
+    await card.getByRole('link', { name: '空投铸造', exact: true }).click();
     await page.waitForURL('**/airdrop**', { timeout: 15_000 });
+    // Owner 2026-11-17: the S5 card is two lines — the share sentence (which
+    // names the unit and ends in 「：」) and the amount alone on its own line.
+    // The 「本次空投：{symbol}」 meta line and the pool-balance note are gone.
+    const shareLocator = page.getByTestId('airdrop-share-percent');
+    await waitVisible(shareLocator, 60_000, 'share line');
+    const shareText = (await shareLocator.innerText()).trim().replaceAll('\n', ' ');
+    check(
+      // formatSharePercent: 「10%」/「10.25%」/「<0.01%」; null renders as 「—」.
+      /^我的份额 (?:<)?\d+(?:\.\d+)?%，预计可铸造空投 TestLOVE20：$/.test(shareText),
+      `share line "${shareText}" != 我的份额 {percent}，预计可铸造空投 TestLOVE20：`,
+    );
     const amountLocator = page.getByTestId('airdrop-expected-amount');
     await waitVisible(amountLocator, 60_000, 'expected amount');
     const expectedText = (await amountLocator.innerText()).trim().replaceAll('\n', ' ');
-    await waitText(page, '按铸造时的池子余额与剩余份额计算，别人铸造后金额会变。', {
-      timeout: 10_000,
-    });
+    check(
+      !expectedText.includes('TestLOVE20'),
+      `amount line repeats the symbol: "${expectedText}" (the symbol belongs to line 1)`,
+    );
     const bodyText = await page.locator('main').innerText();
+    check(
+      !bodyText.includes('本次空投：'),
+      'the removed meta line 「本次空投：{symbol}」 is still on the page',
+    );
+    check(
+      !bodyText.includes('按铸造时的池子余额与剩余份额计算，别人铸造后金额会变。'),
+      'the removed pool-balance note is still on the page',
+    );
+    // 「规则」 defaults to expanded (owner 2026-11-17) with the verbatim
+    // eligibility paragraph and the burn-activity link closing it.
+    const rules = page.getByTestId('airdrop-rules');
+    await waitVisible(rules, 30_000, 'rules fold');
+    check(
+      (await rules.getAttribute('open')) !== null,
+      'rules fold is not expanded by default (<details open> missing)',
+    );
+    const rulesText = (await rules.innerText()).replaceAll('\n', ' ');
+    check(
+      rulesText.includes('空投资格：从TKM链公平发射开始'),
+      `rules fold does not carry the owner paragraph: "${rulesText}"`,
+    );
+    const burnLink = rules.getByRole('link', {
+      name: 'https://love20tkm.github.io/interface/apps/burn/',
+      exact: true,
+    });
+    check(
+      (await burnLink.getAttribute('href')) === 'https://love20tkm.github.io/interface/apps/burn/',
+      'burn activity link is missing or has the wrong href',
+    );
+    check(
+      (await burnLink.getAttribute('target')) === '_blank',
+      'burn activity link does not open in a new tab',
+    );
     const claimWordCount = (bodyText.match(/领取/g) ?? []).length;
     const claimableBefore = castUint(
       AIRDROP,
@@ -927,7 +974,7 @@ async function step8(browser) {
     );
     const eligibleShot = await shot(page, '08-airdrop-eligible.png');
 
-    const claimButton = page.getByRole('button', { name: '铸造空投份额' });
+    const claimButton = page.getByRole('button', { name: '立即铸造', exact: true });
     await waitEnabled(claimButton.first(), 60_000);
     await claimButton.first().click();
     const receiptAmount = await waitReceipt(page, 'airdrop-receipt-amount');
@@ -955,14 +1002,16 @@ async function step8(browser) {
     check(tokenBalanceAfter >= claimedAmount, 'claimed tokens are not in the wallet');
     return {
       status: 'PASS',
-      summary: `空投资格卡→预计金额→铸造成功；回执金额与 AirdropClaimed 一致，isClaimed=true`,
+      summary: `空投资格卡→两行卡片（份额整句 + 数量）→铸造成功；回执金额与 AirdropClaimed 一致，isClaimed=true`,
       evidence: [
         homeShot,
         eligibleShot,
         receiptShot,
         `home card: ${cardText}`,
-        `airdrop page expected amount: ${expectedText}`,
-        `amount label carries 预计 + note「按铸造时的池子余额与剩余份额计算，别人铸造后金额会变。」`,
+        `airdrop page line 1 (airdrop-share-percent): ${shareText}`,
+        `airdrop page line 2 (airdrop-expected-amount): ${expectedText} — symbol lives on line 1 only`,
+        `removed copy absent: 「本次空投：{symbol}」 meta line + 「按铸造时的池子余额与剩余份额计算，别人铸造后金额会变。」`,
+        `rules fold: <details open>, owner paragraph + link https://love20tkm.github.io/interface/apps/burn/ (target=_blank)`,
         `claimableAmount before claim: ${claimableBefore}`,
         `AirdropClaimed.amount: ${claimedAmount}; receipt text: ${receiptAmount}; hash: ${hash}`,
         `isClaimed(${eligible}): ${isClaimed}; wallet TestLOVE20 after: ${tokenBalanceAfter}`,
@@ -1288,7 +1337,7 @@ async function step12(browser) {
       await connect(page);
       await goto(page, '/airdrop');
       await waitVisible(page.getByTestId('airdrop-expected-amount'), 60_000, 'expected amount');
-      const button = page.getByRole('button', { name: '铸造空投份额' }).first();
+      const button = page.getByRole('button', { name: '立即铸造', exact: true }).first();
       await waitVisible(button, 30_000, 'airdrop CTA');
       await waitEnabled(button, 30_000);
       const info = await measureDock(page, button);
@@ -1322,7 +1371,7 @@ async function step13(browser) {
     { slug: 'home', path: '/', title: 'TestLOVE20' },
     { slug: 'my-nft', path: '/my-nft', title: '我的 NFT' },
     { slug: 'mint', path: '/mint', title: '铸造身份' },
-    { slug: 'airdrop', path: '/airdrop', title: '铸造空投份额' },
+    { slug: 'airdrop', path: '/airdrop', title: '空投铸造' },
     { slug: 'swap', path: '/swap?symbol=TestLOVE20&from=ETH&to=TestLOVE20', title: '兑换代币' },
   ];
   let failures = 0;

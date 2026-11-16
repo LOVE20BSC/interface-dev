@@ -1,11 +1,19 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Check, RefreshCw } from '@/shared/ui/icons';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { copy } from '@/shared/config/copy-pages';
 import { UNKNOWN } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
-import { useSoftTransition } from '@/shared/model/soft-transition';
+import {
+  captureFlipPositions,
+  playFlip,
+  pulseFlipHighlight,
+  type FlipElement,
+  type FlipPlayback,
+  type FlipPosition,
+} from '@/shared/lib/flip';
+import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Badge } from '@/shared/ui/badge';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
@@ -59,15 +67,36 @@ function InvalidatedNotice() {
   );
 }
 
+/** A card move that has been measured but not animated yet. */
+interface PendingMove {
+  readonly tokenId: bigint;
+  /** 'First' measurements, taken in the click handler before React commits. */
+  readonly positions: readonly FlipPosition[];
+  readonly mode: 'cards' | 'table';
+}
+
+/** The bottom tab bar / tests never resize across the md breakpoint mid-tap. */
+function isCardListLaidOut(list: HTMLUListElement | null): boolean {
+  return (list?.getBoundingClientRect().height ?? 0) > 0;
+}
+
 export function IdentityList({ identity, onRetry, justMinted = null }: IdentityListProps) {
   const { address: account } = useAccount();
-  const transition = useSoftTransition();
+  // Same media query the page-level transition honours; jsdom defaults to false.
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const [target, setTarget] = useState<MemberIdentity | null>(null);
   const [busy, setBusy] = useState(false);
-  // 使用此身份 NFT is a local cache write (no transaction), but the whole page
-  // changes: keep the tapped row busy while the shell fades it out and back in.
-  const [usingTokenId, setUsingTokenId] = useState<bigint | null>(null);
+  // owner 2026-11-17: 使用此身份 NFT 现在是「被点的卡片移动到列表最顶部」，不再是整页
+  // 淡出淡入。这个 tokenId 同时是忙碌态（按钮 aria-busy/「切换中…」）和「列表先别换成
+  // 骨架屏」的持有标记，直到移动结束且 ownerOf() 确认了新身份。
+  const [pendingTokenId, setPendingTokenId] = useState<bigint | null>(null);
   const [successRecipient, setSuccessRecipient] = useState<`0x${string}` | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const tableRef = useRef<HTMLTableElement | null>(null);
+  const pendingMoveRef = useRef<PendingMove | null>(null);
+  const playbackRef = useRef<FlipPlayback | null>(null);
+  // Bumped when a move settles so the release effect below runs again.
+  const [moveGeneration, setMoveGeneration] = useState(0);
 
   const handleConfirmed = (memberId: bigint, to: `0x${string}`) => {
     if (identity.selected?.tokenId === memberId) identity.clear();
@@ -78,21 +107,105 @@ export function IdentityList({ identity, onRetry, justMinted = null }: IdentityL
   };
 
   /**
-   * Owner 2026-11-16: selecting an identity repaints the page (pill, greeting,
-   * balances). Fade the page out, write the selection while it is invisible, then
-   * fade back in — no more「突然刷新」. The row shows a loading button meanwhile.
+   * The mobile `<ul>` and the desktop `<table>` both exist in the DOM; the keys
+   * are namespaced so a measurement never mixes the two breakpoints.
+   */
+  const collectCardEntries = (): FlipElement[] => {
+    const entries: FlipElement[] = [];
+    for (const node of Array.from(listRef.current?.children ?? [])) {
+      const tokenId = node.getAttribute('data-identity-id');
+      if (tokenId !== null) entries.push({ key: `li:${tokenId}`, element: node });
+    }
+    return entries;
+  };
+
+  const collectRowEntries = (): FlipElement[] => {
+    const entries: FlipElement[] = [];
+    const rows = tableRef.current?.tBodies[0]?.rows;
+    for (const row of Array.from(rows ?? [])) {
+      const tokenId = row.getAttribute('data-identity-id');
+      if (tokenId !== null) entries.push({ key: `tr:${tokenId}`, element: row });
+    }
+    return entries;
+  };
+
+  /**
+   * owner 2026-11-17: 选择身份 NFT 不再整页淡出淡入（`useSoftTransition().run()`），
+   * 改为让被点的卡片从当前位置平滑移动到列表最顶部（排序本来就把当前身份排第一）。
+   * 卡片移动本身就是「已切到这个身份」的信号，页面其它元素同步更新即可。
+   *
+   * 移动用 FLIP：这里先量「First」并记下 tokenId，`identity.select()` 提交重排后的
+   * DOM 由下面的 useLayoutEffect 量「Last」并在首帧绘制前播放动画。
+   * `prefers-reduced-motion: reduce` 时直接落位（不记录，也不播放）。
    */
   const handleUse = (tokenId: bigint) => {
-    if (usingTokenId !== null || transition.isTransitioning) return;
-    setUsingTokenId(tokenId);
-    transition.run(() => {
-      identity.select(tokenId);
-      setUsingTokenId(null);
-    });
+    // 移动/确认还没结束：忽略重复点击（忙碌态按钮另有 aria-busy）。
+    if (pendingTokenId !== null) return;
+    const mode = isCardListLaidOut(listRef.current) ? 'cards' : 'table';
+    const positions =
+      mode === 'cards' && reducedMotion !== true ? captureFlipPositions(collectCardEntries()) : [];
+    pendingMoveRef.current = { tokenId, positions, mode };
+    setPendingTokenId(tokenId);
+    identity.select(tokenId);
   };
-  const count = identity.balance !== undefined ? identity.balance.toString() : UNKNOWN;
 
-  if (identity.status === 'loading') {
+  /**
+   * Plays the measured move. `useLayoutEffect` runs after the reordered list is in
+   * the DOM but before the browser paints, so the inverted transform is what the
+   * first frame shows — no flash of the card at its new place.
+   */
+  useLayoutEffect(() => {
+    const pending = pendingMoveRef.current;
+    if (pending === null) return;
+    pendingMoveRef.current = null;
+    const tokenId = pending.tokenId.toString();
+    const playback =
+      pending.mode === 'cards'
+        ? playFlip(pending.positions, collectCardEntries(), {
+            reducedMotion,
+            emphasisKeys: [`li:${tokenId}`],
+          })
+        : playFlip([], [], { reducedMotion });
+    // 桌面表格行：跨浏览器的 row transform 不可靠，退化为「即时置顶 + 高亮」——行立刻
+    // 落位，用一次柔和的高亮脉冲说明它去了哪里，表格布局不动。
+    // 卡片用 halo（卡片自己的 transition-colors 已经在做底色渐变），行用 tint。
+    const highlight =
+      pending.mode === 'cards'
+        ? collectCardEntries().find((entry) => entry.key === `li:${tokenId}`)?.element
+        : collectRowEntries().find((entry) => entry.key === `tr:${tokenId}`)?.element;
+    if (highlight !== undefined) {
+      pulseFlipHighlight(highlight, {
+        reducedMotion,
+        kind: pending.mode === 'cards' ? 'halo' : 'tint',
+      });
+    }
+    if (playback.animations.length === 0) return;
+    playbackRef.current = playback;
+    void playback.settled.then(() => {
+      playbackRef.current = null;
+      setMoveGeneration((generation) => generation + 1);
+    });
+  });
+
+  // Cancel a running move (and its temporary inline styles) on unmount.
+  useEffect(() => () => playbackRef.current?.cancel(), []);
+
+  // 忙碌态持有到「移动结束 + ownerOf() 确认新身份」都落地为止：过早释放会在慢 RPC 上
+  // 让列表在移动途中或刚落位时换成骨架屏。
+  useEffect(() => {
+    if (pendingTokenId === null) return;
+    if (identity.status === 'loading') return;
+    if (playbackRef.current !== null) return;
+    setPendingTokenId(null);
+  }, [identity.status, moveGeneration, pendingTokenId]);
+
+  const count = identity.balance !== undefined ? identity.balance.toString() : UNKNOWN;
+  // 选中后 ownerOf() 确认期间 status 变成 loading：此时仍用缓存里的枚举渲染列表（顺序
+  // 已按新选中身份排好），FLIP 才有「Last」可量，也避免骨架屏闪一下。
+  const listHeld =
+    identity.status === 'loading' && pendingTokenId !== null && identity.identities.length > 0;
+
+  if (identity.status === 'loading' && !listHeld) {
     return <ListSkeleton />;
   }
 
@@ -134,7 +247,7 @@ export function IdentityList({ identity, onRetry, justMinted = null }: IdentityL
     );
   }
 
-  if (identity.status === 'needs-selection' || identity.status === 'ready') {
+  if (identity.status === 'needs-selection' || identity.status === 'ready' || listHeld) {
     return (
       <div className="space-y-4">
         <Summary count={count} />
@@ -145,13 +258,14 @@ export function IdentityList({ identity, onRetry, justMinted = null }: IdentityL
         ) : null}
         {successRecipient !== null ? <TransferReceipt recipient={successRecipient} /> : null}
 
-        <ul className="space-y-2.5 md:hidden" aria-label={copy.identity.myNftTitle}>
+        <ul ref={listRef} className="space-y-2.5 md:hidden" aria-label={copy.identity.myNftTitle}>
           {identity.identities.map((entry) => {
             const current = identity.selected?.tokenId === entry.tokenId;
             const justMintedRow = justMinted !== null && justMinted.tokenId === entry.tokenId;
             return (
               <li
                 key={entry.tokenId.toString()}
+                data-identity-id={entry.tokenId.toString()}
                 data-testid={justMintedRow ? 'identity-just-minted-row' : undefined}
                 className={cn(
                   'rounded-2xl border p-4 transition-colors',
@@ -181,7 +295,7 @@ export function IdentityList({ identity, onRetry, justMinted = null }: IdentityL
                   <RowActions
                     current={current}
                     busy={busy}
-                    using={usingTokenId === entry.tokenId}
+                    using={pendingTokenId === entry.tokenId}
                     transferring={busy && target?.tokenId === entry.tokenId}
                     onUse={() => handleUse(entry.tokenId)}
                     onTransfer={() => setTarget(entry)}
@@ -193,7 +307,7 @@ export function IdentityList({ identity, onRetry, justMinted = null }: IdentityL
         </ul>
 
         <div className="hidden overflow-hidden rounded-2xl border border-line md:block">
-          <table className="w-full text-left text-sm">
+          <table ref={tableRef} className="w-full text-left text-sm">
             <thead className="bg-elevated text-xs text-muted">
               <tr>
                 <th scope="col" className="px-4 py-2.5 font-medium">
@@ -214,6 +328,7 @@ export function IdentityList({ identity, onRetry, justMinted = null }: IdentityL
                 return (
                   <tr
                     key={entry.tokenId.toString()}
+                    data-identity-id={entry.tokenId.toString()}
                     data-testid={justMintedRow ? 'identity-just-minted-row' : undefined}
                     className={cn(
                       'border-t border-line',
@@ -234,11 +349,7 @@ export function IdentityList({ identity, onRetry, justMinted = null }: IdentityL
                           {copy.pages.myNft.currentBadge}
                         </Badge>
                       ) : justMintedRow ? (
-                        <Badge
-                          tone="success"
-                          className="ml-2"
-                          data-testid="identity-just-minted"
-                        >
+                        <Badge tone="success" className="ml-2" data-testid="identity-just-minted">
                           {copy.pages.myNft.justMinted}
                         </Badge>
                       ) : null}
@@ -248,7 +359,7 @@ export function IdentityList({ identity, onRetry, justMinted = null }: IdentityL
                         <RowActions
                           current={current}
                           busy={busy}
-                          using={usingTokenId === entry.tokenId}
+                          using={pendingTokenId === entry.tokenId}
                           transferring={busy && target?.tokenId === entry.tokenId}
                           onUse={() => handleUse(entry.tokenId)}
                           onTransfer={() => setTarget(entry)}
@@ -335,7 +446,15 @@ function RowActions({
 }) {
   return (
     <>
-      {current ? (
+      {using ? (
+        // The card is already the current one (selection is applied before the move
+        // starts), so the busy label has to win over 「当前身份 NFT」 for the length of
+        // the move: it is the feedback that the switch is in progress and it blocks
+        // a second tap.
+        <Button size="sm" variant="secondary" loading>
+          {copy.pages.myNft.useSwitching}
+        </Button>
+      ) : current ? (
         <Button
           size="sm"
           variant="secondary"
@@ -344,8 +463,8 @@ function RowActions({
           leadingIcon={<Check className="h-4 w-4" aria-hidden="true" />}
         />
       ) : (
-        <Button size="sm" variant="secondary" onClick={onUse} loading={using}>
-          {using ? copy.pages.myNft.useSwitching : copy.pages.myNft.useAction}
+        <Button size="sm" variant="secondary" onClick={onUse}>
+          {copy.pages.myNft.useAction}
         </Button>
       )}
       <Button

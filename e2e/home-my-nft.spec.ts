@@ -1,12 +1,11 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { isolateChain } from './chain';
+import { anvilRpc, isolateChain, revertChain, snapshotChain } from './chain';
 import {
   expectBusyButtonDuringTransition,
-  expectSoftTransition,
-  freezePageFadeAtMidpoint,
   recordSoftTransition,
+  transitionPhases,
 } from './soft-transition';
 import {
   ACCOUNTS,
@@ -32,12 +31,15 @@ import {
 
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
 
+const DEPLOYMENT = JSON.parse(
+  readFileSync(resolve(process.cwd(), 'src/config/network/anvil31337_dev/network.json'), 'utf8'),
+) as {
+  addresses: { pair: string; memberNFT: `0x${string}` };
+};
+
 // 地址簿已知合约（交易对）：转让抽屉的 智能资产保护 拦截对象。
-const PAIR = (
-  JSON.parse(
-    readFileSync(resolve(process.cwd(), 'src/config/network/anvil31337_dev/network.json'), 'utf8'),
-  ) as { addresses: { pair: string } }
-).addresses.pair;
+const PAIR = DEPLOYMENT.addresses.pair;
+const MEMBER_NFT = DEPLOYMENT.addresses.memberNFT;
 
 test.use({
   permissions: ['clipboard-read', 'clipboard-write'],
@@ -61,6 +63,184 @@ async function shotLive(page: Page, name: string): Promise<void> {
 /** The page h1 greeting (never a link). */
 function greeting(page: Page) {
   return page.getByRole('heading', { level: 1 });
+}
+
+/**
+ * owner 2026-11-17: 点「使用此身份 NFT」时被点的卡片从当前位置移动到列表最顶部（不再整页
+ * 淡出淡入）。下面的探针就是这件事的证据——300ms 的动画不可能靠一次往返轮询抓到，所以
+ * 在页面里包一层 `Element.prototype.animate`，记录「谁被动画了、从哪个位移开始」。
+ */
+interface CardMoveAnimation {
+  readonly kind: 'move' | 'emphasis';
+  readonly tag: string;
+  readonly tokenId: string | null;
+  readonly frames: string;
+  readonly durationMs: number | undefined;
+  readonly easing: string | undefined;
+}
+
+async function recordCardMoves(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const records: unknown[] = [];
+    (window as unknown as { __l20CardMoves?: unknown[] }).__l20CardMoves = records;
+    const original = Element.prototype.animate;
+    Element.prototype.animate = function (
+      this: Element,
+      keyframes: Keyframe[] | PropertyIndexedKeyframes | null,
+      options?: number | KeyframeAnimationOptions,
+    ): Animation {
+      const first = Array.isArray(keyframes)
+        ? (keyframes[0] as { transform?: string } | undefined)
+        : undefined;
+      records.push({
+        kind: typeof first?.transform === 'string' ? 'move' : 'emphasis',
+        tag: this.tagName,
+        tokenId: this.getAttribute('data-identity-id'),
+        frames: JSON.stringify(keyframes),
+        durationMs: typeof options === 'object' ? options.duration : options,
+        easing: typeof options === 'object' ? options.easing : undefined,
+      });
+      return original.call(this, keyframes, options);
+    };
+  });
+}
+
+async function cardMoveAnimations(page: Page): Promise<CardMoveAnimation[]> {
+  return page.evaluate(
+    () => (window as unknown as { __l20CardMoves?: CardMoveAnimation[] }).__l20CardMoves ?? [],
+  );
+}
+
+/**
+ * Records one card's `top` on every frame, starting before the click: a FLIP either
+ * travels through the space between the two positions or it does not, and this is
+ * what tells the two apart.
+ */
+async function sampleCardTrajectory(
+  page: Page,
+  tokenId: string,
+  frames: number,
+): Promise<Array<{ readonly t: number; readonly top: number }>> {
+  return page.evaluate(
+    ({ tokenId: id, frames: count }) =>
+      new Promise<Array<{ t: number; top: number }>>((resolve) => {
+        const startedAt = performance.now();
+        const samples: Array<{ t: number; top: number }> = [];
+        const tick = (): void => {
+          const card = document.querySelector(
+            `ul[aria-label="我的 NFT"] > li[data-identity-id="${id}"]`,
+          );
+          if (card !== null) {
+            samples.push({
+              t: Math.round(performance.now() - startedAt),
+              top: Math.round(card.getBoundingClientRect().top),
+            });
+          }
+          if (samples.length >= count || performance.now() - startedAt > 5_000) resolve(samples);
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+    { tokenId, frames },
+  );
+}
+
+/** Pauses the move at ~1/3 of the 300 ms so a screenshot really shows the crossing. */
+async function freezeCardMoveAtMidpoint(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const animations = document.getAnimations().filter((animation) => {
+      const effect = animation.effect;
+      if (!(effect instanceof KeyframeEffect) || effect.target === null) return false;
+      return effect
+        .getKeyframes()
+        .some((frame) => typeof (frame as { transform?: unknown }).transform === 'string');
+    });
+    for (const animation of animations) {
+      animation.pause();
+      animation.currentTime = 90;
+    }
+    return animations.length;
+  });
+}
+
+async function resumeCardMoves(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    for (const animation of document.getAnimations()) {
+      if (animation.playState === 'paused') animation.play();
+    }
+  });
+}
+
+/**
+ * owner 2026-11-17: 选择身份 NFT 不再走整页软过渡。The soft-transition probe records
+ * every `data-transition` mutation — including plain 「idle」 ones — so the
+ * assertion is that neither 「leaving」 nor 「entering」 ever appeared after the tap.
+ */
+async function expectNoPageFade(page: Page): Promise<void> {
+  expect((await transitionPhases(page)).join(',')).not.toMatch(/leaving|entering/);
+}
+
+/**
+ * The seeded chain gives the wallet under test one identity (#1), so a
+ * 「card travels from below to the top」 scenario needs a second one. These anvil
+ * accounts hold the rest of the seed; iterating from #4 down keeps #1/#2 — which
+ * other tests in this file assert — out of the way.
+ */
+const SECOND_IDENTITY_DONORS = [
+  '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', // anvil #4
+  '0x90F79bf6EB2c4f870365E785982E1f101E93b906', // anvil #3
+  '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', // anvil #2
+  '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', // anvil #1
+] as const;
+
+function padWord(value: string | bigint): string {
+  const hex =
+    typeof value === 'bigint' ? value.toString(16) : value.toLowerCase().replace(/^0x/, '');
+  return hex.padStart(64, '0');
+}
+
+async function memberNftCall(data: string): Promise<string> {
+  return anvilRpc<string>('eth_call', [{ to: MEMBER_NFT, data }, 'latest']);
+}
+
+/** Lends the wallet a second seeded identity (transferFrom on the suite chain). */
+async function lendSecondIdentity(owner: string): Promise<void> {
+  const balanceOf = `0x70a08231${padWord(owner)}`; // balanceOf(address)
+  if (BigInt(await memberNftCall(balanceOf)) >= 2n) return;
+  for (const donor of SECOND_IDENTITY_DONORS) {
+    if (BigInt(await memberNftCall(`0x70a08231${padWord(donor)}`)) === 0n) continue;
+    // tokenOfOwnerByIndex(address,uint256)
+    const tokenId = BigInt(await memberNftCall(`0x2f745c59${padWord(donor)}${padWord(0n)}`));
+    if (tokenId === 1n || tokenId === 2n) continue;
+    await anvilRpc('eth_sendTransaction', [
+      {
+        from: donor,
+        to: MEMBER_NFT,
+        // transferFrom(address,address,uint256)
+        data: `0x23b872dd${padWord(donor)}${padWord(owner)}${padWord(tokenId)}`,
+      },
+    ]);
+    await expect
+      .poll(async () => BigInt(await memberNftCall(balanceOf)), { timeout: 20_000 })
+      .toBe(2n);
+    return;
+  }
+  throw new Error('no seeded identity NFT left to give the wallet a second card');
+}
+
+/**
+ * Runs a test body with the wallet owning two identities, then puts the chain back:
+ * the file-level `isolateChain()` snapshot only reverts at the end of the file, and
+ * later tests here assert 「持有 1 个身份 NFT」.
+ */
+async function withSecondIdentity(body: () => Promise<void>): Promise<void> {
+  const snapshot = await snapshotChain();
+  try {
+    await lendSecondIdentity(ACCOUNTS.withIdentity);
+    await body();
+  } finally {
+    await revertChain(snapshot);
+  }
 }
 
 // Snapshot before any test touches the chain; afterAll restores it.
@@ -279,65 +459,150 @@ test('wallet menu: identity row agrees with the pill when the chain is unreachab
   await shot(page, 'wallet-menu-identity-error.png');
 });
 
-test('my-nft: card list and local selection without a transaction', async ({ page }) => {
+test('my-nft: tapping 使用此身份 NFT moves the card to the top of the list', async ({ page }) => {
   await recordSoftTransition(page);
-  await installWallet(page, ACCOUNTS.withIdentity);
-  await page.goto('/my-nft?symbol=TestLOVE20');
-  await connect(page);
+  await recordCardMoves(page);
+  await withSecondIdentity(async () => {
+    await installWallet(page, ACCOUNTS.withIdentity);
+    await page.goto('/my-nft?symbol=TestLOVE20');
+    await connect(page);
 
-  await expect(page.getByText('持有 1 个身份 NFT')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('button', { name: '当前身份 NFT' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '使用此身份 NFT' })).toBeVisible();
-  await shot(page, 'my-nft-list.png');
+    await expect(page.getByText('持有 2 个身份 NFT')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('button', { name: '当前身份 NFT' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: '使用此身份 NFT' }).click();
-  // Owner 2026-11-16: 选择身份 NFT 是整页变化，必须走软过渡而不是「突然刷新」。
-  // Freeze the fade at its midpoint for the screenshot; the probe below records
-  // the phases itself, so neither assertion races the 180/200 ms animation.
-  await freezePageFadeAtMidpoint(page);
-  await shotLive(page, 'my-nft-selecting.png');
-  await expectBusyButtonDuringTransition(page);
-  await expectSoftTransition(page);
+    const list = page.getByRole('list', { name: '我的 NFT' });
+    const cards = list.locator('li[data-identity-id]');
+    await expect(cards).toHaveCount(2);
+    // The card that has to travel: the second one (order is memberId ascending until
+    // one of them becomes current).
+    const movedTokenId = await cards.nth(1).getAttribute('data-identity-id');
+    if (movedTokenId === null) throw new Error('the second card has no identity id');
+    const listTop = Math.round((await cards.nth(0).boundingBox())?.y ?? -1);
+    const cardTop = Math.round((await cards.nth(1).boundingBox())?.y ?? -1);
+    expect(cardTop).toBeGreaterThan(listTop);
+    await shot(page, 'my-nft-list.png');
 
-  // The row keeps its 当前 pill + tint; the disabled button carries the state
-  // only as its accessible name (the visible duplicate is gone).
-  const identityList = page.getByRole('list', { name: '我的 NFT' });
-  await expect(identityList.getByText('当前', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '当前身份 NFT' })).toBeDisabled();
-  // No wallet confirmation appeared: selection is a local cache write.
-  await expect(page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' })).toBeVisible();
-  await shot(page, 'my-nft-selected.png');
+    // Start sampling before the click: this trajectory is the proof that the card
+    // travels instead of teleporting to the top.
+    const trajectory = sampleCardTrajectory(page, movedTokenId, 40);
+    await cards.nth(1).getByRole('button', { name: '使用此身份 NFT' }).click();
+    // One mid-move frame for the screenshot (the old 整页淡出 frame is gone).
+    await expect.poll(() => freezeCardMoveAtMidpoint(page)).toBeGreaterThan(0);
+    await shotLive(page, 'my-nft-selecting.png');
+    await resumeCardMoves(page);
 
-  await page.reload();
-  await expect(
-    page.getByRole('list', { name: '我的 NFT' }).getByText('当前', { exact: true }),
-  ).toBeVisible({ timeout: 15_000 });
+    // 忙碌态保留：按钮在移动期间 aria-busy（「切换中…」），防重复点击。
+    await expectBusyButtonDuringTransition(page);
+
+    // The tapped card was the one animated, and it started from its old offset:
+    // translateY(+(old top − new top)) → 0 is exactly FLIP.
+    const moves = (await cardMoveAnimations(page)).filter(
+      (entry) => entry.kind === 'move' && entry.tokenId === movedTokenId,
+    );
+    expect(moves).toHaveLength(1);
+    const move = moves[0];
+    if (move === undefined) throw new Error('the card move animation was not recorded');
+    expect(move.tag).toBe('LI');
+    expect(move.durationMs).toBe(300);
+    expect(move.easing).toBe('cubic-bezier(0.22, 1, 0.36, 1)');
+    const delta = Number(/translateY\((-?[\d.]+)px\)/.exec(move.frames)?.[1] ?? 0);
+    expect(delta).toBeGreaterThan(40);
+    expect(Math.abs(delta - (cardTop - listTop))).toBeLessThanOrEqual(2);
+
+    // The measured trajectory: starts where the card was, never leaves the list,
+    // passes through the space in between, and settles on the top position. The
+    // elapsed time between the first and the last movement rules out a teleport.
+    const samples = await trajectory;
+    expect(samples.length).toBeGreaterThan(10);
+    expect(samples[0]?.top).toBe(cardTop);
+    expect(samples[samples.length - 1]?.top).toBe(listTop);
+    const intermediate = samples.filter(
+      (sample) => sample.top < cardTop - 2 && sample.top > listTop + 2,
+    );
+    expect(intermediate.length).toBeGreaterThan(0);
+    for (let index = 1; index < samples.length; index += 1) {
+      const previous = samples[index - 1]?.top ?? cardTop;
+      const current = samples[index]?.top ?? cardTop;
+      expect(current).toBeLessThanOrEqual(previous + 1);
+      expect(current).toBeGreaterThanOrEqual(listTop - 1);
+    }
+    const moving = samples.filter((sample) => sample.top < cardTop - 2);
+    expect((moving[moving.length - 1]?.t ?? 0) - (moving[0]?.t ?? 0)).toBeGreaterThanOrEqual(100);
+
+    // The moved card is now the first item and carries the current state.
+    await expect(cards.first()).toHaveAttribute('data-identity-id', movedTokenId);
+    await expect(list.getByText('当前', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '当前身份 NFT' })).toBeDisabled();
+    // No page-level fade: the card's own move is the whole transition.
+    await expectNoPageFade(page);
+    // No wallet confirmation appeared: selection is a local cache write.
+    await expect(page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' })).toBeVisible();
+    await expect(page.getByText('身份 NFT 暂时读不到')).toHaveCount(0);
+    await shot(page, 'my-nft-selected.png');
+
+    await page.reload();
+    await expect(
+      page.getByRole('list', { name: '我的 NFT' }).getByText('当前', { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+  });
 });
 
-test('my-nft: 1280×800 dark selection also fades through the soft transition', async ({
+test('my-nft: 1280×800 dark selection puts the row on top without the page fade', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await recordSoftTransition(page);
-  await installWallet(page, ACCOUNTS.withIdentity);
-  await page.addInitScript(() => {
-    window.localStorage.setItem('love20:theme', 'dark');
-  });
-  await page.goto('/my-nft');
-  await connect(page);
+  await recordCardMoves(page);
+  await withSecondIdentity(async () => {
+    await installWallet(page, ACCOUNTS.withIdentity);
+    await page.addInitScript(() => {
+      window.localStorage.setItem('love20:theme', 'dark');
+    });
+    await page.goto('/my-nft');
+    await connect(page);
 
-  await expect(page.getByRole('button', { name: '使用此身份 NFT' })).toBeVisible({
-    timeout: 20_000,
-  });
-  await page.getByRole('button', { name: '使用此身份 NFT' }).click();
-  await freezePageFadeAtMidpoint(page);
-  await shotLive(page, 'my-nft-selecting-dark-desktop.png');
-  await expectBusyButtonDuringTransition(page);
-  await expectSoftTransition(page);
+    const rows = page.getByRole('table').locator('tbody tr[data-identity-id]');
+    await expect(rows).toHaveCount(2, { timeout: 20_000 });
+    const movedTokenId = await rows.nth(1).getAttribute('data-identity-id');
+    if (movedTokenId === null) throw new Error('the second row has no identity id');
+    const listTop = Math.round((await rows.nth(0).boundingBox())?.y ?? -1);
+    const rowTop = Math.round((await rows.nth(1).boundingBox())?.y ?? -1);
+    expect(rowTop).toBeGreaterThan(listTop);
 
-  const table = page.getByRole('table');
-  await expect(table.getByText('当前', { exact: true })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole('button', { name: '当前身份 NFT' })).toBeDisabled();
+    await rows.nth(1).getByRole('button', { name: '使用此身份 NFT' }).click();
+    await shotLive(page, 'my-nft-selecting-dark-desktop.png');
+
+    // Desktop fallback (documented in the delivery): a `<tr>` cannot be transformed
+    // reliably across browsers, so the table never moves — the row re-orders at once
+    // and a brand tint pulse carries the emphasis. Both halves are asserted here.
+    await expect
+      .poll(
+        async () =>
+          (await cardMoveAnimations(page)).filter(
+            (entry) =>
+              entry.kind === 'emphasis' && entry.tag === 'TR' && entry.tokenId === movedTokenId,
+          ).length,
+      )
+      .toBe(1);
+    expect((await cardMoveAnimations(page)).filter((entry) => entry.kind === 'move')).toEqual([]);
+    const [emphasis] = (await cardMoveAnimations(page)).filter(
+      (entry) => entry.kind === 'emphasis' && entry.tag === 'TR',
+    );
+    if (emphasis === undefined) throw new Error('the row highlight animation was not recorded');
+    expect(emphasis.frames).toContain('backgroundColor');
+    expect(emphasis.durationMs).toBe(620);
+
+    await expect(rows.first()).toHaveAttribute('data-identity-id', movedTokenId);
+    const settledTop = Math.round((await rows.first().boundingBox())?.y ?? -1);
+    expect(settledTop).toBe(listTop);
+    expect(settledTop).toBeLessThan(rowTop);
+    // No page-level fade either: the switch is instant for the table, not a blink.
+    await expectNoPageFade(page);
+
+    const table = page.getByRole('table');
+    await expect(table.getByText('当前', { exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('button', { name: '当前身份 NFT' })).toBeDisabled();
+  });
 });
 
 test('identity cache is cleared when ownerOf belongs to someone else', async ({ page }) => {
