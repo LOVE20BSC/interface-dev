@@ -9,7 +9,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import {
   ANVIL_EXPORT_DIR,
   buildSyncOutputs,
-  comparableManifest,
+  manifestContent,
+  manifestHeadDrift,
   FRONTEND_MANIFEST_FILE,
   readJson,
 } from './lib/anvil-export.mjs';
@@ -66,9 +67,9 @@ async function main() {
     mismatches.push(`${FRONTEND_MANIFEST_FILE}: missing (run \`pnpm sync:anvil\`)`);
   } else {
     const committed = readJson(FRONTEND_MANIFEST_FILE, 'manifest');
-    const same = comparableManifest(committed) === comparableManifest(manifest);
+    const same = manifestContent(committed) === manifestContent(manifest);
     if (!same) {
-      const diff = firstDifference(comparableManifest(manifest), comparableManifest(committed));
+      const diff = firstDifference(manifestContent(manifest), manifestContent(committed));
       mismatches.push(
         `${FRONTEND_MANIFEST_FILE}: differs at line ${diff.line}\n` +
           `    committed: ${clip(diff.actual)}\n` +
@@ -81,6 +82,16 @@ async function main() {
     console.log(
       '[abis:check] ABIs, manifest, address book and airdrop snapshot match ../anvil/export.',
     );
+    // Provenance-only drift: a sibling repo gained commits (typically docs/style) after the last
+    // `pnpm sync:anvil`. The artifacts are identical, so this must not fail the gate; it is still
+    // worth printing, because the manifest's `sources.*.head` is the record of what was built.
+    const drift = manifestHeadDrift(readJson(FRONTEND_MANIFEST_FILE, 'manifest'), manifest);
+    for (const { repo, committed, expected } of drift) {
+      console.warn(
+        `[abis:check] note: ${repo} HEAD moved ${committed.slice(0, 8)} → ${expected.slice(0, 8)} ` +
+          'with no artifact change; run `pnpm sync:anvil` to refresh provenance.',
+      );
+    }
     return;
   }
 

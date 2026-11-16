@@ -22,7 +22,12 @@ export interface AirdropInfo {
   readonly totalRemainingShare: bigint;
   readonly totalClaimedAmount: bigint;
   readonly remainingAmount: bigint;
-  /** Empty for the genesis token by design (CI-017); http(s) for launched tokens. */
+  /**
+   * http(s) URI the launcher registered for this token's Merkle snapshot. New deployments write the
+   * genesis URI at construction time (core `45e82c5`); deployments older than that can still report
+   * an empty string for the genesis token (CI-017). Never treated as trusted data on its own: the
+   * snapshot must also match `merkleRoot`.
+   */
   readonly snapshotUri: string;
 }
 

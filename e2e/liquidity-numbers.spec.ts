@@ -121,14 +121,11 @@ function ensureChildCommunity(): void {
     [deployment.addresses.tokenAddress, '1', '1'],
     deployment.addresses.mint,
   );
-  castSend(deployment.addresses.launch, 'launchToken(string,address,uint256,address,uint8,bytes[])', [
-    CHILD_INPUT_SYMBOL,
-    deployment.addresses.tokenAddress,
-    '1',
-    ACCOUNTS.withIdentity,
-    '0',
-    '[]',
-  ]);
+  castSend(
+    deployment.addresses.launch,
+    'launchToken(string,address,uint256,address,uint8,bytes[])',
+    [CHILD_INPUT_SYMBOL, deployment.addresses.tokenAddress, '1', ACCOUNTS.withIdentity, '0', '[]'],
+  );
   const child = addressOf(
     deployment.addresses.launch,
     'tokenAddressBySymbol(string)(address)',
@@ -681,9 +678,7 @@ test.describe('流动性池 QA 缺陷回归（D1/D2/D4/D5/D6/D7/D8/D9/D10）', (
       await expect(page.getByTestId('liquidity-token')).toContainText('自定义');
 
       // 右上角社区切换 → TestCMTOK1（不刷新页面）。
-      await page
-        .getByRole('button', { name: new RegExp(`当前代币社区 ${SYMBOL}`) })
-        .click();
+      await page.getByRole('button', { name: new RegExp(`当前代币社区 ${SYMBOL}`) }).click();
       await page.getByTestId('community-search').fill(CHILD_SYMBOL);
       await page.getByTestId(`community-search-result-${CHILD_SYMBOL}`).click();
       await expect(page).toHaveURL(new RegExp(`[?&]symbol=${CHILD_SYMBOL}(&|$)`), {
@@ -811,7 +806,7 @@ test.describe('社区流动性查询（旧库四块布局 + 任意地址）', ()
 
       // 卡 4：#5 在这个池子里没有 LP。
       await expect(page.getByTestId('liquidity-query-no-lp')).toHaveText(
-        '该地址在此交易对中，没有 LP 代币',
+        '该地址在此交易对中，没有流动性凭证',
       );
 
       // 任意地址：质押合约持有 totalSupply − 1000 → 4,472.135954 LP / 99.99%。

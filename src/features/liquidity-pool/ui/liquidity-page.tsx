@@ -170,6 +170,19 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
     if (next.kind !== 'custom') clearCustomRef.current();
   };
 
+  // 社区流动性查询面板在两条分支（未连接/网络不对 与 已连接页签）里出现；prop 列表只写一次，
+  // 避免两处漂移（旧库也只有一份）。接受已窄化的 token，调用点在窄化之后。
+  const renderQueryPanel = (queryToken: LiquidityToken) => (
+    <PoolQueryPanel
+      token={queryToken}
+      target={catalog.wrappedToken}
+      pool={pool}
+      catalog={catalog}
+      isConnected={isConnected}
+      onSelectToken={handleSelectToken}
+    />
+  );
+
   if (router === undefined || factory === undefined || wrappedAddress === undefined) {
     return (
       <StateCard
@@ -248,14 +261,7 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
         )
       ) : !isConnected || isWrongChain ? (
         tab === 'query' ? (
-          <PoolQueryPanel
-            token={token}
-            target={catalog.wrappedToken}
-            pool={pool}
-            catalog={catalog}
-            isConnected={isConnected}
-            onSelectToken={handleSelectToken}
-          />
+          renderQueryPanel(token)
         ) : (
           <StateCard
             title={
@@ -305,16 +311,7 @@ export function LiquidityPage({ isConnected, isWrongChain, connectAction }: Liqu
               isConnected={isConnected}
             />
           </div>
-          <div hidden={tab !== 'query'}>
-            <PoolQueryPanel
-              token={token}
-              target={catalog.wrappedToken}
-              pool={pool}
-              catalog={catalog}
-              isConnected={isConnected}
-              onSelectToken={handleSelectToken}
-            />
-          </div>
+          <div hidden={tab !== 'query'}>{renderQueryPanel(token)}</div>
         </>
       )}
 

@@ -582,9 +582,31 @@ export async function buildSyncOutputs() {
   return { outputs, manifest, root, exportData };
 }
 
-/** Stable comparison form: the export mtime is metadata, not content. */
-export function comparableManifest(manifest) {
+/**
+ * Stable comparison form: the export timestamp and each sibling repository's HEAD SHA are
+ * **provenance**, not content. A docs-only commit in a sibling repo changes `sources.<repo>.head`
+ * without changing a single ABI, so comparing them would fail the drift gate for a reason that
+ * cannot break the app. Content (ABI entry lists, paths, address-book keys) stays in the
+ * comparison; {@link manifestHeadDrift} reports the provenance difference separately.
+ */
+export function manifestContent(manifest) {
   const copy = JSON.parse(JSON.stringify(manifest));
   delete copy.anvilExport.exportedAt;
+  for (const source of Object.values(copy.sources ?? {})) delete source.head;
   return `${JSON.stringify(copy, null, 2)}\n`;
+}
+
+/** @deprecated use {@link manifestContent}; kept so older callers keep compiling. */
+export const comparableManifest = manifestContent;
+
+/** Sibling HEADs recorded in the manifest that no longer match the export they were made from. */
+export function manifestHeadDrift(committed, expected) {
+  const drift = [];
+  for (const [repo, expectedSource] of Object.entries(expected.sources ?? {})) {
+    const committedHead = committed.sources?.[repo]?.head;
+    if (committedHead !== undefined && committedHead !== expectedSource.head) {
+      drift.push({ repo, committed: committedHead, expected: expectedSource.head });
+    }
+  }
+  return drift;
 }

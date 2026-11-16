@@ -74,8 +74,8 @@ test; else prod; ADR-0002 §5), and `vars.VITE_ENV` overrides it. A fork whose n
 `dev` therefore builds dev — an accepted consequence of the keyword rule.
 `vite.config.ts` aliases `@deployments` to exactly one of:
 
-| variant | file                                          | chain                                   |
-| ------- | --------------------------------------------- | --------------------------------------- |
+| variant | file                                              | chain                                   |
+| ------- | ------------------------------------------------- | --------------------------------------- |
 | `dev`   | `src/config/network/anvil31337_dev/network.json`  | 31337 (anvil)                           |
 | `test`  | `src/config/network/bscTestnet_test/network.json` | 97 (placeholder; ADR leaves 97/56 open) |
 | `prod`  | `src/config/network/bscMainnet_prod/network.json` | 56                                      |
@@ -98,7 +98,11 @@ parameters) and, once available, `airdrop.json`. Run
 address files and snapshot directly. The command never reads `.account` and verifies every
 Merkle proof before writing either frontend file; the anvil command above also syncs ABIs.
 `sync:network` owns public `params` and its notes; `sync:anvil` preserves those fields while
-updating deployment data. `abis:check` still checks addresses, deployment metadata, ABIs and snapshot.
+updating deployment data. Both commands write `airdrop.json`, and the two sources must agree
+byte-for-byte: the anvil export snapshot and core's `script/network/<network>/airdrop.json` are the
+same Merkle fixture, each verified against its chain's `merkleRoot` before writing. `abis:check`
+compares the committed snapshot with the **anvil export** (the local deployment that produced the
+addressbook), so a `sync:network`-only change must still match it or the gate fails.
 Additional module addresses belong in core's network directory as `addresses.*.params`.
 
 The frontend loads the bundled genesis snapshot on demand and compares its root with

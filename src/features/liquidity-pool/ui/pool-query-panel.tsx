@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount } from 'wagmi';
+import { isHexAddress } from '@/config/deployments/types';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { formatPercent, formatRate, formatTokenAmount } from '@/shared/lib/format';
@@ -21,7 +22,7 @@ import type { PoolStateResult } from '@/features/liquidity-pool/model/use-pool-s
 export interface PoolQueryPanelProps {
   /** 交易对里的社区代币一侧（「基础代币」；来自 Launch 目录或自定义地址）。 */
   readonly token: LiquidityToken;
-  /** 目标代币 = WETH（只读显示；元数据还没读回来时按 WETH / 18 位渲染）。 */
+  /** 目标代币 = 包装原生币（Router.WETH() 一侧；元数据未就绪时显示 `—`，不臆造符号）。 */
   readonly target: LiquidityToken | undefined;
   readonly pool: PoolStateResult;
   readonly catalog: LiquidityCatalog;
@@ -30,11 +31,8 @@ export interface PoolQueryPanelProps {
   readonly onSelectToken: (token: LiquidityToken) => void;
 }
 
-/** 目标代币固定是 WETH（本环境只有一个基币）；元数据未就绪时的显示兜底。 */
-const TARGET_FALLBACK = { symbol: 'WETH', decimals: 18 } as const;
 /** pair 的 LP 凭证精度固定 18（Uniswap V2 `UniswapV2ERC20.decimals`）。 */
 const LP_DECIMALS = 18;
-const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const EMPTY_CELL = copy.liquidity.query.none;
 /** 价格用 6 位小数再裁掉尾零：反向价格常常很小（1 社区代币 = 0.0005 WETH）。 */
 const RATE_OPTIONS = { maxFractionDigits: 6 } as const;
@@ -47,13 +45,13 @@ const CARD = 'p-5';
  * `components/Dex/LiquidityQuery.tsx`，并支持查询任意地址）。
  *
  * 四块，顺序与旧库一致：
- * 1. 选择交易对：左「社区代币」选择器（Launch 目录）/ 右「目标代币」只读 WETH；
- *    下方居中的「LP 代币地址」可点击复制。
- * 2. 交易对统计：LP 总数量、两侧总数量、价格行 + 方向切换；loading `加载中...`、
+ * 1. 选择交易对：左「社区代币」选择器（Launch 目录）/ 右「目标代币」只读包装原生币；
+ *    下方居中的「流动性凭证地址」可点击复制。
+ * 2. 交易对统计：凭证总数量、两侧总数量、价格行 + 方向切换；loading `加载中…`、
  *    无池 `交易对不存在`。
- * 3. 查询地址：输入 + 提交（查询 / 重新查询 / 查询中...）+ 重置；未连接提示；
+ * 3. 查询地址：输入 + 提交（查询 / 重新查询 / 查询中…）+ 重置；未连接提示；
  *    已连接时默认填当前钱包地址并自动查一次。
- * 4. 查询结果：该地址 LP 数量与份额、按储备比例折算的可兑换两币数量；
+ * 4. 查询结果：该地址凭证数量与份额、按储备比例折算的可兑换两币数量；
  *    无池 / 该地址没有 LP / 读取失败各有独立态。
  *
  * 读链只有三个标准 view（`pair.balanceOf(addr)` / `pair.totalSupply()` /
@@ -82,33 +80,48 @@ export function PoolQueryPanel({
     setSubmitted(account);
   }, [account]);
 
-  const targetSymbol = target?.symbol ?? TARGET_FALLBACK.symbol;
-  const targetDecimals = target?.decimals ?? TARGET_FALLBACK.decimals;
+  const targetSymbol = target?.symbol ?? EMPTY_CELL;
+  const targetDecimals = target?.decimals;
 
   const trimmed = input.trim();
-  const isValidAddress = ADDRESS_RE.test(trimmed);
-  const addressError = trimmed.length > 0 && !isValidAddress ? copy.liquidity.query.addressInvalid : undefined;
+  const isValidAddress = isHexAddress(trimmed);
+  const addressError =
+    trimmed.length > 0 && !isValidAddress ? copy.liquidity.query.addressInvalid : undefined;
 
-  const { balance, isLoading: balanceLoading, isError: balanceError, refetch: refetchBalance } =
-    usePairBalance(pool.pairAddress, submitted);
+  const {
+    balance,
+    isLoading: balanceLoading,
+    isError: balanceError,
+    refetch: refetchBalance,
+  } = usePairBalance(pool.pairAddress, submitted);
 
   const snapshot = pool.snapshot;
   const reserves = pool.reserves;
   const hasPool =
-    snapshot !== undefined && pool.hasLiquidity && snapshot.totalSupply > 0n && reserves !== undefined;
+    snapshot !== undefined &&
+    pool.hasLiquidity &&
+    snapshot.totalSupply > 0n &&
+    reserves !== undefined;
 
   const position = useMemo((): AddressLpPosition | undefined => {
     if (balance === undefined || snapshot === undefined || reserves === undefined) return undefined;
-    return addressLpPosition(balance, snapshot.totalSupply, reserves.reserveToken, reserves.reserveNative);
+    return addressLpPosition(
+      balance,
+      snapshot.totalSupply,
+      reserves.reserveToken,
+      reserves.reserveNative,
+    );
   }, [balance, reserves, snapshot]);
 
   const queryLoading =
     submitted !== undefined && (pool.isLoading || (balanceLoading && !balanceError));
 
   // ── 交易对统计（第 2 块）的数值 ─────────────────────────────────────────
-  // 价格行沿用旧库方向：默认 1 目标代币(WETH) = X 社区代币，箭头切到反向。
+  // 价格行沿用旧库方向：默认 1 包装原生币 = X 社区代币，箭头切到反向。元数据未就绪时显示 `—`。
   const price = useMemo(() => {
-    if (reserves === undefined) return { current: EMPTY_CELL, reverse: EMPTY_CELL };
+    if (reserves === undefined || targetDecimals === undefined) {
+      return { current: EMPTY_CELL, reverse: EMPTY_CELL };
+    }
     return {
       current: formatRate(
         reserves.reserveToken,
@@ -201,8 +214,10 @@ export function PoolQueryPanel({
   const runQuery = () => {
     if (!isValidAddress) return;
     setSubmitted(trimmed as `0x${string}`);
-    if (pool.isError) pool.refetch();
-    if (balanceError) refetchBalance();
+    // 「查询 / 重新查询」都必须真的重读一次链：同值 setSubmitted 不会触发 hook 重取，
+    // 所以池子与凭证余额在这里无条件 refetch（用户点它就是要新数据）。
+    pool.refetch();
+    refetchBalance();
   };
 
   const resetQuery = () => {
@@ -270,10 +285,7 @@ export function PoolQueryPanel({
               testId="liquidity-query-pair"
             />
           ) : (
-            <span
-              className="text-xs text-muted"
-              data-testid="liquidity-query-pair-missing"
-            >
+            <span className="text-xs text-muted" data-testid="liquidity-query-pair-missing">
               {copy.liquidity.query.lpAddressMissing}
             </span>
           )}
@@ -293,12 +305,20 @@ export function PoolQueryPanel({
         ) : pool.isError ? (
           <div className="mt-3 space-y-2">
             <p className="text-sm text-muted">{copy.liquidity.states.readFailed}</p>
-            <Button variant="secondary" size="sm" data-testid="liquidity-query-stats-retry" onClick={pool.refetch}>
+            <Button
+              variant="secondary"
+              size="sm"
+              data-testid="liquidity-query-stats-retry"
+              onClick={pool.refetch}
+            >
               {copy.liquidity.query.retry}
             </Button>
           </div>
         ) : !hasPool || reserves === undefined || snapshot === undefined ? (
-          <p className="mt-3 text-center text-sm text-muted" data-testid="liquidity-query-stats-empty">
+          <p
+            className="mt-3 text-center text-sm text-muted"
+            data-testid="liquidity-query-stats-empty"
+          >
             {copy.liquidity.query.statsEmpty}
           </p>
         ) : (
@@ -325,7 +345,9 @@ export function PoolQueryPanel({
                   className="font-medium text-foreground"
                   data-testid="liquidity-query-total-target"
                 >
-                  {formatTokenAmount(reserves.reserveNative, targetDecimals)}
+                  {targetDecimals === undefined
+                    ? EMPTY_CELL
+                    : formatTokenAmount(reserves.reserveNative, targetDecimals)}
                 </dd>
               </div>
             </dl>
@@ -443,7 +465,10 @@ export function PoolQueryPanel({
               </Button>
             </div>
           ) : pool.isLoading && snapshot === undefined ? (
-            <p className="text-center text-sm text-muted" data-testid="liquidity-query-result-loading">
+            <p
+              className="text-center text-sm text-muted"
+              data-testid="liquidity-query-result-loading"
+            >
               {copy.liquidity.query.submitting}
             </p>
           ) : !hasPool ? (
@@ -456,7 +481,10 @@ export function PoolQueryPanel({
               </p>
             </div>
           ) : queryLoading || position === undefined ? (
-            <p className="text-center text-sm text-muted" data-testid="liquidity-query-result-loading">
+            <p
+              className="text-center text-sm text-muted"
+              data-testid="liquidity-query-result-loading"
+            >
               {copy.liquidity.query.submitting}
             </p>
           ) : position.lpAmount === 0n ? (
@@ -506,7 +534,9 @@ export function PoolQueryPanel({
                       className="font-medium text-foreground"
                       data-testid="liquidity-query-convertible-target"
                     >
-                      {formatTokenAmount(position.amountNative, targetDecimals)}
+                      {targetDecimals === undefined
+                        ? EMPTY_CELL
+                        : formatTokenAmount(position.amountNative, targetDecimals)}
                     </dd>
                   </div>
                 </dl>
@@ -518,4 +548,3 @@ export function PoolQueryPanel({
     </div>
   );
 }
-

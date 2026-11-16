@@ -690,7 +690,7 @@
 - `?symbol=NoSuchCommunity99` 显示「读不到这个社区。」+ 重试，不回退 TestLOVE20；选过自定义代币后从右上角切社区，抬头/池子/查询跟随新社区（自定义标记消失）。
 - 加池页填 `123` 并展开详情 → 切「社区流动性」→ 切回：输入仍为 `123`、详情仍展开、智能模式状态不变。
 - 三线校验见 [three-line/liquidity.md](three-line/liquidity.md)（理论线 06:36 先于实现 → 合约线 `scripts/verify/liquidity-contract.mjs` 45/45 → 前端线 `e2e/liquidity-numbers.spec.ts`；任意地址折算见 §3.1）。
-- 截图：`liquidity-{add,mine,withdraw,query}-{light,dark}-{mobile,desktop}.png`（390×844 / 1280×800；`query` 一态为整页截图，包含四块布局与任意地址查询结果——四块在 390×844 / 1280×800 的一屏里放不下）。
+- 截图：`liquidity-{add,mine,withdraw,query,empty}-{light,dark}-{mobile,desktop}.png` 共 20 张（390×844 / 1280×800；`query` 一态为整页截图，包含四块布局与任意地址查询结果——四块在 390×844 / 1280×800 的一屏里放不下）。
 
 ## §4 横切交互规范
 
