@@ -6,7 +6,7 @@
     "path": "../anvil/export",
     "chainId": 31337,
     "deployBlock": 34,
-    "exportedAt": "2026-11-17T01:04:51.357Z"
+    "exportedAt": "2026-11-17T01:35:26.396Z"
   },
   "sources": {
     "core": {
@@ -35,7 +35,7 @@
       }
     },
     "group-chat": {
-      "head": "644c22cf2cb398182bf54d8bbf556ead4ff5e527",
+      "head": "ad176d54aad91709034b876ca02e507344fff818",
       "path": "../group-chat",
       "abis": {
         "GroupChat": 67
@@ -57,7 +57,7 @@
       }
     },
     "anvil": {
-      "head": "c35f43ef63300e118ee2e49e2cc2f9b09532be70",
+      "head": "b348b9c5b3030638caa2e03bd694f7619c121096",
       "path": "../anvil",
       "abis": {
         "WETH9": 16,
