@@ -15,7 +15,7 @@ const loadBatchTransferPage = () => import('@/pages/batch-transfer/batch-transfe
 const loadApprovalsPage = () => import('@/pages/approvals/approvals-page');
 const loadAppsPage = () => import('@/pages/apps/apps-page');
 const loadAboutPage = () => import('@/pages/about/about-page');
-const loadGovPage = () => import('@/pages/gov/gov-page');
+const loadGovSection = () => import('@/pages/gov/gov-section');
 const loadActPage = () => import('@/pages/act/act-page');
 const loadGroupPage = () => import('@/pages/group/group-page');
 const loadMePage = () => import('@/pages/me/me-page');
@@ -62,10 +62,6 @@ export const AboutPage = lazy(async () => {
   const module = await loadAboutPage();
   return { default: module.AboutPage };
 });
-export const GovPage = lazy(async () => {
-  const module = await loadGovPage();
-  return { default: module.GovPage };
-});
 export const ActPage = lazy(async () => {
   const module = await loadActPage();
   return { default: module.ActPage };
@@ -99,18 +95,29 @@ const ROUTE_LOADERS: Readonly<Record<string, () => Promise<unknown>>> = Object.f
   '/approvals': loadApprovalsPage,
   '/apps': loadAppsPage,
   '/about': loadAboutPage,
-  '/gov': loadGovPage,
   '/act': loadActPage,
   '/group': loadGroupPage,
   '/me': loadMePage,
   '/theme': loadThemePage,
 });
 
+export const GovSectionPage = lazy(async () => {
+  const module = await loadGovSection();
+  return { default: module.GovSection };
+});
+
+/** 治理域（含旧版占位页）都在同一个懒加载分区里。 */
+const GOV_SECTION_RE = /^\/(gov|stake|vote|verify|submit|acting|action)(\/|$)/;
+
 /**
  * Warm a route chunk on navigation intent (hover/focus/touch). It is a no-op
  * for eager routes and for paths that do not own a chunk yet.
  */
 export function prefetchRoute(pathname: string): void {
+  if (GOV_SECTION_RE.test(pathname)) {
+    void loadGovSection();
+    return;
+  }
   const load = ROUTE_LOADERS[pathname];
   if (load !== undefined) void load();
 }

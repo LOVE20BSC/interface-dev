@@ -431,7 +431,7 @@ cast call $PHASE "phaseInfo(uint256)(uint256,uint256)" 237 --rpc-url http://127.
 
 ### §3.1 前端线的实际断言（Lead 回填，2026-11-17 14:20）
 
-spec：`e2e/gov-stake-numbers.spec.ts`（**6 条 `test()`、619 行、110 处 `expect()`**）。两遍实跑、严格串行（每遍自己起/停 preview，`E2E_REUSE_PREVIEW=0`）：
+spec（**2026-11-17 晚按 TKM 多页面 IA 重写后为 8 条 `test()`**；下表 6 条是重写前的首版记录，数值口径完全一致，新结构见 §3.2）：两遍实跑、严格串行（每遍自己起/停 preview，`E2E_REUSE_PREVIEW=0`）：
 
 | 链 | 命令 | 结果 | 快照 |
 | --- | --- | --- | --- |
@@ -455,6 +455,24 @@ spec：`e2e/gov-stake-numbers.spec.ts`（**6 条 `test()`、619 行、110 处 `e
 2. 「承诺解锁期」显示 **`N 个阶段（约 X 分钟）`**（阶段数 + 约分钟），不是只写「约 X 分钟」——GLOSSARY 要求等待期以阶段计量，UX §4.5 要求估算写「约」。
 3. **C5 / C6 不在前端线覆盖**：页面在提交前就拦掉这些输入（主按钮禁用 + 就地文案），不会走到 revert。实际文案：超上限 `超过本阶段还能加速的 9,571.385499 TestLOVE20。`；0 值 `数量要大于 0。` / `两侧数量都要大于 0。`；未质押时是锁定卡 `先完成流动性质押`；意外 revert 的兜底是 `交易上链了，但没有成功，代币没有变化。`（revert 本身由合约线 C5/C6 覆盖）。
 4. 「我的质押折算」行只显示数值（单位在行标签「预计可取回社区代币 / 父币」里），断言按页面实际文本。
+
+### §3.2 多页面 IA 重写（2026-11-17 晚，owner 要求复刻 TKM）
+
+**为什么重写**：owner 要求「复刻 LOVE20TKM 旧版治理相关页面，同样的页面/功能/页面布局，只换样式；旧设计无法适配新协议才允许调整」。实现从「一个 `/gov` 两个页签」改回旧版的多页面 IA；**理论值口径（§1）与合约线（§2）一个 wei 都没变**，变的只是页面位置与交互路径：
+
+| 旧路径 | 本仓路由 | 本轮 |
+| --- | --- | --- |
+| `/gov` | `/gov`（治理首页：我的 / 社区） | 实装 |
+| `/stake/stakelp` | `/stake/stakelp` | 实装（含智能模式） |
+| `/stake/staketoken` | `/stake/staketoken` | 实装（加速质押） |
+| `/stake/unstake` | `/stake/unstake` | 实装（申请解锁 / 撤出 / 增加承诺解锁期） |
+| `/stake/liquid` | `/stake/liquid` | 实装（只读数据页） |
+| `/my/govrewards` | `/gov/rewards` | 占位（Mint ABI 未导出） |
+| `/vote/*`、`/verify/*`、`/submit/*`、`/acting/*`、`/action/*` | 同名路径 | 占位（Vote/Verify/Submit ABI 未导出） |
+
+**新 spec（8 条）**：24 张截图（6 状态 × 390×844 / 1280×800 × 浅/深）1 条 + 前端线 7 条——稳态（首页两个 tab、社区数据、按身份 NFT 编号查询、占位页）/ C1（stakelp 关闭智能模式，1,000 + 1 → 1,000 + 0.5 截断 → 治理权 223.606797）/ C2（staketoken，加速上限 19,142.770999 → 加速 9,571.385499）/ C3（unstake，+335.410196 → 559.016994）/ C4（unstake，解锁 26 阶段 52 分钟 → 撤出 10,571.385499 + 0.499999）/ **智能模式只填社区代币**（Hub token 变体，回执出现）/ **智能模式只填原生币**（Hub native 变体，无需代币授权即回执）。
+
+**智能模式的合约依据（不在 §1 理论线里，属新增功能）**：单币质押由 periphery `LOVE20Hub` 完成——`stakeLiquidityWithNative`（必须带 value，只填社区代币时会 revert `ZeroNativeTokenAmount`）/ `stakeLiquidityWithToken`（两枚 ERC20，只填社区代币时用它）；页面按「有没有原生币输入」选入口，报价用 `quoteStakeLiquidity(WithNative)` 的 `willSwap / amountToSwap / amountOutFromSwap / prepared* / liquiditySharesAdded / govVotesAdded`，滑点折算后的 `minLiquidityShares` 作为最少份额。C1–C4 的理论值仍走**关闭智能模式**的直接 `Stake.stakeLiquidity` 路径，因此与前文逐 wei 对齐。
 
 ## §4 三线对照表
 

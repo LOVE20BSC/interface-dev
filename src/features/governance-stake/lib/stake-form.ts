@@ -94,3 +94,11 @@ export function estimateLpMinted(input: LpMintedInput): bigint | null {
   const fromParent = (optimal.parentTokenAmount * lpTotalSupply) / reserveParent;
   return fromToken < fromParent ? fromToken : fromParent;
 }
+
+/** 质押类交易的 deadline：提交后 20 分钟内有效（页面不展示 deadline 文本）。 */
+export const STAKE_DEADLINE_SECONDS = 20 * 60;
+
+/** 纯靠模块作用域调用 Date.now，避免在组件 render 期出现 impure 调用。 */
+export function stakeDeadline(): bigint {
+  return BigInt(Math.floor(Date.now() / 1000) + STAKE_DEADLINE_SECONDS);
+}

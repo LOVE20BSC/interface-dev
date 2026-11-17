@@ -12,12 +12,19 @@ export interface StakeCommunity {
   readonly totalLp: bigint | undefined;
   readonly withdrawableLp: bigint | undefined;
   readonly totalBoostShares: bigint | undefined;
+  /** `totalStake` 第 4 项：已结算的手续费凭证（LP 口径）。 */
+  readonly feeLp: bigint | undefined;
   /** 本阶段社区总治理权（`totalGovVotes(token, 当前阶段)`）。 */
   readonly totalGovVotes: bigint | undefined;
   /** 本阶段社区有效加速份额（`totalValidBoostShares(token, 当前阶段)`）。 */
   readonly totalValidBoostShares: bigint | undefined;
   /** 累计销毁的社区代币（`totalBurnedToken`）。 */
   readonly totalBurnedToken: bigint | undefined;
+  /** 累计存入的社区代币本金（`liquidityTokenAmount`，加速上限的基数）。 */
+  readonly liquidityTokenAmount: bigint | undefined;
+  /** 社区口径的预计可取回两侧（`totalStake` 第 6/7 项，随池子价格变）。 */
+  readonly tokenAmountForLiquidity: bigint | undefined;
+  readonly parentTokenAmountForLiquidity: bigint | undefined;
   readonly refetch: () => void;
 }
 
@@ -27,9 +34,13 @@ const IDLE: StakeCommunity = {
   totalLp: undefined,
   withdrawableLp: undefined,
   totalBoostShares: undefined,
+  feeLp: undefined,
   totalGovVotes: undefined,
   totalValidBoostShares: undefined,
   totalBurnedToken: undefined,
+  liquidityTokenAmount: undefined,
+  tokenAmountForLiquidity: undefined,
+  parentTokenAmountForLiquidity: undefined,
   refetch: () => {},
 };
 
@@ -61,6 +72,12 @@ export function useStakeCommunity(
         address: stake,
         abi: stakeAbi,
         functionName: 'totalBurnedToken' as const,
+        args: [tokenAddress] as const,
+      },
+      {
+        address: stake,
+        abi: stakeAbi,
+        functionName: 'liquidityTokenAmount' as const,
         args: [tokenAddress] as const,
       },
     ] as const;
@@ -96,8 +113,9 @@ export function useStakeCommunity(
   const data = read.data;
   const totalEntry = data?.[0];
   const burnedEntry = data?.[1];
-  const govVotesEntry = phaseDependent ? data?.[2] : undefined;
-  const boostEntry = phaseDependent ? data?.[3] : undefined;
+  const principalEntry = data?.[2];
+  const govVotesEntry = phaseDependent ? data?.[3] : undefined;
+  const boostEntry = phaseDependent ? data?.[4] : undefined;
 
   const totalTuple =
     totalEntry?.status === 'success' && Array.isArray(totalEntry.result)
@@ -117,9 +135,13 @@ export function useStakeCommunity(
     totalLp: totalTuple?.[1],
     withdrawableLp: totalTuple?.[2],
     totalBoostShares: totalTuple?.[4],
+    feeLp: totalTuple?.[3],
     totalGovVotes: uintOf(govVotesEntry),
     totalValidBoostShares: uintOf(boostEntry),
     totalBurnedToken: uintOf(burnedEntry),
+    liquidityTokenAmount: uintOf(principalEntry),
+    tokenAmountForLiquidity: totalTuple?.[5],
+    parentTokenAmountForLiquidity: totalTuple?.[6],
     refetch,
   };
 }

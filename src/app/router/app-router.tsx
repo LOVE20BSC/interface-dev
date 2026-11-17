@@ -10,7 +10,7 @@ import {
   ApprovalsPage,
   AppsPage,
   BatchTransferPage,
-  GovPage,
+  GovSectionPage,
   GroupPage,
   LiquidityPage,
   MePage,
@@ -63,7 +63,13 @@ export function AppRouter() {
           <Route path="approvals" element={<ApprovalsPage />} />
           <Route path="apps" element={<AppsPage />} />
           <Route path="about" element={<AboutPage />} />
-          <Route path="gov" element={<GovPage />} />
+          <Route path="gov/*" element={<GovSectionPage />} />
+          <Route path="stake/*" element={<GovSectionPage />} />
+          <Route path="vote/*" element={<GovSectionPage />} />
+          <Route path="verify/*" element={<GovSectionPage />} />
+          <Route path="submit/*" element={<GovSectionPage />} />
+          <Route path="acting/*" element={<GovSectionPage />} />
+          <Route path="action/*" element={<GovSectionPage />} />
           <Route path="act" element={<ActPage />} />
           <Route path="group" element={<GroupPage />} />
           <Route path="me" element={<MePage />} />
