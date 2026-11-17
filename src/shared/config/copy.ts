@@ -55,7 +55,7 @@ export const copy = {
     apps: '应用',
     me: '我的',
     homeAria: '首页',
-    govAria: '治理（即将上线）',
+    govAria: '治理',
     actAria: '行动（即将上线）',
     appsAria: '应用',
     meAria: '我的',
@@ -146,6 +146,7 @@ export const copy = {
     batchTransfer: '批量转账',
     approvals: '代币授权',
     liquidity: '流动性池',
+    gov: '治理',
   },
   /** Page titles the eager router/header needs; bodies live in ./copy-pages. */
   placeholders: {

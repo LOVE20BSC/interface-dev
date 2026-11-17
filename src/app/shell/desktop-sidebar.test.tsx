@@ -43,9 +43,10 @@ beforeEach(() => {
 });
 
 describe('DesktopSidebar navigation', () => {
-  it('keeps 即将上线 only on the 治理 / 行动 placeholders', () => {
+  it('keeps 即将上线 only on the 行动 placeholder', () => {
     renderSidebar();
-    expect(screen.getByRole('link', { name: /治理/ })).toHaveTextContent('即将上线');
+    // 治理 became a real page on 2026-11-17 (流动性质押 + 加速质押).
+    expect(screen.getByRole('link', { name: /治理/ })).not.toHaveTextContent('即将上线');
     expect(screen.getByRole('link', { name: /行动/ })).toHaveTextContent('即将上线');
     expect(screen.getByRole('link', { name: '我的' })).not.toHaveTextContent('即将上线');
     expect(screen.getByRole('link', { name: '应用' })).not.toHaveTextContent('即将上线');

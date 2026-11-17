@@ -29,7 +29,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     label: copy.nav.gov,
     ariaLabel: copy.nav.govAria,
     icon: Vote,
-    placeholder: true,
+    // 治理页自 2026-11-17 起是真实页面（流动性质押 + 加速质押），不再是占位页。
+    placeholder: false,
   },
   {
     key: 'act',
@@ -73,7 +74,7 @@ const PAGE_TITLES: Readonly<Record<string, string>> = Object.freeze({
   '/approvals': copy.pageTitles.approvals,
   '/apps': copy.pageTitles.apps,
   '/about': copy.pageTitles.about,
-  '/gov': copy.placeholders.gov.title,
+  '/gov': copy.pageTitles.gov,
   '/act': copy.placeholders.act.title,
   '/group': copy.placeholders.group.title,
   '/me': copy.placeholders.me.title,

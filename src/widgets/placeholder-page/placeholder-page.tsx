@@ -4,7 +4,7 @@ import { copy } from '@/shared/config/copy-pages';
 import { buttonStyles } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
 
-export type PlaceholderKey = 'gov' | 'act' | 'group' | 'me';
+export type PlaceholderKey = 'act' | 'group' | 'me';
 
 export interface PlaceholderPageProps {
   readonly page: PlaceholderKey;
