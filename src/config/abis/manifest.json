@@ -6,11 +6,11 @@
     "path": "../anvil/export",
     "chainId": 31337,
     "deployBlock": 34,
-    "exportedAt": "2026-11-16T15:21:47.041Z"
+    "exportedAt": "2026-11-17T00:11:20.989Z"
   },
   "sources": {
     "core": {
-      "head": "3742f6c614888d2a116183a47662232b52bccd0d",
+      "head": "9944c8a4e795e38b4da59a717606294484294d6a",
       "path": "../core",
       "abis": {
         "LOVE20Token": 30,
@@ -25,7 +25,7 @@
       }
     },
     "action": {
-      "head": "b212c76cc4323ea06b2ef3e9e431fab69584cb98",
+      "head": "4f3d85444b517218b4192c8cd037810856274150",
       "path": "../action",
       "abis": {
         "ActionTarget": 44,
@@ -35,7 +35,7 @@
       }
     },
     "group-chat": {
-      "head": "ed3231aded0299d909d102405f18865029710f04",
+      "head": "c80625bb444064b3c3fa9a49a88d8b2eed321618",
       "path": "../group-chat",
       "abis": {
         "GroupChat": 67
@@ -48,7 +48,7 @@
       "note": "no ABI is exported from this repo; its HEAD pins the linked library bytecode"
     },
     "dex": {
-      "head": "111ad184741d9ce025ceb45b005846eee5cb3049",
+      "head": "69c6462ea56baca99b9e4400798c8aca846cb1ea",
       "path": "../dex",
       "abis": {
         "UniswapV2Factory": 10,
@@ -57,7 +57,7 @@
       }
     },
     "anvil": {
-      "head": "c18aeab112da7da7906e8664497f6cc05737fe98",
+      "head": "e23dc2e42c5dcf4d3d0008d2beb5cbbca98b1a14",
       "path": "../anvil",
       "abis": {
         "WETH9": 16,
@@ -65,7 +65,7 @@
       }
     },
     "periphery": {
-      "head": "d8a105f2de6e245244cfbbe88c709dd0ab206626",
+      "head": "03bbd4ce1e479d04dbaac9ca3084a3ad44d4388c",
       "path": "../periphery",
       "abis": {
         "LOVE20Hub": 50
