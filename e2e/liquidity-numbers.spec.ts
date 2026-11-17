@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { encodeAbiParameters, parseAbiParameters } from 'viem';
@@ -158,10 +158,29 @@ function withChainSnapshot(fn: (page: Page) => Promise<void>) {
   };
 }
 
+/**
+ * 兄弟仓产物路径。正常 checkout 里兄弟仓就在仓库上一级；在 git worktree（例如
+ * `.agents/worktrees/<name>`）里，兄弟仓仍然挨着**主 checkout**，所以用
+ * `git rev-parse --git-common-dir` 回退到主 checkout 再拼。2026-11-17 在 worktree
+ * 里跑全量 e2e 时，这里曾把 `../dex/out` 解析成 `.agents/worktrees/dex/out` 而
+ * ENOENT（只影响本用例，不影响产品）。
+ */
+function siblingRepoPath(...segments: readonly string[]): string {
+  const direct = resolve(process.cwd(), '..', ...segments);
+  if (existsSync(direct)) return direct;
+  // commonDir 在 worktree 里是绝对路径（例如 /repo/main-checkout/.git），它的上一级
+  // 就是主 checkout；兄弟仓在主 checkout 的上一级。
+  const commonDir = execFileSync('git', ['rev-parse', '--git-common-dir'], {
+    encoding: 'utf8',
+  }).trim();
+  const mainRoot = resolve(process.cwd(), commonDir, '..');
+  return resolve(mainRoot, '..', ...segments);
+}
+
 async function deployTestToken(): Promise<string> {
   const artifact = JSON.parse(
     readFileSync(
-      resolve(process.cwd(), '../dex/out/WETH9Configurable.sol/WETH9Configurable.json'),
+      siblingRepoPath('dex', 'out', 'WETH9Configurable.sol', 'WETH9Configurable.json'),
       'utf8',
     ),
   ) as { abi: unknown[]; bytecode: { object: string } };
