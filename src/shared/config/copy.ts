@@ -51,9 +51,6 @@ export const copy = {
   nav: {
     home: '首页',
     gov: '治理',
-    stakeLp: '流动性质押',
-    stakeToken: '质押代币',
-    unstake: '取消质押',
     act: '行动',
     apps: '应用',
     me: '我的',
@@ -112,27 +109,13 @@ export const copy = {
     /** Identity read states that must never leave the page as a bare greeting. */
     identityReading: '读取身份 NFT 中…',
     identityErrorTitle: '身份 NFT 暂时读不到',
-    noIdentity: '你还没有身份 NFT',
-    goMyNft: '去我的 NFT',
-    switchIdentity: '切换身份 NFT',
     identityInvalidated: '这个身份 NFT 已不属于当前钱包',
-    chooseIdentityTitle: '还没有选择当前身份 NFT',
-    chooseIdentityBody: '这个钱包持有身份 NFT。去「我的 NFT」选一个作为当前身份 NFT。',
-    mintAirdrop: '空投铸造',
     /** Reminder card 1: no identity yet. */
     reminderNoIdentityTitle: '你还没有身份 NFT',
     mintIdentity: '铸造身份 NFT',
     /** Reminder card 2: holds identities but none selected (vs card 1, mutually exclusive). */
     reminderNeedsSelectionTitle: '你还没有选择身份 NFT',
     chooseIdentity: '选择身份 NFT',
-    /** Reminder card 2: eligible and unclaimed; drop the clause when unknown. */
-    reminderAirdrop: '你有空投资格',
-    reminderAirdropWithAmount: (amount: string, symbol: string) =>
-      `你有空投资格，可铸造 ${amount} ${symbol}`,
-    /** Still rendered by 我的 (§3.7) and the shared technical-details widget. */
-    docs: '开源文档',
-    technical: '技术详情',
-    errorTitle: '暂时读不到身份 NFT',
     errorBody: '网络可能不稳，你的身份 NFT 没有变化。',
     balanceError: '余额暂时读不到',
   },

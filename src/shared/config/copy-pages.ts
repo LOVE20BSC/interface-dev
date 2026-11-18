@@ -54,10 +54,7 @@ export const copy = {
   identity: {
     ...firstScreenCopy.identity,
     memberId: (id: string) => `NFT #${id}`,
-    unconfiguredBody: '部署地址还没有填。',
     truncated: '这个钱包持有的身份 NFT 较多，这里只显示前 100 个。',
-    emptyBody: '每个身份 NFT 都是一个独立的身份。铸造后可以参与社区治理与行动。',
-    selectedLabel: '当前身份 NFT',
     myNftTitle: '我的 NFT',
     selectedBadge: '当前',
   },
@@ -518,7 +515,22 @@ export const copy = {
   // spends a filled button. The identity NFT card was removed on 2026-11-14
   // (owner) — /my-nft owns identity management, so no identity keys remain here.
   // ───────────────────────────────────────────────────────────────────────────
+  /**
+   * 首页动态提醒卡（`pages/home/airdrop-reminder` 是动态 import 的懒加载 chunk）用到的
+   * 几条文案；放在 ./copy 会白占首屏预算，所以覆盖到这里（其余 home 键仍用首屏那份）。
+   */
+  home: {
+    ...firstScreenCopy.home,
+    mintAirdrop: '空投铸造',
+    /** Reminder card 2: eligible and unclaimed; drop the clause when unknown. */
+    reminderAirdrop: '你有空投资格',
+    reminderAirdropWithAmount: (amount: string, symbol: string) =>
+      `你有空投资格，可铸造 ${amount} ${symbol}`,
+  },
   me: {
+    tabsAria: '我的',
+    /** owner 2026-11-18 23:20：我的页两个标签 + 质押资产卡。 */
+    tabs: { balance: '钱包余额', stake: '质押资产' },
     balanceTitle: '我的余额',
     balanceUnavailable: '这个环境还没有配置社区代币，暂时看不到余额。',
     swap: '兑换',
@@ -1478,7 +1490,7 @@ export const copy = {
     mine: {
       title: '我的质押',
       emptyTitle: '这个身份 NFT 还没有质押。',
-      emptyBody: '质押流动性之后，这里会显示治理权、加速份额和解锁进度。',
+      emptyBody: '质押流动性之后，这里会显示流动性质押份额与加速激励质押量。',
       emptyAction: '去质押流动性',
       votes: '我的治理权',
       shares: '流动性质押份额',
@@ -1497,6 +1509,11 @@ export const copy = {
       stateWithdrawable: '可以撤出了',
       stateWithdrawableNote: '撤出后这些代币会回到钱包，治理权清零。',
       stateUnknown: '解锁状态暂时读不到。',
+      /** 「我的」页质押资产卡（owner 2026-11-18 23:20）：加速质押只有一种量，不分「有效」。 */
+      boostStake: '加速激励质押量',
+      infoAria: '查看质押份额与预计可取回代币',
+      infoTitle: '质押份额与预计可取回',
+      unlockProgressLink: '查看解锁进度',
       increasePhases: '提高承诺解锁期',
       increasePhasesMin: (phases: string) => `至少要提高到 ${phases} 个阶段。`,
       increasePhasesInvalid: '请输入整数阶段数。',
@@ -1554,9 +1571,8 @@ export const copy = {
       liquid: '流动性质押数据',
     },
     publicCard: {
-      title: '治理公示',
+      /** 验证中的行动在新协议里已不存在（owner 2026-11-18 23:52），只保留投票入口。 */
       voteActions: '投票中的行动',
-      verifyActions: '验证中的行动',
     },
     /**
      * 旧库 LOVE20TKM /gov 首页：我的 / 社区 两个 tab。
@@ -1578,8 +1594,7 @@ export const copy = {
       liquidityLink: '流动性质押获取治理权',
       boostLink: '加速质押增加加速激励',
       mintRewardAction: '铸造 治理激励',
-      detailTitle: '我的流动性质押',
-      /** 「社区」摘要：头条数字 + 四格。 */
+      /** 「社区」摘要：头条数字 + 一个行动入口 + 四格。 */
       communityVotes: '社区总治理权',
       communityVotesNote: '本阶段',
       communityShares: '社区流动性质押份额',
@@ -1611,20 +1626,21 @@ export const copy = {
      */
     query: {
       title: '治理权查询',
-      hint: '按身份 NFT 编号或钱包地址查询治理权；钱包查询会统计该地址当前持有的全部身份 NFT。',
-      modes: { nft: '按身份 NFT', wallet: '按钱包地址' },
-      nftLabel: '身份 NFT 编号',
-      nftPlaceholder: '例如 12',
-      walletLabel: '钱包地址',
-      walletPlaceholder: '0x…',
+      hint: '按身份 NFT 的 ID 或名称查询治理权；名称会先在链上解析成 NFT 编号。',
+      /** owner 2026-11-18 23:20：去掉按地址查询，只按身份 NFT，支持 ID / 名称两种。 */
+      modeLabel: '查询方式',
+      modes: { id: 'NFT ID', name: 'NFT 名称' },
+      idLabel: 'NFT ID',
+      idPlaceholder: '例如 12',
+      nameLabel: 'NFT 名称',
+      namePlaceholder: '例如 polar',
       submit: '查询',
       reset: '重置',
       loading: '查询中…',
-      invalidNft: '请输入身份 NFT 的整数编号。',
-      invalidWallet: '请输入有效的钱包地址。',
+      invalidId: '请输入身份 NFT 的整数编号。',
       error: '治理权暂时读不到。',
+      nameNotFound: '查询不到这个名称的身份 NFT。',
       notFoundNft: '这个身份 NFT 还没有质押。',
-      notFoundWallet: '这个钱包当前没有身份 NFT。',
       nftId: 'NFT ID',
       nftName: 'NFT 名称',
       holder: '当前持有人地址',
@@ -1637,8 +1653,6 @@ export const copy = {
       note: '治理权按本阶段有效值统计；已经申请解锁的质押，治理权为 0。',
       copy: '复制',
       copied: '已复制',
-      walletCount: (count: string) => `该钱包当前持有 ${count} 个身份 NFT`,
-      walletTruncated: '只统计前 100 个身份 NFT。',
     },
     accelerated: {
       title: '我的加速质押',

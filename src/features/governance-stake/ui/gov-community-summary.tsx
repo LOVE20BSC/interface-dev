@@ -4,21 +4,22 @@ import { formatTokenAmount } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription } from '@/shared/ui/card';
 import type { StakeCommunity } from '@/entities/stake/model/use-stake-community';
-import { GovStakeLinks, GovStatCell } from '@/features/governance-stake/ui/gov-home-parts';
+import { GovStatCell } from '@/features/governance-stake/ui/gov-home-parts';
 
 const VOTE_DECIMALS = 18;
 
 export interface GovCommunitySummaryProps {
   readonly community: StakeCommunity;
   readonly tokenDecimals: number | undefined;
-  /** 当前社区 symbol 的查询串，两个质押入口带上它。 */
+  /** 当前社区 symbol 的查询串，带在「投票中的行动」入口上。 */
   readonly q: string;
 }
 
 /**
- * 治理首页「社区」tab 的摘要卡（owner 2026-11-18 20:05 按 TKM 旧版截图重排）：
+ * 治理首页「社区」tab 的摘要卡（owner 2026-11-18 20:05 按 TKM 旧版截图重排，
+ * 23:20 再去掉「治理公示」标题/外框与两个质押入口）：
  *
- * 上面一个头条数字 + 中间「治理公示」+ 下面 2×2 统计 + 两个质押入口。
+ * 上面一个头条数字 + 一个行动入口按钮（投票中的行动；验证中的行动在新协议已不存在）+ 下面 2×2 统计。
  * 旧版头条是「预估年化收益率 APY」，本协议没有对应的只读 view（`Stake` 没有年化/
  * 奖励金额），按硬规则 4 不编数，换成同位置的真实口径「社区总治理权」；旧版的
  * 「预计新增铸币 / SL / ST 凭证」同样没有对应对象，换成社区份额、流动性凭证总量、
@@ -54,28 +55,15 @@ export function GovCommunitySummary({ community, tokenDecimals, q }: GovCommunit
         <p className="mt-1 text-[11px] leading-4 text-muted">{copy.gov.home.communityVotesNote}</p>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-line bg-elevated/60 px-3 py-3">
-        <p className="text-base font-semibold leading-6 text-foreground">
-          {copy.gov.publicCard.title}
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <Link
-            to={`/vote/actions${q}`}
-            data-testid="gov-entry-vote"
-            className={buttonStyles('secondary', 'sm')}
-          >
-            {copy.gov.publicCard.voteActions}
-            <span aria-hidden="true"> &gt;&gt;</span>
-          </Link>
-          <Link
-            to={`/verify/actions${q}`}
-            data-testid="gov-entry-verify"
-            className={buttonStyles('secondary', 'sm')}
-          >
-            {copy.gov.publicCard.verifyActions}
-            <span aria-hidden="true"> &gt;&gt;</span>
-          </Link>
-        </div>
+      <div className="mt-4">
+        <Link
+          to={`/vote/actions${q}`}
+          data-testid="gov-entry-vote"
+          className={buttonStyles('secondary', 'sm', 'w-full')}
+        >
+          {copy.gov.publicCard.voteActions}
+          <span aria-hidden="true"> &gt;&gt;</span>
+        </Link>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4">
@@ -100,8 +88,6 @@ export function GovCommunitySummary({ community, tokenDecimals, q }: GovCommunit
           testId="gov-community-burned"
         />
       </div>
-
-      <GovStakeLinks q={q} />
     </Card>
   );
 }

@@ -35,6 +35,8 @@ pnpm e2e:reset-chain
 
 - **Stale-build guard（`playwright.config.ts`）**：启动测试前请求已有 preview 的 `/build-id.json`，与本次即将构建的 `E2E_BUILD_ID`（源码 + 构建环境/端点指纹，`scripts/gen-build-id.mjs` 接受该值）比较。一致才 `reuseExistingServer`；不一致时只有 `lsof` + `ps` 证明监听者确实是该端口的 `vite preview` 才重启它，否则立即失败并打印 `:4173 上是旧构建（A ≠ B），拒绝复用`。绝不静默测试旧 bundle。
 - **Wedged-chain guard（`scripts/e2e-chain.mjs`）**：bootstrap 前先用 3 s 超时发 `eth_chainId`。有应答视为链存活，继续校验 chain id、`cast code <memberNFT>` 与完整地址簿部署，而不是重新 bootstrap；端口被占用但不应答则立即 fatal，打印 `lsof -nP -iTCP:8555` 结果并提示 `pnpm e2e:reset-chain`。只在 pidfile + `ps` cmdline 同时证明是本套件的 anvil 时才停止它。`make` 另有 10 分钟上限，避免卡死到 15 分钟锁超时。
+- **Chain doctor（`scripts/e2e-chain-doctor.mjs`，2026-11-18）**：长时间 interval mining 后 anvil 偶发「端口 LISTEN 但 HTTP 全超时」的假活状态（1.8.1 在 8555/8566 都复现过）。`node scripts/e2e-chain-doctor.mjs` 会探测 8555，假死就 kill 假活进程、用 `$E2E_ANVIL_STATE`（默认 `/tmp/state-8566-canonical.json`）重载并恢复 `automine=false + intervalMining=1`；`--check` 只探测，`--port`/`--state` 可换链与快照，硬拒绝 8545。跑全量前先跑它，避免跑十几分钟后整轮报废。
+- **Retries（`playwright.config.ts`，2026-11-18）**：本地默认 0（flake 要暴露）；收尾跑一次全量时可设 `E2E_RETRIES=1` 让已知动画采样 flake 自愈，CI 仍默认 2。
 - **Mining-mode restore（`e2e/chain.ts`，2026-11-16）**：`suspendMining()` / `restoreMining()` 成对使用，`restoreMining()` 回读 `anvil_getAutomine` + `anvil_getIntervalMining` 并在不一致时失败；`isolateChain()` 在取快照前与回滚后各恢复一次，见下文「挖矿模式」。`--grep "swap" --repeat-each=3` 用来验证不再泄漏。
 - **Known flake fix（`e2e/tx-recovery.spec.ts`）**：连接后等待 pill 进入稳定态（`打开钱包与身份 NFT 菜单` 触发按钮可见、`网络不对，点此切换` 不存在），并在提交前断言注入钱包的 `eth_chainId` 等于 app chain（31337），避免偶发落到 wrong-network pill 后恢复卡断言超时。
 

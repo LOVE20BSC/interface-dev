@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MePage } from '@/pages/me/me-page';
@@ -22,6 +22,12 @@ vi.mock('@/entities/community-token/model/use-community-balance', () => ({
 
 vi.mock('@/features/connect-wallet/model/use-wallet-connection', () => ({
   useWalletConnection: vi.fn(),
+}));
+
+// 质押资产 tab 的真实面板会挂 wagmi + 治理域读（15 s 轮询），单测里只留一个壳，
+// 用来断言「切到该标签时它才挂载」。
+vi.mock('@/pages/me/stake-assets-panel', () => ({
+  StakeAssetsPanel: () => <div data-testid="stake-assets-panel" />,
 }));
 
 const communityToken = vi.mocked(useCommunityToken);
@@ -82,6 +88,42 @@ describe('MePage', () => {
     expect(screen.queryByRole('link', { name: '铸造身份 NFT' })).toBeNull();
   });
 
+  it('renders the 钱包余额 / 质押资产 tabs and defaults to 钱包余额 (owner 2026-11-18 23:20)', () => {
+    renderPage();
+
+    expect(screen.getByRole('tablist', { name: '我的' })).toBeVisible();
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
+    expect(screen.getByTestId('me-tab-balance')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('me-tab-stake')).toHaveAttribute('aria-selected', 'false');
+    expect(screen.getByRole('tab', { name: '钱包余额' })).toBeVisible();
+    expect(screen.getByRole('tab', { name: '质押资产' })).toBeVisible();
+    // The default tab still shows the old 我的余额 section; the stake panel is not mounted.
+    expect(screen.getByRole('heading', { name: '我的余额' })).toBeVisible();
+    expect(screen.queryByTestId('stake-assets-panel')).toBeNull();
+  });
+
+  it('mounts 质押资产 only on its tab and restores the balance section when switching back', () => {
+    renderPage();
+
+    fireEvent.click(screen.getByTestId('me-tab-stake'));
+
+    expect(screen.getByTestId('stake-assets-panel')).toBeVisible();
+    expect(screen.getByTestId('me-tab-stake')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('me-tab-balance')).toHaveAttribute('aria-selected', 'false');
+    expect(screen.queryByRole('heading', { name: '我的余额' })).toBeNull();
+    expect(screen.queryByText('99,799,100 TestLOVE20')).toBeNull();
+    // 账户 / 关于 sit below the tabs, so they stay on both tabs.
+    expect(screen.getByRole('heading', { name: '账户' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: '关于' })).toBeVisible();
+
+    fireEvent.click(screen.getByTestId('me-tab-balance'));
+
+    expect(screen.queryByTestId('stake-assets-panel')).toBeNull();
+    expect(screen.getByTestId('me-tab-balance')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: '我的余额' })).toBeVisible();
+    expect(screen.getByText('99,799,100 TestLOVE20')).toBeVisible();
+  });
+
   it('carries the current community balance and an inline 兑换 link with ?symbol=', () => {
     renderPage();
 
@@ -127,8 +169,11 @@ describe('MePage', () => {
   it('never renders a filled button: the page is a settings-ish list', () => {
     renderPage();
 
-    // The only button is the 全局地址复制 affordance (owner 2026-11-14): the page
-    // itself stays a settings-ish list with no primary/filled action.
+    // Default tab (owner 2026-11-18 23:20): 3 real <button> elements — the two
+    // 钱包余额 / 质押资产 tabs, which expose role="tab", plus the 全局地址复制
+    // affordance (owner 2026-11-14), which is the page's only role="button".
+    // The page itself stays a settings-ish list with no primary/filled action.
+    expect(document.querySelectorAll('button')).toHaveLength(3);
     const buttons = screen.queryAllByRole('button');
     expect(buttons).toHaveLength(1);
     expect(buttons[0]).toHaveAccessibleName('复制地址：钱包地址');

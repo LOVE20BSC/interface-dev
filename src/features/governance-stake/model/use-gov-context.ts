@@ -140,11 +140,17 @@ export function useGovContext(): GovContextValue {
     return 'ready';
   })();
 
+  /** 「读不到 → 重试」要重读页面上所有读模型，不能只刷门禁那几项（member 另有 15 s 轮询兜底）。 */
   const retry = () => {
     identity.refetch();
     communityToken.refetch();
+    parentToken.refetch();
     clock.refetch();
     params.refetch();
+    member.refetch();
+    community.refetch();
+    pool.refetch();
+    balances.refetch();
   };
 
   return {

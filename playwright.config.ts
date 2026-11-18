@@ -281,7 +281,16 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: process.env.CI === 'true',
-  retries: process.env.CI === 'true' ? 2 : 0,
+  // 本地默认 0：flake 要暴露出来。收尾跑一次全量时可用 E2E_RETRIES=1 吸收已知的
+  // 动画采样 flake（例：home-my-nft 的 FLIP 位置断言），避免为 1 条偶发重跑 12 分钟。
+  retries: (() => {
+    const raw = process.env.E2E_RETRIES;
+    if (raw !== undefined && raw !== '') {
+      const parsed = Number.parseInt(raw, 10);
+      if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+    }
+    return process.env.CI === 'true' ? 2 : 0;
+  })(),
   reporter: process.env.CI === 'true' ? 'github' : 'list',
   use: {
     baseURL: `${ORIGIN}${BASE_PATH}`,

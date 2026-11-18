@@ -13,21 +13,21 @@ LOVE20BSC 协议前端的 **dev 变体**：纯静态、移动优先、无后端�
 
 ## 1. 必读顺序（别跳，按这个次序）
 
-| #   | 读什么                                                                    | 什么时候必须读                                                                               |
-| --- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| 0   | [docs/engineering/agent-role.md](docs/engineering/agent-role.md)          | **你是接手这个项目的总负责人**（拆活 / 派活 / 复核 / 对 owner 汇报）时；只做单一子任务不用读 |
-| 1   | 本文件                                                                    | 开工前                                                                                       |
-| 2   | [GLOSSARY.md](GLOSSARY.md)                                                | **写任何中文文案前**（六条纪律 + 术语表）                                                    |
-| 3   | [m0-ux-spec.md](docs/product/m0-ux-spec.md) §0 设计原则 + §4 横切交互规范 | 动任何页面/交互前                                                                            |
-| 4   | [frontend-standards.md](docs/engineering/frontend-standards.md)           | 按需查章（目录见 §4）                                                                        |
-| 5   | [three-line-verification.md](docs/product/three-line-verification.md)     | 改会读写链上数值的页面时（**硬门槛**）                                                       |
-| 6   | [e2e/README.md](e2e/README.md)                                            | 跑 e2e 前（8545/8555 硬边界，违反会毁掉人工测试链）                                          |
-| 7   | [docs/adr/](docs/adr/)、[docs/contract-issues/](docs/contract-issues/)    | 要改架构、或怀疑合约缺陷时                                                                   |
+| #   | 读什么                                                                                                  | 什么时候必须读                                                                                                                                                  |
+| --- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0   | [agent-role.md](docs/engineering/agent-role.md) + [lead-playbook.md](docs/engineering/lead-playbook.md) | **你是接手这个项目的总负责人**（拆活 / 派活 / 复核 / 对 owner 汇报）时：前者讲角色边界，后者是时间分配 / 并行拆分 / 链与 flake 的经验手册；只做单一子任务不用读 |
+| 1   | 本文件                                                                                                  | 开工前                                                                                                                                                          |
+| 2   | [GLOSSARY.md](GLOSSARY.md)                                                                              | **写任何中文文案前**（六条纪律 + 术语表）                                                                                                                       |
+| 3   | [m0-ux-spec.md](docs/product/m0-ux-spec.md) §0 设计原则 + §4 横切交互规范                               | 动任何页面/交互前                                                                                                                                               |
+| 4   | [frontend-standards.md](docs/engineering/frontend-standards.md)                                         | 按需查章（目录见 §4）                                                                                                                                           |
+| 5   | [three-line-verification.md](docs/product/three-line-verification.md)                                   | 改会读写链上数值的页面时（**硬门槛**）                                                                                                                          |
+| 6   | [e2e/README.md](e2e/README.md)                                                                          | 跑 e2e 前（8545/8555 硬边界，违反会毁掉人工测试链）                                                                                                             |
+| 7   | [docs/adr/](docs/adr/)、[docs/contract-issues/](docs/contract-issues/)                                  | 要改架构、或怀疑合约缺陷时                                                                                                                                      |
 
 ## 2. 十条硬规则（违反会被门禁、验收或线上打回）
 
 1. **不加新依赖**，不换库，不引动画库（FLIP 用原生 Web Animations）。首屏包体 gzip 预算
-   dev 161 / prod 160 kB，现在 160.6 / 159.2，**余量不到 1 kB**。
+   dev 161 / prod 160 kB，现在 160.9 / 159.4，**余量不到 1 kB**。
 2. **不把合约函数映射成界面**：按用户任务组织（拿到身份 / 空投铸造 / 买到币），
    一个任务可以调多个方法；合约有但用户不需要的能力（融合、默认身份、限额）不出现。
 3. **所有用户可见中文只能写在** `src/shared/config/copy.ts`（首屏）或
@@ -55,9 +55,9 @@ LOVE20BSC 协议前端的 **dev 变体**：纯静态、移动优先、无后端�
 ## 3. 提交前必跑
 
 ```bash
-pnpm check          # format:check + typecheck + lint + 单测（801 条），pre-commit 钩子自动调这个
+pnpm check          # format:check + typecheck + lint + 单测（877 条），pre-commit 钩子自动调这个
 pnpm build          # 包体门禁（scripts/check-bundle.mjs）+ 404.html + build-id
-pnpm e2e            # 全量 Playwright（152 条，约 10 分钟；自己起/复用 8555 链）
+pnpm e2e            # 全量 Playwright（160 条，约 11 分钟；自己起/复用 8555 链）
 ```
 
 - 钩子安装一次即可：`pnpm hooks:install`（写 `core.hooksPath=.githooks`，本机生效，不入库）。
@@ -67,18 +67,19 @@ pnpm e2e            # 全量 Playwright（152 条，约 10 分钟；自己起/�
 
 ## 4. 找规则去哪个文件
 
-| 我要…                                          | 读                                                        |
-| ---------------------------------------------- | --------------------------------------------------------- |
-| 判断新文件放哪个目录                           | 规范 §2.3                                                 |
-| 知道哪条规则会被机器拦                         | 规范 §3 门禁总表                                          |
-| 写按钮/状态/空态/错态文案                      | 规范 §4 + GLOSSARY                                        |
-| 处理读失败、loading、refetch                   | 规范 §5（`refetch()` 无视 `enabled:false`，这是踩过的坑） |
-| 加 testid、写动效、用颜色                      | 规范 §6                                                   |
-| 决定要不要补测试 / 三线 / e2e                  | 规范 §7 三张判据表                                        |
-| 提交、发布、Pages 出事                         | 规范 §9                                                   |
-| 遇到「为什么会这样」                           | 规范 §10 已知坑清单（11 条，都有根因和正解）              |
-| 交互细节（授权阶梯、pending 三态、nonce 口径） | m0-ux-spec §4                                             |
-| 术语、禁用词                                   | GLOSSARY.md                                               |
+| 我要…                                          | 读                                                              |
+| ---------------------------------------------- | --------------------------------------------------------------- |
+| 判断新文件放哪个目录                           | 规范 §2.3                                                       |
+| 知道哪条规则会被机器拦                         | 规范 §3 门禁总表                                                |
+| 写按钮/状态/空态/错态文案                      | 规范 §4 + GLOSSARY                                              |
+| 处理读失败、loading、refetch                   | 规范 §5（`refetch()` 无视 `enabled:false`，这是踩过的坑）       |
+| 加 testid、写动效、用颜色                      | 规范 §6                                                         |
+| 决定要不要补测试 / 三线 / e2e                  | 规范 §7 三张判据表                                              |
+| 提交、发布、Pages 出事                         | 规范 §9                                                         |
+| 遇到「为什么会这样」                           | 规范 §10 已知坑清单（11 条，都有根因和正解）                    |
+| 交互细节（授权阶梯、pending 三态、nonce 口径） | m0-ux-spec §4                                                   |
+| 派子代理 / 给子代理立规矩                      | [roles/README.md](docs/engineering/roles/README.md)（角色手册） |
+| 术语、禁用词                                   | GLOSSARY.md                                                     |
 
 ## 5. 收尾自查（在自己回复里逐条打勾，不要只说"已完成"）
 

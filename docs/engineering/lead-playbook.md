@@ -1,0 +1,120 @@
+# 前端负责人 agent 指导手册（经验沉淀）
+
+> **适用**：接手这个项目的 AI 总负责人（lead）。
+> **和别的文档怎么分工**：角色边界看 [agent-role.md](agent-role.md)；硬规则与门禁看 [frontend-standards.md](frontend-standards.md)；本文件只沉淀**操作经验**——怎么把一轮改版做得更快、更稳，以及哪里会翻车。
+> **维护规则**：每轮实战结束，只把新出现的「时间黑洞 / 翻车 / 复用技巧」补进对应章节，不写流水账；过时条目直接改写或删除。
+
+## 1. 一句话结论
+
+**慢不在写代码，在验证基础设施。** 2026-11-18 两轮同规模改版的实测：串行做 135 分钟 → 拆并行 + 去掉重复验证后约 55 分钟。下面每一条都是为了守住这个数字。
+
+## 2. 时间去哪了（实测基线，2026-11-18）
+
+| 项目 | 串行一轮 | 说明 |
+| --- | --- | --- |
+| 全量 e2e | **40.8 分钟** | 跑了 3 次：16.3m（链假死报废）+ 12.7m（1 条动画 flake）+ 11.8m（全绿） |
+| 目标 spec（治理域 8 条） | ~12 分钟 | 8555 跑 4 次 + 8566 跑 2 次，每次 2–3m |
+| 失败单点复跑 | ~4 分钟 | 2 次 |
+| anvil 重载 | ~10 分钟 | 5 次手动 kill/load-state/重设挖矿 |
+| `pnpm check` | ~7 分钟 | 手动 5 次；而 pre-commit 本来还会跑一次 |
+| build | ~3 分钟 | prod/dev/e2e 各一次 |
+| 写代码 | ~20 分钟 | 真正动手并不慢 |
+| 读码/核对截图 | ~16 分钟 | 必要成本 |
+| 文档 | ~14 分钟 | |
+| 提交+推送 | ~7 分钟 | 钩子会再跑一遍 check |
+
+**记忆点**：一轮里「全量 e2e」只应该有**一次**，且必须跑在**健康的链**上。2026-11-19 按这套做法实测：全量一次 **160/160（11.0m）**、治理 spec 两链 8/8（4.0m / 1.9m），整轮约 55 分钟。
+
+## 3. 每轮的标准时间轴（目标 50–60 分钟）
+
+| 时间 | 谁 | 做什么 |
+| --- | --- | --- |
+| 0–10m | lead | 读需求 + 读现状代码，定「改哪几个文件、哪些是共享/入口文件」 |
+| 10–25m | lead | 先写死契约（testid / 文案 / href / 数据结构），再写核心代码；`tsc` + `eslint` 自查 |
+| 15–40m | 3 个子代理并行 | ① e2e：改 spec + 跑目标 spec；② docs：改三份文档；③ unit：改受影响单测 |
+| 40–52m | lead | 契约复核 + **一次**全量 e2e（可后台跑）+ 看截图 |
+| 52–58m | lead | 清理截图 churn、回填文档数字、commit（pre-commit 跑 check）、push |
+
+可压缩点：3 个子代理的活儿与 lead 写码完全重叠；全量 e2e 用后台跑，和「看截图/整理文档」重叠。
+
+## 4. 派活（并行拆分）模板
+
+- **先选角色**：子代理角色手册在 [roles/](roles/README.md)（`e2e-runner` / `unit-tester` / `docs-writer` / `chain-operator` / `reviewer`）。派活时把「角色手册路径 + 本轮契约 + 写作用域 + 验证命令 + 回报格式」贴进 spawn prompt，子代理开工先读手册，注意事项不用手抄。
+- **默认三路**：e2e（改 spec + 跑目标链）、docs（三份文档）、unit（单测）。三者写作用域互不重叠。
+- **契约先行**：派活前把 testid / 文案 / href / 数据来源写死在 prompt 里；子代理**不许改 `src/`**，发现「契约 vs 实现」不符只回报。
+- **写作用域表**：e2e agent 只碰 `e2e/*.spec.ts`；docs agent 只碰指定的 3 份文档；unit agent 只碰 1 个 test 文件；lead 独占 `src/` 与提交。
+- **并发禁忌（踩过）**：同一时刻只允许一个进程跑会写 `src/config/build-id.generated.ts` 的命令（`pnpm typecheck` / `test` / `build` / `e2e` 都会跑 `gen-build-id`）。并发会让 build-id 互相覆盖，preview 复用校验误判、构建 hash 不一致。子代理跑 e2e 时，lead 不要跑 typecheck/build，也不要改 `src/`。
+- **子代理回报格式**：改了哪些断言/段落（分点）、命令 + 通过数 + 耗时 + EXIT、发现的契约差异（若有）。不要只说「已完成」。
+
+## 5. 验证策略（省时间的关键）
+
+- **迭代期**：只跑受影响文件——`npx vitest run <file>`、`npx eslint <paths>`；**不跑** `pnpm check`、**不跑** `pnpm build`。
+- **收尾**：目标 e2e spec（2–3m）；改到共享文件（`copy.ts`、`shared/`、`app/`）或改文案/包体相关才需要**一次**全量（约 12m）；`pnpm check` 交给 pre-commit 那一次。
+- **`E2E_REUSE_PREVIEW=1`**：迭代期复用 preview（配置会按源码 hash 校验，源码变了自动重建）；首跑与最终跑用 `0`。
+- **`E2E_RETRIES=1`**：收尾跑全量时给已知动画 flake 一次自愈机会（本地默认 0、CI 默认 2）；仍失败就是真问题，别再加次数。
+- **flake 清单（已知）**：`e2e/home-my-nft.spec.ts` 的 FLIP 动画采样断言（`current <= previous + 1`）偶发 1–2px 抖动。处理：单点复跑；复跑绿就记为 flake，**不要**改实现去迁就。
+- **全量失败先分诊**：看错误是 `operation timed out` / `failed to confirm chain ID`（链假死，不是代码）还是断言不符（代码/测试问题）。链假死先 doctor，再重跑，别急着改代码。
+
+## 6. 链管理（anvil 假死是常态）
+
+- **症状**：端口还 LISTEN，但 HTTP 全超时；cast 报 `failed to confirm chain ID from fork endpoint`；e2e 中途整轮报废。长时间 interval mining 或一次 `anvil_mine` 推几千块之后出现（8555/8566 都复现过）。
+- **工具**：`node scripts/e2e-chain-doctor.mjs`（2026-11-18 加）
+  - 默认检查并自愈 8555：探测 RPC → kill 假活进程 → `anvil --load-state <state>` → 恢复 `automine=false` + `intervalMining=1`；
+  - `--check` 只探测（CI/脚本用）；`--port 8566` 换链；`--state <path>` 换快照；硬拒绝 8545。
+- **本机快照**：`/tmp/state-8566-canonical.json`（8555/8566 共用，owner 机器上的本地产物，不在仓库里）；丢失时 `pnpm e2e:reset-chain` 重新 bootstrap（需要 `../anvil` 仓库）。
+- **全量前先 doctor**，且不要在链已长时间高频出块后直接开全量。
+- **挖矿模式**必须是 `automine=false` + `intervalMining=1`；`e2e/chain.ts#restoreMining()` 会回读断言，模式不对会让后续 spec 全超时。
+- 铁律：**自动化永不碰 8545 人工链**（只读也不碰）。
+
+## 7. 截图与交付物
+
+- 全量 e2e 会重写上百张截图（余额、区块号、时序都会变），但**只有本领域截图应入库**。清理三步（跑完全量后做）：
+  ```bash
+  mkdir -p /tmp/domain-shots && rm -f /tmp/domain-shots/*.png
+  cp docs/product/screenshots/<本领域前缀>-*.png /tmp/domain-shots/
+  git checkout -- docs/product/screenshots
+  cp /tmp/domain-shots/*.png docs/product/screenshots/
+  ```
+- 四档截图 = 390×844 / 1280×800 × 浅色/深色；新增一个截图状态 = +4 张，记得同步文档里的张数（24 → 28 …）。
+- 截图先自己 `read_image` 看一遍：数字换行、链接换行、深色对比度这三类问题最常出现。
+- 领域截图贡献者：`e2e` 里对应的 spec 自己 `page.screenshot`，不要手工截图。
+
+## 8. 包体与首屏
+
+- 预算：**prod 160 / dev 161 kB gzip**（dev 有 +1 kB 部署数据豁免）；只有 `pnpm build`（`scripts/check-bundle.mjs`）能量准。
+- 只有 `index.html` 直接加载/`modulepreload` 的 JS 计入首屏；懒加载 chunk 不计入，但**别把 features 拉进 app shell / home**。
+- `copy.ts` 是首屏文案，`copy-pages.ts` 是懒加载页文案；往首屏加字之前先量 build。
+- 新页面一律走 `src/app/router/lazy-routes.ts`。
+
+## 9. 文档回填
+
+- 派 docs agent 写正文，**具体耗时/通过数留占位**，跑完由 lead 回填（避免「跑一次改一次」）。
+- 三线数值页：理论线先于实现 → 合约线脚本 → 前端线 spec + 四档截图 → §3 对照表；数值口径没变时文档只加「变更记录」，不改理论值。
+- 每轮收尾检查三处一致性：**UX spec 描述 ↔ 页面实际 testid/文案 ↔ e2e 断言**。
+
+## 10. 翻车清单（持续补充）
+
+| 坑 | 现象 | 正解 |
+| --- | --- | --- |
+| anvil 假死 | LISTEN 但 HTTP 超时，全量报废 | 先 `e2e-chain-doctor.mjs`，再跑 |
+| 全量 e2e 重复跑 | 一轮 40+ 分钟全耗在测试 | 目标 spec 迭代 + 收尾一次全量 |
+| build-id 并发写 | preview 复用误判、build hash 不一致 | 同一时刻只跑一个 build/test/e2e 进程 |
+| 截图 churn | 全量后几十张无关截图变脏 | 保存本领域 → `git checkout` 其余 → 恢复 |
+| 动画 flake | `home-my-nft` FLIP 采样偶发失败 | 单点复跑证明是 flake，不改实现 |
+| 子代理同改 src | 互相覆盖、契约漂移 | 契约先行 + 写作用域表，子代理不碰 src |
+| 组件里写中文 | `architecture.test.ts` 拦下 | 中文只进 `copy.ts` / `copy-pages.ts` |
+| 未知值渲染 0 | 违反硬规则 4 | 未知给「—」，读失败给「读不到 + 重试」 |
+| 手改生成物 | errors / network / ABI / build-id 漂移 | 只走 `pnpm gen:errors` / `sync:anvil` |
+| `--no-verify` | 绕过门禁，不可信 | 禁止；紧急情况必须写明原因 |
+
+## 11. 汇报模板（固定四段）
+
+1. **做了什么**：按 owner 的原始要求逐条对应，不复述他的话；
+2. **证据**：命令 + 通过数/耗时/EXIT + 包体数字 + 截图路径（表格优先）；
+3. **没做什么 + 原因**：例如「8566 未复跑，因为…」；
+4. **需要拍板的事**：一次只问真正需要决策的（合 main、发 test、范围取舍）。
+
+## 12. 本文件怎么维护
+
+- 每轮结束问自己三句：**哪里最慢？哪里最险？哪个动作下次可以省掉？** 有答案就改对应章节。
+- 角色/边界问题 → 改 [agent-role.md](agent-role.md)；规则/门禁 → 改 [frontend-standards.md](frontend-standards.md)；只有「经验」留在这里，避免三处漂移。

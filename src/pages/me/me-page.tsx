@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { BUILD_ID } from '@/config/build-id.generated';
 import { APP_ENV } from '@/config/env';
 import { BRAND_DOCS_URL, NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
+import { cn } from '@/shared/lib/cn';
 import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { formatBuildId, formatTokenAmount } from '@/shared/lib/format';
 import { variantLabel } from '@/shared/lib/variant-label';
@@ -11,6 +12,9 @@ import { useCommunityBalance } from '@/entities/community-token/model/use-commun
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
+import { StakeAssetsPanel } from '@/pages/me/stake-assets-panel';
+
+type MeTab = 'balance' | 'stake';
 
 const TEXT_LINK =
   'inline-flex items-center text-sm font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
@@ -48,6 +52,9 @@ function Row({ label, children }: { readonly label: string; readonly children: R
  * identity NFT card moved out (owner 2026-11-14) — `/my-nft` owns identity
  * management; only text links remain here, so the page never spends the
  * one-filled-button rule.
+ *
+ * owner 2026-11-18 23:20：页面加两个标签「钱包余额」「质押资产」；治理域原来的
+ * 「我的流动性质押」卡从 `/gov` 挪到「质押资产」下（只在切到该标签时挂载）。
  */
 export function MePage() {
   const { search } = useLocation();
@@ -55,6 +62,7 @@ export function MePage() {
   const { symbol } = useCommunityContext();
   const token = useCommunityToken(symbol);
   const balance = useCommunityBalance(token.address, token.decimals);
+  const [tab, setTab] = useState<MeTab>('balance');
 
   const to = (pathname: string) => ({ pathname, search }) as const;
   const amountText =
@@ -64,20 +72,49 @@ export function MePage() {
 
   return (
     <div className="space-y-4">
-      <Section id="me-balance-title" title={copy.me.balanceTitle}>
-        {token.address === undefined ? (
-          <p className="mt-2 text-sm leading-6 text-muted">{copy.me.balanceUnavailable}</p>
-        ) : (
-          <div className="mt-2 flex items-baseline justify-between gap-3">
-            <p className="min-w-0 truncate font-mono text-lg font-semibold text-foreground">
-              {amountText ?? copy.common.unknown}
-            </p>
-            <Link to={to('/swap')} className={TEXT_LINK}>
-              {copy.me.swap}
-            </Link>
-          </div>
-        )}
-      </Section>
+      <div
+        role="tablist"
+        aria-label={copy.me.tabsAria}
+        className="grid grid-cols-2 gap-1 rounded-2xl border border-line bg-elevated p-1 text-xs"
+      >
+        {(['balance', 'stake'] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={tab === value}
+            data-testid={`me-tab-${value}`}
+            onClick={() => setTab(value)}
+            className={cn(
+              'rounded-xl px-2 py-2 font-medium transition-colors',
+              tab === value
+                ? 'bg-surface text-brand-strong shadow-soft'
+                : 'text-muted hover:text-foreground',
+            )}
+          >
+            {copy.me.tabs[value]}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'balance' ? (
+        <Section id="me-balance-title" title={copy.me.balanceTitle}>
+          {token.address === undefined ? (
+            <p className="mt-2 text-sm leading-6 text-muted">{copy.me.balanceUnavailable}</p>
+          ) : (
+            <div className="mt-2 flex items-baseline justify-between gap-3">
+              <p className="min-w-0 truncate font-mono text-lg font-semibold text-foreground">
+                {amountText ?? copy.common.unknown}
+              </p>
+              <Link to={to('/swap')} className={TEXT_LINK}>
+                {copy.me.swap}
+              </Link>
+            </div>
+          )}
+        </Section>
+      ) : (
+        <StakeAssetsPanel />
+      )}
 
       <Section id="me-account-title" title={copy.me.accountTitle}>
         <dl className="mt-1 divide-y divide-line">

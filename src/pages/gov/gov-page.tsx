@@ -17,8 +17,7 @@ import { GovGate, GovTxFeedback } from '@/features/governance-stake/ui/gov-gate'
 import { GovStakeLinks, GovStatCell } from '@/features/governance-stake/ui/gov-home-parts';
 import { GovIntro } from '@/features/governance-stake/ui/gov-intro';
 import { GovQueryPanel } from '@/features/governance-stake/ui/gov-query-panel';
-import { hasStakePosition, MyStakeSummary } from '@/features/governance-stake/ui/my-stake-summary';
-import { StakeActions } from '@/features/governance-stake/ui/stake-actions';
+import { hasStakePosition } from '@/features/governance-stake/ui/my-stake-summary';
 import { StakeStateCard } from '@/features/governance-stake/ui/stake-controls';
 
 const VOTE_DECIMALS = 18;
@@ -31,10 +30,10 @@ type HomeTab = 'mine' | 'community';
  * owner 2026-11-18 20:05 给了旧版两张截图，要求这两个 tab 的版面照它排：
  * - 「我的」：2×2 统计（有效治理权 / 承诺解锁期 / 治理权占比 / 加速质押占比）
  *   → 两个质押入口 → 「铸造 治理激励」；
- * - 「社区」：一个头条数字 → 「治理公示」（投票中的行动 / 验证中的行动）→ 2×2 统计
- *   → 两个质押入口。
- * 有仓位时「我的」下面继续给「我的流动性质押」明细（份额、可取回两侧、解锁进度）
- * 与解锁动作；旧版的 APY / 预计新增铸币 / SL·ST 凭证在本协议没有对应只读 view，
+ * - 「社区」：一个头条数字 → 一个行动入口（投票中的行动；验证中的行动新协议不存在）
+ *   → 2×2 统计。
+ * 有仓位时的「我的流动性质押」明细卡已按 owner 要求挪到 `/me` 的「质押资产」标签；
+ * 旧版的 APY / 预计新增铸币 / SL·ST 凭证在本协议没有对应只读 view，
  * 按硬规则 4 不编数，换成真实口径（见 `GovCommunitySummary` 注释）。
  *
  * 旧版按 `validGovVotes(token, account) > 0` 分叉；本协议按 `govVotes(token, 阶段,
@@ -77,7 +76,7 @@ export function GovPage() {
           ))}
         </div>
 
-        {tab === 'mine' ? <MineTab ctx={ctx} q={q} /> : <CommunityTab ctx={ctx} q={q} />}
+        {tab === 'mine' ? <MineTab ctx={ctx} q={q} /> : <CommunityTab ctx={ctx} />}
       </GovGate>
     </div>
   );
@@ -164,30 +163,13 @@ function MineTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string
         </Link>
       </Card>
 
-      <Card data-testid="gov-home-detail">
-        <CardTitle>{copy.gov.home.detailTitle}</CardTitle>
-        <div className="mt-3">
-          <MyStakeSummary
-            member={ctx.member}
-            clock={ctx.clock}
-            token={{ symbol: ctx.token?.symbol ?? '', decimals: ctx.token?.decimals }}
-            parent={{ symbol: ctx.parent?.symbol ?? '', decimals: ctx.parent?.decimals }}
-            testIdPrefix="gov-home-stake"
-            showVotes={false}
-            showPhases={false}
-          />
-        </div>
-        <div className="mt-4">
-          <StakeActions ctx={ctx} testIdPrefix="gov-home" />
-        </div>
-      </Card>
-
       <GovIntro />
     </div>
   );
 }
 
-function CommunityTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string }) {
+function CommunityTab({ ctx }: { readonly ctx: GovContextValue }) {
+  const q = `?symbol=${encodeURIComponent(ctx.symbol)}`;
   return (
     <div className="space-y-4">
       <GovCommunitySummary community={ctx.community} tokenDecimals={ctx.token?.decimals} q={q} />
