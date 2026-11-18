@@ -33,7 +33,8 @@ function Section({
 }
 
 /**
- * 我的 (UX spec §3.7): balance + account/about, a settings-ish list. The
+ * 我的 (UX spec §3.7): two tabs (钱包余额 / 质押资产); account/about moved out —— wallet
+ * 地址/网络在右上角钱包弹层，版本与文档入口在 /about。 The
  * identity NFT card moved out (owner 2026-11-14) — `/my-nft` owns identity
  * management; only text links remain here, so the page never spends the
  * one-filled-button rule.

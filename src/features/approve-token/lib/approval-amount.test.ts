@@ -36,10 +36,11 @@ describe('approvalDisplayText', () => {
     expect(approvalDisplayText(1500000000000000000n, SYMBOL, 18)).toBe(`1.5 ${SYMBOL}`);
   });
 
-  it('truncates to six fraction digits instead of rounding', () => {
-    expect(approvalDisplayText(1234567890123456789n, SYMBOL, 18)).toBe(`1.234567 ${SYMBOL}`);
+  it('applies the magnitude rule and never rounds the allowance up', () => {
+    // <1 → 6 位；1–999 → 4 位（owner 2026-11-19 数字显示规范）。
+    expect(approvalDisplayText(1234567890123456789n, SYMBOL, 18)).toBe(`1.2345 ${SYMBOL}`);
     expect(approvalDisplayText(999999999999999999n, SYMBOL, 18)).toBe(`0.999999 ${SYMBOL}`);
-    expect(approvalDisplayText(1999999999999999999n, SYMBOL, 18)).toBe(`1.999999 ${SYMBOL}`);
+    expect(approvalDisplayText(1999999999999999999n, SYMBOL, 18)).toBe(`1.9999 ${SYMBOL}`);
   });
 
   it('never renders a non-zero allowance as 0', () => {
@@ -55,8 +56,9 @@ describe('approvalDisplayText', () => {
   });
 
   it('renders the 2^255 - 1 boundary as a concrete amount', () => {
+    // ≥1e6 只显示整数部分：小数位按数量级归零，不四舍五入。
     expect(approvalDisplayText(UNLIMITED_APPROVAL_THRESHOLD - 1n, SYMBOL, 18)).toBe(
-      `57,896,044,618,658,097,711,785,492,504,343,953,926,634,992,332,820,282,019,728.792003 ${SYMBOL}`,
+      `57,896,044,618,658,097,711,785,492,504,343,953,926,634,992,332,820,282,019,728 ${SYMBOL}`,
     );
   });
 });

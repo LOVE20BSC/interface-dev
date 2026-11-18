@@ -8,8 +8,8 @@ describe('swapBalanceLine', () => {
     );
   });
 
-  it('keeps at most six fraction digits (truncated, never rounded up)', () => {
-    // 0.123456789 → 0.123456, both sides use the same rule.
+  it('keeps the magnitude rule: at most six fraction digits, truncated never rounded up', () => {
+    // 0.123456789 → 0.123456（<1 档 6 位），两边用同一条规则。
     expect(swapBalanceLine('TestWETH', 123_456_789_000_000_000n, 18)).toBe(
       '余额 TestWETH 0.123456',
     );
@@ -25,9 +25,9 @@ describe('swapBalanceLine', () => {
 
   it('never writes the precision note itself, including non-18 decimals', () => {
     // 精度 6 位 lives on the card's dedicated note line (shouldShowPrecision), never
-    // inside the balance line.
+    // inside the balance line. 12.345678 → 12.3456（1–999 档 4 位，截断不四舍五入）。
     const line = swapBalanceLine('TestUSDC', 12_345_678n, 6);
-    expect(line).toBe('余额 TestUSDC 12.345678');
+    expect(line).toBe('余额 TestUSDC 12.3456');
     expect(line).not.toContain('精度');
   });
 

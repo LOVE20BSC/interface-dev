@@ -7,13 +7,14 @@
  * The default strings are byte-for-byte what the UI rendered before the parameter
  * existed: grouping `,`, decimal `.`, and the same truncation rules.
  *
- * Displayed token amounts have exactly one rule: group the integer part, trim the
- * fractional part, and keep at most `TOKEN_AMOUNT_MAX_FRACTION_DIGITS` (6) digits.
- * Six digits keep small balances visible instead of collapsing them to `0.00`,
- * while fees, rates and percentages use `RATE_MAX_FRACTION_DIGITS` (2). All
- * user-facing token numbers must go through `formatTokenAmount` (or
- * `formatRate`/`formatPercent`) so the same value renders identically on every
- * surface.
+ * Displayed token amounts follow one magnitude-aware rule (owner 2026-11-19):
+ * always group the integer part, then keep at most 6 fraction digits below 1,
+ * 4 digits from 1 to 999, 2 digits from 1,000 to 999,999, and no fraction at all
+ * from 1,000,000 up. Truncation is never rounded up, and `TOKEN_AMOUNT_MAX_FRACTION_DIGITS`
+ * (6) is the cap for the smallest bucket; fees, rates and percentages use
+ * `RATE_MAX_FRACTION_DIGITS` (2). All user-facing token numbers must go through
+ * `formatTokenAmount` (or `formatRate`/`formatPercent`) so the same value
+ * renders identically on every surface.
  */
 
 export const DEFAULT_LOCALE = 'zh-CN';
@@ -112,6 +113,31 @@ function formatScaled(
 }
 
 /**
+ * 数字显示规范（owner 2026-11-19）：小数位按数量级自适应，避免大数拖一长串小数。
+ *
+ * - |值| < 1        → 最多 6 位（小额仍可见）
+ * - 1 ≤ |值| < 1e3  → 最多 4 位
+ * - 1e3 ≤ |值| < 1e6 → 最多 2 位
+ * - |值| ≥ 1e6      → 0 位（只显示整数部分）
+ *
+ * 一律截断、不四舍五入；整数部分始终千分位分组。百分比独立用两位。
+ */
+export function fractionDigitsForMagnitude(
+  value: bigint | undefined | null,
+  decimals: number,
+): number {
+  if (value === undefined || value === null || decimals < 0 || !Number.isInteger(decimals)) {
+    return TOKEN_AMOUNT_MAX_FRACTION_DIGITS;
+  }
+  const absolute = value < 0n ? -value : value;
+  const whole = absolute / 10n ** BigInt(decimals);
+  if (whole >= 1_000_000n) return 0;
+  if (whole >= 1_000n) return 2;
+  if (whole >= 1n) return 4;
+  return TOKEN_AMOUNT_MAX_FRACTION_DIGITS;
+}
+
+/**
  * Low-level amount formatter: integer part grouped with thousands separators and
  * at most `maxFractionDigits` decimals (truncated, never rounded up). Prefer
  * `formatTokenAmount` for displayed token balances, quotes and receipts; it
@@ -132,9 +158,9 @@ export function formatAmount(
 
 /**
  * The one formatter for displayed token amounts (balances, quotes, minimums,
- * receipts, info rows and selectors). Defaults to six fraction digits so small
- * balances stay visible; pass `maxFractionDigits` only for a surface that is
- * explicitly a fee or a percentage.
+ * receipts, info rows and selectors). Fraction digits follow the magnitude rule
+ * documented above (see `fractionDigitsForMagnitude`); pass `maxFractionDigits`
+ * only for a surface that is explicitly a fee or a percentage.
  */
 export function formatTokenAmount(
   value: bigint | undefined | null,
@@ -145,7 +171,7 @@ export function formatTokenAmount(
   return formatAmount(
     value,
     decimals,
-    options.maxFractionDigits ?? TOKEN_AMOUNT_MAX_FRACTION_DIGITS,
+    options.maxFractionDigits ?? fractionDigitsForMagnitude(value, decimals),
     options.locale,
   );
 }
@@ -191,7 +217,7 @@ export function formatVisibleTokenAmount(
   }
   const smallest = smallestVisibleTokenAmount(
     decimals,
-    options.maxFractionDigits ?? TOKEN_AMOUNT_MAX_FRACTION_DIGITS,
+    options.maxFractionDigits ?? fractionDigitsForMagnitude(value, decimals),
   );
   return `< ${formatUnits(smallest, decimals)}`;
 }

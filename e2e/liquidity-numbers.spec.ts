@@ -268,7 +268,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       await openLiquidity(page, TOKEN_HOLDER_4);
       await expect(page.getByTestId('liquidity-token')).toContainText(SYMBOL, { timeout: 20_000 });
       await expect(page.getByTestId('liquidity-balance-token')).toContainText(
-        `${SYMBOL} 余额 99,999,099.999639`,
+        `${SYMBOL} 余额 99,999,099`,
         { timeout: 20_000 },
       );
       // 智能模式默认开。
@@ -278,7 +278,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       );
 
       // 旧库 LOVE20TKM 加池抬头：底池总LP / 我的LP（还没有 LP 时是 0）。
-      await expect(page.getByTestId('liquidity-pool-total-supply')).toHaveText('4,472.135954', {
+      await expect(page.getByTestId('liquidity-pool-total-supply')).toHaveText('4,472.13', {
         timeout: 20_000,
       });
       await expect(page.getByTestId('liquidity-pool-my-lp')).toHaveText('0');
@@ -295,7 +295,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       await page.getByTestId('liquidity-price-toggle').click();
 
       await addQuote(page, '100000');
-      // Hub 会先换掉 45,016.508348 TestLOVE20：加池后 1 ETH 从 2,000 涨到 3,000，
+      // Hub 会先换掉 45,016.508348 TestLOVE20（≥1e6 → 显示 45,016.5）：加池后 1 ETH 从 2,000 涨到 3,000，
       // 所以默认方向（1 社区代币 = X ETH）的涨跌幅是 -33.33%。
       await expect(page.getByTestId('liquidity-price-after')).toHaveText(
         '1 TestLOVE20 = 0.000333 ETH',
@@ -305,18 +305,18 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       // §1.2 用例 A：过程量默认收起，点开「详情」才出现。
       await expect(page.getByTestId('liquidity-details')).toHaveCount(0);
       await expect(page.getByTestId('liquidity-quote-liquidity')).toHaveText(
-        '预计获得 1,003.579928 流动性凭证',
+        '预计获得 1,003.57 流动性凭证',
         { timeout: 20_000 },
       );
       await openDetails(page);
       await expect(page.getByTestId('liquidity-quote-swap')).toHaveText(
-        '其中 45,016.508348 TestLOVE20 会先换成 18.32783 ETH。',
+        '其中 45,016.5 TestLOVE20 会先换成 18.3278 ETH。',
       );
       await expect(page.getByTestId('liquidity-quote-prepared')).toHaveText(
-        '实际进池 54,983.491651 TestLOVE20 + 18.32783 ETH',
+        '实际进池 54,983.49 TestLOVE20 + 18.3278 ETH',
       );
       await expect(page.getByTestId('liquidity-quote-min')).toHaveText(
-        '至少获得 998.562028 流动性凭证',
+        '至少获得 998.562 流动性凭证',
       );
 
       await approveThenSubmit(page, 'liquidity-add-approve', 'liquidity-add-submit');
@@ -329,7 +329,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
 
       // 用例 C 的初始状态：我的 LP 与份额。
       await page.getByTestId('liquidity-tab-mine').click();
-      await expect(page.getByTestId('liquidity-my-lp')).toHaveText('1,003.579928', {
+      await expect(page.getByTestId('liquidity-my-lp')).toHaveText('1,003.57', {
         timeout: 20_000,
       });
       await expect(page.getByTestId('liquidity-my-share')).toHaveText('18.32%');
@@ -337,22 +337,22 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       await expect(page.getByTestId('liquidity-withdraw-receive')).toHaveCount(0);
       await page.getByTestId('liquidity-withdraw-percent-100').click();
       // 输入框只回填 6 位小数（可读），但交易用的是完整 18 位 LP：
-      // 下面「预计收到约 54,983.491651」就是完整精度算出来的，截断会少 0.000031。
+      // 下面「预计收到约 54,983.49」就是完整精度算出来的（输入框仍只回填 6 位），截断会少 0.000031。
       await expect(page.getByTestId('liquidity-withdraw-lp')).toHaveValue('1003.579928');
       await expect(page.getByTestId('liquidity-withdraw-receive')).toHaveText(
-        '预计收到约 54,983.491651 TestLOVE20 + 18.32783 ETH',
+        '预计收到约 54,983.49 TestLOVE20 + 18.3278 ETH',
       );
       // 用户仍然可以手输更多小数位。
       await page.getByTestId('liquidity-withdraw-lp').fill('1003.579928576458381352');
       await expect(page.getByTestId('liquidity-withdraw-receive')).toHaveText(
-        '预计收到约 54,983.491651 TestLOVE20 + 18.32783 ETH',
+        '预计收到约 54,983.49 TestLOVE20 + 18.3278 ETH',
       );
       await page.getByTestId('liquidity-withdraw-percent-100').click();
 
       // 撤出 100%：先允许，再确认。
       await approveThenSubmit(page, 'liquidity-withdraw-approve', 'liquidity-withdraw-submit');
       await expect(page.getByTestId('liquidity-receipt-detail')).toHaveText(
-        '已撤出 54,983.491651 TestLOVE20 + 18.32783 ETH',
+        '已撤出 54,983.49 TestLOVE20 + 18.3278 ETH',
         { timeout: 30_000 },
       );
       await page.getByRole('button', { name: '好的' }).click();
@@ -368,18 +368,18 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
 
       await page.getByTestId('liquidity-native-amount').fill('10');
       await expect(page.getByTestId('liquidity-quote-liquidity')).toHaveText(
-        '预计获得 217.951904 流动性凭证',
+        '预计获得 217.9519 流动性凭证',
         { timeout: 20_000 },
       );
       await openDetails(page);
       await expect(page.getByTestId('liquidity-quote-swap')).toHaveText(
-        '其中 4.888217 ETH 会先换成 9,294.150182 TestLOVE20。',
+        '其中 4.8882 ETH 会先换成 9,294.15 TestLOVE20。',
       );
       await expect(page.getByTestId('liquidity-quote-prepared')).toHaveText(
-        '实际进池 9,294.150182 TestLOVE20 + 5.111782 ETH',
+        '实际进池 9,294.15 TestLOVE20 + 5.1117 ETH',
       );
       await expect(page.getByTestId('liquidity-quote-min')).toHaveText(
-        '至少获得 216.862145 流动性凭证',
+        '至少获得 216.8621 流动性凭证',
       );
 
       // 旧库的 25% / 50% / 最高 快捷按钮：原生币按「余额 − 手续费预留」算。
@@ -406,7 +406,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       await page.getByRole('button', { name: '好的' }).click();
 
       await page.getByTestId('liquidity-tab-mine').click();
-      await expect(page.getByTestId('liquidity-my-lp')).toHaveText('217.951904', {
+      await expect(page.getByTestId('liquidity-my-lp')).toHaveText('217.9519', {
         timeout: 20_000,
       });
       await expect(page.getByTestId('liquidity-my-share')).toHaveText('4.64%');
@@ -439,7 +439,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
         { timeout: 20_000 },
       );
       await expect(page.getByTestId('liquidity-quote-liquidity')).toHaveText(
-        '预计获得 22.360679 流动性凭证',
+        '预计获得 22.3606 流动性凭证',
       );
       await expect(page.getByTestId('liquidity-quote-min')).toHaveText(
         '最少进池 995 TestLOVE20 + 0.4975 ETH',
@@ -466,7 +466,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       await page.getByRole('button', { name: '好的' }).click();
 
       await page.getByTestId('liquidity-tab-mine').click();
-      await expect(page.getByTestId('liquidity-my-lp')).toHaveText('22.360679', {
+      await expect(page.getByTestId('liquidity-my-lp')).toHaveText('22.3606', {
         timeout: 20_000,
       });
     }),
@@ -535,7 +535,7 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       // 卡 4：默认地址是当前钱包（#8 刚建池）→ LP 0.999999 / 99.99% / 两币折算。
       await expect(page.getByTestId('liquidity-query-lp')).toHaveText('0.999999');
       await expect(page.getByTestId('liquidity-query-share')).toHaveText('99.99%');
-      await expect(page.getByTestId('liquidity-query-convertible-token')).toHaveText('99.999999');
+      await expect(page.getByTestId('liquidity-query-convertible-token')).toHaveText('99.9999');
       await expect(page.getByTestId('liquidity-query-convertible-target')).toHaveText('0.009999');
       // 交易对地址可点击复制（完整地址 + title 用于核对）。
       await expect(page.getByTestId('liquidity-query-pair')).toHaveAttribute(
@@ -811,7 +811,7 @@ test.describe('社区流动性查询（旧库四块布局 + 任意地址）', ()
       await expect(page.getByTestId('liquidity-query-submit')).toHaveText('重新查询');
 
       // 卡 2：初始池统计（LP 总数量 / 两侧总数量）。
-      await expect(page.getByTestId('liquidity-query-supply')).toHaveText('4,472.135954');
+      await expect(page.getByTestId('liquidity-query-supply')).toHaveText('4,472.13');
       await expect(page.getByTestId('liquidity-query-total-token')).toHaveText('200,000');
       await expect(page.getByTestId('liquidity-query-total-target')).toHaveText('100');
       await expect(page.getByTestId('liquidity-query-price')).toHaveText(
@@ -828,17 +828,15 @@ test.describe('社区流动性查询（旧库四块布局 + 任意地址）', ()
         '该地址在此交易对中，没有流动性凭证',
       );
 
-      // 任意地址：质押合约持有 totalSupply − 1000 → 4,472.135954 LP / 99.99%。
+      // 任意地址：质押合约持有 totalSupply − 1000 → 4,472.13 LP（显示截断）/ 99.99%。
       await page.getByTestId('liquidity-query-address').fill(STAKE);
       await expect(page.getByTestId('liquidity-query-submit')).toHaveText('查询');
       await page.getByTestId('liquidity-query-submit').click();
-      await expect(page.getByTestId('liquidity-query-lp')).toHaveText('4,472.135954');
+      await expect(page.getByTestId('liquidity-query-lp')).toHaveText('4,472.13');
       await expect(page.getByTestId('liquidity-query-share')).toHaveText('99.99%');
       // 可兑换两币 = LP × reserve / totalSupply（向下取整）。
-      await expect(page.getByTestId('liquidity-query-convertible-token')).toHaveText(
-        '199,999.999999',
-      );
-      await expect(page.getByTestId('liquidity-query-convertible-target')).toHaveText('99.999999');
+      await expect(page.getByTestId('liquidity-query-convertible-token')).toHaveText('199,999.99');
+      await expect(page.getByTestId('liquidity-query-convertible-target')).toHaveText('99.9999');
 
       // 重置：清空输入、收起结果卡，按钮回到「查询」。
       await page.getByTestId('liquidity-query-reset').click();
@@ -871,7 +869,7 @@ test.describe('社区流动性查询（旧库四块布局 + 任意地址）', ()
       // 任意地址查询。
       await page.getByTestId('liquidity-query-address').fill(STAKE);
       await page.getByTestId('liquidity-query-submit').click();
-      await expect(page.getByTestId('liquidity-query-lp')).toHaveText('4,472.135954', {
+      await expect(page.getByTestId('liquidity-query-lp')).toHaveText('4,472.13', {
         timeout: 20_000,
       });
       await expect(page.getByTestId('liquidity-query-share')).toHaveText('99.99%');
@@ -928,7 +926,7 @@ test.describe('流动性池 验收截图', () => {
           });
           await addQuote(page, '100000');
           await expect(page.getByTestId('liquidity-quote-liquidity')).toHaveText(
-            '预计获得 1,003.579928 流动性凭证',
+            '预计获得 1,003.57 流动性凭证',
             { timeout: 20_000 },
           );
           await page
@@ -942,13 +940,13 @@ test.describe('流动性池 验收截图', () => {
           });
           await page.getByRole('button', { name: '好的' }).click();
           await page.getByTestId('liquidity-tab-mine').click();
-          await expect(page.getByTestId('liquidity-my-lp')).toHaveText('1,003.579928', {
+          await expect(page.getByTestId('liquidity-my-lp')).toHaveText('1,003.57', {
             timeout: 20_000,
           });
           await shoot(page, `mine-${theme}-${viewport.key}`);
           await page.getByTestId('liquidity-withdraw-percent-100').click();
           await expect(page.getByTestId('liquidity-withdraw-receive')).toHaveText(
-            '预计收到约 54,983.491651 TestLOVE20 + 18.32783 ETH',
+            '预计收到约 54,983.49 TestLOVE20 + 18.3278 ETH',
           );
           await page.getByTestId('liquidity-withdraw-receive').scrollIntoViewIfNeeded();
           await shoot(page, `withdraw-${theme}-${viewport.key}`);
@@ -967,7 +965,7 @@ test.describe('流动性池 验收截图', () => {
           await page.getByTestId('liquidity-tab-query').click();
           await page.getByTestId('liquidity-query-address').fill(STAKE);
           await page.getByTestId('liquidity-query-submit').click();
-          await expect(page.getByTestId('liquidity-query-lp')).toHaveText('4,472.135954', {
+          await expect(page.getByTestId('liquidity-query-lp')).toHaveText('4,472.13', {
             timeout: 20_000,
           });
           // 四块一屏放不下（390×844 / 1280×800 都放不下）：这一态用整页截图，

@@ -52,7 +52,6 @@ export function GovCommunitySummary({ community, tokenDecimals, q }: GovCommunit
         >
           {formatTokenAmount(community.totalGovVotes, VOTE_DECIMALS)}
         </p>
-        <p className="mt-1 text-[11px] leading-4 text-muted">{copy.gov.home.communityVotesNote}</p>
       </div>
 
       <div className="mt-4">

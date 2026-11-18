@@ -28,7 +28,6 @@ export function UnstakePage() {
       <h1 className="text-lg font-bold text-foreground">{copy.gov.pageTitles.unstake}</h1>
       <GovGate ctx={ctx} isWrongChain={isWrongChain}>
         <GovTxFeedback ctx={ctx} />
-        <p className="text-sm leading-6 text-muted">{copy.gov.unstakePage.intro}</p>
         <UnstakeBody ctx={ctx} q={q} />
       </GovGate>
     </div>
@@ -75,7 +74,7 @@ function UnstakeBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q: st
         />
       </div>
       <div className="mt-4">
-        <StakeActions ctx={ctx} testIdPrefix="gov-unstake" />
+        <StakeActions ctx={ctx} testIdPrefix="gov-unstake" showIncreasePhases={false} />
       </div>
     </Card>
   );

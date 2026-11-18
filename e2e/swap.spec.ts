@@ -213,10 +213,18 @@ function ensureFixtures(): void {
   );
 }
 
-function displayAmount(value: bigint, decimals = 18, digits = 6): string {
+/**
+ * 与 `src/shared/lib/format.ts#formatTokenAmount` 同一条数字显示规范
+ * （owner 2026-11-19）：小数位按整数部分的量级自适应——|值| < 1 → 6 位、
+ * 1–999 → 4 位、1e3–1e6 → 2 位、≥1e6 → 0 位；一律截断，整数部分千分位分组。
+ * 回执/余额的期望值必须与页面逐字一致，所以这里重算，不从页面读取。
+ */
+function displayAmount(value: bigint, decimals = 18): string {
   const raw = formatUnits(value, decimals);
   const [whole = '0', fraction = ''] = raw.split('.');
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const wholeValue = BigInt(whole);
+  const digits = wholeValue >= 1_000_000n ? 0 : wholeValue >= 1_000n ? 2 : wholeValue >= 1n ? 4 : 6;
   const trimmed = fraction.slice(0, digits).replace(/0+$/, '');
   return trimmed.length > 0 ? `${grouped}.${trimmed}` : grouped;
 }
@@ -788,7 +796,7 @@ test('swap: 代币选择器不提供另一侧已选中的代币，并给出一�
   expect(url.searchParams.get('to')).toBe('TestLOVE20');
 });
 
-test('swap: 「到」侧也显示到账代币余额（同「从」侧规则：6 位小数、不重复 symbol、不写精度标签）', async ({
+test('swap: 「到」侧也显示到账代币余额（同「从」侧规则：量级自适应小数位、不重复 symbol、不写精度标签）', async ({
   page,
 }) => {
   const buyerBalance = uintOf(TOKEN, 'balanceOf(address)(uint256)', BUYER);
@@ -802,7 +810,7 @@ test('swap: 「到」侧也显示到账代币余额（同「从」侧规则：6 
     timeout: 20_000,
   });
   const text = (await toBalance.innerText()).trim();
-  // 6 位小数规则：最多 6 位小数（这里余额是整枚代币，验证没有多余小数位）。
+  // 量级自适应规则：最多 6 位小数（这里余额是整枚代币，验证没有多余小数位）。
   const fraction = text.split('.')[1] ?? '';
   expect(fraction.replace(/[^0-9]/g, '').length).toBeLessThanOrEqual(6);
   // 18 位精度不显示精度标签。

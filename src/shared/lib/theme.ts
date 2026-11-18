@@ -46,7 +46,8 @@ export interface ThemeDefinition {
   readonly preview: ThemePreview;
 }
 
-export const DEFAULT_THEME: ThemeId = 'light';
+/** 默认主题：深色（owner 2026-11-19）。用户切换后仍按 love20:theme 记住。 */
+export const DEFAULT_THEME: ThemeId = 'dark';
 export const THEME_STORAGE_KEY = 'theme';
 export const THEME_CHANGE_EVENT = 'love20:theme-change';
 
@@ -90,7 +91,7 @@ export const THEMES: readonly ThemeDefinition[] = Object.freeze([
 const THEME_IDS: ReadonlySet<string> = new Set(THEMES.map((theme) => theme.id));
 
 /**
- * Pure resolver: anything that is not an exact known id falls back to light.
+ * Pure resolver: anything that is not an exact known id falls back to the default (dark).
  * Used for storage reads, the `data-theme` attribute and tests, so an unknown
  * value can never leave the app without a palette.
  */

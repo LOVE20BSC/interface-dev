@@ -17,6 +17,8 @@ export interface MyStakeSummaryProps {
   /** 首页摘要卡已经单独显示治理权 / 承诺解锁期时，明细里不再重复。 */
   readonly showVotes?: boolean;
   readonly showPhases?: boolean;
+  /** 流动性质押页的「我的流动性质押」卡不展示加速质押相关数据（owner 2026-11-19）。 */
+  readonly showBoost?: boolean;
 }
 
 /** 「我的质押」是否为空仓位：份额与解锁申请都为 0。 */
@@ -38,6 +40,7 @@ export function MyStakeSummary({
   testIdPrefix = 'gov-my',
   showVotes = true,
   showPhases = true,
+  showBoost = true,
 }: MyStakeSummaryProps) {
   const unlock = stakeUnlockState({
     currentPhase: clock.currentPhase ?? null,
@@ -70,12 +73,14 @@ export function MyStakeSummary({
         value={formatTokenAmount(member.liquidityShares, VOTE_DECIMALS)}
         testId={`${testIdPrefix}-shares`}
       />
-      <StakeStatRow
-        label={copy.gov.mine.boost}
-        value={formatTokenAmount(member.validBoostShares, token.decimals)}
-        note={copy.gov.stats.boostNote}
-        testId={`${testIdPrefix}-boost`}
-      />
+      {showBoost ? (
+        <StakeStatRow
+          label={copy.gov.mine.boost}
+          value={formatTokenAmount(member.validBoostShares, token.decimals)}
+          note={copy.gov.stats.boostNote}
+          testId={`${testIdPrefix}-boost`}
+        />
+      ) : null}
       {showPhases ? (
         <StakeStatRow
           label={copy.gov.mine.phases}
@@ -94,7 +99,7 @@ export function MyStakeSummary({
         value={formatTokenAmount(member.parentTokenAmountForLiquidity, parent.decimals)}
         testId={`${testIdPrefix}-parent-amount`}
       />
-      {member.boostShares !== undefined && member.boostShares > 0n ? (
+      {showBoost && member.boostShares !== undefined && member.boostShares > 0n ? (
         <StakeStatRow
           label={copy.gov.mine.boostAmount}
           value={formatTokenAmount(member.boostShares, token.decimals)}

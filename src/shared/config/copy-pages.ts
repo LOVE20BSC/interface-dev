@@ -1499,6 +1499,9 @@ export const copy = {
       stateWithdrawable: '可以撤出了',
       stateWithdrawableNote: '撤出后这些代币会回到钱包，治理权清零。',
       stateUnknown: '解锁状态暂时读不到。',
+      /** 已申请解锁时治理页「我的」不再显示四项数据，只提示状态 + 去解锁页（owner 2026-11-19）。 */
+      unlockingTitle: '已申请解锁',
+      unlockingBody: '治理权已清零，等承诺解锁期走完就能撤出。',
       /** 「我的」页质押资产卡（owner 2026-11-18 23:20）：加速质押只有一种量，不分「有效」。 */
       boostStake: '加速激励质押量',
       infoAria: '查看质押份额与预计可取回代币',
@@ -1586,7 +1589,6 @@ export const copy = {
       mintRewardAction: '铸造 治理激励',
       /** 「社区」摘要：头条数字 + 一个行动入口 + 四格。 */
       communityVotes: '社区总治理权',
-      communityVotesNote: '本阶段',
       communityShares: '社区流动性质押份额',
       communityLp: '流动性凭证总量',
       communityBoost: '本阶段有效加速份额',
@@ -1616,14 +1618,14 @@ export const copy = {
      */
     query: {
       title: '治理权查询',
-      hint: '按身份 NFT 的 ID 或名称查询治理权；名称会先在链上解析成 NFT 编号。',
+      hint: '按身份 NFT 的 ID 或名称查询治理权（输入即查询，名称会先在链上解析成 NFT 编号）。',
       /** owner 2026-11-18 23:20：去掉按地址查询，只按身份 NFT，支持 ID / 名称两种。 */
       modeLabel: '查询方式',
       modes: { id: 'NFT ID', name: 'NFT 名称' },
       idLabel: 'NFT ID',
       idPlaceholder: '例如 12',
       nameLabel: 'NFT 名称',
-      namePlaceholder: '例如 polar',
+      namePlaceholder: '输入身份 NFT 名称',
       submit: '查询',
       reset: '重置',
       loading: '查询中…',
@@ -1682,7 +1684,6 @@ export const copy = {
     },
     unstakePage: {
       sectionTitle: '我的治理资产',
-      intro: '取消质押分两步：先申请解锁，治理权立刻清零；等承诺解锁期走完，再撤出拿回代币。',
       waiting: (phases: string, minutes: string | null) =>
         minutes === null
           ? `已申请解锁：还要再等 ${phases} 个阶段才能撤出。`

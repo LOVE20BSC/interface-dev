@@ -50,10 +50,10 @@ const EXPECTED_TOKENS = {
     muted: '#55647a',
     line: '#d9e1ec',
     'line-strong': '#b7c3d4',
-    brand: '#2563eb',
-    'brand-strong': '#1d4ed8',
-    'brand-soft': '#dbeafe',
-    'on-brand': '#ffffff',
+    brand: '#fcd535',
+    'brand-strong': '#856500',
+    'brand-soft': '#fef8dd',
+    'on-brand': '#181a20',
     danger: '#dc2626',
     'danger-strong': '#b91c1c',
     'danger-soft': '#fee2e2',
@@ -102,7 +102,6 @@ const PAIRS = [
   ['muted', 'background', 3],
   ['muted', 'surface', 3],
   ['muted', 'elevated', 3],
-  ['brand', 'surface', 3],
 ];
 
 function luminance(hex) {

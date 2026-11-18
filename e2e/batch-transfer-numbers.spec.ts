@@ -440,7 +440,7 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('batch-transfer-submit')).toBeEnabled();
   });
 
-  test('用例 B ERC20 批量 + approve：0 → 授权 2.000002 → 3 行到账', async ({ page }) => {
+  test('用例 B ERC20 批量 + approve：0 → 授权 2（输入 2.000002）→ 3 行到账', async ({ page }) => {
     await openBatch(page, ERC20_SENDER);
     await useTokenMode(page);
     await expect(page.getByTestId('batch-transfer-balance')).toHaveText(
@@ -449,9 +449,10 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     );
 
     await fillBatch(page, [`${R5} 1.5`, `${R2} 0.5`, `${R7} 0.000002`]);
-    await expect(page.getByTestId('batch-transfer-total')).toHaveText(`合计 2.000002 ${SYMBOL}`);
+    // owner 2026-11-19 数字显示规范：2.000002 属 1–999 量级 → 4 位小数截断后是「2」。
+    await expect(page.getByTestId('batch-transfer-total')).toHaveText(`合计 2 ${SYMBOL}`);
     await expect(page.getByTestId('batch-transfer-allowance')).toHaveText(
-      `已允许批量转账合约使用 0 / 本次需要 2.000002 ${SYMBOL}`,
+      `已允许批量转账合约使用 0 / 本次需要 2 ${SYMBOL}`,
       { timeout: 20_000 },
     );
 
@@ -464,15 +465,14 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await expect(submit).toHaveText('批量转账', { timeout: 30_000 });
     await expect(submit).toBeEnabled();
     await expect(page.getByTestId('batch-transfer-allowance')).toHaveText(
-      `已允许批量转账合约使用 2.000002 / 本次需要 2.000002 ${SYMBOL}`,
+      `已允许批量转账合约使用 2 / 本次需要 2 ${SYMBOL}`,
       { timeout: 20_000 },
     );
     await submit.click();
 
-    await expect(page.getByTestId('batch-transfer-receipt-total')).toHaveText(
-      `2.000002 ${SYMBOL}`,
-      { timeout: 30_000 },
-    );
+    await expect(page.getByTestId('batch-transfer-receipt-total')).toHaveText(`2 ${SYMBOL}`, {
+      timeout: 30_000,
+    });
     await expect(page.getByTestId('batch-transfer-receipt-delta-0')).toHaveText('+1.5');
     await expect(page.getByTestId('batch-transfer-receipt-delta-1')).toHaveText('+0.5');
     await expect(page.getByTestId('batch-transfer-receipt-delta-2')).toHaveText('+0.000002');
@@ -480,8 +480,9 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('batch-transfer-receipt-residual-allowance')).toHaveCount(0);
 
     await page.getByRole('button', { name: '好的' }).click();
+    // 余额 99,799,097.999998 属 ≥1e6 量级 → 显示 0 位小数（owner 2026-11-19 数字规范）。
     await expect(page.getByTestId('batch-transfer-balance')).toHaveText(
-      `${SYMBOL} 余额 99,799,097.999998`,
+      `${SYMBOL} 余额 99,799,097`,
       { timeout: 20_000 },
     );
   });
@@ -543,7 +544,7 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
   });
 
   // D7：先按合计授权、再改小清单提交，回执必须提示链上残留的授权额度。
-  test('用例 K 残留授权：授权 2.000002 后改小清单，回执提示剩余授权', async ({ page }) => {
+  test('用例 K 残留授权：授权 2（输入 2.000002）后改小清单，回执提示剩余授权', async ({ page }) => {
     await openBatch(page, ERC20_SENDER);
     await useTokenMode(page);
     await expect(page.getByTestId('batch-transfer-balance')).toContainText('余额', {
@@ -553,13 +554,13 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     const submit = page.getByTestId('batch-transfer-submit');
     await fillBatch(page, [`${R5} 1.5`, `${R2} 0.5`, `${R7} 0.000002`]);
     await expect(page.getByTestId('batch-transfer-allowance')).toHaveText(
-      `已允许批量转账合约使用 0 / 本次需要 2.000002 ${SYMBOL}`,
+      `已允许批量转账合约使用 0 / 本次需要 2 ${SYMBOL}`,
       { timeout: 20_000 },
     );
     await submit.click();
     await expect(submit).toHaveText('批量转账', { timeout: 30_000 });
     await expect(page.getByTestId('batch-transfer-allowance')).toHaveText(
-      `已允许批量转账合约使用 2.000002 / 本次需要 2.000002 ${SYMBOL}`,
+      `已允许批量转账合约使用 2 / 本次需要 2 ${SYMBOL}`,
       { timeout: 20_000 },
     );
 

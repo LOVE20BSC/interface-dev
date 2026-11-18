@@ -10,7 +10,7 @@ vi.mock('@/shared/lib/clipboard', () => ({
 const copyTextMock = vi.mocked(copyText);
 const ROUTER = '0x0165878A594ca255338adfa4d48449f69242Eb8F';
 
-function renderAddress(display?: 'short' | 'full') {
+function renderAddress(display?: 'short' | 'full' | 'auto') {
   return render(
     <CopyableAddress
       address={ROUTER}
@@ -76,6 +76,25 @@ describe('CopyableAddress 全局地址组件', () => {
     const button = screen.getByTestId('copy-address');
     expect(button).toHaveTextContent(ROUTER);
     expect(button).toHaveAttribute('title', ROUTER);
+  });
+
+  it('auto: shows the full address when it fits, the middle-elided form when it overflows', () => {
+    // jsdom 没有排版：手动给出宽度，验证 auto 的两条分支（owner 2026-11-19）。
+    const scrollWidth = vi.spyOn(Element.prototype, 'scrollWidth', 'get').mockReturnValue(100);
+    vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(100);
+
+    const fits = renderAddress('auto');
+    const full = screen.getByTestId('copy-address');
+    expect(full).toHaveTextContent(ROUTER);
+    expect(full).toHaveAttribute('title', ROUTER);
+    fits.unmount();
+
+    // 放不下才退回中间省略；title / 复制的仍是完整地址。
+    scrollWidth.mockReturnValue(400);
+    renderAddress('auto');
+    const elided = screen.getByTestId('copy-address');
+    expect(elided).toHaveTextContent('0x0165…Eb8F');
+    expect(elided).toHaveAttribute('title', ROUTER);
   });
 
   it('adds <wbr> break points every 4 hex chars so the last line is never 1 char', () => {

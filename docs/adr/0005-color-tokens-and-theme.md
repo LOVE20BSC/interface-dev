@@ -38,7 +38,7 @@
 
 ### 2. 主题状态三处同步 + 首帧前应用
 
-根元素同时写 `data-theme="light|dark"`、`.dark`（深色）、`style.colorScheme`；`<meta name="theme-color">` 跟随画布色。选择持久化在 **`love20:theme`**（全局、不按链/钱包命名空间；经 `shared/lib/cache.ts` 的 `readPreference`/`writePreference`，它是唯一允许碰 localStorage 的模块）。`index.html` 的内联引导脚本在样式与 React 之前读同一键并应用，避免刷新时白闪/浅色闪。默认浅色；非法值回落浅色；localStorage 抛错时当前页仍生效。
+根元素同时写 `data-theme="light|dark"`、`.dark`（深色）、`style.colorScheme`；`<meta name="theme-color">` 跟随画布色。选择持久化在 **`love20:theme`**（全局、不按链/钱包命名空间；经 `shared/lib/cache.ts` 的 `readPreference`/`writePreference`，它是唯一允许碰 localStorage 的模块）。`index.html` 的内联引导脚本在样式与 React 之前读同一键并应用，避免刷新时白闪、也不会先亮后暗。**默认深色（owner 2026-11-19 改，原为默认浅色）**：没有任何 `love20:theme` 时首帧就是深色——`<html data-theme="dark">`、`<meta name="theme-color" content="#0b0e11">`、`<meta name="color-scheme" content="dark">` 与引导脚本的兜底值都是深色，`shared/lib/theme.ts` 的 `DEFAULT_THEME = 'dark'`；非法值回落深色；localStorage 抛错（隐私模式）时当前页仍应用深色（`data-theme="dark"` 与 `.dark` 都已写入）。**存储值优先于默认值**：用户切换过浅色或深色之后，刷新与下次打开都按 `love20:theme`。
 
 不做「跟随系统」（owner 2026-11-14），与旧库 TKM 一致；要做得 owner 另定。
 

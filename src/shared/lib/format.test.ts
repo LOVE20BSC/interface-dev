@@ -9,7 +9,9 @@ import {
   formatTokenAmount,
   formatUnits,
   formatVisibleTokenAmount,
+  fractionDigitsForMagnitude,
   smallestVisibleTokenAmount,
+  TOKEN_AMOUNT_MAX_FRACTION_DIGITS,
   UNKNOWN,
 } from '@/shared/lib/format';
 
@@ -101,11 +103,64 @@ describe('formatDateTime', () => {
   });
 });
 
+describe('fractionDigitsForMagnitude', () => {
+  it('picks the digit budget from the integer magnitude (owner 2026-11-19)', () => {
+    // <1 → 6 位；1–999 → 4 位；1e3–1e6 → 2 位；≥1e6 → 0 位。
+    expect(fractionDigitsForMagnitude(0n, 18)).toBe(6);
+    expect(fractionDigitsForMagnitude(999_999_999_999_999_999n, 18)).toBe(6); // 0.999999999999999999
+    expect(fractionDigitsForMagnitude(1n * E18, 18)).toBe(4); // 1
+    expect(fractionDigitsForMagnitude(999n * E18, 18)).toBe(4); // 999.…
+    expect(fractionDigitsForMagnitude(1_000n * E18, 18)).toBe(2); // 1,000
+    expect(fractionDigitsForMagnitude(999_999n * E18, 18)).toBe(2); // 999,999
+    expect(fractionDigitsForMagnitude(1_000_000n * E18, 18)).toBe(0); // 1,000,000
+    expect(fractionDigitsForMagnitude(49_134_920_836n * E18, 18)).toBe(0);
+  });
+
+  it('reads the threshold from the integer part, not from the raw units', () => {
+    // decimals = 0 时整数部分就是 value 本身，边界必须落在同一处。
+    expect(fractionDigitsForMagnitude(999n, 0)).toBe(4);
+    expect(fractionDigitsForMagnitude(1_000n, 0)).toBe(2);
+    expect(fractionDigitsForMagnitude(1_000_000n, 0)).toBe(0);
+  });
+
+  it('uses the magnitude of negative values', () => {
+    expect(fractionDigitsForMagnitude(-1n, 18)).toBe(6); // -1e-18
+    expect(fractionDigitsForMagnitude(-1n * E18, 18)).toBe(4);
+    expect(fractionDigitsForMagnitude(-1_000n * E18, 18)).toBe(2);
+    expect(fractionDigitsForMagnitude(-1_000_000n * E18, 18)).toBe(0);
+  });
+
+  it('returns the six-digit default for unusable inputs', () => {
+    expect(TOKEN_AMOUNT_MAX_FRACTION_DIGITS).toBe(6);
+    expect(fractionDigitsForMagnitude(undefined, 18)).toBe(6);
+    expect(fractionDigitsForMagnitude(null, 18)).toBe(6);
+    expect(fractionDigitsForMagnitude(1n, -1)).toBe(6);
+    expect(fractionDigitsForMagnitude(1n, 1.5)).toBe(6);
+  });
+});
+
 describe('formatTokenAmount', () => {
-  it('is the single token rule: max 6 decimals, trailing zeros trimmed', () => {
+  it('adapts the fraction digits to the magnitude, then trims trailing zeros', () => {
+    // <1 → 6 位；1–999 → 4 位；1e3–1e6 → 2 位；≥1e6 → 0 位。
+    expect(formatTokenAmount(123_456_789_000_000_000n, 18)).toBe('0.123456'); // 0.123456789
+    expect(formatTokenAmount(223_606_797_000_000_000_000n, 18)).toBe('223.6067'); // 223.606797
+    expect(formatTokenAmount(999_999_999_000_000_000_000n, 18)).toBe('999.9999'); // 999.999999
+    expect(formatTokenAmount(9_999_885_749_000_000_000_000n, 18)).toBe('9,999.88');
+    expect(formatTokenAmount(4_494_496_634_000_000_000_000n, 18)).toBe('4,494.49');
+    expect(formatTokenAmount(99_998_199_990_000_000_000_000_000n, 18)).toBe('99,998,199');
+    expect(formatTokenAmount(49_134_920_836_000_000_000_000_000_000n, 18)).toBe('49,134,920,836');
     expect(formatTokenAmount(1_234_500_000_000_000_000n, 18)).toBe('1.2345');
-    expect(formatTokenAmount(9_999_885_749_000_000_000_000n, 18)).toBe('9,999.885749');
-    expect(formatTokenAmount(99_998_199_990_000_000_000_000_000n, 18)).toBe('99,998,199.99');
+    // 语言环境参数与数量级规则同时生效。
+    expect(formatTokenAmount(1_234_500_000_000_000_000_000n, 18, { locale: 'de-DE' })).toBe(
+      '1.234,5',
+    );
+  });
+
+  it('always truncates instead of rounding, even at a magnitude boundary', () => {
+    // 截断不四舍五入：223.606797 → 223.6067（不是 .6068）、4,494.496634 → 4,494.49、
+    // 999.999999 → 999.9999（不是 1,000）、0.123456789 → 0.123456（不是 .123457）。
+    expect(formatTokenAmount(2_236_067_970_000_000_000_000n, 18)).toBe('2,236.06');
+    expect(formatTokenAmount(1_999_999_999_999_999_999_999n, 18)).toBe('1,999.99');
     expect(formatTokenAmount(1n, 18)).toBe('0');
     expect(formatTokenAmount(1n, 6)).toBe('0.000001');
   });
@@ -146,6 +201,8 @@ describe('formatVisibleTokenAmount', () => {
     expect(smallestVisibleTokenAmount(18, 2)).toBe(10000000000000000n);
     expect(formatVisibleTokenAmount(1n, 6)).toBe('0.000001');
     expect(formatVisibleTokenAmount(1n, 2)).toBe('0.01');
+    // 显式 cap 同样决定「最小可见单位」，不是写死 6 位。
+    expect(formatVisibleTokenAmount(1n, 18, { maxFractionDigits: 2 })).toBe('< 0.01');
   });
 });
 

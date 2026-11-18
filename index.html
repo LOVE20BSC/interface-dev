@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#edf1f7" />
-    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#0b0e11" />
+    <meta name="color-scheme" content="dark" />
     <meta name="application-name" content="LOVE20协议" />
     <meta
       name="description"
@@ -33,7 +33,7 @@
           var storageKey = 'love20:theme';
           var metaColors = { light: '#edf1f7', dark: '#0b0e11' };
           var stored = localStorage.getItem(storageKey);
-          var theme = stored === 'dark' || stored === 'light' ? stored : 'light';
+          var theme = stored === 'dark' || stored === 'light' ? stored : 'dark';
           var root = document.documentElement;
           root.setAttribute('data-theme', theme);
           root.classList.toggle('dark', theme === 'dark');
@@ -43,10 +43,10 @@
           var colorScheme = document.querySelector('meta[name="color-scheme"]');
           if (colorScheme) colorScheme.setAttribute('content', theme);
         } catch (error) {
-          // Storage can throw (private mode / sandboxed iframe): light still applies.
-          document.documentElement.setAttribute('data-theme', 'light');
-          document.documentElement.classList.remove('dark');
-          document.documentElement.style.colorScheme = 'light';
+          // Storage can throw (private mode / sandboxed iframe): dark still applies.
+          document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.classList.add('dark');
+          document.documentElement.style.colorScheme = 'dark';
         }
       })();
     </script>

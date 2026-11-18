@@ -25,6 +25,11 @@ import { connect, installWallet, seedIdentity } from './wallet-stub';
  * `toContainText`。智能模式是新增交互，没有理论线数值（Hub 报价不在 §1 的手算范围），
  * 所以那一条只断言结构性文案与「不是未知」，不写数字。
  *
+ * 数字显示规范（owner 2026-11-19，`formatTokenAmount`）：小数位按数量级自适应——
+ * |值| < 1 → 6 位、1–999 → 4 位、1e3–1e6 → 2 位、≥1e6 → 0 位，一律截断不四舍五入。
+ * 所以本文件的期望值按此规则从理论线常量派生：223.606797 → 223.6067、
+ * 4,472.135954 → 4,472.13、9,571.385499 → 9,571.38、999.999999 → 999.9999。
+ *
  * 夹具（与理论线 §0.5 一致）:
  * - 操作账户 = anvil #4 `0x15d3…6A65`，它持有 MemberNFT #5；`seedIdentity` 直接写
  *   选择缓存，不依赖页面点选（身份 NFT 是 onlyMemberOwner 的调用主体）。
@@ -67,60 +72,66 @@ const MEMBER_STAKE_SIGNATURE =
 /** 理论线 §1 / §0 在 clean bootstrap 种子上的常量（§3 的页面字符串就是它们）。 */
 const EXPECTED = {
   seed: {
-    /** 种子里 memberId 1 的票：4,472.135954e18（§0.3）。 */
-    communityVotes: '4,472.135954',
-    communityShares: '4,472.135954',
-    communityTotalLp: '4,472.135954',
-    communityWithdrawableLp: '4,472.135954',
+    /** 种子里 memberId 1 的票：4,472.135954e18（§0.3）；量级 1e3–1e6 → 2 位小数。 */
+    communityVotes: '4,472.13',
+    communityShares: '4,472.13',
+    communityTotalLp: '4,472.13',
+    communityWithdrawableLp: '4,472.13',
     communityPrincipal: '200,000',
     communityBurned: '0',
     communityFeeRatio: '0.25%',
     /** 按 memberId 1 查询（种子仓位）：治理权与占比（它是种子里唯一的质押者）。 */
-    queryVotes: '4,472.135954',
+    queryVotes: '4,472.13',
     queryShare: '100%',
   },
   c1: {
     /**
      * owner 2026-11-18 12:58 修正：**首次质押可以自选任意承诺解锁期**（MIN..MAX）。
      * 所以 C1 恢复单步：表单里选 10 个阶段 → shares 22360679774997896964、
-     * 治理权 +223.606797；提交后选择器消失（保持当前值），由顶部卡单独调整。
+     * 治理权 +223.6067（4 位小数截断）；提交后选择器消失（保持当前值），由顶部卡单独调整。
      */
-    votesAdded: '+223.606797',
+    votesAdded: '+223.6067',
     optimal: '按池子比例实际存入 1,000 TestLOVE20 + 0.5 TestWETH。',
-    receiptVotes: '治理权 +223.606797',
-    receiptShares: '流动性质押份额 +22.360679',
-    myVotes: '223.606797',
-    myShares: '22.360679',
+    receiptVotes: '治理权 +223.6067',
+    receiptShares: '流动性质押份额 +22.3606',
+    myVotes: '223.6067',
+    myShares: '22.3606',
     myPhases: '10 个阶段',
     /** 首页「我的」摘要里的两个占比（fixture 没有加速份额 → 0%）。 */
     mySharePercent: '4.76%',
     myBoostPercent: '0%',
-    myTokenAmount: '999.999999',
+    myTokenAmount: '999.9999',
     myParentAmount: '0.499999',
-    communityVotes: '4,695.742752',
-    communityShares: '4,494.496634',
+    communityVotes: '4,695.74',
+    communityShares: '4,494.49',
     communityShare: '4.76%',
     communityPrincipal: '201,000',
   },
   c2: {
     /** `boostAmount = floor(memberCap / 2)`，完整 18 位小数走用户输入。 */
     boostInput: '9571.385499991385715425',
-    capBefore: '19,142.770999 TestLOVE20',
-    capAfter: '9,571.385499 TestLOVE20',
-    used: '9,571.385499',
-    receipt: '加速质押 9,571.385499 TestLOVE20',
+    capBefore: '19,142.77 TestLOVE20',
+    capAfter: '9,571.38 TestLOVE20',
+    used: '9,571.38',
+    /** 加速前剩余额度 = memberCap（已用 0）。 */
+    remaining: '19,142.77',
+    receipt: '加速质押 9,571.38 TestLOVE20',
     phasesCard: '10 个阶段',
   },
   c3: {
-    preview: '治理权 +335.410196',
+    preview: '治理权 +335.4101',
     phases: '25 个阶段',
     receiptNote: '承诺解锁期现在是 25 个阶段。',
-    votes: '559.016994',
+    votes: '559.0169',
   },
   c4: {
-    /** 可撤出阶段 = Q + 26（合约条件是「当前阶段 > Q + 25」，严格大于）。 */
-    unlockNote: '已申请解锁：还要再等 26 个阶段（约 52 分钟）才能撤出。',
-    withdrawReceipt: '已撤出 10,571.385499 TestLOVE20 + 0.499999 TestWETH',
+    /**
+     * 可撤出阶段 = Q + 26（合约条件是「当前阶段 > Q + 25」，严格大于）。
+     * 等待状态只在 `gov-unstake-unlock-state` 摘要卡里（owner 2026-11-19）：
+     * 标题「已申请解锁」+ 下面这句剩余阶段说明。
+     */
+    unlockNote: '还要再等 26 个阶段（约 52 分钟）才能撤出。',
+    withdrawReceipt: '已撤出 10,571.38 TestLOVE20 + 0.499999 TestWETH',
   },
 } as const;
 
@@ -251,6 +262,22 @@ async function openPage(page: Page, path: string): Promise<void> {
   await seedIdentity(page, ACCOUNT, MEMBER_ID);
   await page.goto(`${path}${QUERY}`);
   await connect(page);
+}
+
+/**
+ * 卡片从上到下的顺序（owner 2026-11-19 流动性质押页重排）。用 viewport 坐标比较，
+ * 不依赖像素高度：同一次滚动状态下取各自 boundingBox 的 y 即可。
+ */
+async function expectTopOrder(page: Page, testIds: readonly string[]): Promise<void> {
+  const tops: number[] = [];
+  for (const testId of testIds) {
+    const box = await page.getByTestId(testId).boundingBox();
+    if (box === null) throw new Error(`${testId} has no bounding box`);
+    tops.push(box.y);
+  }
+  for (let index = 1; index < tops.length; index += 1) {
+    expect(tops[index]!).toBeGreaterThan(tops[index - 1]!);
+  }
 }
 
 /**
@@ -454,10 +481,13 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
       EXPECTED.seed.communityBurned,
     );
     await expect(page.getByTestId('gov-entry-vote')).toBeVisible();
+    // owner 2026-11-19：社区总治理权下方不再有「本阶段」说明行。
+    await expect(page.getByText('本阶段', { exact: true })).toHaveCount(0);
 
     // 治理权查询：按身份 NFT 编号查种子仓位 memberId 1（纯 view，不发交易）。
-    await page.getByTestId('gov-query-input').fill('1');
-    await page.getByTestId('gov-query-submit').click();
+    // owner 2026-11-19：输入即查询，查询按钮不再禁用、也不需要先点它。
+    const queryInput = page.getByTestId('gov-query-input');
+    await queryInput.fill('1');
     await expect(page.getByTestId('gov-query-votes')).toHaveText(EXPECTED.seed.queryVotes, {
       timeout: 20_000,
     });
@@ -469,27 +499,31 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-query-target-address')).toBeVisible();
     await expect(page.getByTestId('gov-query-note')).toContainText('治理权按本阶段有效值统计');
     // 名称模式（owner 2026-11-18 23:20：去掉地址查询，改成 ID / 名称两种）：从结果卡读出
-    // 链上名称，切到名称模式后由合约 `memberId(name)` 解析，治理权 / 占比 / NFT ID 必须
-    // 与按 ID 查询逐字一致。
+    // 链上名称，切到名称模式后输入名称（300 ms 防抖后自动解析），治理权 / 占比 / NFT ID
+    // 必须与按 ID 查询逐字一致。
     const chainName = (await page.getByTestId('gov-query-nft-name').innerText()).trim();
     expect(chainName.length).toBeGreaterThan(0);
     expect(chainName).not.toBe('读不到名称');
     await page.getByTestId('gov-query-mode-name').click();
-    await page.getByTestId('gov-query-input').fill(chainName);
-    await page.getByTestId('gov-query-submit').click();
+    await expect(queryInput).toHaveAttribute('placeholder', '输入身份 NFT 名称');
+    await queryInput.fill(chainName);
     await expect(page.getByTestId('gov-query-votes')).toHaveText(EXPECTED.seed.queryVotes, {
       timeout: 20_000,
     });
     await expect(page.getByTestId('gov-query-share')).toHaveText(EXPECTED.seed.queryShare);
     await expect(page.getByTestId('gov-query-nft-id')).toHaveText('#1');
-    // 名称模式空输入：查不了，查询按钮禁用。
-    await page.getByTestId('gov-query-input').fill('');
-    await expect(page.getByTestId('gov-query-submit')).toBeDisabled();
-    // 非法输入即时给原因并禁用查询。
+    // 名称模式空输入：没有查询目标 → 结果区整个不出现，查询按钮仍可点。
+    await queryInput.fill('');
+    await expect(page.getByTestId('gov-query-result')).toHaveCount(0);
+    await expect(page.getByTestId('gov-query-empty')).toHaveCount(0);
+    await expect(page.getByTestId('gov-query-submit')).toBeEnabled();
+    // 非法输入即时给原因；查询按钮不再禁用，只是没有目标 → 不渲染结果区与空态。
     await page.getByTestId('gov-query-mode-id').click();
-    await page.getByTestId('gov-query-input').fill('abc');
+    await queryInput.fill('abc');
     await expect(page.getByTestId('gov-query-invalid')).toContainText('整数编号');
-    await expect(page.getByTestId('gov-query-submit')).toBeDisabled();
+    await expect(page.getByTestId('gov-query-result')).toHaveCount(0);
+    await expect(page.getByTestId('gov-query-empty')).toHaveCount(0);
+    await expect(page.getByTestId('gov-query-submit')).toBeEnabled();
 
     // 完整社区口径（可撤出 LP / 累计本金 / 手续费比例）在 /stake/liquid，首页只放四个数。
     await page.goto(`/stake/liquid${QUERY}`);
@@ -567,7 +601,7 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-placeholder')).toContainText('即将上线');
   });
 
-  test('用例 C1：流动性质押（关智能模式，填 1,000 TestLOVE20 自动联动 0.5 TestWETH / 10 阶段）→ 治理权 223.606797', async ({
+  test('用例 C1：流动性质押（关智能模式，填 1,000 TestLOVE20 自动联动 0.5 TestWETH / 10 阶段）→ 治理权 223.6067', async ({
     page,
   }) => {
     await openPage(page, '/stake/stakelp');
@@ -621,13 +655,23 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-page-my-stake')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('gov-my-votes')).toHaveText(EXPECTED.c1.myVotes);
     await expect(page.getByTestId('gov-my-shares')).toHaveText(EXPECTED.c1.myShares);
-    await expect(page.getByTestId('gov-my-boost')).toHaveText('0');
+    // 这张卡不再展示加速质押行（owner 2026-11-19：加速量只在「我的」质押资产卡里）。
+    await expect(page.getByTestId('gov-my-boost')).toHaveCount(0);
     await expect(page.getByTestId('gov-my-phases')).toHaveText(EXPECTED.c1.myPhases);
     // §3 显示规则边界 1/2：只截断不四舍五入，不显示成 1,000 / 0.5。
     await expect(page.getByTestId('gov-my-token-amount')).toHaveText(EXPECTED.c1.myTokenAmount);
     await expect(page.getByTestId('gov-my-parent-amount')).toHaveText(EXPECTED.c1.myParentAmount);
     await expect(page.getByTestId('gov-my-unlock-state')).toContainText('正常质押中');
     await expect(page.getByTestId('gov-my-boost-amount')).toHaveCount(0);
+    // owner 2026-11-19 卡片顺序：承诺解锁期 → 质押表单 → 提示 → 我的流动性质押（倒数第二）
+    // → 治理权的作用（最后）。
+    await expectTopOrder(page, [
+      'gov-phases-card',
+      'gov-liquidity-card',
+      'gov-tips',
+      'gov-page-my-stake',
+      'gov-intro',
+    ]);
 
     // 首页「我的」：2×2 摘要 + 两个质押入口 + 铸造治理激励（owner 2026-11-18 20:05 截图版）。
     await page.goto(`/gov${QUERY}`);
@@ -676,9 +720,7 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     );
   });
 
-  test('用例 C2：质押代币（加速质押一半上限）→ 加速份额 9,571.385499，治理权不变', async ({
-    page,
-  }) => {
+  test('用例 C2：质押代币（加速质押一半上限）→ 加速份额 9,571.38，治理权不变', async ({ page }) => {
     await openPage(page, '/stake/staketoken');
     await expect(page.getByTestId('gov-accelerated-summary')).toBeVisible({ timeout: 30_000 });
     // 已有流动性质押 → 页面最上面也有「调整承诺解锁期」卡（值 = 当前 10 个阶段）。
@@ -686,7 +728,7 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-phases-card-value')).toHaveText(EXPECTED.c2.phasesCard);
     await expect(page.getByTestId('gov-accelerated-valid')).toHaveText('0');
     await expect(page.getByTestId('gov-accelerated-used')).toHaveText('0');
-    await expect(page.getByTestId('gov-accelerated-remaining')).toHaveText('19,142.770999');
+    await expect(page.getByTestId('gov-accelerated-remaining')).toHaveText(EXPECTED.c2.remaining);
     await expect(page.getByTestId('gov-boost-cap')).toHaveText(EXPECTED.c2.capBefore);
     await expect(page.getByTestId('gov-boost-used')).toHaveText('0');
 
@@ -712,7 +754,7 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-accelerated-used')).toHaveText(EXPECTED.c2.used);
     await expect(page.getByTestId('gov-accelerated-remaining')).toHaveText(EXPECTED.c2.used);
 
-    // 加速质押不产生治理权：首页「我的」的治理权仍是 C1 的 223.606797。
+    // 加速质押不产生治理权：首页「我的」的治理权仍是 C1 的 223.6067。
     await page.goto(`/gov${QUERY}`);
     await expect(page.getByTestId('gov-my-votes')).toHaveText(EXPECTED.c1.myVotes, {
       timeout: 30_000,
@@ -727,9 +769,7 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('me-stake-boost')).toHaveText(EXPECTED.c2.used);
   });
 
-  test('用例 C3：流动性质押页顶部「承诺解锁期」卡 10 → 25 → 治理权 559.016994', async ({
-    page,
-  }) => {
+  test('用例 C3：流动性质押页顶部「承诺解锁期」卡 10 → 25 → 治理权 559.0169', async ({ page }) => {
     await openPage(page, '/stake/stakelp');
     await expect(page.getByTestId('gov-phases-card')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('gov-phases-card-value')).toHaveText(EXPECTED.c1.myPhases);
@@ -759,21 +799,16 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-phases-card-value')).toHaveText(EXPECTED.c3.phases);
   });
 
-  test('用例 C4：申请解锁 → 到期 → 撤出 10,571.385499 TestLOVE20 + 0.499999 TestWETH', async ({
+  test('用例 C4：申请解锁 → 到期 → 撤出 10,571.38 TestLOVE20 + 0.499999 TestWETH', async ({
     page,
   }) => {
     await openPage(page, '/stake/unstake');
     await expect(page.getByTestId('gov-unstake-votes')).toHaveText(EXPECTED.c3.votes, {
       timeout: 30_000,
     });
-    // smoke：取消质押页仍保留「调整承诺解锁期」入口（复用同一弹层；这里只开不提交，不改状态）。
-    await page.getByTestId('gov-unstake-increase-phases-button').click();
-    await expect(page.getByTestId('gov-unstake-increase-phases-input')).toBeVisible({
-      timeout: 20_000,
-    });
-    await expect(page.getByTestId('gov-unstake-increase-phases-input')).toHaveValue('26');
-    await page.getByRole('dialog').getByRole('button', { name: '取消' }).click();
-    await expect(page.getByTestId('gov-unstake-increase-phases-input')).toHaveCount(0);
+    // owner 2026-11-19：取消质押页不再提供「提高承诺解锁期」（改在各质押页顶部卡片），
+    // 只保留申请解锁 / 撤出两个动作。
+    await expect(page.getByTestId('gov-unstake-increase-phases-button')).toHaveCount(0);
     await settleAtPhaseStart();
 
     await page.getByTestId('gov-unstake-unstake-button').click();
@@ -790,13 +825,34 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-unstake-boost')).toHaveText('0');
     await expect(page.getByTestId('gov-unstake-shares')).toHaveText(EXPECTED.c1.myShares);
     await expect(page.getByTestId('gov-unstake-boost-amount')).toHaveText(EXPECTED.c2.used);
+    // owner 2026-11-19：等待状态只在 `gov-unstake-unlock-state` 摘要卡里（不再有单独的
+    // 等待按钮 / 说明行），标题「已申请解锁」+ 剩余阶段说明各出现一次。
     await expect(page.getByTestId('gov-unstake-unlock-state')).toContainText('已申请解锁');
-    await expect(page.getByTestId('gov-unstake-waiting-withdraw')).toBeVisible();
-    await expect(page.getByTestId('gov-unstake-waiting-withdraw')).toBeDisabled();
+    await expect(page.getByTestId('gov-unstake-waiting-withdraw')).toHaveCount(0);
+    await expect(page.getByTestId('gov-unstake-unlock-note')).toHaveCount(0);
     // 剩余阶段 = Q + 26 − 当前阶段（Q 为申请阶段，含端计数）；settle 已保证同一阶段。
-    await expect(page.getByTestId('gov-unstake-unlock-note')).toHaveText(EXPECTED.c4.unlockNote, {
-      timeout: 20_000,
-    });
+    await expect(page.getByTestId('gov-unstake-unlock-state')).toContainText(
+      EXPECTED.c4.unlockNote,
+      {
+        timeout: 20_000,
+      },
+    );
+
+    // 已申请解锁时治理页「我的」不再渲染四项统计，只给状态与「查看解锁进度」。
+    await page.goto(`/gov${QUERY}`);
+    await connect(page);
+    await expect(page.getByTestId('gov-my-unlocking')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('gov-my-unlocking')).toContainText('已申请解锁');
+    await expect(page.getByTestId('gov-my-unlocking-link')).toHaveText('查看解锁进度');
+    await expect(page.getByTestId('gov-my-unlocking-link')).toHaveAttribute(
+      'href',
+      /\/stake\/unstake\?symbol=TestLOVE20$/,
+    );
+    await expect(page.getByTestId('gov-my-votes')).toHaveCount(0);
+    await expect(page.getByTestId('gov-my-shares')).toHaveCount(0);
+    await expect(page.getByTestId('gov-my-phases-summary')).toHaveCount(0);
+    await expect(page.getByTestId('gov-my-share')).toHaveCount(0);
+    await expect(page.getByTestId('gov-my-boost-share')).toHaveCount(0);
 
     // 「我的」→「质押资产」：解锁中分支（右上角变「查看解锁进度」+ 剩余阶段提示）；
     // 加速激励质押量读的是已质押的加速量（boostShares），申请解锁不清零（撤出才清）。
@@ -831,7 +887,7 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await page.getByTestId('gov-unstake-withdraw-confirm').click();
     await expect(page.getByTestId('gov-receipt')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('gov-receipt')).toContainText('已撤出');
-    // 实际到账 = LP 折算 999.999999 + 加速质押退还（§1 ⑤ 的 boost 返还）。
+    // 实际到账 = LP 折算 999.9999（显示截断）+ 加速质押退还（§1 ⑤ 的 boost 返还）。
     await expect(page.getByTestId('gov-receipt-line')).toHaveText(EXPECTED.c4.withdrawReceipt);
     await page.getByTestId('gov-receipt-close').click();
 

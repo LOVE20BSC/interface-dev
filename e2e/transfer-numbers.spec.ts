@@ -158,7 +158,9 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await expect(page).toHaveURL(new RegExp(`/transfer\\${QUERY}$`));
   });
 
-  test('用例 B 非整数 ERC20 转账：99,799,100 → 99,799,098.5 TestLOVE20', async ({ page }) => {
+  test('用例 B 非整数 ERC20 转账：99,799,100 → 99,799,098.5（显示整数 99,799,098）', async ({
+    page,
+  }) => {
     await openTransfer(page, ERC20_SENDER);
     await selectToken(page, SYMBOL);
     await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 99,799,100 ${SYMBOL}`, {
@@ -178,8 +180,9 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await expect(receiptRecipient).toHaveAttribute('title', RECIPIENT);
 
     await page.getByRole('button', { name: '好的' }).click();
-    // 余额刷新后与理论线 §1 用例 B 的 S_after 逐字相等。
-    await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 99,799,098.5 ${SYMBOL}`, {
+    // 余额刷新后与理论线 §1 用例 B 的 S_after 逐字相等；数量级 ≥1e6 → 0 位小数
+    // （owner 2026-11-19 数字显示规范），所以显示成整数 99,799,098。
+    await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 99,799,098 ${SYMBOL}`, {
       timeout: 20_000,
     });
   });
@@ -319,12 +322,9 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
   test('用例 E 按身份 NFT 收款：#2 → Testdev-member-1 的 owner', async ({ page }) => {
     await openTransfer(page, IDENTITY_SENDER);
     await selectToken(page, SYMBOL);
-    await expect(page.getByTestId('transfer-balance')).toHaveText(
-      `余额 99,999,099.999639 ${SYMBOL}`,
-      {
-        timeout: 20_000,
-      },
-    );
+    await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 99,999,099 ${SYMBOL}`, {
+      timeout: 20_000,
+    });
 
     await selectRecipientMode(page, 'member');
     await page.getByTestId('transfer-recipient').fill('#2');
@@ -363,12 +363,9 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     );
 
     await page.getByRole('button', { name: '好的' }).click();
-    await expect(page.getByTestId('transfer-balance')).toHaveText(
-      `余额 99,999,097.499639 ${SYMBOL}`,
-      {
-        timeout: 20_000,
-      },
-    );
+    await expect(page.getByTestId('transfer-balance')).toHaveText(`余额 99,999,097 ${SYMBOL}`, {
+      timeout: 20_000,
+    });
   });
 
   test('用例 F 收款方模式按模式校验：ID 只收编号，名字模式按名字解析', async ({ page }) => {

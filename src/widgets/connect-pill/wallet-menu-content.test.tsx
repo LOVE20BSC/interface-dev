@@ -114,9 +114,14 @@ describe('WalletMenuContent identity row', () => {
   it('ready: shows the name, NFT #id and the 切换 link', () => {
     renderMenu(identityState('ready', SELECTED));
 
-    expect(screen.getByText('Testdev-member-1')).toBeInTheDocument();
-    expect(screen.getByText('NFT #2')).toBeInTheDocument();
+    // owner 2026-11-19 重排：第一行「身份 NFT」+「切换」徽标，第二行左 `#id`、右名称。
+    expect(screen.getByText('身份 NFT')).toBeInTheDocument();
     expect(screen.getByText('切换')).toBeInTheDocument();
+    const id = screen.getByText('NFT #2');
+    const name = screen.getByText('Testdev-member-1');
+    expect(id.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     expect(screen.getByRole('link')).toHaveAttribute('href', '/my-nft');
   });
 
@@ -144,12 +149,19 @@ describe('WalletMenuContent account rows', () => {
 
     const address = screen.getByTestId('wallet-menu-address');
     expect(address).toBeVisible();
-    // Compact dropdown (owner 2026-11-19): the visible text is always the middle-
-    // elided short form (`0x1234…abcd`), never the full 40 hex chars; the full
-    // address stays in title / aria-label — that is also exactly what gets copied.
+    // owner 2026-11-19: display="auto" —— 宽度够就显示完整 40 位地址，只有放不下时才
+    // 退回中间省略（`0x1234…abcd`）。jsdom 没有真实排版（scrollWidth = clientWidth = 0），
+    // 所以这里断言「放得下」的完整形态；截断分支由 copyable-address.test.tsx 覆盖。
+    // 完整地址始终在 title 里，复制与无障碍名也都用它。
     expect(address).toHaveAttribute('title', ADDRESS);
-    expect(address).toHaveTextContent(/^0x[0-9a-f]{4}…[0-9a-f]{4}$/i);
+    expect(address).toHaveTextContent(ADDRESS);
     expect(address).toHaveAccessibleName('复制地址：钱包地址');
+
+    // 地址行两端对齐：左侧「钱包地址」标签，右侧地址。
+    const label = screen.getByText('钱包地址');
+    expect(label.compareDocumentPosition(address) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
 
     // Moved out of /me (账户 section): the 网络 row now lives in this dropdown.
     const network = screen.getByTestId('wallet-menu-network');

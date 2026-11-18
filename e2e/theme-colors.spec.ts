@@ -152,13 +152,15 @@ async function expectApplied(page: Page, palette: Palette): Promise<void> {
 }
 
 test.describe('主题配色（线二：浏览器计算样式）', () => {
-  test('defaults to the light palette when nothing is stored', async ({ page }) => {
+  test('defaults to the dark palette when nothing is stored', async ({ page }) => {
     await seedStoredTheme(page, null);
     await page.goto('/theme');
     await expect(page.getByTestId('theme-page')).toBeVisible({ timeout: 15_000 });
 
-    await expectApplied(page, 'light');
-    await expect(page.getByRole('radio', { name: '浅色' })).toHaveAttribute('aria-checked', 'true');
+    // owner 2026-11-19：默认主题改为深色。`expectApplied` 同时核对 data-theme、
+    // meta theme-color(#0b0e11) / color-scheme=dark、body 背景与整套 token。
+    await expectApplied(page, 'dark');
+    await expect(page.getByRole('radio', { name: '深色' })).toHaveAttribute('aria-checked', 'true');
   });
 
   test('applies the stored dark palette before paint and after reload', async ({ page }) => {

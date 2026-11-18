@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useReadContract, useReadContracts } from 'wagmi';
 import { memberNftAbi, stakeAbi } from '@/config/abis';
 import { copy } from '@/shared/config/copy-pages';
@@ -76,6 +76,16 @@ function readString(entry: { status: string; result?: unknown } | undefined): st
   return entry?.status === 'success' && typeof entry.result === 'string' ? entry.result : undefined;
 }
 
+/** 输入即查询：名称输入用 300 ms 防抖，避免每个字符都打一次链上读。 */
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
+}
+
 /**
  * 治理权查询（owner 2026-11-18 23:20：移除按地址查询，只按身份 NFT，支持 ID / 名称两种）：
  *
@@ -91,9 +101,24 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
   const memberNft = useMemberNftAddress();
   const [mode, setMode] = useState<QueryMode>('id');
   const [input, setInput] = useState('');
-  const [target, setTarget] = useState<QueryTarget | null>(null);
 
   const phase = clock.currentPhase;
+  const trimmedName = input.trim();
+  // 切到 ID 模式时把名称输入清空，避免 300 ms 内用旧名称发一次查询。
+  const debouncedName = useDebouncedValue(mode === 'name' ? trimmedName : '', 300);
+  const parsedId = parseMemberIdInput(input);
+  /**
+   * owner 2026-11-19：输入即查询。ID 模式按编号即时查；名称模式对输入做 300 ms
+   * 防抖后自动解析，不再要求先点「查询」。
+   */
+  const target: QueryTarget | null =
+    mode === 'id'
+      ? parsedId === null
+        ? null
+        : { mode: 'id', id: parsedId }
+      : debouncedName.length === 0
+        ? null
+        : { mode: 'name', name: debouncedName };
 
   // 名称 → 编号：合约 memberId(name) 是唯一的权威解析，未知名称返回 0。
   const nameRead = useReadContract({
@@ -162,25 +187,10 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
     query: { enabled: nftContracts.length > 0 },
   });
 
-  const parsedId = parseMemberIdInput(input);
-  const trimmedName = input.trim();
-  const valid = mode === 'id' ? parsedId !== null : trimmedName.length > 0;
-  const invalid = mode === 'id' && input.trim().length > 0 && parsedId === null;
-
-  const submit = () => {
-    if (!valid) return;
-    if (mode === 'id' && parsedId !== null) {
-      setTarget({ mode: 'id', id: parsedId });
-      return;
-    }
-    if (mode === 'name' && trimmedName.length > 0) {
-      setTarget({ mode: 'name', name: trimmedName });
-    }
-  };
+  const invalid = mode === 'id' && trimmedName.length > 0 && parsedId === null;
 
   const reset = () => {
     setInput('');
-    setTarget(null);
   };
 
   const retry = () => {
@@ -250,7 +260,6 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
             onClick={() => {
               setMode(value);
               setInput('');
-              setTarget(null);
             }}
             className={cn(
               'rounded-xl px-2 py-2 font-medium transition-colors',
@@ -294,8 +303,10 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
             size="md"
             className="flex-1"
             data-testid="gov-query-submit"
-            disabled={!valid}
-            onClick={submit}
+            onClick={() => {
+              if (target?.mode === 'name') nameRead.refetch();
+              if (nftContracts.length > 0) void nftRead.refetch();
+            }}
           >
             {copy.gov.query.submit}
           </Button>

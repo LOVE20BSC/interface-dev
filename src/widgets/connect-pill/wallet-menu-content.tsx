@@ -25,78 +25,94 @@ export interface WalletMenuContentProps {
 }
 
 interface IdentityRow {
-  readonly title: string;
-  readonly subtitle: string | null;
+  /** 第一行左侧：身份 NFT / 未关联 NFT / 未选择身份 NFT / 读取中… 等。 */
+  readonly label: string;
+  /** 第一行右侧动作徽标：切换 / 去设置；不可操作时为 null。 */
   readonly action: string | null;
   readonly href: string | null;
   readonly isReady: boolean;
+  /** 第二行左侧：NFT 编号（仅已选中身份时）。 */
+  readonly secondary: string | null;
+  /** 第二行右侧：NFT 名称。 */
+  readonly primary: string | null;
 }
 
 /**
- * One row, derived only from the revalidated state (ADR-0003 §2). A cached
- * selection (`identity.selected`) is never a fact on its own: while loading,
- * error or unconfigured it must not leak a name, an id or a link to the NFT
- * page.
+ * 钱包弹层身份区（owner 2026-11-19 重排）：
+ *
+ * - 已选中：第一行「身份 NFT」+ 右侧「切换」；第二行左侧 `#id`、右侧名称；
+ * - 未关联 / 未选择：只一行，左侧状态、右侧「去设置」；
+ * - 读取中 / 读不到 / 未部署：只一行状态，不给入口。
+ *
+ * 行内容只取 `useMemberIdentity()` 的 `status`：缓存的选择不是事实，未就绪时
+ * 不得渲染名称、`#id` 或前往 NFT 页的入口（ADR-0003 §2）。
  */
 function identityRow(identity: MemberIdentityState): IdentityRow {
   switch (identity.status) {
     case 'ready':
       if (identity.selected === null) {
         return {
-          title: copy.wallet.noIdentitySelected,
-          subtitle: null,
+          label: copy.wallet.noIdentitySelected,
           action: copy.wallet.goSelect,
           href: '/my-nft',
           isReady: false,
+          secondary: null,
+          primary: null,
         };
       }
       return {
-        title: identity.selected.name ?? copy.common.unknown,
-        subtitle: copy.identity.memberId(identity.selected.tokenId.toString()),
+        label: copy.wallet.identityLabel,
         action: copy.wallet.viewNft,
         href: '/my-nft',
         isReady: true,
+        secondary: copy.identity.memberId(identity.selected.tokenId.toString()),
+        primary: identity.selected.name ?? copy.common.unknown,
       };
     case 'loading':
       return {
-        title: copy.common.loading,
-        subtitle: null,
+        label: copy.common.loading,
         action: null,
         href: null,
         isReady: false,
+        secondary: null,
+        primary: null,
       };
     case 'error':
       return {
-        title: copy.wallet.identityUnavailable,
-        subtitle: copy.wallet.identityUnavailableBody,
+        label: copy.wallet.identityUnavailable,
         action: null,
         href: null,
         isReady: false,
+        secondary: null,
+        primary: copy.wallet.identityUnavailableBody,
       };
     case 'unconfigured':
       return {
-        title: copy.wallet.identityUnconfigured,
-        subtitle: null,
+        label: copy.wallet.identityUnconfigured,
         action: null,
         href: null,
         isReady: false,
+        secondary: null,
+        primary: null,
       };
     case 'empty':
       return {
-        title: copy.wallet.noIdentity,
-        subtitle: null,
+        label: copy.wallet.noIdentity,
         action: copy.wallet.goMint,
         href: '/mint',
         isReady: false,
+        secondary: null,
+        primary: null,
       };
     case 'disconnected':
     case 'needs-selection':
       return {
-        title: copy.wallet.noIdentitySelected,
-        subtitle: null,
+        label: copy.wallet.noIdentitySelected,
         action: identity.status === 'needs-selection' ? copy.wallet.goSelect : null,
         href: identity.status === 'needs-selection' ? '/my-nft' : null,
         isReady: false,
+        secondary: null,
+        primary: null,
       };
   }
 }
@@ -136,54 +152,50 @@ export function WalletMenuContent({
       'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
   );
   const rowBody = (
-    <>
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] text-muted">{copy.wallet.identityLabel}</p>
-        <p
-          className={cn(
-            'truncate text-sm font-medium',
-            row.isReady ? 'text-foreground' : 'text-muted',
-          )}
-        >
-          {row.title}
-        </p>
-        {row.subtitle !== null ? (
-          <p
-            className={cn(
-              'text-[11px] leading-4 text-muted',
-              row.isReady ? 'font-mono' : undefined,
-            )}
-          >
-            {row.subtitle}
-          </p>
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] text-muted">{row.label}</span>
+        {row.action !== null ? (
+          <Badge tone={row.isReady ? 'brand' : 'neutral'}>{row.action}</Badge>
         ) : null}
       </div>
-      {row.action !== null ? (
-        <Badge tone={row.isReady ? 'brand' : 'neutral'}>{row.action}</Badge>
+      {row.isReady ? (
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <span className="shrink-0 font-mono text-[11px] leading-4 text-muted">
+            {row.secondary}
+          </span>
+          <span className="min-w-0 truncate text-sm font-medium text-foreground">
+            {row.primary}
+          </span>
+        </div>
+      ) : row.primary !== null ? (
+        <p className="mt-1 text-[11px] leading-4 text-muted">{row.primary}</p>
       ) : null}
-    </>
+    </div>
   );
 
   return (
     <div>
-      <div className="px-2.5 pt-1">
-        <span className="text-xs font-medium text-muted">{copy.wallet.addressLabel}</span>
+      {/* 地址行：标签左对齐、地址右对齐；宽度够就完整显示，不够才中间省略 */}
+      <div className="flex items-center justify-between gap-3 px-2.5 pt-1">
+        <span className="shrink-0 text-xs font-medium text-muted">{copy.wallet.addressLabel}</span>
         <CopyableAddress
           address={address}
           label={copy.wallet.addressLabel}
+          display="auto"
           testId="wallet-menu-address"
-          className="mt-1 text-foreground"
+          className="min-w-0 justify-end text-foreground"
         />
-        {/* owner 2026-11-19：原「我的」页的账户信息（钱包地址 / 网络）挪进钱包下拉。 */}
-        <div
-          className="mt-2 flex items-center justify-between gap-3"
-          data-testid="wallet-menu-network"
-        >
-          <span className="text-xs text-muted">{copy.me.networkLabel}</span>
-          <span className="text-xs font-medium text-foreground">
-            {copy.me.networkValue(NETWORK.name, NETWORK.chainId)}
-          </span>
-        </div>
+      </div>
+      {/* 网络行：2026-11-19 从 /me 的「账户」section 挪进来 */}
+      <div
+        className="mt-2 flex items-center justify-between gap-3 px-2.5"
+        data-testid="wallet-menu-network"
+      >
+        <span className="text-xs text-muted">{copy.me.networkLabel}</span>
+        <span className="text-xs font-medium text-foreground">
+          {copy.me.networkValue(NETWORK.name, NETWORK.chainId)}
+        </span>
       </div>
 
       <Separator className="my-2" />
@@ -201,6 +213,7 @@ export function WalletMenuContent({
       <Separator className="my-2" />
 
       <dl className="space-y-2.5 px-2.5 py-1">
+        {/* 余额顺序：原生币在前、社区代币在后（owner 2026-11-19） */}
         <div className="flex items-center justify-between gap-3">
           <dt className="text-xs text-muted">
             {copy.wallet.nativeBalanceLabel(nativeBalance.symbol)}

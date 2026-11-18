@@ -299,6 +299,11 @@ test('home: wrong chain shows the red outlined switch pill, not a solid fill', a
   // EIP-1193 stub reports mainnet; the app targets 31337, so the header pill
   // must become the §1.4 outlined switch button instead of a danger fill.
   await installWallet(page, ACCOUNTS.outsider, '0x1');
+  // owner 2026-11-19：默认主题改为深色。这条用例断言的是浅色下的具体色值
+  // (#b91c1c 文本 / #dc2626 描边)，显式 seed 浅色，避免默认主题变化影响配色断言。
+  await page.addInitScript(() => {
+    window.localStorage.setItem('love20:theme', 'light');
+  });
   await page.goto('/');
 
   const connect = page.getByRole('button', { name: '连接钱包' }).first();

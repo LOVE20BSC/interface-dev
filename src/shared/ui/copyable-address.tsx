@@ -43,8 +43,11 @@ export interface CopyableAddressProps {
   readonly address: string;
   /** Human label for the aria-label: `复制地址：{label}`. */
   readonly label: string;
-  /** `'short'` abbreviates (default 0x7099…79C8); `'full'` shows every character. */
-  readonly display?: 'short' | 'full';
+  /**
+   * `'short'` = 中间省略（默认）；`'full'` = 铺满（必要时换行）；`'auto'` = 宽度够就完整、
+   * 不够自动退回中间省略（owner 2026-11-19：「能显示开就不要加省略号，不够再用省略号」）。
+   */
+  readonly display?: 'short' | 'full' | 'auto';
   /** Truncation width in `'short'` mode (hex digits kept before/after the ellipsis). */
   readonly front?: number;
   readonly back?: number;
@@ -72,7 +75,32 @@ export function CopyableAddress({
   className,
 }: CopyableAddressProps) {
   const [status, setStatus] = useState<AddressCopyStatus>('idle');
+  const [autoShort, setAutoShort] = useState(false);
+  const textRef = useRef<HTMLSpanElement | null>(null);
+  const lastWidth = useRef(0);
   const timer = useRef<number | undefined>(undefined);
+
+  // auto 模式：先按完整地址渲染，测到溢出就退回中间省略；窗口变宽后重新测量。
+  useEffect(() => {
+    if (display !== 'auto') return;
+    const element = textRef.current;
+    if (element === null) return;
+    const measure = () => {
+      const width = element.clientWidth;
+      // 容器变宽：先回到完整地址重新试一次（下一轮 effect 会再判溢出）。
+      if (autoShort && width > lastWidth.current + 8) {
+        lastWidth.current = width;
+        setAutoShort(false);
+        return;
+      }
+      lastWidth.current = width;
+      if (!autoShort && element.scrollWidth > element.clientWidth + 1) setAutoShort(true);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [address, autoShort, display]);
 
   useEffect(() => {
     return () => {
@@ -88,7 +116,8 @@ export function CopyableAddress({
     });
   };
 
-  const text = display === 'full' ? address : shortenAddress(address, front, back);
+  const shortened = display === 'short' || (display === 'auto' && autoShort);
+  const text = shortened ? shortenAddress(address, front, back) : address;
 
   return (
     <button
@@ -106,9 +135,14 @@ export function CopyableAddress({
       )}
     >
       <span
+        ref={textRef}
         className={cn(
           'font-mono text-[11px] leading-5',
-          display === 'full' ? 'text-balance [overflow-wrap:anywhere]' : 'shrink-0',
+          display === 'full'
+            ? 'text-balance [overflow-wrap:anywhere]'
+            : display === 'auto' && !autoShort
+              ? 'min-w-0 truncate'
+              : 'shrink-0',
         )}
       >
         {display === 'full' ? <WrappableAddress address={address} /> : text}

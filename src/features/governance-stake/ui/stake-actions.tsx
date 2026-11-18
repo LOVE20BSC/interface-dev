@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { stakeAbi } from '@/config/abis';
 import { copy } from '@/shared/config/copy-pages';
-import { phasesToMinutes } from '@/domain/gov-stake';
-import { formatTokenAmount } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';
 import { Sheet } from '@/shared/ui/sheet';
 import { stakeDeadline } from '@/features/governance-stake/lib/stake-form';
@@ -16,6 +14,8 @@ export interface StakeActionsProps {
   readonly ctx: GovContextValue;
   /** 旧页面的按钮顺序：取消质押页把「申请解锁 / 撤出」放主位。 */
   readonly testIdPrefix?: string;
+  /** 取消质押页不再提供「提高承诺解锁期」（改在各质押页顶部卡片，owner 2026-11-19）。 */
+  readonly showIncreasePhases?: boolean;
 }
 
 /**
@@ -25,8 +25,12 @@ export interface StakeActionsProps {
  * 申请解锁与撤出的按钮按解锁状态出现；调整承诺解锁期复用与质押页同一张弹层
  * （owner 2026-11-18：承诺解锁期是单独可调整的一项，不在新增质押里选择）。
  */
-export function StakeActions({ ctx, testIdPrefix = 'gov' }: StakeActionsProps) {
-  const { member, clock, token, stakeAddress, memberId, tx } = ctx;
+export function StakeActions({
+  ctx,
+  testIdPrefix = 'gov',
+  showIncreasePhases = true,
+}: StakeActionsProps) {
+  const { member, token, stakeAddress, memberId, tx } = ctx;
   const [sheet, setSheet] = useState<SheetKind>('none');
 
   if (
@@ -42,7 +46,6 @@ export function StakeActions({ ctx, testIdPrefix = 'gov' }: StakeActionsProps) {
   }
 
   const busy = tx.stage !== 'idle' || tx.approveStage !== 'idle' || tx.receipt !== null;
-  const currentPhases = member.promisedWaitingPhases;
   const unlockRequestPhase = member.unlockRequestPhase;
   const notRequested = unlockRequestPhase === 0n;
   const withdrawReady = member.canWithdraw === true && !notRequested;
@@ -73,32 +76,22 @@ export function StakeActions({ ctx, testIdPrefix = 'gov' }: StakeActionsProps) {
     setSheet('none');
   };
 
-  const currentPhase = clock.currentPhase ?? null;
-  const waitingPhases = (() => {
-    if (unlockRequestPhase === 0n || currentPhase === null) return undefined;
-    const withdrawAt = unlockRequestPhase + currentPhases;
-    if (currentPhase > withdrawAt) return undefined;
-    const phases = withdrawAt - currentPhase + 1n;
-    return {
-      phases,
-      minutes: phasesToMinutes(phases, clock.secondsPerPhase ?? null),
-    };
-  })();
-
   return (
     <div className="space-y-2">
       {notRequested ? (
         <>
-          <Button
-            variant="secondary"
-            size="md"
-            className="w-full"
-            onClick={() => setSheet('increase')}
-            disabled={busy}
-            data-testid={`${testIdPrefix}-increase-phases-button`}
-          >
-            {copy.gov.mine.increasePhases}
-          </Button>
+          {showIncreasePhases ? (
+            <Button
+              variant="secondary"
+              size="md"
+              className="w-full"
+              onClick={() => setSheet('increase')}
+              disabled={busy}
+              data-testid={`${testIdPrefix}-increase-phases-button`}
+            >
+              {copy.gov.mine.increasePhases}
+            </Button>
+          ) : null}
           <Button
             variant="secondary"
             size="md"
@@ -122,27 +115,7 @@ export function StakeActions({ ctx, testIdPrefix = 'gov' }: StakeActionsProps) {
         >
           {copy.gov.mine.withdraw}
         </Button>
-      ) : (
-        <>
-          <Button
-            variant="secondary"
-            size="md"
-            className="w-full"
-            disabled
-            data-testid={`${testIdPrefix}-waiting-withdraw`}
-          >
-            {copy.gov.mine.stateUnlocking}
-          </Button>
-          {waitingPhases !== undefined ? (
-            <p className="text-xs leading-5 text-muted" data-testid={`${testIdPrefix}-unlock-note`}>
-              {copy.gov.unstakePage.waiting(
-                formatTokenAmount(waitingPhases.phases, 0),
-                waitingPhases.minutes === null ? null : String(waitingPhases.minutes),
-              )}
-            </p>
-          ) : null}
-        </>
-      )}
+      ) : null}
 
       <IncreasePhasesSheet
         open={sheet === 'increase'}

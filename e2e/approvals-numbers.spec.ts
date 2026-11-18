@@ -46,8 +46,9 @@ const CUSTOM_SPENDER = ACCOUNTS.eligible;
 const UNLIMITED_THRESHOLD = 2n ** 255n;
 const CONCRETE = 1234567890123456789n;
 const CUSTOM_AMOUNT = 2500000000000000000n;
-const CONCRETE_TEXT = `1.234567 ${SYMBOL}`;
-const BOUNDARY_TEXT = `57,896,044,618,658,097,711,785,492,504,343,953,926,634,992,332,820,282,019,728.792003 ${SYMBOL}`;
+// owner 2026-11-19 数字显示规范：1–999 → 4 位小数；≥1e6 → 0 位小数（截断）。
+const CONCRETE_TEXT = `1.2345 ${SYMBOL}`;
+const BOUNDARY_TEXT = `57,896,044,618,658,097,711,785,492,504,343,953,926,634,992,332,820,282,019,728 ${SYMBOL}`;
 const BELOW_MINIMUM_TEXT = `< 0.000001 ${SYMBOL}`;
 
 const ERC20 = parseAbi(['function approve(address spender, uint256 amount) returns (bool)']);
@@ -232,7 +233,7 @@ test.describe('代币授权 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('approvals-amount-stake')).toHaveText(CONCRETE_TEXT, {
       timeout: 20_000,
     });
-    // E1: 2^255 − 1 仍是具体额度，显示按 6 位小数截断。
+    // E1: 2^255 − 1 仍是具体额度；量级 ≥1e6 → 只显示整数部分（小数截断）。
     await expect(page.getByTestId('approvals-amount-vote')).toHaveText(BOUNDARY_TEXT);
     // E2: 2^255 起算长期授权；按钮文案为只读的「已长期授权」。
     await expect(page.getByTestId('approvals-amount-submit')).toHaveText('长期授权');

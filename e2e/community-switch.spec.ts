@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { isolateChain } from './chain';
 import { expectSoftTransition, recordSoftTransition } from './soft-transition';
-import { ACCOUNTS, connect, installWallet, shortAddress } from './wallet-stub';
+import { ACCOUNTS, connect, installWallet } from './wallet-stub';
 
 /**
  * 全局地址复制 + 社区 symbol 搜索 (owner 2026-11-14 09:30):
@@ -12,9 +12,10 @@ import { ACCOUNTS, connect, installWallet, shortAddress } from './wallet-stub';
  * 1. 右上角社区菜单 can switch by typing a symbol: exact match through
  *    Launch.tokenAddressBySymbol and prefix matches over the loaded Launch
  *    catalog, with 最近访问 kept as the default surface (UX spec §1.3).
- * 2. 钱包菜单 address is copyable through the shared 全局地址组件: shown shortened
- *    in the middle (owner 2026-11-19), full address in `title` / clipboard, 已复制
- *    feedback and the exact address in the clipboard.
+ * 2. 钱包菜单 address is copyable through the shared 全局地址组件: width-permitting
+ *    full address, otherwise shortened in the middle (`display="auto"`, owner
+ *    2026-11-19); full address in `title` / clipboard, 已复制 feedback and the exact
+ *    address in the clipboard.
  *
  * The symbol fixture launches one child community through the same `cast`
  * pattern e2e/swap.spec.ts uses; the file-level chain snapshot reverts it.
@@ -188,7 +189,7 @@ test('社区菜单：未知 symbol 给诚实空态，不发切换', async ({ pag
   await expect(page).toHaveURL(new RegExp(`[?&]symbol=${GENESIS_SYMBOL}(&|$)`));
 });
 
-test('钱包菜单：地址短显示，点击复制拿到完整地址', async ({ page }) => {
+test('钱包菜单：地址行宽度够显示完整、不够中间省略，点击复制拿到完整地址', async ({ page }) => {
   await installWallet(page, ACCOUNTS.withIdentity);
   await page.goto(`/?symbol=${GENESIS_SYMBOL}`);
   await connect(page);
@@ -196,8 +197,10 @@ test('钱包菜单：地址短显示，点击复制拿到完整地址', async ({
   await page.getByRole('button', { name: '打开钱包与身份 NFT 菜单' }).click();
   const address = page.getByTestId('wallet-menu-address');
   await expect(address).toBeVisible({ timeout: 15_000 });
-  // Owner 2026-11-19：所有页面地址统一中间省略；完整地址只放在 title 与剪贴板里。
-  await expect(address).toHaveText(shortAddress(ACCOUNTS.withIdentity));
+  // Owner 2026-11-19：钱包弹层的地址行「宽度够就完整显示，不够才中间省略」
+  // （`CopyableAddress display="auto"`），所以可见文本是完整地址或 0x1234…abcd 两种之一；
+  // 完整地址始终在 title 与剪贴板里，断言只认这两个权威值。
+  await expect(address).toHaveText(/^(0x[0-9a-f]{4}…[0-9a-f]{4}|0x[0-9a-f]{40})$/i);
   await expect(address).toHaveAttribute('title', ACCOUNTS.withIdentity);
 
   await address.click();

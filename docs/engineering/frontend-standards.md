@@ -492,8 +492,9 @@ CI 明确不做的两件事：
 | 4-1 | 中文只有一个出口 | `shared/config/copy.ts`（首屏）/ `shared/config/copy-pages.ts`（懒加载页与弹层）/ `config/errors.generated.ts`（生成） | `src/architecture.test.ts:158-163`、`:198-206` |
 | 4-2 | 一句话 = 一个函数 | `copy.airdrop.eligible.shareLine(percent, symbol)` | `src/shared/config/copy-pages.ts:293-294` |
 | 4-3 | 术语按 GLOSSARY，一词一义 | 空投动作写「空投铸造」，不写「领取」 | `GLOSSARY.md:27`、`:145` |
-| 4-4 | 数字只走 `shared/lib/format.ts` | `formatTokenAmount(value, decimals)` | `src/shared/lib/format.ts:139-151` |
+| 4-4 | 数字只走 `shared/lib/format.ts` | `formatTokenAmount(value, decimals)` | `src/shared/lib/format.ts:164-176` |
 | 4-5 | 按钮文案全局同形 | `授权 {symbol}` / `立即铸造` / `已铸造` | `copy-pages.ts:1081-1082`、`:301`、`:314` |
+| 4-6 | 同一内容不在同一页面出现两次 | 解锁状态只在摘要卡出现一次，动作区不重复 | 本节 §4.7；`m0-ux-spec.md` §3.14 |
 
 ### 4.1 CJK 门禁：唯一出口 + 编译期断言
 
@@ -614,10 +615,11 @@ cta: '立即铸造', title: '已铸造',
 
 | 函数 | 用途 | 硬规则 | 证据 |
 | --- | --- | --- | --- |
-| `formatTokenAmount` | 所有展示的代币数量 | 整数分组、小数**截断**（不四舍五入）、最多 6 位 | `format.ts:139-151`、`:23-24` |
-| `formatVisibleTokenAmount` | 会真正移动的金额（批量转账/回执/前后余额） | 非零但会被显示规则抹成 `0` 时渲染 `< 0.000001` | `format.ts:166-197` |
-| `formatPercent` / `formatRate` | 费率、百分比、兑换比率 | 最多 2 位；`minimumFractionDigits` 只给固定预置标签 | `format.ts:199-215`、`:224-252` |
-| `formatPhase` | 高级视图里的轮次/阶段 | 不加千分位 | `format.ts:254-260` |
+| `formatTokenAmount` | 所有展示的代币数量 | 整数分组、小数**截断**（不四舍五入）、小数位按数量级自适应（最多 6 位，见 §4.5.1） | `format.ts:124-137`、`:164-176` |
+| `formatVisibleTokenAmount` | 会真正移动的金额（批量转账/回执/前后余额） | 非零但会被显示规则抹成 `0` 时渲染 `< 最小可见单位`（18 位精度即 `< 0.000001`） | `format.ts:192-222` |
+| `formatPercent` / `formatBpsPercent` | 百分比、滑点档、占比 | 最多 2 位（截断）；`minimumFractionDigits` 只给固定预置标签 | `format.ts:229-247` |
+| `formatRate` | 价格 / 汇率（`1 FROM ≈ X TO`） | 默认 2 位；价格行可显式传 6 位，避免反向价格被截成 0 | `format.ts:254-277` |
+| `formatPhase` | 高级视图里的轮次/阶段 | 不加千分位 | `format.ts:279-285` |
 | `UNKNOWN` / `DEFAULT_LOCALE` | 未知值 / 默认语言 | `'—'` / `'zh-CN'` | `format.ts:19-21` |
 
 `locale` 规则：**每个 locale 相关函数的签名都带 `locale` 参数（默认 `zh-CN`）**，调用点直接吃默认值；任何 `toLocaleString()`、`new Intl.*` 都只允许出现在 `format.ts` 内部（统计：`grep` 全仓，`shared/lib/format.ts` 之外 0 处）。
@@ -640,6 +642,36 @@ const amountText =
     : undefined;
 // ✅ src/features/batch-transfer/ui/batch-receipt.tsx:132
 {`${formatVisibleTokenAmount(record.total, record.decimals)} ${record.symbol}`}
+```
+
+### 4.5.1 数字显示规范：小数位按数量级自适应（owner 2026-11-19）
+
+规则：**同一数量级用同一小数位**，整数部分一律千分位，小数一律**截断、不四舍五入**；未知值仍是「—」。
+
+| 显示值的整数部分 | 最多小数位 | 例（18 位精度） |
+| --- | --- | --- |
+| `< 1` | 6 | `0.000001`、`0.999999` |
+| `1 – 999` | 4 | `1.2345`、`999.9999` |
+| `1e3 – < 1e6` | 2 | `1,000.12`、`99,999.99` |
+| `≥ 1e6` | 0 | `99,799,100` |
+
+- 判断依据是 `value / 10^decimals` 的**整数部分**（不是四舍五入后的值）。实现是 `shared/lib/format.ts#fractionDigitsForMagnitude(value, decimals)`，返回 0 / 2 / 4 / 6 四档；`formatTokenAmount` 现在**默认**按它取位数，调用点不要再传死位数。
+- 只有**明确不是代币金额**的面才允许显式传 `maxFractionDigits`，且要在调用点写清原因。现状两个例外：**价格 / 汇率**（`formatRate` 传 6 位——反向价格常常很小，2 位会被截成 0）；**输入框回填 / 校验用的无损原文**（`rawInputValue`：位数 = `decimals`、去掉千分位，不能丢 wei）。**百分比与滑点档固定 2 位**（`formatPercent` / `formatBpsPercent`，最多 2 位、截断），不随数量级变化。
+- 未知值（`undefined` / `null`）仍渲染 `—`，绝不渲染 `0`（§5-2）。
+- **会真正移动的金额**（批量转账合计 / 逐行金额 / 回执 / 前后余额）继续用 `formatVisibleTokenAmount`：非零但被显示规则截成 `0` 时渲染 `< 最小可见单位`（18 位精度即 `< 0.000001`），裸 `0` 只代表真的 0。
+
+owner 原话（2026-11-19）：`|值| < 1` → 6 位；`1–999` → 4 位；`1e3–1e6` → 2 位；`≥1e6` → 0 位；一律千分位 + 截断不四舍五入；未知仍「—」，非零被截断成 0 时用 `< 最小可见单位`；百分比固定 2 位。
+
+**反例 / 正例**：
+
+```ts
+// ❌ 调用点自己写死位数：同一个数在不同页面位数不同
+formatTokenAmount(balance, 18, { maxFractionDigits: 6 });
+
+// ✅ 默认按数量级取位数（9,999.885749 → 9,999.88）
+formatTokenAmount(9_999_885_749n * 10n ** 12n, 18);
+// ✅ 会真正移动的金额：非零但会被显示规则截成 0 时给「< 最小可见单位」
+formatVisibleTokenAmount(1n, 18); // '< 0.000001'
 ```
 
 ### 4.6 按钮与状态文案的统一形
@@ -671,14 +703,31 @@ approving: '授权中…',
 approved: '已授权',
 ```
 
-### 4.7 第 4 章检查清单
+### 4.7 同一内容不在同一页面出现两次（owner 2026-11-19）
+
+规则：**除页面级帮助 / 提示信息外，同一内容不应在同一页面出现两次。** 「内容」包括状态词、字段名 + 数值、同一句说明；同一条状态只能从一处数据源渲染一次。
+
+- **页面级帮助 / 提示**（各页底部「提示」卡、`GovIntro`「治理权的作用」、规则折叠、错误提示）可以解释同一个概念，但**不许复述数据卡里已经显示的状态句**——帮助是「为什么会这样」，不是第二份状态。
+- **状态类信息只在摘要卡出现一次**：解锁状态由纯函数算一次（`domain/gov-stake.ts#stakeUnlockState`），只在一张卡的「状态块」渲染；动作区不再重复「已申请解锁」按钮或「还要再等…」小字。
+- **摘要已经给出的数据，明细不再重复列**：`MyStakeSummary` 的 `showVotes` / `showPhases` / `showBoost` 就是这条规则的开关（治理首页摘要已显示治理权与承诺解锁期时，明细里不再列一遍）。
+- 页面 intro 若只是复述下方摘要卡的状态，直接删掉，不要「引言 + 卡片」说两遍。
+
+**反例（2026-11-19 修掉）**：取消质押页曾同时出现「已申请解锁」和「还要再等 N 个阶段（约 X 分钟）」各两次——一次在摘要卡的状态块，一次在动作区（一个禁用的「已申请解锁」按钮 + 一行等待提示）。两处口径一样，用户会以为其中一处是另一种状态。
+
+**正例**：取消质押页只保留摘要卡里的状态块（「已申请解锁」+ 一句「还要再等…」）；解锁等待期间动作区不渲染任何按钮，可撤出时才多一个「撤出」。
+
+**自查**：按页面数同一状态文案 / 同一 `data-testid` 前缀的出现次数；同一内容有两处渲染时，删掉信息量更少的那处（通常是动作区的重复说明），不要两处都留。这条与 GLOSSARY 文案纪律第 6 条「同一概念一页只能有一个叫法」同源：叫法不能有两个，同一内容也不该出现两次。
+
+### 4.8 第 4 章检查清单
 
 - [ ] 新增中文没有落在 `copy.ts` / `copy-pages.ts` 之外（`pnpm vitest run src/architecture.test.ts`）。
 - [ ] 新字符串进的是对的模块：首屏路径进 `copy.ts`，懒加载页/弹层进 `copy-pages.ts`。
 - [ ] 句子是函数；组件里没有 `+`/模板串拼中文。
 - [ ] 术语逐条过 `GLOSSARY.md`：空投=空投铸造、LP=流动性凭证、激励≠奖励。
 - [ ] 数字走 `format.*`；没有新的 `toLocaleString` / `toFixed` / `Number(...)/1e18`。
+- [ ] 金额位数跟数量级走（§4.5.1）：调用点没有写死位数；会移动的金额用 `formatVisibleTokenAmount`。
 - [ ] 按钮与状态用 4.6 的表里的固定形，省略号是 `…`。
+- [ ] 同一内容没有在同一页面出现两次（§4.7）：状态只在一张卡出现，摘要与明细不重复；页面级帮助 / 提示除外。
 
 ---
 
@@ -1083,6 +1132,7 @@ const restoreAnchorFocus = (event: Event) => {
 - [ ] 没有 palette 色类与 `#rrggbb`；新 token 同步 `index.css` 两套与 ADR/三线文档。
 - [ ] 弹层用 `Sheet`/`PopoverContent`，有 Title，焦点归还走 `onCloseAutoFocus`。
 - [ ] 按钮组在 `ActionStack` 里，先决条件在前、主按钮在后，没有 fixed 吸底。
+- [ ] 金额走 §4.5.1 的数量级规则（不写死位数；百分比 / 费率固定 2 位；会移动的金额用 `formatVisibleTokenAmount`）。
 
 ---
 
@@ -1589,3 +1639,5 @@ git config --get core.hooksPath           # 应输出 .githooks
 | --- | --- | --- |
 | 2026-11-17 | 首版：新增入口 `AGENTS.md` + 3 个指针 shim + 本规范（11 章）+ `pnpm check` + pre-commit 钩子 + README 文档索引 | owner 选 A 档（完整规范 + 轻量 pre-commit） |
 | 2026-11-17 | **D1 执行**：`ledger/` 加入 `.prettierignore`；全仓一次性格式化（71 文件 / 522+ 556- 行，纯换行与缩进）；`format:check` 并入 `pnpm check` 与 CI `check` job；`pnpm format:check` 从 118 文件失败变为全绿 | owner 选 A（一次性付清 + 纳入门禁） |
+| 2026-11-19 | 新增 §4.5.1 数字显示规范：小数位按数量级自适应（按显示值整数部分的绝对值：小于 1 → 6 位 / 1–999 → 4 位 / 1e3–1e6 → 2 位 / 大于等于 1e6 → 0 位，千分位 + 截断；百分比固定 2 位；未知「—」；非零被截断成 0 用 `< 最小可见单位`）。`formatTokenAmount` 默认改用 `fractionDigitsForMagnitude`；显式位数只保留价格（6 位）与输入框无损原文两个已登记例外 | owner 2026-11-19 拍板 |
+| 2026-11-19 | 新增 §4.7「同一内容不在同一页面出现两次」（原 §4.7 检查清单改为 §4.8；`4-6` 铁律新增）：状态只在摘要卡出现一次、动作区不重复；页面级帮助 / 提示除外 | owner 2026-11-19 拍板（取消质押页重复状态） |

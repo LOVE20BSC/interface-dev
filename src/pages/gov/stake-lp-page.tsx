@@ -28,22 +28,22 @@ export function StakeLpPage() {
         <GovTxFeedback ctx={ctx} />
         {/* owner 2026-11-18：已有流动性质押时，承诺解锁期放在最上面单独调整。 */}
         {hasStakePosition(ctx.member) ? <PromisedPhasesCard ctx={ctx} /> : null}
-        <GovIntro />
-        <StakeLpBody ctx={ctx} hub={hub} q={q} />
+        <StakeLiquidityForm ctx={ctx} hub={hub} />
         <GovTips />
+        {/* owner 2026-11-19：我的流动性质押倒数第二，治理权的作用最后。 */}
+        <MyLiquidityStakeCard ctx={ctx} q={q} />
+        <GovIntro />
       </GovGate>
     </div>
   );
 }
 
-function StakeLpBody({
+function StakeLiquidityForm({
   ctx,
   hub,
-  q,
 }: {
   readonly ctx: ReturnType<typeof useGovContext>;
   readonly hub: `0x${string}` | undefined;
-  readonly q: string;
 }) {
   const { token, parent, stakeAddress, memberId } = ctx;
   if (
@@ -57,20 +57,6 @@ function StakeLpBody({
 
   return (
     <div className="space-y-4">
-      {hasStakePosition(ctx.member) ? (
-        <Card data-testid="gov-page-my-stake">
-          <div className="flex items-start justify-between gap-2">
-            <CardTitle>{copy.gov.myLiquidityTitle}</CardTitle>
-            <Link to={`/stake/unstake${q}`} className="text-xs font-medium text-brand-strong">
-              {copy.gov.home.unstakeAction}
-            </Link>
-          </div>
-          <div className="mt-3">
-            <MyStakeSummary member={ctx.member} clock={ctx.clock} token={token} parent={parent} />
-          </div>
-        </Card>
-      ) : null}
-
       <StakeLiquidityPanel
         token={token}
         parent={parent}
@@ -89,5 +75,36 @@ function StakeLpBody({
         }
       />
     </div>
+  );
+}
+
+/** 流动性质押页的「我的流动性质押」卡（不展示加速质押数据，owner 2026-11-19）。 */
+function MyLiquidityStakeCard({
+  ctx,
+  q,
+}: {
+  readonly ctx: ReturnType<typeof useGovContext>;
+  readonly q: string;
+}) {
+  const { token, parent } = ctx;
+  if (!hasStakePosition(ctx.member) || token === undefined || parent === undefined) return null;
+  return (
+    <Card data-testid="gov-page-my-stake">
+      <div className="flex items-start justify-between gap-2">
+        <CardTitle>{copy.gov.myLiquidityTitle}</CardTitle>
+        <Link to={`/stake/unstake${q}`} className="text-xs font-medium text-brand-strong">
+          {copy.gov.home.unstakeAction}
+        </Link>
+      </div>
+      <div className="mt-3">
+        <MyStakeSummary
+          member={ctx.member}
+          clock={ctx.clock}
+          token={token}
+          parent={parent}
+          showBoost={false}
+        />
+      </div>
+    </Card>
   );
 }

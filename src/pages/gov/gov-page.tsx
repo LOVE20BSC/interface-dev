@@ -97,6 +97,16 @@ function MineTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string
     );
   }
 
+  if (ctx.member.status === 'loading' || ctx.member.status === 'idle') {
+    return (
+      <StakeStateCard
+        testId="gov-my-loading"
+        title={copy.gov.mine.title}
+        description={copy.gov.stats.loading}
+      />
+    );
+  }
+
   if (!hasStakePosition(ctx.member)) {
     return (
       <div className="space-y-4">
@@ -111,6 +121,28 @@ function MineTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string
             </div>
           </Card>
         </div>
+        <GovIntro />
+      </div>
+    );
+  }
+
+  // 已申请解锁：治理权清零、四项数据不再显示，只给状态与去解锁页的入口（owner 2026-11-19）。
+  if ((ctx.member.unlockRequestPhase ?? 0n) > 0n) {
+    return (
+      <div className="space-y-4">
+        <Card data-testid="gov-my-unlocking">
+          <CardTitle>{copy.gov.mine.unlockingTitle}</CardTitle>
+          <CardDescription>{copy.gov.mine.unlockingBody}</CardDescription>
+          <div className="mt-3">
+            <Link
+              to={`/stake/unstake${q}`}
+              data-testid="gov-my-unlocking-link"
+              className={buttonStyles('primary', 'md', 'w-full')}
+            >
+              {copy.gov.mine.unlockProgressLink}
+            </Link>
+          </div>
+        </Card>
         <GovIntro />
       </div>
     );

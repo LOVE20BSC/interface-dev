@@ -36,24 +36,31 @@ describe('resolveTheme', () => {
     expect(resolveTheme('dark')).toBe('dark');
   });
 
-  it('falls back to light for absent or illegal values', () => {
+  it('falls back to the dark default for absent or illegal values', () => {
     for (const value of [null, undefined, '', 'system', 'DARK', ' dark', 'blue']) {
       expect(resolveTheme(value)).toBe(DEFAULT_THEME);
     }
-    expect(DEFAULT_THEME).toBe('light');
+    expect(DEFAULT_THEME).toBe('dark');
   });
 });
 
 describe('readStoredTheme', () => {
   it('reads the persisted palette through the cache boundary', () => {
+    // owner 2026-11-19：默认主题改为深色，未存过偏好时读到的就是 dark。
+    expect(readStoredTheme()).toBe('dark');
+    window.localStorage.setItem(STORAGE_KEY, 'light');
     expect(readStoredTheme()).toBe('light');
     window.localStorage.setItem(STORAGE_KEY, 'dark');
     expect(readStoredTheme()).toBe('dark');
   });
 
-  it('falls back to light when the stored value is junk', () => {
+  it('falls back to dark when the stored value is junk', () => {
     window.localStorage.setItem(STORAGE_KEY, 'sepia');
-    expect(readStoredTheme()).toBe('light');
+    expect(readStoredTheme()).toBe('dark');
+  });
+
+  it('applies the dark default to the document before any stored preference', () => {
+    expect(getTheme()).toBe('dark');
   });
 });
 
@@ -98,6 +105,15 @@ describe('applyTheme', () => {
 });
 
 describe('index.html bootstrap script', () => {
+  it('ships the dark palette as the first-paint default (owner 2026-11-19)', () => {
+    const source = html();
+    // 首屏渲染前就必须是深色：html 属性 + 两个 meta 与 DEFAULT_THEME 一致，
+    // 否则会先闪一帧浅色再被脚本改回来。
+    expect(source).toMatch(/<html[^>]*data-theme="dark"/);
+    expect(source).toContain(`<meta name="theme-color" content="${THEME_META_COLOR.dark}" />`);
+    expect(source).toContain('<meta name="color-scheme" content="dark" />');
+  });
+
   it('applies the stored palette before the module entry (no light flash)', () => {
     const source = html();
     const bootstrap = source.indexOf(STORAGE_KEY);
