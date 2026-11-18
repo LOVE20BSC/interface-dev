@@ -6,7 +6,7 @@ import { copy } from '@/shared/config/copy-pages';
 import { decideApproveAmount } from '@/shared/lib/approve-amount';
 import { formatPercent, formatTokenAmount, formatUnits, UNKNOWN } from '@/shared/lib/format';
 import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
-import { Button, buttonStyles } from '@/shared/ui/button';
+import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import type { MemberStake } from '@/entities/stake/model/use-member-stake';
 import type { StakeBalances } from '@/entities/stake/model/use-stake-balances';
@@ -14,11 +14,11 @@ import type { StakePool } from '@/entities/stake/model/use-stake-pool';
 import type { StakeCommunity } from '@/entities/stake/model/use-stake-community';
 import type { StakeParams } from '@/entities/stake/model/use-stake-params';
 import { useHubStakeQuote } from '@/entities/stake/model/use-hub-stake-quote';
+import { phaseOptionText } from '@/features/governance-stake/lib/phase-duration';
 import {
   amountShortfall,
   parsePhaseCount,
   parseStakeAmount,
-  PHASE_PRESETS,
   resolveStakePhases,
   stakeDeadline,
 } from '@/features/governance-stake/lib/stake-form';
@@ -71,6 +71,8 @@ export interface StakeLiquidityPanelProps {
   readonly balances: StakeBalances;
   readonly tx: StakeTransactionState;
   readonly disabled: boolean;
+  /** 阶段长度（秒），只用于承诺解锁期下拉里的时间估算；读不到时省略估算。 */
+  readonly secondsPerPhase: number | undefined;
 }
 
 /**
@@ -99,6 +101,7 @@ export function StakeLiquidityPanel({
   balances,
   tx,
   disabled,
+  secondsPerPhase,
 }: StakeLiquidityPanelProps) {
   const { address: account } = useAccount();
   const approvalPreference = useUnlimitedApprovalPreference();
@@ -119,15 +122,21 @@ export function StakeLiquidityPanel({
    */
   const currentPhases = member.promisedWaitingPhases ?? 0n;
   const hasExistingPosition = currentPhases > 0n;
-  const defaultPhases = params.minPhases;
-  const phasesText =
-    phasesInput.trim().length === 0
-      ? defaultPhases === undefined
-        ? ''
-        : String(defaultPhases)
-      : phasesInput;
-  const phasesParsed = useMemo(() => parsePhaseCount(phasesText), [phasesText]);
-  const phasesChosen = phasesParsed.kind === 'ok' ? phasesParsed.value : undefined;
+  /**
+   * 首次质押的承诺解锁期改为下拉列表（owner 2026-11-18 20:05）：选项来自合约参数
+   * MIN..MAX，每项写「N 个阶段 · 约 X」。默认落在下限，用户可改任意合法值。
+   */
+  const phaseOptions = useMemo(() => {
+    const min = params.minPhases;
+    const max = params.maxPhases;
+    if (min === undefined || max === undefined) return [];
+    const values: bigint[] = [];
+    for (let value = min; value <= max && values.length < 200; value += 1n) values.push(value);
+    return values;
+  }, [params.maxPhases, params.minPhases]);
+  const phasesParsed = useMemo(() => parsePhaseCount(phasesInput), [phasesInput]);
+  const phasesChosen =
+    phasesParsed.kind === 'ok' ? phasesParsed.value : (phaseOptions[0] ?? undefined);
   const phasesReady = resolveStakePhases(currentPhases, phasesChosen);
 
   const wrappedNative = configuredAddress('weth');
@@ -236,18 +245,6 @@ export function StakeLiquidityPanel({
   let validationMessage: string | undefined;
   if (phasesReady === undefined) {
     validationMessage = copy.gov.stats.loading;
-  } else if (
-    !hasExistingPosition &&
-    params.minPhases !== undefined &&
-    params.maxPhases !== undefined &&
-    (phasesParsed.kind !== 'ok' ||
-      phasesParsed.value < params.minPhases ||
-      phasesParsed.value > params.maxPhases)
-  ) {
-    validationMessage = copy.gov.liquidity.phasesInvalid(
-      formatTokenAmount(params.minPhases, 0),
-      formatTokenAmount(params.maxPhases, 0),
-    );
   } else if (
     tokenParsed.kind === 'too-precise' ||
     parentParsed.kind === 'too-precise' ||
@@ -379,6 +376,60 @@ export function StakeLiquidityPanel({
     );
   };
 
+  /**
+   * 非智能模式的两侧联动（owner 2026-11-18 20:05）：改一侧立刻按池子比例算出另一侧，
+   * 尽量不把「多余的某一侧」留给合约截断/返还。池子储备读不到时保持手动输入，
+   * 不猜比例。
+   */
+  const reserveReady =
+    pool.reserveToken !== undefined &&
+    pool.reserveParent !== undefined &&
+    pool.reserveToken > 0n &&
+    pool.reserveParent > 0n;
+
+  const parentInputForToken = (raw: string): string | null => {
+    if (!reserveReady || pool.reserveToken === undefined || pool.reserveParent === undefined) {
+      return null;
+    }
+    const parsed = parseStakeAmount(raw, token.decimals ?? 18);
+    if (parsed.kind !== 'ok') return null;
+    const parentWei = (parsed.value * pool.reserveParent) / pool.reserveToken;
+    return rawInputValue(parentWei, parent.decimals ?? 18);
+  };
+
+  const tokenInputForParent = (raw: string): string | null => {
+    if (!reserveReady || pool.reserveToken === undefined || pool.reserveParent === undefined) {
+      return null;
+    }
+    const parsed = parseStakeAmount(raw, parent.decimals ?? 18);
+    if (parsed.kind !== 'ok') return null;
+    const tokenWei = (parsed.value * pool.reserveToken) / pool.reserveParent;
+    return rawInputValue(tokenWei, token.decimals ?? 18);
+  };
+
+  const handleTokenInput = (raw: string) => {
+    setTokenInput(raw);
+    if (hubPath) return;
+    const next = parentInputForToken(raw);
+    if (next !== null) setParentInput(next);
+  };
+
+  const handleParentInput = (raw: string) => {
+    setParentInput(raw);
+    const next = tokenInputForParent(raw);
+    if (next !== null) setTokenInput(next);
+  };
+
+  const handleSmartToggle = () => {
+    const next = !smartMode;
+    // 从智能模式切回两侧都填时，用当前已填的一侧把另一侧补齐，避免一进表单就缺一侧。
+    if (!next) {
+      const synced = parentInputForToken(tokenInput);
+      if (synced !== null) setParentInput(synced);
+    }
+    setSmartMode(next);
+  };
+
   const votesPreview = hubPath
     ? hubReady && hubQuote !== undefined
       ? hubQuote.govVotesAdded
@@ -411,7 +462,7 @@ export function StakeLiquidityPanel({
           aria-label={copy.gov.smart.label}
           data-testid="gov-liquidity-smart-mode"
           disabled={!smartAvailable || disabled}
-          onClick={() => setSmartMode((value) => !value)}
+          onClick={handleSmartToggle}
           className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors ${
             hubPath ? 'border-brand bg-brand' : 'border-line bg-surface'
           } disabled:opacity-60`}
@@ -431,14 +482,14 @@ export function StakeLiquidityPanel({
           symbol={token.symbol}
           decimals={token.decimals}
           value={tokenInput}
-          onChange={setTokenInput}
+          onChange={handleTokenInput}
           balance={balances.tokenBalance}
           balanceLoading={balances.status === 'loading'}
           testId="gov-liquidity-token-input"
           disabled={disabled}
           onMax={() => {
             if (balances.tokenBalance !== undefined) {
-              setTokenInput(rawInputValue(balances.tokenBalance, token.decimals ?? 18));
+              handleTokenInput(rawInputValue(balances.tokenBalance, token.decimals ?? 18));
             }
           }}
         />
@@ -467,14 +518,14 @@ export function StakeLiquidityPanel({
             symbol={parent.symbol}
             decimals={parent.decimals}
             value={parentInput}
-            onChange={setParentInput}
+            onChange={handleParentInput}
             balance={balances.parentBalance}
             balanceLoading={balances.status === 'loading'}
             testId="gov-liquidity-parent-input"
             disabled={disabled}
             onMax={() => {
               if (balances.parentBalance !== undefined) {
-                setParentInput(rawInputValue(balances.parentBalance, parent.decimals ?? 18));
+                handleParentInput(rawInputValue(balances.parentBalance, parent.decimals ?? 18));
               }
             }}
           />
@@ -486,48 +537,31 @@ export function StakeLiquidityPanel({
           </p>
         ) : (
           <div data-testid="gov-liquidity-phases">
-            <span className="text-sm font-medium text-foreground">
-              {copy.gov.liquidity.phasesLabel}
-            </span>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              {PHASE_PRESETS.map((preset) => {
-                const value = BigInt(preset);
-                const available =
-                  params.minPhases !== undefined &&
-                  params.maxPhases !== undefined &&
-                  value >= params.minPhases &&
-                  value <= params.maxPhases;
-                const selected = phasesParsed.kind === 'ok' && phasesParsed.value === value;
-                return (
-                  <button
-                    key={preset}
-                    type="button"
-                    disabled={!available || disabled}
-                    onClick={() => setPhasesInput(String(preset))}
-                    data-testid={`gov-liquidity-phases-preset-${preset}`}
-                    className={
-                      selected
-                        ? 'rounded-xl bg-brand px-3 py-1.5 text-sm font-medium text-on-brand'
-                        : 'rounded-xl border border-line bg-surface px-3 py-1.5 text-sm text-foreground hover:bg-elevated disabled:text-muted'
-                    }
-                  >
-                    {copy.gov.liquidity.phasesPreset(preset)}
-                  </button>
-                );
-              })}
-              <input
-                type="text"
-                inputMode="numeric"
-                value={phasesInput}
-                placeholder={defaultPhases === undefined ? '' : String(defaultPhases)}
-                onChange={(event) => setPhasesInput(event.target.value)}
-                aria-label={copy.gov.liquidity.phasesLabel}
-                data-testid="gov-liquidity-phases-input"
-                disabled={disabled}
-                className="w-20 rounded-xl border border-line bg-surface px-2 py-1.5 text-right text-sm text-foreground focus:border-brand focus:outline-none"
-              />
-              <span className="text-xs text-muted">{copy.gov.liquidity.phasesUnit}</span>
-            </div>
+            <label className="block">
+              <span className="text-sm font-medium text-foreground">
+                {copy.gov.liquidity.phasesLabel}
+              </span>
+              {phaseOptions.length > 0 ? (
+                <select
+                  value={phasesChosen === undefined ? '' : String(phasesChosen)}
+                  onChange={(event) => setPhasesInput(event.target.value)}
+                  aria-label={copy.gov.liquidity.phasesLabel}
+                  data-testid="gov-liquidity-phases-select"
+                  disabled={disabled}
+                  className="mt-1.5 w-full rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm text-foreground focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30 disabled:text-muted"
+                >
+                  {phaseOptions.map((value) => (
+                    <option key={value.toString()} value={value.toString()}>
+                      {phaseOptionText(value, secondsPerPhase ?? null)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="mt-1.5 text-sm text-muted" data-testid="gov-liquidity-phases-loading">
+                  {copy.gov.stats.loading}
+                </p>
+              )}
+            </label>
             <p className="mt-1.5 text-xs leading-5 text-muted">{copy.gov.liquidity.phasesHint}</p>
             {params.minPhases !== undefined && params.maxPhases !== undefined ? (
               <p className="text-xs leading-5 text-muted">
@@ -704,15 +738,6 @@ export function StakeLiquidityPanel({
         >
           {tx.stage === 'idle' ? copy.gov.liquidity.submit : copy.gov.liquidity.submitting}
         </Button>
-        {smartAvailable && !hubPath ? (
-          <button
-            type="button"
-            className={buttonStyles('ghost', 'sm', 'w-full')}
-            onClick={() => setSmartMode(true)}
-          >
-            {copy.gov.smart.label}
-          </button>
-        ) : null}
       </div>
     </Card>
   );

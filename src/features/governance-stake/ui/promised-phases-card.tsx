@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { copy } from '@/shared/config/copy-pages';
-import { phasesToMinutes } from '@/domain/gov-stake';
-import { formatTokenAmount } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import type { GovContextValue } from '@/features/governance-stake/model/use-gov-context';
+import { phaseDurationText, phasesValueText } from '@/features/governance-stake/lib/phase-duration';
 import { IncreasePhasesSheet } from '@/features/governance-stake/ui/increase-phases-sheet';
 
 export interface PromisedPhasesCardProps {
@@ -25,7 +24,7 @@ export function PromisedPhasesCard({ ctx }: PromisedPhasesCardProps) {
   if (member.status !== 'ready' || member.promisedWaitingPhases === undefined) return null;
 
   const phases = member.promisedWaitingPhases;
-  const minutes = phasesToMinutes(phases, clock.secondsPerPhase ?? null);
+  const duration = phaseDurationText(phases, clock.secondsPerPhase ?? null);
   const busy = ctx.tx.stage !== 'idle' || ctx.tx.approveStage !== 'idle' || ctx.tx.receipt !== null;
 
   return (
@@ -38,13 +37,16 @@ export function PromisedPhasesCard({ ctx }: PromisedPhasesCardProps) {
               className="mt-1 text-xl font-semibold text-foreground"
               data-testid="gov-phases-card-value"
             >
-              {minutes === null
-                ? copy.gov.stats.phasesValue(formatTokenAmount(phases, 0))
-                : copy.gov.stats.phasesValueWithMinutes(
-                    formatTokenAmount(phases, 0),
-                    String(minutes),
-                  )}
+              {phasesValueText(phases)}
             </p>
+            {duration !== null ? (
+              <p
+                className="mt-1 text-[11px] leading-4 text-muted"
+                data-testid="gov-phases-card-time"
+              >
+                {duration}
+              </p>
+            ) : null}
             <p className="mt-1 text-[11px] leading-4 text-muted">
               {copy.gov.phasesAdjust.cardHint}
             </p>

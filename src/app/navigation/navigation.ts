@@ -78,6 +78,7 @@ const PAGE_TITLES: Readonly<Record<string, string>> = Object.freeze({
   '/stake/stakelp': copy.pageTitles.stakeLp,
   '/stake/staketoken': copy.pageTitles.stakeToken,
   '/stake/unstake': copy.pageTitles.unstake,
+  '/stake/liquid': copy.pageTitles.stakeLiquid,
   '/act': copy.placeholders.act.title,
   '/group': copy.placeholders.group.title,
   '/me': copy.placeholders.me.title,

@@ -235,3 +235,54 @@ export function phasesToMinutes(phases: bigint, secondsPerPhase: number | null):
   const totalMilliseconds = Number(phases) * millisecondsPerPhase;
   return Math.max(1, Math.ceil(totalMilliseconds / MILLISECONDS_PER_MINUTE));
 }
+
+/** 1 小时 / 1 天，单位秒；阶段长度由协议决定，这里只做展示换算。 */
+const SECONDS_PER_HOUR = 3_600;
+const SECONDS_PER_DAY = 86_400;
+
+/**
+ * 阶段数 → 便于阅读的时长估算（owner 2026-11-18 20:05：承诺解锁期下拉里除了
+ * 阶段数还要显示预估时间，「超过 1 天用 x.x 天」）。
+ *
+ * 只做展示：阶段长度来自调用方观测到的 `secondsPerPhase`，协议 `sync()` 可能改变
+ * 出块速度，所以页面永远写成「约」。阶段长度未知 / 非法时返回 `{ kind: 'unknown' }`，
+ * 调用方省略估算而不是印一个假时间（AGENTS.md 硬规则 4）。
+ *
+ * 单位切换：< 1 小时按整分钟（向上取整、至少 1 分钟）；< 1 天按小时（一位小数）；
+ * 其余按天（一位小数）。返回值是已四舍五入到一位小数的 `number`，格式化交给
+ * copy 层（领域层不出现中文）。
+ */
+export type PhaseDuration =
+  | { readonly kind: 'unknown' }
+  | { readonly kind: 'minutes'; readonly minutes: number }
+  | { readonly kind: 'hours'; readonly hours: number }
+  | { readonly kind: 'days'; readonly days: number };
+
+/** 保留一位小数（去掉浮点噪声，如 3.3000000000000003 → 3.3）。 */
+function roundToOne(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+export function phasesToDuration(phases: bigint, secondsPerPhase: number | null): PhaseDuration {
+  if (secondsPerPhase === null || !Number.isFinite(secondsPerPhase) || secondsPerPhase <= 0) {
+    return { kind: 'unknown' };
+  }
+  const millisecondsPerPhase = Math.round(secondsPerPhase * MILLISECONDS_PER_SECOND);
+  const totalMilliseconds = Number(phases) * millisecondsPerPhase;
+  if (totalMilliseconds < SECONDS_PER_HOUR * MILLISECONDS_PER_SECOND) {
+    return {
+      kind: 'minutes',
+      minutes: Math.max(1, Math.ceil(totalMilliseconds / MILLISECONDS_PER_MINUTE)),
+    };
+  }
+  if (totalMilliseconds < SECONDS_PER_DAY * MILLISECONDS_PER_SECOND) {
+    return {
+      kind: 'hours',
+      hours: roundToOne(totalMilliseconds / (SECONDS_PER_HOUR * MILLISECONDS_PER_SECOND)),
+    };
+  }
+  return {
+    kind: 'days',
+    days: roundToOne(totalMilliseconds / (SECONDS_PER_DAY * MILLISECONDS_PER_SECOND)),
+  };
+}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
+import { formatPercent, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
@@ -9,23 +10,32 @@ import {
   useGovContext,
   type GovContextValue,
 } from '@/features/governance-stake/model/use-gov-context';
-import { GovCommunityPanel } from '@/features/governance-stake/ui/gov-community-panel';
+import { sharePercent } from '@/features/governance-stake/lib/gov-share';
+import { phaseDurationText, phasesValueText } from '@/features/governance-stake/lib/phase-duration';
+import { GovCommunitySummary } from '@/features/governance-stake/ui/gov-community-summary';
 import { GovGate, GovTxFeedback } from '@/features/governance-stake/ui/gov-gate';
+import { GovStakeLinks, GovStatCell } from '@/features/governance-stake/ui/gov-home-parts';
 import { GovIntro } from '@/features/governance-stake/ui/gov-intro';
-import { GovPublicCard } from '@/features/governance-stake/ui/gov-public-card';
 import { GovQueryPanel } from '@/features/governance-stake/ui/gov-query-panel';
 import { hasStakePosition, MyStakeSummary } from '@/features/governance-stake/ui/my-stake-summary';
 import { StakeActions } from '@/features/governance-stake/ui/stake-actions';
+import { StakeStateCard } from '@/features/governance-stake/ui/stake-controls';
+
+const VOTE_DECIMALS = 18;
 
 type HomeTab = 'mine' | 'community';
 
 /**
  * 治理首页（复刻 TKM `/gov`）：「我的」「社区」两个 tab。
  *
- * - 我的：我的治理资产摘要（治理权 / 份额 / 解锁期 / 解锁状态）→ 有治理权时给出
- *   投票 / 验证 / 链群 / 发射 四张入口卡（对应页面本轮为占位）；没有治理权时给
- *   「立即成为治理者」引导 + 治理权说明。
- * - 社区：社区治理数据 + 治理权查询。
+ * owner 2026-11-18 20:05 给了旧版两张截图，要求这两个 tab 的版面照它排：
+ * - 「我的」：2×2 统计（有效治理权 / 承诺解锁期 / 治理权占比 / 加速质押占比）
+ *   → 两个质押入口 → 「铸造 治理激励」；
+ * - 「社区」：一个头条数字 → 「治理公示」（投票中的行动 / 验证中的行动）→ 2×2 统计
+ *   → 两个质押入口。
+ * 有仓位时「我的」下面继续给「我的流动性质押」明细（份额、可取回两侧、解锁进度）
+ * 与解锁动作；旧版的 APY / 预计新增铸币 / SL·ST 凭证在本协议没有对应只读 view，
+ * 按硬规则 4 不编数，换成真实口径（见 `GovCommunitySummary` 注释）。
  *
  * 旧版按 `validGovVotes(token, account) > 0` 分叉；本协议按 `govVotes(token, 阶段,
  * memberId)`，主体是身份 NFT 而不是钱包地址。
@@ -67,154 +77,121 @@ export function GovPage() {
           ))}
         </div>
 
-        {tab === 'mine' ? <MineTab ctx={ctx} q={q} /> : <CommunityTab ctx={ctx} />}
+        {tab === 'mine' ? <MineTab ctx={ctx} q={q} /> : <CommunityTab ctx={ctx} q={q} />}
       </GovGate>
     </div>
   );
 }
 
 function MineTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string }) {
-  const hasStake = hasStakePosition(ctx.member);
-  const hasVotes = (ctx.member.govVotes ?? 0n) > 0n;
+  if (ctx.member.status === 'error') {
+    return (
+      <StakeStateCard
+        testId="gov-my-error"
+        title={copy.gov.stats.errorTitle}
+        description={copy.gov.stats.errorBody}
+      >
+        <button type="button" className={buttonStyles('secondary', 'md')} onClick={ctx.retry}>
+          {copy.gov.stats.retry}
+        </button>
+      </StakeStateCard>
+    );
+  }
 
-  return (
-    <div className="space-y-4">
-      <Card data-testid="gov-my-assets">
-        <div className="flex items-start justify-between gap-2">
-          <CardTitle>{copy.gov.home.myAssetsTitle}</CardTitle>
-          <Link to={`/gov/rewards${q}`} className="text-xs font-medium text-brand-strong">
-            {copy.gov.home.rewardsAction}
-          </Link>
-        </div>
-        {hasStake ? (
-          <>
-            <div className="mt-3">
-              <MyStakeSummary
-                member={ctx.member}
-                clock={ctx.clock}
-                token={{ symbol: ctx.token?.symbol ?? '', decimals: ctx.token?.decimals }}
-                parent={{ symbol: ctx.parent?.symbol ?? '', decimals: ctx.parent?.decimals }}
-              />
-            </div>
-            <div className="mt-3">
-              <StakeActions ctx={ctx} testIdPrefix="gov-home" />
-            </div>
-          </>
-        ) : (
-          <>
-            <CardDescription>{copy.gov.mine.emptyBody}</CardDescription>
+  if (!hasStakePosition(ctx.member)) {
+    return (
+      <div className="space-y-4">
+        <div data-testid="gov-my-assets">
+          <Card data-testid="gov-become-governor">
+            <CardTitle>{copy.gov.home.becomeTitle}</CardTitle>
+            <CardDescription>{copy.gov.home.becomeBody}</CardDescription>
             <div className="mt-3">
               <Link to={`/stake/stakelp${q}`} className={buttonStyles('primary', 'md', 'w-full')}>
                 {copy.gov.home.becomeAction}
               </Link>
             </div>
-          </>
-        )}
+          </Card>
+        </div>
+        <GovIntro />
+      </div>
+    );
+  }
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <Link to={`/stake/stakelp${q}`} className={buttonStyles('secondary', 'sm')}>
-            {copy.gov.home.stakeLpAction}
-          </Link>
-          <Link to={`/stake/staketoken${q}`} className={buttonStyles('secondary', 'sm')}>
-            {copy.gov.home.stakeBoostAction}
-          </Link>
-          <Link to={`/stake/unstake${q}`} className={buttonStyles('secondary', 'sm')}>
-            {copy.gov.home.unstakeAction}
-          </Link>
-          <Link to={`/stake/liquid${q}`} className={buttonStyles('secondary', 'sm')}>
-            {copy.gov.home.liquidAction}
-          </Link>
+  const phases = ctx.member.promisedWaitingPhases;
+  const myShare = sharePercent(ctx.member.govVotes, ctx.community.totalGovVotes);
+  const boostShare = sharePercent(ctx.member.validBoostShares, ctx.community.totalValidBoostShares);
+  const phasesDuration =
+    phases === undefined ? null : phaseDurationText(phases, ctx.clock.secondsPerPhase ?? null);
+
+  return (
+    <div className="space-y-4">
+      <Card data-testid="gov-my-assets">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+          <GovStatCell
+            label={copy.gov.home.myVotes}
+            value={formatTokenAmount(ctx.member.govVotes, VOTE_DECIMALS)}
+            testId="gov-my-votes"
+          />
+          <GovStatCell
+            label={copy.gov.home.myPhases}
+            value={phases === undefined ? UNKNOWN : phasesValueText(phases)}
+            note={phasesDuration ?? undefined}
+            testId="gov-my-phases-summary"
+          />
+          <GovStatCell
+            label={copy.gov.home.myShare}
+            value={myShare === undefined ? UNKNOWN : `${formatPercent(myShare)}%`}
+            testId="gov-my-share"
+          />
+          <GovStatCell
+            label={copy.gov.home.myBoostShare}
+            value={boostShare === undefined ? UNKNOWN : `${formatPercent(boostShare)}%`}
+            testId="gov-my-boost-share"
+          />
+        </div>
+
+        <div className="mt-4">
+          <GovStakeLinks q={q} />
+        </div>
+
+        <Link
+          to={`/gov/rewards${q}`}
+          data-testid="gov-my-rewards-link"
+          className={`${buttonStyles('secondary', 'md', 'w-full')} mt-4`}
+        >
+          {copy.gov.home.mintRewardAction}
+          <span aria-hidden="true"> &gt;&gt;</span>
+        </Link>
+      </Card>
+
+      <Card data-testid="gov-home-detail">
+        <CardTitle>{copy.gov.home.detailTitle}</CardTitle>
+        <div className="mt-3">
+          <MyStakeSummary
+            member={ctx.member}
+            clock={ctx.clock}
+            token={{ symbol: ctx.token?.symbol ?? '', decimals: ctx.token?.decimals }}
+            parent={{ symbol: ctx.parent?.symbol ?? '', decimals: ctx.parent?.decimals }}
+            testIdPrefix="gov-home-stake"
+            showVotes={false}
+            showPhases={false}
+          />
+        </div>
+        <div className="mt-4">
+          <StakeActions ctx={ctx} testIdPrefix="gov-home" />
         </div>
       </Card>
 
-      {hasVotes ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <PlaceholderEntry
-            title={copy.gov.home.votingCard}
-            body={copy.gov.home.votingBody}
-            action={copy.gov.home.votingAction}
-            to={`/vote${q}`}
-            testId="gov-entry-vote"
-          />
-          <PlaceholderEntry
-            title={copy.gov.home.verifyingCard}
-            body={copy.gov.home.verifyingBody}
-            action={copy.gov.home.verifyingAction}
-            to={`/verify${q}`}
-            testId="gov-entry-verify"
-          />
-          <PlaceholderEntry
-            title={copy.gov.home.groupsCard}
-            body={copy.gov.home.groupsBody}
-            action={copy.gov.home.groupsAction}
-            to="/group"
-            testId="gov-entry-groups"
-          />
-          <PlaceholderEntry
-            title={copy.gov.home.deployCard}
-            body={copy.gov.home.deployBody}
-            action={copy.gov.home.deployAction}
-            to="/apps"
-            testId="gov-entry-deploy"
-          />
-        </div>
-      ) : (
-        <Card data-testid="gov-become-governor">
-          <CardTitle>{copy.gov.home.becomeTitle}</CardTitle>
-          <CardDescription>{copy.gov.home.becomeBody}</CardDescription>
-          <div className="mt-3">
-            <Link to={`/stake/stakelp${q}`} className={buttonStyles('primary', 'md', 'w-full')}>
-              {copy.gov.home.becomeAction}
-            </Link>
-          </div>
-        </Card>
-      )}
-
-      <GovPublicCard q={q} />
       <GovIntro />
     </div>
   );
 }
 
-function CommunityTab({ ctx }: { readonly ctx: GovContextValue }) {
-  const q = `?symbol=${encodeURIComponent(ctx.symbol)}`;
+function CommunityTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string }) {
   return (
     <div className="space-y-4">
-      <GovPublicCard q={q} />
-      <GovCommunityPanel
-        community={ctx.community}
-        params={ctx.params}
-        token={{ symbol: ctx.token?.symbol ?? '', decimals: ctx.token?.decimals }}
-        parent={{ symbol: ctx.parent?.symbol ?? '', decimals: ctx.parent?.decimals }}
-        myVotes={ctx.member.govVotes}
-      />
+      <GovCommunitySummary community={ctx.community} tokenDecimals={ctx.token?.decimals} q={q} />
       <GovQueryPanel ctx={ctx} />
     </div>
-  );
-}
-
-function PlaceholderEntry({
-  title,
-  body,
-  action,
-  to,
-  testId,
-}: {
-  readonly title: string;
-  readonly body: string;
-  readonly action: string;
-  readonly to: string;
-  readonly testId: string;
-}) {
-  return (
-    <Card data-testid={testId}>
-      <CardTitle>{title}</CardTitle>
-      <CardDescription>{body}</CardDescription>
-      <div className="mt-3">
-        <Link to={to} className={buttonStyles('secondary', 'sm', 'w-full')}>
-          {action}
-        </Link>
-      </div>
-    </Card>
   );
 }

@@ -1,9 +1,9 @@
 import { copy } from '@/shared/config/copy-pages';
-import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatTokenAmount } from '@/shared/lib/format';
 import { stakeUnlockState } from '@/domain/gov-stake';
-import { phasesToMinutes } from '@/domain/gov-stake';
 import type { MemberStake } from '@/entities/stake/model/use-member-stake';
 import type { PhaseClock } from '@/entities/phase/model/use-phase-clock';
+import { phaseDurationText, phasesValueText } from '@/features/governance-stake/lib/phase-duration';
 import { StakeStatRow } from '@/features/governance-stake/ui/stake-controls';
 
 const VOTE_DECIMALS = 18;
@@ -14,6 +14,9 @@ export interface MyStakeSummaryProps {
   readonly token: { readonly symbol: string; readonly decimals: number | undefined };
   readonly parent: { readonly symbol: string; readonly decimals: number | undefined };
   readonly testIdPrefix?: string;
+  /** 首页摘要卡已经单独显示治理权 / 承诺解锁期时，明细里不再重复。 */
+  readonly showVotes?: boolean;
+  readonly showPhases?: boolean;
 }
 
 /** 「我的质押」是否为空仓位：份额与解锁申请都为 0。 */
@@ -33,6 +36,8 @@ export function MyStakeSummary({
   token,
   parent,
   testIdPrefix = 'gov-my',
+  showVotes = true,
+  showPhases = true,
 }: MyStakeSummaryProps) {
   const unlock = stakeUnlockState({
     currentPhase: clock.currentPhase ?? null,
@@ -41,28 +46,25 @@ export function MyStakeSummary({
     secondsPerPhase: clock.secondsPerPhase ?? null,
   });
 
-  const phasesText =
+  const phasesValue =
     member.promisedWaitingPhases === undefined
-      ? UNKNOWN
-      : (() => {
-          const minutes = phasesToMinutes(
-            member.promisedWaitingPhases,
-            clock.secondsPerPhase ?? null,
-          );
-          const phases = formatTokenAmount(member.promisedWaitingPhases, 0);
-          return minutes === null
-            ? copy.gov.stats.phasesValue(phases)
-            : copy.gov.stats.phasesValueWithMinutes(phases, String(minutes));
-        })();
+      ? undefined
+      : phasesValueText(member.promisedWaitingPhases);
+  const phasesDuration =
+    member.promisedWaitingPhases === undefined
+      ? null
+      : phaseDurationText(member.promisedWaitingPhases, clock.secondsPerPhase ?? null);
 
   return (
     <div>
-      <StakeStatRow
-        label={copy.gov.mine.votes}
-        value={formatTokenAmount(member.govVotes, VOTE_DECIMALS)}
-        note={copy.gov.stats.formula}
-        testId={`${testIdPrefix}-votes`}
-      />
+      {showVotes ? (
+        <StakeStatRow
+          label={copy.gov.mine.votes}
+          value={formatTokenAmount(member.govVotes, VOTE_DECIMALS)}
+          note={copy.gov.stats.formula}
+          testId={`${testIdPrefix}-votes`}
+        />
+      ) : null}
       <StakeStatRow
         label={copy.gov.mine.shares}
         value={formatTokenAmount(member.liquidityShares, VOTE_DECIMALS)}
@@ -74,11 +76,14 @@ export function MyStakeSummary({
         note={copy.gov.stats.boostNote}
         testId={`${testIdPrefix}-boost`}
       />
-      <StakeStatRow
-        label={copy.gov.mine.phases}
-        value={phasesText}
-        testId={`${testIdPrefix}-phases`}
-      />
+      {showPhases ? (
+        <StakeStatRow
+          label={copy.gov.mine.phases}
+          value={phasesValue ?? copy.common.unknown}
+          note={phasesDuration ?? undefined}
+          testId={`${testIdPrefix}-phases`}
+        />
+      ) : null}
       <StakeStatRow
         label={copy.gov.mine.token}
         value={formatTokenAmount(member.tokenAmountForLiquidity, token.decimals)}

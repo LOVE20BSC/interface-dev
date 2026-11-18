@@ -7,6 +7,7 @@ import {
   isPromisedWaitingPhasesInRange,
   liquiditySharesAdded,
   optimalAmounts,
+  phasesToDuration,
   phasesToMinutes,
   projectedGovVotesAdded,
   projectedLiquidityGovVotes,
@@ -534,5 +535,38 @@ describe('phasesToMinutes', () => {
     expect(phasesToMinutes(3n, -1)).toBeNull();
     expect(phasesToMinutes(3n, Number.NaN)).toBeNull();
     expect(phasesToMinutes(3n, Number.POSITIVE_INFINITY)).toBeNull();
+  });
+});
+
+describe('phasesToDuration', () => {
+  it('uses whole minutes below one hour, rounding up and never below one', () => {
+    expect(phasesToDuration(1n, 120)).toEqual({ kind: 'minutes', minutes: 2 });
+    expect(phasesToDuration(10n, 120)).toEqual({ kind: 'minutes', minutes: 20 });
+    expect(phasesToDuration(1n, 1)).toEqual({ kind: 'minutes', minutes: 1 });
+    expect(phasesToDuration(1n, 30)).toEqual({ kind: 'minutes', minutes: 1 });
+    expect(phasesToDuration(0n, 60)).toEqual({ kind: 'minutes', minutes: 1 });
+    // 59 min 59 s → 60 minutes（向上取整），仍然在分钟档位。
+    expect(phasesToDuration(1n, 3_599)).toEqual({ kind: 'minutes', minutes: 60 });
+  });
+
+  it('switches to hours at one hour with one decimal', () => {
+    expect(phasesToDuration(1n, 3_600)).toEqual({ kind: 'hours', hours: 1 });
+    // 100 × 120 s = 3.3 h
+    expect(phasesToDuration(100n, 120)).toEqual({ kind: 'hours', hours: 3.3 });
+    expect(phasesToDuration(1n, 86_399)).toEqual({ kind: 'hours', hours: 24 });
+  });
+
+  it('uses x.x days from one day up', () => {
+    expect(phasesToDuration(1n, 86_400)).toEqual({ kind: 'days', days: 1 });
+    expect(phasesToDuration(120n, 86_400)).toEqual({ kind: 'days', days: 120 });
+    expect(phasesToDuration(1n, 129_600)).toEqual({ kind: 'days', days: 1.5 });
+  });
+
+  it('reports unknown instead of guessing when the phase length is unusable', () => {
+    expect(phasesToDuration(3n, null)).toEqual({ kind: 'unknown' });
+    expect(phasesToDuration(3n, 0)).toEqual({ kind: 'unknown' });
+    expect(phasesToDuration(3n, -1)).toEqual({ kind: 'unknown' });
+    expect(phasesToDuration(3n, Number.NaN)).toEqual({ kind: 'unknown' });
+    expect(phasesToDuration(3n, Number.POSITIVE_INFINITY)).toEqual({ kind: 'unknown' });
   });
 });

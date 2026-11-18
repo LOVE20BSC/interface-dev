@@ -12,8 +12,8 @@ import { MyStakeSummary } from '@/features/governance-stake/ui/my-stake-summary'
 import { StakeLiquidityPanel } from '@/features/governance-stake/ui/stake-liquidity-panel';
 
 /**
- * 质押LP（复刻 TKM `/stake/stakelp`）：治理权说明 → 我的流动性质押 → 质押表单
- * （智能模式：单币即可，或关掉后两侧都填）→ 提示。
+ * 流动性质押（复刻 TKM `/stake/stakelp`）：治理权说明 → 我的流动性质押 → 质押表单
+ * （智能模式：单币即可，或关掉后两侧按池子比例自动联动）→ 提示。
  */
 export function StakeLpPage() {
   const ctx = useGovContext();
@@ -83,6 +83,7 @@ function StakeLpBody({
         params={ctx.params}
         balances={ctx.balances}
         tx={ctx.tx}
+        secondsPerPhase={ctx.clock.secondsPerPhase}
         disabled={
           ctx.tx.stage !== 'idle' || ctx.tx.approveStage !== 'idle' || ctx.tx.receipt !== null
         }

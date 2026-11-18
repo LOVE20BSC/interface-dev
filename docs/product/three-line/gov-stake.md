@@ -465,7 +465,7 @@ spec（**2026-11-17 晚按 TKM 多页面 IA 重写后为 8 条 `test()`**；下�
 | `/gov` | `/gov`（治理首页：我的 / 社区） | 实装 |
 | `/stake/stakelp` | `/stake/stakelp` | 实装（含智能模式） |
 | `/stake/staketoken` | `/stake/staketoken` | 实装（加速质押） |
-| `/stake/unstake` | `/stake/unstake` | 实装（申请解锁 / 撤出 / 增加承诺解锁期） |
+| `/stake/unstake` | `/stake/unstake` | 实装（申请解锁 / 撤出 / 提高承诺解锁期） |
 | `/stake/liquid` | `/stake/liquid` | 实装（只读数据页） |
 | `/my/govrewards` | `/gov/rewards` | 占位（Mint ABI 未导出） |
 | `/vote/*`、`/verify/*`、`/submit/*`、`/acting/*`、`/action/*` | 同名路径 | 占位（Vote/Verify/Submit ABI 未导出） |
@@ -475,6 +475,17 @@ spec（**2026-11-17 晚按 TKM 多页面 IA 重写后为 8 条 `test()`**；下�
 **2026-11-18 变更（owner：承诺解锁期怎么选）**：**首次质押**（没有流动性质押仓位）时表单里仍可选择任意合法承诺解锁期（`PROMISED_WAITING_PHASES_MIN..MAX`，本链 1–100）——合约允许，Hub 也不限制首押；**已有仓位再加仓**时不再给选择（与 periphery `LOVE20Hub` 一致：`_stake` 要求承诺解锁期等于当前值），改为页面顶部「调整承诺解锁期」卡单独加大（`increasePromisedWaitingPhases`，只能加大）。因此前端线 C1 仍是单步：首押选 10 个阶段 → 回执 `治理权 +223.606797`、份额 `22.360679`，与 §1 完全一致；提交后表单里的选择器消失、出现「已有质押：承诺解锁期保持 10 个阶段」说明与顶部调整卡。C3 的 10→25 由顶部卡完成（`+335.410196`）。
 
 **2026-11-18 前端线复跑（承诺解锁期单独调整之后）**：spec 8 条，8555 `E2E_REUSE_PREVIEW=0 pnpm e2e --grep "治理域"` → **8 passed（3.2m）EXIT 0**；8566 `E2E_ANVIL_RPC=… pnpm exec playwright test e2e/gov-stake-numbers.spec.ts` → **8 passed（2.7m）EXIT 0**（snapshot 0x0 → reverted 0x0）。C1 两步：首押回执 `治理权 +22.360679` → 顶部卡调整 1→10（`+201.246117`）→ 末态 `223.606797`；C3 由顶部卡完成 10→25（`+335.410196` → `559.016994`）。
+
+**2026-11-18 20:05 变更（owner：首页两 tab 按旧版截图重排 + 首押承诺解锁期改下拉 + 非智能模式两侧联动）**：数值口径（§1）一个 wei 没变，变的是版面与输入方式：
+
+- **首页「我的」**：2×2 摘要 = `我的有效治理权 223.606797` / `我承诺的解锁期 10 个阶段`（下一行 `约 20 分钟`）/ `我的治理权占比 4.76%` / `加速质押占比 0%` → 两个入口 `流动性质押获取治理权` / `加速质押增加加速激励` → 描边按钮 `铸造 治理激励`；有仓位时下面是明细（份额 `22.360679` 等）与解锁动作。
+- **首页「社区」**：头条 `社区总治理权 4,695.742752`（本阶段）→ 治理公示（`投票中的行动` / `验证中的行动`）→ 四格 `4,494.496634` / `4,494.496634` / `0` / `0`（社区流动性质押份额 / 流动性凭证总量 / 本阶段有效加速份额 / 累计销毁社区代币）→ 两个入口。旧版头条「APY」与「预计新增铸币 / SL / ST 凭证」在 `Stake` 里没有对应 view，按硬规则 4 换成真实口径，不编数；完整社区口径仍在 `/stake/liquid`。
+- **首次质押承诺解锁期**：下拉列表（选项来自 `PROMISED_WAITING_PHASES_MIN..MAX`，每项 `N 个阶段 · 约 X`；本链 `1 个阶段 · 约 2 分钟` … `100 个阶段 · 约 3.3 小时`），默认 `1`；选择后回执与 §1 的 `10 个阶段` 一致。
+- **非智能模式两侧联动**：填 `1000` TestLOVE20 → 父币自动 `0.5`；再改父币 `1` → 社区代币自动 `2000`；因此 C1 不再需要「先填 1 再被合约截断成 0.5」，但 C1 期望值不变（`按池子比例实际存入 1,000 TestLOVE20 + 0.5 TestWETH。` → `223.606797`）。
+- **文案**：顶卡按钮 `调整` → `提高`，回执标题 `承诺解锁期已增加` → `承诺解锁期已提高`；`质押LP` 相关可见文案改为 `流动性质押` / `去质押流动性`。
+- **查询面板**：两个模式。按身份 NFT：`#1` / NFT 名称 / 当前持有人地址 / 查询目标地址 / `治理权 4,472.135954` / `占总治理权比例 100%` / 备注；按钱包地址：`该钱包当前持有 1 个身份 NFT` + 汇总治理权。
+
+**2026-11-18 21:57 前端线复跑（最终代码）**：8555 `E2E_REUSE_PREVIEW=0 pnpm e2e e2e/gov-stake-numbers.spec.ts` → **8 passed（2.4m），EXIT 0**（snapshot 0x0 → reverted 0x0）；三线链 8566 `E2E_ANVIL_RPC=http://127.0.0.1:8566 E2E_PORT=4174 pnpm e2e e2e/gov-stake-numbers.spec.ts` → **8 passed（2.0m），EXIT 0**（snapshot 0x0 → reverted 0x0），两条链断言逐字相同；24 张截图由最终代码重生成（`gov-home-* / stake-lp-* / stake-token-* / unstake-* / gov-vote-placeholder-*`）。同晚 8555 全量回归：`E2E_REUSE_PREVIEW=0 pnpm e2e` → **160/160 passed（11.8m），EXIT 0**。
 
 **智能模式的合约依据（不在 §1 理论线里，属新增功能）**：单币质押由 periphery `LOVE20Hub` 完成——`stakeLiquidityWithNative`（必须带 value，只填社区代币时会 revert `ZeroNativeTokenAmount`）/ `stakeLiquidityWithToken`（两枚 ERC20，只填社区代币时用它）；页面按「有没有原生币输入」选入口，报价用 `quoteStakeLiquidity(WithNative)` 的 `willSwap / amountToSwap / amountOutFromSwap / prepared* / liquiditySharesAdded / govVotesAdded`，滑点折算后的 `minLiquidityShares` 作为最少份额。C1–C4 的理论值仍走**关闭智能模式**的直接 `Stake.stakeLiquidity` 路径，因此与前文逐 wei 对齐。
 

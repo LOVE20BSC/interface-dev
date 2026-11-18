@@ -4,11 +4,11 @@ import { copy } from '@/shared/config/copy-pages';
 import {
   increasedPromisedWaitingPhasesVotes,
   isPromisedWaitingPhasesInRange,
-  phasesToMinutes,
 } from '@/domain/gov-stake';
 import { formatTokenAmount } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';
 import { Sheet } from '@/shared/ui/sheet';
+import { phaseDurationText } from '@/features/governance-stake/lib/phase-duration';
 import { PHASE_PRESETS, parsePhaseCount } from '@/features/governance-stake/lib/stake-form';
 import type { GovContextValue } from '@/features/governance-stake/model/use-gov-context';
 
@@ -95,10 +95,7 @@ export function IncreasePhasesSheet({
         <p className="text-sm leading-6 text-muted">
           {copy.gov.phasesAdjust.current(
             formatTokenAmount(currentPhases, 0),
-            (() => {
-              const minutes = phasesToMinutes(currentPhases, ctx.clock.secondsPerPhase ?? null);
-              return minutes === null ? null : String(minutes);
-            })(),
+            phaseDurationText(currentPhases, ctx.clock.secondsPerPhase ?? null),
           )}
         </p>
         <div className="flex flex-wrap items-center gap-2">

@@ -51,7 +51,7 @@ export const copy = {
   nav: {
     home: '首页',
     gov: '治理',
-    stakeLp: '质押LP',
+    stakeLp: '流动性质押',
     stakeToken: '质押代币',
     unstake: '取消质押',
     act: '行动',
@@ -150,7 +150,7 @@ export const copy = {
     approvals: '代币授权',
     liquidity: '流动性池',
     gov: '治理',
-    stakeLp: '质押LP',
+    stakeLp: '流动性质押',
     stakeToken: '质押代币',
     unstake: '取消质押',
     stakeLiquid: '流动性质押数据',

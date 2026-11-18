@@ -1388,10 +1388,6 @@ export const copy = {
   // 是唯一消费者。
   // ───────────────────────────────────────────────────────────────────────────
   gov: {
-    tabs: {
-      stake: '质押',
-      mine: '我的质押',
-    },
     intro: '流动性质押决定你的治理权；加速质押不产生治理权，只决定加速激励里你能分到多少。',
     gates: {
       connectTitle: '连接钱包后可以参与治理',
@@ -1412,11 +1408,16 @@ export const copy = {
     },
     stats: {
       boost: '加速质押份额',
-      phases: '承诺解锁期',
       phasesValue: (phases: string) => `${phases} 个阶段`,
-      /** 阶段数 + 约 N 分钟：阶段长度会被协议调整，所以永远写「约」. */
-      phasesValueWithMinutes: (phases: string, minutes: string) =>
-        `${phases} 个阶段（约 ${minutes} 分钟）`,
+      /**
+       * 承诺解锁期的时间估算。阶段长度会被协议调整（`sync()`），所以永远写「约」；
+       * 超过 1 天按「x.x 天」写（owner 2026-11-18 20:05）。
+       */
+      durationMinutes: (minutes: string) => `约 ${minutes} 分钟`,
+      durationHours: (hours: string) => `约 ${hours} 小时`,
+      durationDays: (days: string) => `约 ${days} 天`,
+      /** 下拉选项：阶段数 + 预估时长，例如「10 个阶段 · 约 20 分钟」。 */
+      phasesWithDuration: (phases: string, duration: string) => `${phases} 个阶段 · ${duration}`,
       formula: '治理权 = 流动性质押份额 × 承诺解锁期',
       boostNote: '只统计本阶段有效的加速份额',
       loading: '读取质押状态中…',
@@ -1496,10 +1497,10 @@ export const copy = {
       stateWithdrawable: '可以撤出了',
       stateWithdrawableNote: '撤出后这些代币会回到钱包，治理权清零。',
       stateUnknown: '解锁状态暂时读不到。',
-      increasePhases: '增加承诺解锁期',
-      increasePhasesMin: (phases: string) => `至少要增加到 ${phases} 个阶段。`,
+      increasePhases: '提高承诺解锁期',
+      increasePhasesMin: (phases: string) => `至少要提高到 ${phases} 个阶段。`,
       increasePhasesInvalid: '请输入整数阶段数。',
-      increasePhasesSubmit: '确认增加',
+      increasePhasesSubmit: '确认提高',
       unstake: '申请解锁',
       unstakeHint: '本阶段已经投过票或推举过，就不能申请解锁，要等下一个阶段。',
       unstakeTitle: '确认申请解锁？',
@@ -1547,70 +1548,97 @@ export const copy = {
     pageTitles: {
       home: '治理首页',
       rewards: '治理激励',
-      stakeLp: '质押LP',
+      stakeLp: '流动性质押',
       stakeToken: '质押代币',
       unstake: '取消质押',
       liquid: '流动性质押数据',
     },
     publicCard: {
-      title: '治理动态',
-      hint: '列表页随 M1 接入，先保留旧版入口。',
+      title: '治理公示',
       voteActions: '投票中的行动',
       verifyActions: '验证中的行动',
-      submitActions: '推举',
     },
-    /** 旧库 LOVE20TKM /gov 首页：我的 / 社区 两个 tab。 */
+    /**
+     * 旧库 LOVE20TKM /gov 首页：我的 / 社区 两个 tab。
+     *
+     * owner 2026-11-18 20:05 给了旧版两张截图，要求这两个 tab 的版面照它排：
+     * 「我的」= 2×2 统计 + 两个质押入口 + 铸造治理激励；「社区」= 一个头条数字 +
+     * 治理公示 + 2×2 统计 + 两个质押入口。旧版的「预估年化收益率 APY / 预计新增
+     * 铸币 / SL·ST 代币」在本协议没有对应只读 view，换成同样位置的真实口径
+     * （社区总治理权 / 流动性凭证总量 / 本阶段有效加速份额 / 累计销毁量），不编数。
+     */
     home: {
       tabs: { mine: '我的', community: '社区' },
-      myAssetsTitle: '我的治理资产',
-      votingCard: '投票',
-      votingBody: '用治理权给行动投票。投票随 M1 接入，这里先占位。',
-      votingAction: '去投票',
-      verifyingCard: '验证',
-      verifyingBody: '验证链群行动的参与结果。验证随 M1 接入。',
-      verifyingAction: '去验证',
-      groupsCard: '我的链群',
-      groupsBody: '链群由身份 NFT 组成，链群页随 M1 接入。',
-      groupsAction: '查看链群',
-      deployCard: '发射新代币',
-      deployBody: '发射在「应用 → 发射」接入后开放。',
-      deployAction: '查看应用',
+      /** 「我的」摘要四格。 */
+      myVotes: '我的有效治理权',
+      myPhases: '我承诺的解锁期',
+      myShare: '我的治理权占比',
+      myBoostShare: '加速质押占比',
+      /** 两个质押入口（旧版「质押 获取治理票 / 质押 增加治理收益」）。 */
+      liquidityLink: '流动性质押获取治理权',
+      boostLink: '加速质押增加加速激励',
+      mintRewardAction: '铸造 治理激励',
+      detailTitle: '我的流动性质押',
+      /** 「社区」摘要：头条数字 + 四格。 */
+      communityVotes: '社区总治理权',
+      communityVotesNote: '本阶段',
+      communityShares: '社区流动性质押份额',
+      communityLp: '流动性凭证总量',
+      communityBoost: '本阶段有效加速份额',
+      communityBurned: '累计销毁社区代币',
       becomeTitle: '想给自己喜欢的行动投票？',
       becomeBody: '质押社区代币的流动性，拿到治理权后就能参与投票与激励分配。',
       becomeAction: '立即成为治理者',
-      stakeLpAction: '质押LP',
-      stakeBoostAction: '质押代币',
       unstakeAction: '取消质押',
-      liquidAction: '流动性质押数据',
-      rewardsAction: '治理激励',
     },
     tips: { title: '提示' },
     /** 调整承诺解锁期（owner 2026-11-18：已有质押时单独调整，不在新增质押里选）。 */
     phasesAdjust: {
       title: '调整承诺解锁期',
-      body: '只能加大、不能缩短；每多 1 个阶段，治理权按你的流动性质押份额增加。',
-      current: (phases: string, minutes: string | null) =>
-        minutes === null
+      body: '只能提高、不能缩短；每多 1 个阶段，治理权按你的流动性质押份额增加。',
+      current: (phases: string, duration: string | null) =>
+        duration === null
           ? `当前承诺解锁期：${phases} 个阶段`
-          : `当前承诺解锁期：${phases} 个阶段（约 ${minutes} 分钟）`,
-      action: '调整',
-      cardHint: '质押期间治理权 = 流动性质押份额 × 承诺解锁期；想提高治理权就调整它。',
+          : `当前承诺解锁期：${phases} 个阶段（${duration}）`,
+      /** owner 2026-11-18 20:05：按钮文案从「调整」改成「提高」。 */
+      action: '提高',
+      cardHint: '质押期间治理权 = 流动性质押份额 × 承诺解锁期；想提高治理权就提高承诺解锁期。',
     },
+    /**
+     * 治理权查询（owner 2026-11-18 20:12 按 TKM 旧版截图重排）：
+     * 支持「按身份 NFT」与「按钱包地址」两种查询；钱包查询会枚举该地址当前持有的
+     * 全部身份 NFT（`balanceOf` + `tokenOfOwnerByIndex`）再汇总治理权。
+     */
     query: {
       title: '治理权查询',
-      hint: '按身份 NFT 编号查询：协议没有「钱包地址 → 身份」的反查索引，所以这里输入编号。',
-      label: '身份 NFT 编号',
-      placeholder: '例如 12',
+      hint: '按身份 NFT 编号或钱包地址查询治理权；钱包查询会统计该地址当前持有的全部身份 NFT。',
+      modes: { nft: '按身份 NFT', wallet: '按钱包地址' },
+      nftLabel: '身份 NFT 编号',
+      nftPlaceholder: '例如 12',
+      walletLabel: '钱包地址',
+      walletPlaceholder: '0x…',
       submit: '查询',
-      loading: '查询中…',
-      invalid: '请输入身份 NFT 的整数编号。',
-      error: '这个身份 NFT 的治理权暂时读不到。',
-      notFound: '查询不到这个身份 NFT。',
-      votes: '治理权',
-      phases: '承诺解锁期',
-      shares: '流动性质押份额',
-      boost: '加速质押份额',
       reset: '重置',
+      loading: '查询中…',
+      invalidNft: '请输入身份 NFT 的整数编号。',
+      invalidWallet: '请输入有效的钱包地址。',
+      error: '治理权暂时读不到。',
+      notFoundNft: '这个身份 NFT 还没有质押。',
+      notFoundWallet: '这个钱包当前没有身份 NFT。',
+      nftId: 'NFT ID',
+      nftName: 'NFT 名称',
+      holder: '当前持有人地址',
+      nameUnknown: '读不到名称',
+      target: '查询目标地址',
+      votes: '治理权',
+      votesNote: '本阶段有效治理权',
+      share: '占总治理权比例',
+      noteTitle: '备注',
+      note: '治理权按本阶段有效值统计；已经申请解锁的质押，治理权为 0。',
+      copy: '复制',
+      copied: '已复制',
+      walletCount: (count: string) => `该钱包当前持有 ${count} 个身份 NFT`,
+      walletTruncated: '只统计前 100 个身份 NFT。',
     },
     accelerated: {
       title: '我的加速质押',
@@ -1629,7 +1657,7 @@ export const copy = {
     smart: {
       label: '智能模式',
       onHint: '只填一侧也行：另一侧由合约先兑换再一起质押。',
-      offHint: '两侧都填，按池子比例联动；直接质押，不经过兑换。',
+      offHint: '两侧自动按池子比例联动：改一侧，另一侧立刻跟着变；直接质押，不经过兑换。',
       hubMissing: '这个环境没有配置智能质押的合约，只能用两侧都填的方式。',
       swapNote: (amount: string, symbol: string, out: string, outSymbol: string) =>
         `其中 ${amount} ${symbol} 会先换成 ${out} ${outSymbol}。`,
@@ -1638,7 +1666,6 @@ export const copy = {
         `实际进池 ${a} ${aSymbol} + ${b} ${bSymbol}`,
       minSharesNote: (min: string) => `最少获得 ${min} 流动性份额`,
       quoteFailed: '智能模式的报价暂时算不出来，可以关掉智能模式自己填两侧。',
-      disable: '关掉智能模式，自己填两侧',
       shortfallBoth: '两侧数量都要大于 0。',
       nativeLabel: (symbol: string) => `原生币 ${symbol}`,
       nativeBalance: (amount: string, symbol: string) => `余额 ${amount} ${symbol}`,
@@ -1657,11 +1684,9 @@ export const copy = {
           ? `已申请解锁：还要再等 ${phases} 个阶段才能撤出。`
           : `已申请解锁：还要再等 ${phases} 个阶段（约 ${minutes} 分钟）才能撤出。`,
       noStake: '这个身份 NFT 还没有质押。',
-      goStake: '去质押LP',
-      increasePhases: '增加承诺解锁期',
+      goStake: '去质押流动性',
     },
     liquidPage: {
-      communityTitle: '社区流动性质押',
       mineTitle: '我的流动性质押',
       totalShares: '流动性质押总份额',
       totalLp: '记在质押合约里的流动性凭证',
@@ -1675,7 +1700,7 @@ export const copy = {
       mySharePercent: '我的占比',
       myTokenAmount: (symbol: string) => `我的预计可取回 ${symbol}`,
       myParentAmount: (symbol: string) => `我的预计可取回 ${symbol}`,
-      goStake: '去质押LP',
+      goStake: '去质押流动性',
       feeNote: '手续费结算是流动性凭证口径：结算后用于回购并销毁社区代币。',
       empty: '这个社区还没有流动性质押。',
     },
@@ -1742,13 +1767,13 @@ export const copy = {
         body: '逐轮铸造治理激励需要 Mint 合约的 ABI 导出；当前版本不显示激励金额。',
       },
       backToGov: '回治理首页',
-      goStake: '去质押LP',
+      goStake: '去质押流动性',
       badge: '即将上线',
     },
     receipt: {
       liquidity: '流动性质押已提交',
       boost: '加速质押已提交',
-      increasePhases: '承诺解锁期已增加',
+      increasePhases: '承诺解锁期已提高',
       unstake: '已申请解锁',
       withdraw: '已撤出',
       votes: (votes: string) => `治理权 +${votes}`,
