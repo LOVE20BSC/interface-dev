@@ -4,7 +4,7 @@ import { memberNftAbi, stakeAbi } from '@/config/abis';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
 import { cn } from '@/shared/lib/cn';
-import { formatPercent, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatTinyPercent, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { parseMemberIdInput } from '@/shared/lib/identity-input';
 import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
@@ -394,7 +394,7 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
               />
               <ResultStat
                 label={copy.gov.query.share}
-                value={share === undefined ? UNKNOWN : `${formatPercent(share)}%`}
+                value={share === undefined ? UNKNOWN : `${formatTinyPercent(share)}%`}
                 testId="gov-query-share"
               />
               <div

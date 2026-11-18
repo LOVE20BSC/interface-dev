@@ -4,7 +4,13 @@ import { love20HubAbi, love20TokenAbi, stakeAbi } from '@/config/abis';
 import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { decideApproveAmount } from '@/shared/lib/approve-amount';
-import { formatPercent, formatTokenAmount, formatUnits, UNKNOWN } from '@/shared/lib/format';
+import {
+  formatPercent,
+  formatTokenAmount,
+  formatUnits,
+  isSameAddress,
+  UNKNOWN,
+} from '@/shared/lib/format';
 import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
 import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
@@ -85,6 +91,10 @@ export interface StakeLiquidityPanelProps {
  * - **关闭智能模式**：两侧都填（社区代币 + 父币），按池子比例联动，直接
  *   `Stake.stakeLiquidity`，不经过兑换；两侧比例由合约再截断一次。
  *
+ * 父币是 WETH 时（owner 2026-11-19）：父币一栏直接用原生币（Hub 内置 wrap，用户不用
+ * 自己封装 WETH），因此只有一笔社区代币授权；关掉智能模式也仍走 Hub 原生币入口，
+ * 只是两侧都填并按池子比例联动。
+ *
  * 已有质押时承诺解锁期锁在当前值：Hub 要求与当前值完全相等，Stake 也不允许变小；
  * 想加大请用「增加承诺解锁期」（旧设计里没有这个动作，属协议适配）。
  */
@@ -140,9 +150,14 @@ export function StakeLiquidityPanel({
   const phasesReady = resolveStakePhases(currentPhases, phasesChosen);
 
   const wrappedNative = configuredAddress('weth');
+  const parentIsNative = wrappedNative !== undefined && parent.address === wrappedNative;
+  /** 父币是 WETH 时直接用原生币参与质押（owner 2026-11-19）：走 Hub 内生 wrap，不再让用户封装。 */
+  const nativeParentMode = parentIsNative && hubAddress !== undefined;
+  /** 关闭智能模式但父币是 WETH：两侧都填、仍走 Hub（不经过兑换，只有一笔代币授权）。 */
+  const nativeTwoSide = nativeParentMode && !smartMode;
   const smartAvailable =
     hubAddress !== undefined && wrappedNative !== undefined && parent.address === wrappedNative;
-  const hubPath = smartMode && smartAvailable;
+  const hubPath = (smartMode && smartAvailable) || nativeParentMode;
 
   const tokenParsed = useMemo(
     () => parseStakeAmount(tokenInput, token.decimals ?? 18),
@@ -265,6 +280,8 @@ export function StakeLiquidityPanel({
     validationMessage = copy.gov.liquidity.amountInvalid;
   } else if (hubPath) {
     if ((tokenAmount ?? 0n) === 0n && (nativeAmount ?? 0n) === 0n) {
+      validationMessage = copy.gov.smart.shortfallBoth;
+    } else if (nativeTwoSide && ((tokenAmount ?? 0n) === 0n || (nativeAmount ?? 0n) === 0n)) {
       validationMessage = copy.gov.smart.shortfallBoth;
     } else if (quote.isError) {
       validationMessage = copy.gov.smart.quoteFailed;
@@ -407,25 +424,63 @@ export function StakeLiquidityPanel({
     return rawInputValue(tokenWei, token.decimals ?? 18);
   };
 
+  /** 原生币与社区代币的联动（两侧都填模式）。 */
+  const nativeInputForToken = (raw: string): string | null => {
+    if (!reserveReady || pool.reserveToken === undefined || pool.reserveParent === undefined) {
+      return null;
+    }
+    const parsed = parseStakeAmount(raw, token.decimals ?? 18);
+    if (parsed.kind !== 'ok') return null;
+    const nativeWei = (parsed.value * pool.reserveParent) / pool.reserveToken;
+    return rawInputValue(nativeWei, NETWORK.nativeCurrency.decimals);
+  };
+
+  const tokenInputForNative = (raw: string): string | null => {
+    if (!reserveReady || pool.reserveToken === undefined || pool.reserveParent === undefined) {
+      return null;
+    }
+    const parsed = parseStakeAmount(raw, NETWORK.nativeCurrency.decimals);
+    if (parsed.kind !== 'ok') return null;
+    const tokenWei = (parsed.value * pool.reserveToken) / pool.reserveParent;
+    return rawInputValue(tokenWei, token.decimals ?? 18);
+  };
+
   const handleTokenInput = (raw: string) => {
     setTokenInput(raw);
-    if (hubPath) return;
+    if (hubPath && !nativeTwoSide) return;
+    if (nativeTwoSide) {
+      const nextNative = nativeInputForToken(raw);
+      if (nextNative !== null) setNativeInput(nextNative);
+      return;
+    }
     const next = parentInputForToken(raw);
     if (next !== null) setParentInput(next);
   };
 
-  const handleParentInput = (raw: string) => {
-    setParentInput(raw);
-    const next = tokenInputForParent(raw);
-    if (next !== null) setTokenInput(next);
+  const handleNativeInput = (raw: string) => {
+    setNativeInput(raw);
+    if (!nativeTwoSide) return;
+    const nextToken = tokenInputForNative(raw);
+    if (nextToken !== null) setTokenInput(nextToken);
   };
 
+  const handleParentInput = (raw: string) => {
+    setParentInput(raw);
+    const nextToken = tokenInputForParent(raw);
+    if (nextToken !== null) setTokenInput(nextToken);
+  };
+
+  /** 关闭智能模式时把两侧补齐（父币是 WETH 时补原生币，否则补父币）。 */
   const handleSmartToggle = () => {
     const next = !smartMode;
-    // 从智能模式切回两侧都填时，用当前已填的一侧把另一侧补齐，避免一进表单就缺一侧。
     if (!next) {
-      const synced = parentInputForToken(tokenInput);
-      if (synced !== null) setParentInput(synced);
+      if (nativeParentMode) {
+        const syncedNative = nativeInputForToken(tokenInput);
+        if (syncedNative !== null) setNativeInput(syncedNative);
+      } else {
+        const synced = parentInputForToken(tokenInput);
+        if (synced !== null) setParentInput(synced);
+      }
     }
     setSmartMode(next);
   };
@@ -449,27 +504,31 @@ export function StakeLiquidityPanel({
           <p className="text-sm font-medium text-foreground">{copy.gov.smart.label}</p>
           <p className="mt-0.5 text-[11px] leading-4 text-muted">
             {smartAvailable
-              ? hubPath
-                ? copy.gov.smart.onHint
-                : copy.gov.smart.offHint
+              ? smartMode
+                ? nativeParentMode
+                  ? copy.gov.smart.onHintNative
+                  : copy.gov.smart.onHint
+                : nativeParentMode
+                  ? copy.gov.smart.offHintNative
+                  : copy.gov.smart.offHint
               : copy.gov.smart.hubMissing}
           </p>
         </div>
         <button
           type="button"
           role="switch"
-          aria-checked={hubPath}
+          aria-checked={smartMode}
           aria-label={copy.gov.smart.label}
           data-testid="gov-liquidity-smart-mode"
           disabled={!smartAvailable || disabled}
           onClick={handleSmartToggle}
           className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors ${
-            hubPath ? 'border-brand-strong bg-brand' : 'border-line bg-surface'
+            smartMode ? 'border-brand-strong bg-brand' : 'border-line bg-surface'
           } disabled:opacity-60`}
         >
           <span
             className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow-soft transition-all ${
-              hubPath ? 'left-6' : 'left-0.5'
+              smartMode ? 'left-6' : 'left-0.5'
             }`}
             aria-hidden="true"
           />
@@ -477,30 +536,14 @@ export function StakeLiquidityPanel({
       </div>
 
       <div className="mt-4 space-y-4">
-        <StakeAmountField
-          label={copy.gov.liquidity.tokenLabel(token.symbol)}
-          symbol={token.symbol}
-          decimals={token.decimals}
-          value={tokenInput}
-          onChange={handleTokenInput}
-          balance={balances.tokenBalance}
-          balanceLoading={balances.status === 'loading'}
-          testId="gov-liquidity-token-input"
-          disabled={disabled}
-          onMax={() => {
-            if (balances.tokenBalance !== undefined) {
-              handleTokenInput(rawInputValue(balances.tokenBalance, token.decimals ?? 18));
-            }
-          }}
-        />
-
+        {/* owner 2026-11-19：父币（原生币）在上、社区代币在下 */}
         {hubPath ? (
           <StakeAmountField
             label={copy.gov.smart.nativeLabel(NETWORK.nativeCurrency.symbol)}
             symbol={NETWORK.nativeCurrency.symbol}
             decimals={NETWORK.nativeCurrency.decimals}
             value={nativeInput}
-            onChange={setNativeInput}
+            onChange={handleNativeInput}
             balance={nativeBalance.data?.value}
             balanceLoading={nativeBalance.isLoading}
             testId="gov-liquidity-native-input"
@@ -509,7 +552,7 @@ export function StakeLiquidityPanel({
               const value = nativeBalance.data?.value;
               if (value === undefined) return;
               const usable = value > NATIVE_FEE_RESERVE_WEI ? value - NATIVE_FEE_RESERVE_WEI : 0n;
-              setNativeInput(rawInputValue(usable, NETWORK.nativeCurrency.decimals));
+              handleNativeInput(rawInputValue(usable, NETWORK.nativeCurrency.decimals));
             }}
           />
         ) : (
@@ -530,6 +573,23 @@ export function StakeLiquidityPanel({
             }}
           />
         )}
+
+        <StakeAmountField
+          label={copy.gov.liquidity.tokenLabel(token.symbol)}
+          symbol={token.symbol}
+          decimals={token.decimals}
+          value={tokenInput}
+          onChange={handleTokenInput}
+          balance={balances.tokenBalance}
+          balanceLoading={balances.status === 'loading'}
+          testId="gov-liquidity-token-input"
+          disabled={disabled}
+          onMax={() => {
+            if (balances.tokenBalance !== undefined) {
+              handleTokenInput(rawInputValue(balances.tokenBalance, token.decimals ?? 18));
+            }
+          }}
+        />
 
         {hasExistingPosition ? (
           <p className="text-xs leading-5 text-muted" data-testid="gov-liquidity-phases-note">
@@ -685,16 +745,16 @@ export function StakeLiquidityPanel({
 
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted">
-            {hubPath ? copy.gov.liquidity.approveTitle : copy.gov.liquidity.approveTitle}
+            {hubPath ? copy.gov.liquidity.approveTitleSingle : copy.gov.liquidity.approveTitle}
           </p>
           <StakeApproveRow
             symbol={token.symbol}
             allowance={allowances.allowances[0]}
             required={requiredTokenAmount}
-            stage={tx.approveStage}
+            stage={isSameAddress(tx.approveTokenAddress, token.address) ? tx.approveStage : 'idle'}
             unlimitedPreferred={approvalPreference.enabled}
             testId="gov-liquidity-approve-token"
-            disabled={disabled || tx.stage !== 'idle'}
+            disabled={disabled || tx.stage !== 'idle' || tx.approveStage !== 'idle'}
             onApprove={() => {
               if (requiredTokenAmount === undefined || approveSpender === undefined) return;
               void tx.approve({
@@ -710,10 +770,12 @@ export function StakeLiquidityPanel({
               symbol={parent.symbol}
               allowance={allowances.allowances[1]}
               required={requiredParentAmount}
-              stage={tx.approveStage}
+              stage={
+                isSameAddress(tx.approveTokenAddress, parent.address) ? tx.approveStage : 'idle'
+              }
               unlimitedPreferred={approvalPreference.enabled}
               testId="gov-liquidity-approve-parent"
-              disabled={disabled || tx.stage !== 'idle'}
+              disabled={disabled || tx.stage !== 'idle' || tx.approveStage !== 'idle'}
               onApprove={() => {
                 if (requiredParentAmount === undefined) return;
                 void tx.approve({

@@ -240,7 +240,23 @@ export function formatPercent(value: number, options: PercentFormatOptions = {})
   );
 }
 
-/** Basis points → percentage with at most two decimals, e.g. 123 → `1.23`. */
+/**
+ * 极小百分比的显示（owner 2026-11-19）：占比小到两位小数会变成 0.00% 时，改用
+ * 最多 6 位小数显示（如 0.000012%）；仍小于 0.000001% 则显示 <0.000001%，让用户
+ * 知道「有份额但极小」，而不是误读成 0。
+ */
+export function formatTinyPercent(value: number, locale: string = DEFAULT_LOCALE): string {
+  if (!Number.isFinite(value)) return UNKNOWN;
+  if (value <= 0) return formatPercent(value, { locale });
+  // 用格式化后的字符串判断是否为 0：Number() 解析会破坏千分位与非默认 locale。
+  const two = formatPercent(value, { locale });
+  if (two !== '0') return two;
+  const six = formatPercent(value, { locale, maxFractionDigits: 6 });
+  if (six !== '0') return six;
+  return '<' + formatPercent(0.000001, { locale, maxFractionDigits: 6 });
+}
+
+/** Basis points -> percentage with at most two decimals, e.g. 123 -> `1.23`. */
 export function formatBpsPercent(bps: number): string {
   if (!Number.isFinite(bps)) return UNKNOWN;
   const clamped = Math.max(0, Math.round(bps));

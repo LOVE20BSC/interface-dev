@@ -617,9 +617,10 @@ cta: '立即铸造', title: '已铸造',
 | --- | --- | --- | --- |
 | `formatTokenAmount` | 所有展示的代币数量 | 整数分组、小数**截断**（不四舍五入）、小数位按数量级自适应（最多 6 位，见 §4.5.1） | `format.ts:124-137`、`:164-176` |
 | `formatVisibleTokenAmount` | 会真正移动的金额（批量转账/回执/前后余额） | 非零但会被显示规则抹成 `0` 时渲染 `< 最小可见单位`（18 位精度即 `< 0.000001`） | `format.ts:192-222` |
-| `formatPercent` / `formatBpsPercent` | 百分比、滑点档、占比 | 最多 2 位（截断）；`minimumFractionDigits` 只给固定预置标签 | `format.ts:229-247` |
-| `formatRate` | 价格 / 汇率（`1 FROM ≈ X TO`） | 默认 2 位；价格行可显式传 6 位，避免反向价格被截成 0 | `format.ts:254-277` |
-| `formatPhase` | 高级视图里的轮次/阶段 | 不加千分位 | `format.ts:279-285` |
+| `formatPercent` / `formatBpsPercent` | 百分比、滑点档、占比 | 最多 2 位（截断）；`minimumFractionDigits` 只给固定预置标签 | `format.ts:230-241`、`:260-264` |
+| `formatTinyPercent` | **「占比」类百分比**（治理权占比、加速份额占比、查询结果占比） | 先按 2 位；占比 `>0` 却会被截成 `0.00%` 时改用最多 6 位（如 `0.000012%`）；仍会截成 0 时写 `<0.000001%`，**不把有份额渲染成 0**（§4.5.1） | `format.ts:248-257` |
+| `formatRate` | 价格 / 汇率（`1 FROM ≈ X TO`） | 默认 2 位；价格行可显式传 6 位，避免反向价格被截成 0 | `format.ts:271-294` |
+| `formatPhase` | 高级视图里的轮次/阶段 | 不加千分位 | `format.ts:296-302` |
 | `UNKNOWN` / `DEFAULT_LOCALE` | 未知值 / 默认语言 | `'—'` / `'zh-CN'` | `format.ts:19-21` |
 
 `locale` 规则：**每个 locale 相关函数的签名都带 `locale` 参数（默认 `zh-CN`）**，调用点直接吃默认值；任何 `toLocaleString()`、`new Intl.*` 都只允许出现在 `format.ts` 内部（统计：`grep` 全仓，`shared/lib/format.ts` 之外 0 处）。
@@ -656,11 +657,13 @@ const amountText =
 | `≥ 1e6` | 0 | `99,799,100` |
 
 - 判断依据是 `value / 10^decimals` 的**整数部分**（不是四舍五入后的值）。实现是 `shared/lib/format.ts#fractionDigitsForMagnitude(value, decimals)`，返回 0 / 2 / 4 / 6 四档；`formatTokenAmount` 现在**默认**按它取位数，调用点不要再传死位数。
-- 只有**明确不是代币金额**的面才允许显式传 `maxFractionDigits`，且要在调用点写清原因。现状两个例外：**价格 / 汇率**（`formatRate` 传 6 位——反向价格常常很小，2 位会被截成 0）；**输入框回填 / 校验用的无损原文**（`rawInputValue`：位数 = `decimals`、去掉千分位，不能丢 wei）。**百分比与滑点档固定 2 位**（`formatPercent` / `formatBpsPercent`，最多 2 位、截断），不随数量级变化。
+- 只有**明确不是代币金额**的面才允许显式传 `maxFractionDigits`，且要在调用点写清原因。现状两个例外：**价格 / 汇率**（`formatRate` 传 6 位——反向价格常常很小，2 位会被截成 0）；**输入框回填 / 校验用的无损原文**（`rawInputValue`：位数 = `decimals`、去掉千分位，不能丢 wei）。**百分比与滑点档固定 2 位**（`formatPercent` / `formatBpsPercent`，最多 2 位、截断），不随数量级变化——唯一例外是「占比」类的极小值，见下一条。
+- **占比小到 2 位会变 0 时走极小占比规则**（owner 2026-11-19；实现 `shared/lib/format.ts#formatTinyPercent`）：占比 `> 0` 但按 2 位会被截成 `0.00%` 时，升级到**最多 6 位**（如 `0.000012%`）；6 位仍会截成 0 时写 `<0.000001%`（与「会真正移动的金额」用 `< 最小可见单位` 同一思路），**绝不把「有份额」渲染成 `0.00%`**。适用面 = **「占比」类百分比**（我的治理权占比 / 加速质押占比 / 查询结果里的占比）；滑点、费率、部署参数比例仍固定 2 位（它们是用户设定的值或协议参数，不是份额占比）。
 - 未知值（`undefined` / `null`）仍渲染 `—`，绝不渲染 `0`（§5-2）。
 - **会真正移动的金额**（批量转账合计 / 逐行金额 / 回执 / 前后余额）继续用 `formatVisibleTokenAmount`：非零但被显示规则截成 `0` 时渲染 `< 最小可见单位`（18 位精度即 `< 0.000001`），裸 `0` 只代表真的 0。
 
 owner 原话（2026-11-19）：`|值| < 1` → 6 位；`1–999` → 4 位；`1e3–1e6` → 2 位；`≥1e6` → 0 位；一律千分位 + 截断不四舍五入；未知仍「—」，非零被截断成 0 时用 `< 最小可见单位`；百分比固定 2 位。
+（2026-11-19 追加的极小占比口径：**占比** > 0 但 2 位会变 0 时升到最多 6 位、更小写 `<0.000001%`，见本节的 `formatTinyPercent` 一条。）
 
 **反例 / 正例**：
 
@@ -672,6 +675,12 @@ formatTokenAmount(balance, 18, { maxFractionDigits: 6 });
 formatTokenAmount(9_999_885_749n * 10n ** 12n, 18);
 // ✅ 会真正移动的金额：非零但会被显示规则截成 0 时给「< 最小可见单位」
 formatVisibleTokenAmount(1n, 18); // '< 0.000001'
+
+// ✅ 极小占比（治理权占比 / 加速份额占比 / 查询结果占比）：2 位会变 0 就升到 6 位，更小给 `<0.000001%`
+`${formatTinyPercent(0.0002)}%`; // '0.0002%'
+`${formatTinyPercent(0.0000004)}%`; // '<0.000001%'
+// ❌ 有份额却显示 0.00%，用户会以为没有治理权
+`${formatPercent(0.0002)}%`;
 ```
 
 ### 4.6 按钮与状态文案的统一形
@@ -718,6 +727,16 @@ approved: '已授权',
 
 **自查**：按页面数同一状态文案 / 同一 `data-testid` 前缀的出现次数；同一内容有两处渲染时，删掉信息量更少的那处（通常是动作区的重复说明），不要两处都留。这条与 GLOSSARY 文案纪律第 6 条「同一概念一页只能有一个叫法」同源：叫法不能有两个，同一内容也不该出现两次。
 
+### 4.7.1 一页通常只做一件事、说明集中（参考性规范，owner 2026-11-19）
+
+**性质：参考性规范，不是硬门禁。** 机器不拦、评审按它判断「这页是不是把多个任务和一堆说明堆在一起」；确实需要例外时按个例分析（见第 4 条）。
+
+1. **一页一件事**：一个页面通常只承载一个用户任务（质押一份流动性、申请解锁、查一个地址的流动性…）。一页上并排两个不相关的任务时，优先拆页面或折进一处入口，而不是把两块表单并排摆出来。
+2. **说明文字尽量集中**：同一页的规则 / 提示收进**一张**说明卡或一份说明里，不要「每张卡都配一段小字」。同页多张说明卡会把正文挤散，也让用户不知道先读哪张——2026-11-19 的 `/stake/stakelp` 就把「提示」与「治理权的作用」合并成一张「治理权的作用与提示」（`data-testid="gov-rules-card"`），`/stake/staketoken` 则把散落的提示收成一张「加速激励质押的作用」。
+3. **多个元素各自都需要说明时，用信息符号按钮**：在元素旁放一枚 `Info` 图标按钮（`shared/ui/icons` 的 `Info`；图标 `aria-hidden`，按钮自身带 `aria-label` 说明点开是什么），点击**自下而上弹出面板**（用 `shared/ui/sheet` 的 `Sheet`：`<md` 底部 sheet / `≥md` 居中弹层，§6.5），面板里放该元素的解释。这样按钮不占正文行、页面也不会被说明文字撑长。图标按钮的现成写法可参照 `/me`「质押资产」里「我的流动性质押」标题旁的信息按钮（`copy.gov.mine.infoAria` / `infoTitle`，`aria-label` + `Info aria-hidden`）；它当前的说明层是锚定 popover（`PopoverContent`），**新加的信息按钮按本节用自下而上的 `Sheet`**，已有锚定写法不强制改造（按个例判断）。
+4. **例外要具体分析**：确实需要在同页并排多块说明时（例如必须同屏对照的两份口径），在实现处写清为什么不能收进信息按钮，评审按个例判断，不套模板、也不为凑规则删掉用户真正需要的信息。
+5. 本条与 §4.7 是同一取向的两面：§4.7 管**重复**（同一内容说两遍不行），本条管**分散**（每处都配一段小字也不行）。
+
 ### 4.8 第 4 章检查清单
 
 - [ ] 新增中文没有落在 `copy.ts` / `copy-pages.ts` 之外（`pnpm vitest run src/architecture.test.ts`）。
@@ -725,9 +744,10 @@ approved: '已授权',
 - [ ] 句子是函数；组件里没有 `+`/模板串拼中文。
 - [ ] 术语逐条过 `GLOSSARY.md`：空投=空投铸造、LP=流动性凭证、激励≠奖励。
 - [ ] 数字走 `format.*`；没有新的 `toLocaleString` / `toFixed` / `Number(...)/1e18`。
-- [ ] 金额位数跟数量级走（§4.5.1）：调用点没有写死位数；会移动的金额用 `formatVisibleTokenAmount`。
+- [ ] 金额位数跟数量级走（§4.5.1）：调用点没有写死位数；会移动的金额用 `formatVisibleTokenAmount`；「占比」类百分比用 `formatTinyPercent`，有份额时不会显示成 `0.00%`。
 - [ ] 按钮与状态用 4.6 的表里的固定形，省略号是 `…`。
 - [ ] 同一内容没有在同一页面出现两次（§4.7）：状态只在一张卡出现，摘要与明细不重复；页面级帮助 / 提示除外。
+- [ ] 一页只做一件事、说明集中（§4.7.1，参考性）：没有把两件无关的事并排堆在一页；同页说明已收进一张卡，多个元素各自要解释时用 `Info` 信息按钮 + `Sheet` 面板，例外处写清理由。
 
 ---
 
@@ -924,6 +944,7 @@ setError(String(error));           // 或 error.message
 | 6-4 | 颜色只用语义 token | 禁止 palette 类与 `#rrggbb` | `docs/adr/0005-color-tokens-and-theme.md:13-15` |
 | 6-5 | Radix 弹层一个实现两断点 | 必须有 Title；焦点归还由弹层统一负责 | `src/shared/ui/sheet.tsx:24-28`、`:16-22` |
 | 6-6 | 按钮组顺序 | 先决条件（授权）在前、主按钮在后、同组在流内 | `src/shared/ui/action-stack.tsx:9-26` |
+| 6-7 | 可点 / 不可点一眼分辨 | primary 禁用 → 灰底；secondary 禁用 → 虚线边框；禁用态 `cursor-not-allowed`；禁用时旁边给原因 | §6.6.1；`src/shared/ui/button.tsx:33-40` |
 
 ### 6.1 `data-testid` 命名约定
 
@@ -1123,6 +1144,37 @@ const restoreAnchorFocus = (event: Event) => {
 
 第 6 章这套顺序的产品依据写在 `m0-ux-spec.md:704-705`（owner 2026-11-14：「授权和兑换按钮应放到一起……先决条件按钮在前、主按钮在后」；移动端不再有 fixed 吸底按钮栏）。
 
+### 6.6.1 可点 / 不可点一眼分辨（owner 2026-11-19）
+
+规则：**禁用态的外观必须和可点态明显不同，而且按 variant 分两种禁用外观**——用户不该靠「点一下没反应」才发现按钮不可点。禁用样式只在 `shared/ui/button.tsx#buttonStyles()` 里定义，页面不要自己拼 `disabled:opacity-*` 之类的覆盖。
+
+| 按钮 | 可点 | 不可点（`disabled`） |
+| --- | --- | --- |
+| `primary`（主操作） | 品牌色实底 + `text-on-brand` + 阴影 | **灰底**（中性面 `bg-elevated`）+ `text-muted`、无阴影、品牌色完全退掉 |
+| `secondary`（次要动作 / 先决条件如「授权」） | 实线描边 `border-line` + `bg-surface` | **虚线描边** + `text-muted`（虚线是「这一格现在不能按」的统一视觉，与空态虚线卡同源，§6.2） |
+| 鼠标指针 | `cursor-pointer` | `cursor-not-allowed`；**不要用 `pointer-events-none` 把光标也吃掉**——光标连同 hover 反馈一起消失后，用户会以为按钮坏了，而不是知道自己现在不能点 |
+| 进行中 | — | 走 `loading`：按钮内文案换「…中…」+ 进度图标、保持看得懂；不是简单 disabled |
+
+三条配套纪律：
+
+1. **禁用必须给原因**：按钮不可点时，旁边或下方要有一句可见原因（「两侧数量都要大于 0。」「{symbol} 不够，还差 {x}」），原因消失才解锁；只灰不解释等于让用户猜。
+2. **只读态不是禁用语义**：`已授权` / `已长期授权` / `已铸造` 这类「已经是最终状态」的按钮借用禁用外观，但文案必须是状态词（§4.6），和「这一步还不能做」的禁用要在文案上分得开。
+3. **与 §4.2 的单一写操作约束配套**：同一时刻只允许一个写操作在途，在途时其余写按钮禁用；正因为一次性会有多个按钮变灰，禁用外观才必须一眼能认出（否则用户会以为是自己填错了）。同一页多枚代币的授权按钮（流动性质押的社区代币 / 父币）还要做到「只有正在签名的那一行显示进行中」，另一行禁用但文案不变。
+
+**实现状态（2026-11-19）**：`buttonStyles()` 目前统一给 `disabled:border-line disabled:bg-elevated disabled:text-muted disabled:opacity-100 disabled:pointer-events-none`——**primary 的灰底已达成**；`secondary` 的虚线边框与 `cursor-not-allowed` 还需在该函数里按 variant 分开给（不要在各页面覆盖）。
+
+**反例 / 正例**：
+
+```tsx
+// ❌ 靠透明度冲淡：可点和不可点只差一点灰度，用户分不清
+<Button className="disabled:opacity-60">确认质押</Button>
+// ❌ 用 pointer-events-none 把「不可点」的线索也删掉
+<Button className="disabled:pointer-events-none disabled:opacity-50">确认质押</Button>
+// ✅ 样式收敛在 buttonStyles()：primary 灰底 / secondary 虚线 / cursor-not-allowed，页面只给 disabled 与原因
+<Button variant="primary" disabled={!readyToSubmit}>确认质押</Button>
+<p className="text-xs text-muted">{reasonText}</p>
+```
+
 ### 6.7 第 6 章检查清单
 
 - [ ] `data-testid` 是 kebab-case 层级链，第一段是页面/区域；没有复述文案的锚点。
@@ -1132,7 +1184,8 @@ const restoreAnchorFocus = (event: Event) => {
 - [ ] 没有 palette 色类与 `#rrggbb`；新 token 同步 `index.css` 两套与 ADR/三线文档。
 - [ ] 弹层用 `Sheet`/`PopoverContent`，有 Title，焦点归还走 `onCloseAutoFocus`。
 - [ ] 按钮组在 `ActionStack` 里，先决条件在前、主按钮在后，没有 fixed 吸底。
-- [ ] 金额走 §4.5.1 的数量级规则（不写死位数；百分比 / 费率固定 2 位；会移动的金额用 `formatVisibleTokenAmount`）。
+- [ ] 按钮禁用态按 §6.6.1：primary 灰底、secondary 虚线边框、`cursor-not-allowed`，旁边或下方有一句禁用原因；没有在页面里用 `disabled:opacity-*` 覆盖。
+- [ ] 金额走 §4.5.1 的数量级规则（不写死位数；百分比 / 费率固定 2 位；会移动的金额用 `formatVisibleTokenAmount`；「占比」用 `formatTinyPercent`）。
 
 ---
 

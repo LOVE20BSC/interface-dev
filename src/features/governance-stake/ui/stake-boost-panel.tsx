@@ -196,7 +196,6 @@ export function StakeBoostPanel({
           value={formatTokenAmount(member.boostUsed, token.decimals)}
           testId="gov-boost-used"
         />
-        <p className="pt-2 text-[11px] leading-4 text-muted">{copy.gov.boost.note}</p>
       </div>
 
       <div className="mt-4 space-y-4">

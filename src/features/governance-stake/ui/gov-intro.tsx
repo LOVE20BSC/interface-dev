@@ -40,14 +40,24 @@ export function GovIntro() {
   );
 }
 
-/** 旧版每个质押页底部的「提示」信息框（不折叠，直接给规则）。 */
-export function GovTips() {
+/**
+ * 流动性质押页的「规则」卡（owner 2026-11-19）：把「治理权的作用」和「提示」合并成
+ * 一张卡，避免同页多张说明卡把正文挤散。
+ */
+export function GovRulesCard() {
+  const rewardPercent = ratioPercent(DEPLOYMENT.params.PROPOSAL_REWARD_MIN_VOTE_RATIO);
+  const submitPercent = ratioPercent(DEPLOYMENT.params.SUBMIT_MIN_RATIO);
   return (
-    <Card data-testid="gov-tips" className="border-line bg-elevated/50">
-      <p className="text-sm font-semibold text-foreground">{copy.gov.tips.title}</p>
-      <ul className="mt-2 space-y-1 text-xs leading-5 text-muted">
-        <li>{copy.gov.rules.votes}</li>
-        <li>{copy.gov.rules.boost}</li>
+    <Card data-testid="gov-rules-card">
+      <CardTitle>{copy.gov.rulesCard.title}</CardTitle>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-muted">
+        <li>{copy.gov.governorIntro.itemOwner}</li>
+        {rewardPercent !== undefined ? (
+          <li>{copy.gov.governorIntro.itemReward(rewardPercent)}</li>
+        ) : null}
+        {submitPercent !== undefined ? (
+          <li>{copy.gov.governorIntro.itemSubmit(submitPercent)}</li>
+        ) : null}
         <li>{copy.gov.rules.unlock}</li>
         <li>{copy.gov.rules.fees}</li>
       </ul>

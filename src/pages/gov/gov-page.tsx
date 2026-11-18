@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { formatPercent, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatTinyPercent, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
@@ -171,12 +171,12 @@ function MineTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string
           />
           <GovStatCell
             label={copy.gov.home.myShare}
-            value={myShare === undefined ? UNKNOWN : `${formatPercent(myShare)}%`}
+            value={myShare === undefined ? UNKNOWN : `${formatTinyPercent(myShare)}%`}
             testId="gov-my-share"
           />
           <GovStatCell
             label={copy.gov.home.myBoostShare}
-            value={boostShare === undefined ? UNKNOWN : `${formatPercent(boostShare)}%`}
+            value={boostShare === undefined ? UNKNOWN : `${formatTinyPercent(boostShare)}%`}
             testId="gov-my-boost-share"
           />
         </div>

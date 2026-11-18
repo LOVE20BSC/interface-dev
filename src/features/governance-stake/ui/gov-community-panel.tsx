@@ -1,5 +1,5 @@
 import { copy } from '@/shared/config/copy-pages';
-import { formatPercent, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatPercent, formatTinyPercent, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import type { StakeCommunity } from '@/entities/stake/model/use-stake-community';
@@ -70,7 +70,7 @@ export function GovCommunityPanel({
         />
         <StakeStatRow
           label={copy.gov.community.myShare}
-          value={mySharePercent === undefined ? UNKNOWN : `${formatPercent(mySharePercent)}%`}
+          value={mySharePercent === undefined ? UNKNOWN : `${formatTinyPercent(mySharePercent)}%`}
           testId="gov-community-share"
         />
         <StakeStatRow

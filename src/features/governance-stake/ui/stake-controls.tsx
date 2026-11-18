@@ -207,19 +207,27 @@ export function StakeTxFeedback({
 
 export interface StakeReceiptCardProps {
   readonly title: string;
+  /** Sheet 已经用 title 作为可访问标题时，卡片内不再重复渲染一次（owner 2026-11-19）。 */
+  readonly showTitle?: boolean;
   readonly lines: readonly string[];
   readonly hash: `0x${string}`;
   readonly onClose: () => void;
 }
 
 /** 页面内回执（UX spec §4.3）：标题 + 你得到什么 + 哈希（复制/浏览器）+ 唯一按钮「好的」。 */
-export function StakeReceiptCard({ title, lines, hash, onClose }: StakeReceiptCardProps) {
+export function StakeReceiptCard({
+  title,
+  lines,
+  hash,
+  onClose,
+  showTitle = true,
+}: StakeReceiptCardProps) {
   const [copied, setCopied] = useState(false);
   const explorerUrl =
     NETWORK.blockExplorerUrl !== null ? `${NETWORK.blockExplorerUrl}/tx/${hash}` : null;
   return (
     <Card data-testid="gov-receipt" className="border-brand-strong/30 bg-brand-soft/30">
-      <CardTitle>{title}</CardTitle>
+      {showTitle ? <CardTitle>{title}</CardTitle> : null}
       <CardDescription>{copy.gov.receipt.refreshHint}</CardDescription>
       {lines.length > 0 ? (
         <ul className="mt-3 space-y-1 text-sm leading-6 text-foreground">

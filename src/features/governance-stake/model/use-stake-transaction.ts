@@ -58,6 +58,8 @@ export interface StakeApproveRequest {
 export interface StakeTransactionState {
   readonly stage: StakeStage;
   readonly approveStage: StakeStage;
+  /** 正在授权哪一枚代币：多枚代币各有一行授权按钮时，只有这一行显示进行中。 */
+  readonly approveTokenAddress: HexAddress | undefined;
   /** 每成功确认一次授权就 +1：调用方据此无条件重读授权额度。 */
   readonly approveRevision: number;
   readonly receipt: StakeReceipt | null;
@@ -112,6 +114,7 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
   const [approveWalletAction, setApproveWalletAction] = useState(false);
   const [mainWalletAction, setMainWalletAction] = useState(false);
   const [approveRevision, setApproveRevision] = useState(0);
+  const [approveTokenAddress, setApproveTokenAddress] = useState<HexAddress | undefined>();
   const [receipt, setReceipt] = useState<StakeReceipt | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isResubmitting, setIsResubmitting] = useState(false);
@@ -207,11 +210,13 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
     if (pendingApprove === null || approveReceipt === null) return;
     if (approveReceipt.status === 'reverted') {
       setPendingApprove(null);
+      setApproveTokenAddress(undefined);
       setError(copy.gov.tx.revert);
       return;
     }
     setApproveRevision((current) => current + 1);
     setPendingApprove(null);
+    setApproveTokenAddress(undefined);
     setError(null);
   }, [approveReceipt, pendingApprove]);
 
@@ -280,6 +285,7 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
   const approve = async (request: StakeApproveRequest): Promise<void> => {
     if (account === undefined || submittingRef.current) return;
     setError(null);
+    setApproveTokenAddress(request.tokenAddress);
     setApproveWalletAction(true);
     submittingRef.current = true;
     try {
@@ -294,6 +300,7 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
       setPendingApprove({ hash, owner: { chainId, account } });
     } catch (cause) {
       setError(toUserMessage(cause));
+      setApproveTokenAddress(undefined);
     } finally {
       setApproveWalletAction(false);
       submittingRef.current = false;
@@ -441,6 +448,7 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
   return {
     stage: mainStage,
     approveStage,
+    approveTokenAddress,
     approveRevision,
     receipt,
     error,

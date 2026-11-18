@@ -9,7 +9,6 @@ import {
   type GovContextValue,
 } from '@/features/governance-stake/model/use-gov-context';
 import { GovGate, GovTxFeedback } from '@/features/governance-stake/ui/gov-gate';
-import { GovTips } from '@/features/governance-stake/ui/gov-intro';
 import { hasStakePosition } from '@/features/governance-stake/ui/my-stake-summary';
 import { PromisedPhasesCard } from '@/features/governance-stake/ui/promised-phases-card';
 import { StakeStatRow } from '@/features/governance-stake/ui/stake-controls';
@@ -32,7 +31,6 @@ export function StakeTokenPage() {
         {/* owner 2026-11-18：承诺解锁期（已有流动性质押时）放在加速质押表单上面。 */}
         {hasStakePosition(ctx.member) ? <PromisedPhasesCard ctx={ctx} /> : null}
         <StakeTokenBody ctx={ctx} q={q} />
-        <GovTips />
       </GovGate>
     </div>
   );
@@ -74,6 +72,7 @@ function StakeTokenBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q:
 
   return (
     <div className="space-y-4">
+      <BoostAboutCard />
       <Card data-testid="gov-accelerated-summary">
         <CardTitle>{copy.gov.accelerated.title}</CardTitle>
         <div className="mt-3">
@@ -90,7 +89,6 @@ function StakeTokenBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q:
           <StakeStatRow
             label={copy.gov.accelerated.remaining}
             value={formatTokenAmount(remaining, token.decimals)}
-            note={copy.gov.accelerated.capNote}
             testId="gov-accelerated-remaining"
           />
         </div>
@@ -109,5 +107,16 @@ function StakeTokenBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q:
         onGoLiquidity={() => undefined}
       />
     </div>
+  );
+}
+
+/** 加速激励质押的作用说明（owner 2026-11-19：集中说明，不再散落在提示卡里）。 */
+function BoostAboutCard() {
+  return (
+    <Card data-testid="gov-boost-about">
+      <CardTitle>{copy.gov.boost.aboutTitle}</CardTitle>
+      <CardDescription>{copy.gov.boost.aboutBody}</CardDescription>
+      <p className="mt-2 text-xs leading-5 text-muted">{copy.gov.boost.aboutNote}</p>
+    </Card>
   );
 }

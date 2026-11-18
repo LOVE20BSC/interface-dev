@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
 import { buttonStyles } from '@/shared/ui/button';
+import { Sheet } from '@/shared/ui/sheet';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
 import type { GovContextValue } from '@/features/governance-stake/model/use-gov-context';
 import {
@@ -141,19 +142,30 @@ export function GovTxFeedback({ ctx }: { readonly ctx: GovContextValue }) {
   const receipt = tx.receipt;
   return (
     <div className="space-y-3">
-      {receipt !== null ? (
-        <StakeReceiptCard
-          title={stakeReceiptTitle(receipt)}
-          lines={stakeReceiptLines(receipt, {
-            tokenSymbol: token.symbol,
-            tokenDecimals: token.decimals,
-            parentSymbol: parent.symbol,
-            parentDecimals: parent.decimals,
-          })}
-          hash={receipt.hash}
-          onClose={tx.clearReceipt}
-        />
-      ) : null}
+      {/* owner 2026-11-19：回执改为自下而上的面板弹出，不再塞在页面顶部。 */}
+      <Sheet
+        open={receipt !== null}
+        onOpenChange={(open) => {
+          if (!open) tx.clearReceipt();
+        }}
+        title={receipt === null ? '' : stakeReceiptTitle(receipt)}
+        className="pb-4"
+      >
+        {receipt !== null ? (
+          <StakeReceiptCard
+            title={stakeReceiptTitle(receipt)}
+            lines={stakeReceiptLines(receipt, {
+              tokenSymbol: token.symbol,
+              tokenDecimals: token.decimals,
+              parentSymbol: parent.symbol,
+              parentDecimals: parent.decimals,
+            })}
+            hash={receipt.hash}
+            onClose={tx.clearReceipt}
+            showTitle={false}
+          />
+        ) : null}
+      </Sheet>
       <StakeTxFeedback
         error={tx.error}
         watch={tx.watch}

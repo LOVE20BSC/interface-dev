@@ -1455,10 +1455,16 @@ export const copy = {
       submit: '质押流动性',
       submitting: '质押中…',
       approveTitle: '质押前先授权这两枚代币',
+      approveTitleSingle: '质押前先授权这枚代币',
     },
     boost: {
       title: '加速质押',
-      body: '存入社区代币参与加速激励分配。加速质押不产生治理权；你在本阶段投票时，链上会按当时的加速份额记入这一轮。',
+      /** 加速激励质押的作用（owner 2026-11-19）：治理激励 = 投票激励 + 加速激励。 */
+      aboutTitle: '加速激励质押的作用',
+      aboutBody:
+        '治理激励分两部分：投票激励和加速激励。加速激励质押不产生治理权，但会提高你在加速激励里的份额，让治理激励发得更快、更多。',
+      aboutNote: '加速份额按本阶段统计，下一阶段会按治理权占比重新计算上限。',
+      body: '存入社区代币，参与本阶段的加速激励分配；不产生治理权。',
       lockedTitle: '先完成流动性质押',
       lockedBody: '加速质押要挂在流动性质押上：先质押流动性，再回来加速。',
       lockedAction: '去质押流动性',
@@ -1475,7 +1481,6 @@ export const copy = {
       insufficient: (symbol: string, shortfall: string) => `${symbol} 不够，还差 ${shortfall}`,
       submit: '加速质押',
       submitting: '加速质押中…',
-      note: '加速份额按本阶段统计，下一个阶段会重新计算上限。',
     },
     mine: {
       title: '我的质押',
@@ -1512,7 +1517,8 @@ export const copy = {
       increasePhasesInvalid: '请输入整数阶段数。',
       increasePhasesSubmit: '确认提高',
       unstake: '申请解锁',
-      unstakeHint: '本阶段已经投过票或推举过，就不能申请解锁，要等下一个阶段。',
+      unstakeHint:
+        '申请后治理权立刻清零，等承诺解锁期走完才能撤出；本阶段已经投过票或推举过则要等下一个阶段。',
       unstakeTitle: '确认申请解锁？',
       unstakeBody: '申请后治理权马上清零，等承诺解锁期走完才能撤出。',
       unstakeConfirm: '确认申请解锁',
@@ -1598,7 +1604,8 @@ export const copy = {
       becomeAction: '立即成为治理者',
       unstakeAction: '取消质押',
     },
-    tips: { title: '提示' },
+    /** 流动性质押页：治理权的作用 + 提示合并成一张卡（owner 2026-11-19）。 */
+    rulesCard: { title: '治理权的作用与提示' },
     /** 调整承诺解锁期（owner 2026-11-18：已有质押时单独调整，不在新增质押里选）。 */
     phasesAdjust: {
       title: '调整承诺解锁期',
@@ -1663,7 +1670,9 @@ export const copy = {
     smart: {
       label: '智能模式',
       onHint: '只填一侧也行：另一侧由合约先兑换再一起质押。',
+      onHintNative: '只填一侧也行：原生币会先和社区代币配平，再一起质押。',
       offHint: '两侧自动按池子比例联动：改一侧，另一侧立刻跟着变；直接质押，不经过兑换。',
+      offHintNative: '两侧自动按池子比例联动；父币直接用原生币，不需要封装 WETH，只需一笔授权。',
       hubMissing: '这个环境没有配置智能质押的合约，只能用两侧都填的方式。',
       swapNote: (amount: string, symbol: string, out: string, outSymbol: string) =>
         `其中 ${amount} ${symbol} 会先换成 ${out} ${outSymbol}。`,

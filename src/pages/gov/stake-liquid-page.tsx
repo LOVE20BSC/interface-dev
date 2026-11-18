@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
-import { formatPercent, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatTinyPercent, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
@@ -69,7 +69,9 @@ function LiquidBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q: str
             />
             <StakeStatRow
               label={copy.gov.liquidPage.mySharePercent}
-              value={mySharePercent === undefined ? UNKNOWN : `${formatPercent(mySharePercent)}%`}
+              value={
+                mySharePercent === undefined ? UNKNOWN : `${formatTinyPercent(mySharePercent)}%`
+              }
               testId="gov-liquid-my-share"
             />
             <MyStakeSummary

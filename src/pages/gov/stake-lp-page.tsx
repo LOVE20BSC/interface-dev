@@ -1,14 +1,11 @@
-import { Link } from 'react-router-dom';
 import { configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import { Card, CardTitle } from '@/shared/ui/card';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
 import { useGovContext } from '@/features/governance-stake/model/use-gov-context';
 import { GovGate, GovTxFeedback } from '@/features/governance-stake/ui/gov-gate';
-import { GovIntro, GovTips } from '@/features/governance-stake/ui/gov-intro';
+import { GovRulesCard } from '@/features/governance-stake/ui/gov-intro';
 import { hasStakePosition } from '@/features/governance-stake/ui/my-stake-summary';
 import { PromisedPhasesCard } from '@/features/governance-stake/ui/promised-phases-card';
-import { MyStakeSummary } from '@/features/governance-stake/ui/my-stake-summary';
 import { StakeLiquidityPanel } from '@/features/governance-stake/ui/stake-liquidity-panel';
 
 /**
@@ -19,7 +16,6 @@ export function StakeLpPage() {
   const ctx = useGovContext();
   const { isWrongChain } = useWalletConnection();
   const hub = configuredAddress('hub');
-  const q = `?symbol=${encodeURIComponent(ctx.symbol)}`;
 
   return (
     <div className="space-y-4">
@@ -29,10 +25,8 @@ export function StakeLpPage() {
         {/* owner 2026-11-18：已有流动性质押时，承诺解锁期放在最上面单独调整。 */}
         {hasStakePosition(ctx.member) ? <PromisedPhasesCard ctx={ctx} /> : null}
         <StakeLiquidityForm ctx={ctx} hub={hub} />
-        <GovTips />
-        {/* owner 2026-11-19：我的流动性质押倒数第二，治理权的作用最后。 */}
-        <MyLiquidityStakeCard ctx={ctx} q={q} />
-        <GovIntro />
+        {/* owner 2026-11-19：取消「我的流动性质押」卡；提示与治理权作用合并为一张卡。 */}
+        <GovRulesCard />
       </GovGate>
     </div>
   );
@@ -75,36 +69,5 @@ function StakeLiquidityForm({
         }
       />
     </div>
-  );
-}
-
-/** 流动性质押页的「我的流动性质押」卡（不展示加速质押数据，owner 2026-11-19）。 */
-function MyLiquidityStakeCard({
-  ctx,
-  q,
-}: {
-  readonly ctx: ReturnType<typeof useGovContext>;
-  readonly q: string;
-}) {
-  const { token, parent } = ctx;
-  if (!hasStakePosition(ctx.member) || token === undefined || parent === undefined) return null;
-  return (
-    <Card data-testid="gov-page-my-stake">
-      <div className="flex items-start justify-between gap-2">
-        <CardTitle>{copy.gov.myLiquidityTitle}</CardTitle>
-        <Link to={`/stake/unstake${q}`} className="text-xs font-medium text-brand-strong">
-          {copy.gov.home.unstakeAction}
-        </Link>
-      </div>
-      <div className="mt-3">
-        <MyStakeSummary
-          member={ctx.member}
-          clock={ctx.clock}
-          token={token}
-          parent={parent}
-          showBoost={false}
-        />
-      </div>
-    </Card>
   );
 }

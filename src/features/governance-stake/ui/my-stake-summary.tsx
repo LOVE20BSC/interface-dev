@@ -107,23 +107,20 @@ export function MyStakeSummary({
         />
       ) : null}
 
-      <div
-        data-testid={`${testIdPrefix}-unlock-state`}
-        className="mt-3 rounded-2xl border border-line bg-elevated/60 px-3 py-2"
-      >
-        <p className="text-sm font-medium text-foreground">
-          {unlock.status === 'not-requested'
-            ? copy.gov.mine.stateStaked
-            : unlock.status === 'unlocking'
+      {unlock.status !== 'not-requested' ? (
+        <div
+          data-testid={`${testIdPrefix}-unlock-state`}
+          className="mt-3 rounded-2xl border border-line bg-elevated/60 px-3 py-2"
+        >
+          <p className="text-sm font-medium text-foreground">
+            {unlock.status === 'unlocking'
               ? copy.gov.mine.stateUnlocking
               : unlock.status === 'withdrawable'
                 ? copy.gov.mine.stateWithdrawable
                 : copy.gov.mine.stateUnknown}
-        </p>
-        <p className="mt-1 text-xs leading-5 text-muted">
-          {unlock.status === 'not-requested'
-            ? copy.gov.mine.stateStakedNote
-            : unlock.status === 'unlocking'
+          </p>
+          <p className="mt-1 text-xs leading-5 text-muted">
+            {unlock.status === 'unlocking'
               ? copy.gov.mine.stateUnlockingNote(
                   formatTokenAmount(unlock.phasesRemaining, 0),
                   unlock.minutes === null ? null : String(unlock.minutes),
@@ -131,8 +128,9 @@ export function MyStakeSummary({
               : unlock.status === 'withdrawable'
                 ? copy.gov.mine.stateWithdrawableNote
                 : copy.gov.mine.stateUnknown}
-        </p>
-      </div>
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

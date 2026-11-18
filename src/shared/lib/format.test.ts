@@ -6,6 +6,7 @@ import {
   formatDateTime,
   formatPercent,
   formatRate,
+  formatTinyPercent,
   formatTokenAmount,
   formatUnits,
   formatVisibleTokenAmount,
@@ -222,6 +223,50 @@ describe('formatPercent', () => {
   it('returns the unknown marker for a non-finite percentage', () => {
     expect(formatPercent(Number.NaN)).toBe(UNKNOWN);
     expect(formatPercent(Number.POSITIVE_INFINITY)).toBe(UNKNOWN);
+  });
+});
+
+describe('formatTinyPercent', () => {
+  it('keeps the normal two-digit percentage when it is visible', () => {
+    expect(formatTinyPercent(1.23)).toBe('1.23');
+    expect(formatTinyPercent(0.5)).toBe('0.5');
+    expect(formatTinyPercent(50)).toBe('50');
+    // 两位小数照旧截断，不四舍五入。
+    expect(formatTinyPercent(0.123456)).toBe('0.12');
+  });
+
+  it('renders a zero share as 0, never as the tiny marker', () => {
+    expect(formatTinyPercent(0)).toBe('0');
+  });
+
+  it('switches to at most six fraction digits when two digits would render 0', () => {
+    // 0.004 / 0.0001 / 0.000012 的两位小数都是 0.00，必须换成 6 位显示。
+    expect(formatTinyPercent(0.004)).toBe('0.004');
+    expect(formatTinyPercent(0.0001)).toBe('0.0001');
+    expect(formatTinyPercent(0.000012)).toBe('0.000012');
+    // 0.000001% 正好是 6 位可显示的最小值（不是 < 标记）。
+    expect(formatTinyPercent(0.000001)).toBe('0.000001');
+    // 6 位同样截断，不四舍五入。
+    expect(formatTinyPercent(0.0000019)).toBe('0.000001');
+  });
+
+  it('marks shares below 0.000001% as <0.000001 instead of 0', () => {
+    expect(formatTinyPercent(0.0000004)).toBe('<0.000001');
+    expect(formatTinyPercent(0.0000001)).toBe('<0.000001');
+    // 1e-9 这种远小于显示精度、但仍非零的份额也不许落成 0。
+    expect(formatTinyPercent(0.0000000001)).toBe('<0.000001');
+  });
+
+  it('passes non-positive values through formatPercent', () => {
+    expect(formatTinyPercent(-1.23)).toBe('-1.23');
+    expect(formatTinyPercent(-0.05)).toBe(formatPercent(-0.05));
+    expect(formatTinyPercent(-0.0000001)).toBe(formatPercent(-0.0000001));
+  });
+
+  it('returns the unknown marker for non-finite values', () => {
+    expect(formatTinyPercent(Number.NaN)).toBe(UNKNOWN);
+    expect(formatTinyPercent(Number.POSITIVE_INFINITY)).toBe(UNKNOWN);
+    expect(formatTinyPercent(Number.NEGATIVE_INFINITY)).toBe(UNKNOWN);
   });
 });
 

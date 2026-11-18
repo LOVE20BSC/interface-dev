@@ -37,7 +37,7 @@ export function buttonStyles(
     // Disabled is a neutral "raised surface + secondary text" state instead of a
     // washed-out 60% opacity: 60% white on 60% blue was 1.80:1 (light) and read as
     // broken, not disabled. Muted on elevated is 5.54:1 light / 3.95:1 dark.
-    'disabled:pointer-events-none disabled:border-line disabled:bg-elevated disabled:text-muted disabled:opacity-100 disabled:shadow-none',
+    'disabled:cursor-not-allowed disabled:border-dashed disabled:border-line disabled:bg-elevated disabled:text-muted disabled:opacity-100 disabled:shadow-none',
     VARIANTS[variant],
     SIZES[size],
     className,
