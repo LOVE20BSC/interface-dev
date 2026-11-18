@@ -16,7 +16,9 @@ import type { StakeParams } from '@/entities/stake/model/use-stake-params';
 import { useHubStakeQuote } from '@/entities/stake/model/use-hub-stake-quote';
 import {
   amountShortfall,
+  parsePhaseCount,
   parseStakeAmount,
+  PHASE_PRESETS,
   resolveStakePhases,
   stakeDeadline,
 } from '@/features/governance-stake/lib/stake-form';
@@ -107,14 +109,26 @@ export function StakeLiquidityPanel({
   const [nativeInput, setNativeInput] = useState('');
   const [smartMode, setSmartMode] = useState(true);
   const [slippagePercent, setSlippagePercent] = useState<number>(DEFAULT_SLIPPAGE_PERCENT);
+  const [phasesInput, setPhasesInput] = useState('');
 
   /**
-   * 新增流动性质押**不再选择承诺解锁期**（owner 2026-11-18）：与 periphery
-   * LOVE20Hub 的语义一致——已有仓位时承诺解锁期必须保持当前值；首次质押取合约
-   * 最小值，质押后用页面顶部的「调整承诺解锁期」单独加大。
+   * 承诺解锁期（owner 2026-11-18）：
+   * - **首次质押**（没有仓位）：合约允许任意合法值，表单里由用户选择；
+   * - **已有质押**：必须保持当前值（Hub 的 `_stake` 要求相等），表单不再给选择，
+   *   改为页面顶部的「调整承诺解锁期」卡单独调整。
    */
   const currentPhases = member.promisedWaitingPhases ?? 0n;
-  const phasesReady = resolveStakePhases(currentPhases, params.minPhases);
+  const hasExistingPosition = currentPhases > 0n;
+  const defaultPhases = params.minPhases;
+  const phasesText =
+    phasesInput.trim().length === 0
+      ? defaultPhases === undefined
+        ? ''
+        : String(defaultPhases)
+      : phasesInput;
+  const phasesParsed = useMemo(() => parsePhaseCount(phasesText), [phasesText]);
+  const phasesChosen = phasesParsed.kind === 'ok' ? phasesParsed.value : undefined;
+  const phasesReady = resolveStakePhases(currentPhases, phasesChosen);
 
   const wrappedNative = configuredAddress('weth');
   const smartAvailable =
@@ -222,6 +236,18 @@ export function StakeLiquidityPanel({
   let validationMessage: string | undefined;
   if (phasesReady === undefined) {
     validationMessage = copy.gov.stats.loading;
+  } else if (
+    !hasExistingPosition &&
+    params.minPhases !== undefined &&
+    params.maxPhases !== undefined &&
+    (phasesParsed.kind !== 'ok' ||
+      phasesParsed.value < params.minPhases ||
+      phasesParsed.value > params.maxPhases)
+  ) {
+    validationMessage = copy.gov.liquidity.phasesInvalid(
+      formatTokenAmount(params.minPhases, 0),
+      formatTokenAmount(params.maxPhases, 0),
+    );
   } else if (
     tokenParsed.kind === 'too-precise' ||
     parentParsed.kind === 'too-precise' ||
@@ -454,11 +480,65 @@ export function StakeLiquidityPanel({
           />
         )}
 
-        <p className="text-xs leading-5 text-muted" data-testid="gov-liquidity-phases-note">
-          {currentPhases > 0n
-            ? copy.gov.smart.phasesLocked(formatTokenAmount(currentPhases, 0))
-            : copy.gov.phasesAdjust.newStakeNote(formatTokenAmount(params.minPhases ?? 1n, 0))}
-        </p>
+        {hasExistingPosition ? (
+          <p className="text-xs leading-5 text-muted" data-testid="gov-liquidity-phases-note">
+            {copy.gov.smart.phasesLocked(formatTokenAmount(currentPhases, 0))}
+          </p>
+        ) : (
+          <div data-testid="gov-liquidity-phases">
+            <span className="text-sm font-medium text-foreground">
+              {copy.gov.liquidity.phasesLabel}
+            </span>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              {PHASE_PRESETS.map((preset) => {
+                const value = BigInt(preset);
+                const available =
+                  params.minPhases !== undefined &&
+                  params.maxPhases !== undefined &&
+                  value >= params.minPhases &&
+                  value <= params.maxPhases;
+                const selected = phasesParsed.kind === 'ok' && phasesParsed.value === value;
+                return (
+                  <button
+                    key={preset}
+                    type="button"
+                    disabled={!available || disabled}
+                    onClick={() => setPhasesInput(String(preset))}
+                    data-testid={`gov-liquidity-phases-preset-${preset}`}
+                    className={
+                      selected
+                        ? 'rounded-xl bg-brand px-3 py-1.5 text-sm font-medium text-on-brand'
+                        : 'rounded-xl border border-line bg-surface px-3 py-1.5 text-sm text-foreground hover:bg-elevated disabled:text-muted'
+                    }
+                  >
+                    {copy.gov.liquidity.phasesPreset(preset)}
+                  </button>
+                );
+              })}
+              <input
+                type="text"
+                inputMode="numeric"
+                value={phasesInput}
+                placeholder={defaultPhases === undefined ? '' : String(defaultPhases)}
+                onChange={(event) => setPhasesInput(event.target.value)}
+                aria-label={copy.gov.liquidity.phasesLabel}
+                data-testid="gov-liquidity-phases-input"
+                disabled={disabled}
+                className="w-20 rounded-xl border border-line bg-surface px-2 py-1.5 text-right text-sm text-foreground focus:border-brand focus:outline-none"
+              />
+              <span className="text-xs text-muted">{copy.gov.liquidity.phasesUnit}</span>
+            </div>
+            <p className="mt-1.5 text-xs leading-5 text-muted">{copy.gov.liquidity.phasesHint}</p>
+            {params.minPhases !== undefined && params.maxPhases !== undefined ? (
+              <p className="text-xs leading-5 text-muted">
+                {copy.gov.liquidity.phasesRange(
+                  formatTokenAmount(params.minPhases, 0),
+                  formatTokenAmount(params.maxPhases, 0),
+                )}
+              </p>
+            ) : null}
+          </div>
+        )}
 
         {/* 报价 / 预览 */}
         {hubPath ? (

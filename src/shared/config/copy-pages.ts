@@ -1437,6 +1437,8 @@ export const copy = {
       phasesLabel: '承诺解锁期',
       phasesUnit: '个阶段',
       phasesPreset: (phases: number) => `${phases} 阶段`,
+      phasesHint: '承诺得越久，治理权越多；解锁要等满这么久才能撤出。',
+      phasesRange: (min: string, max: string) => `可以选 ${min}–${max} 个阶段。`,
       phasesInvalid: (min: string, max: string) => `承诺解锁期要在 ${min} 到 ${max} 个阶段之间。`,
       amountInvalid: '请输入有效的金额。',
       amountZero: '两侧数量都要大于 0。',
@@ -1593,8 +1595,6 @@ export const copy = {
           : `当前承诺解锁期：${phases} 个阶段（约 ${minutes} 分钟）`,
       action: '调整',
       cardHint: '质押期间治理权 = 流动性质押份额 × 承诺解锁期；想提高治理权就调整它。',
-      newStakeNote: (phases: string) =>
-        `新增流动性质押不再选择承诺解锁期：首次质押按 ${phases} 个阶段（最小值），质押后可单独调整。`,
     },
     query: {
       title: '治理权查询',

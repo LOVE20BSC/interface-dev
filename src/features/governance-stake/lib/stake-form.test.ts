@@ -120,16 +120,17 @@ describe('estimateLpMinted', () => {
 });
 
 describe('resolveStakePhases', () => {
-  it('keeps the current value once there is a position', () => {
-    expect(resolveStakePhases(10n, 1n)).toBe(10n);
+  it('keeps the current value once there is a position (Hub requires equality)', () => {
+    expect(resolveStakePhases(10n, 25n)).toBe(10n);
     expect(resolveStakePhases(10n, undefined)).toBe(10n);
   });
 
-  it('uses the contract minimum for a first stake', () => {
+  it('uses the user choice for a first stake', () => {
+    expect(resolveStakePhases(0n, 25n)).toBe(25n);
     expect(resolveStakePhases(0n, 1n)).toBe(1n);
   });
 
-  it('returns undefined when the minimum is unknown (never guesses)', () => {
+  it('returns undefined when a first stake has no valid choice (never guesses)', () => {
     expect(resolveStakePhases(0n, undefined)).toBeUndefined();
   });
 });
