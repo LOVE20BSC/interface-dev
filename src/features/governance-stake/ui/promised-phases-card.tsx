@@ -52,6 +52,7 @@ export function PromisedPhasesCard({ ctx }: PromisedPhasesCardProps) {
           <Button
             variant="secondary"
             size="sm"
+            className="shrink-0 whitespace-nowrap"
             data-testid="gov-phases-card-adjust"
             disabled={busy}
             onClick={() => setOpen(true)}

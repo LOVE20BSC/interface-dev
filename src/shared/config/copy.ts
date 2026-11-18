@@ -51,6 +51,9 @@ export const copy = {
   nav: {
     home: '首页',
     gov: '治理',
+    stakeLp: '质押LP',
+    stakeToken: '质押代币',
+    unstake: '取消质押',
     act: '行动',
     apps: '应用',
     me: '我的',
@@ -147,12 +150,13 @@ export const copy = {
     approvals: '代币授权',
     liquidity: '流动性池',
     gov: '治理',
+    stakeLp: '质押LP',
+    stakeToken: '质押代币',
+    unstake: '取消质押',
+    stakeLiquid: '流动性质押数据',
   },
   /** Page titles the eager router/header needs; bodies live in ./copy-pages. */
   placeholders: {
-    gov: {
-      title: '治理',
-    },
     act: {
       title: '行动',
     },
