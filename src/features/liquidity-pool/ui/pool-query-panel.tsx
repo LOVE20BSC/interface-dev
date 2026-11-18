@@ -281,7 +281,6 @@ export function PoolQueryPanel({
             <CopyableAddress
               address={pool.pairAddress}
               label={copy.liquidity.query.lpAddressLabel}
-              display="full"
               testId="liquidity-query-pair"
             />
           ) : (
@@ -402,7 +401,7 @@ export function PoolQueryPanel({
               placeholder={copy.liquidity.query.addressPlaceholder}
               className={cn(
                 'h-11 min-w-0 flex-1 rounded-2xl border border-line bg-surface px-3 font-mono text-sm text-foreground outline-none',
-                'placeholder:font-sans placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20',
+                'placeholder:font-sans placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20',
               )}
             />
             <div className="flex gap-2">

@@ -270,7 +270,7 @@ export function IdentityList({ identity, onRetry, justMinted = null }: IdentityL
                 className={cn(
                   'rounded-2xl border p-4 transition-colors',
                   current
-                    ? 'border-brand/40 bg-brand-soft/30'
+                    ? 'border-brand-strong/40 bg-brand-soft/30'
                     : justMintedRow
                       ? 'border-success/40 bg-success-soft/30'
                       : 'border-line bg-surface',

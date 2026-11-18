@@ -26,7 +26,7 @@ export interface ClaimAirdropPanelProps {
 }
 
 const TEXT_LINK =
-  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
+  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong';
 
 /**
  * Every state's card. Owner 2026-11-17 removed the 「本次空投：{symbol}」 meta

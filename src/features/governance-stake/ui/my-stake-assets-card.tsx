@@ -121,7 +121,54 @@ export function MyStakeAssetsCard({ ctx }: MyStakeAssetsCardProps) {
   return (
     <Card data-testid="me-stake-card">
       <div className="flex items-start justify-between gap-3">
-        <CardTitle>{copy.gov.myLiquidityTitle}</CardTitle>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <CardTitle>{copy.gov.myLiquidityTitle}</CardTitle>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label={copy.gov.mine.infoAria}
+                data-testid="me-stake-info"
+                className="shrink-0 rounded-full p-1 text-muted transition-colors hover:bg-elevated hover:text-brand-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+              >
+                <Info aria-hidden="true" className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent aria-label={copy.gov.mine.infoTitle} data-testid="me-stake-info-panel">
+              <p className="px-1 pb-1 text-xs font-semibold text-foreground">
+                {copy.gov.mine.infoTitle}
+              </p>
+              <dl className="divide-y divide-line/60">
+                <InfoRow
+                  label={copy.gov.mine.shares}
+                  value={formatTokenAmount(member.liquidityShares, VOTE_DECIMALS)}
+                  testId="me-stake-info-shares"
+                />
+                <InfoRow
+                  label={copy.gov.mine.token}
+                  value={amountText(member.tokenAmountForLiquidity, token?.decimals, token?.symbol)}
+                  testId="me-stake-info-token"
+                />
+                <InfoRow
+                  label={copy.gov.mine.parent}
+                  value={amountText(
+                    member.parentTokenAmountForLiquidity,
+                    parent?.decimals,
+                    parent?.symbol,
+                  )}
+                  testId="me-stake-info-parent"
+                />
+                {member.boostShares !== undefined && member.boostShares > 0n ? (
+                  <InfoRow
+                    label={copy.gov.mine.boostAmount}
+                    value={amountText(member.boostShares, token?.decimals, token?.symbol)}
+                    testId="me-stake-info-boost"
+                  />
+                ) : null}
+              </dl>
+            </PopoverContent>
+          </Popover>
+        </div>
         <Link
           to={unstakePath}
           data-testid="me-stake-action-link"
@@ -134,65 +181,11 @@ export function MyStakeAssetsCard({ ctx }: MyStakeAssetsCardProps) {
       <dl className="mt-2 divide-y divide-line">
         <div className="flex items-center justify-between gap-3 py-2.5">
           <dt className="text-sm text-muted">{copy.gov.mine.shares}</dt>
-          <dd className="flex min-w-0 items-center gap-1.5">
-            <span
-              className="min-w-0 truncate text-sm font-medium text-foreground"
-              data-testid="me-stake-shares"
-            >
-              {formatTokenAmount(member.liquidityShares, VOTE_DECIMALS)}
-            </span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  aria-label={copy.gov.mine.infoAria}
-                  data-testid="me-stake-info"
-                  className="shrink-0 rounded-full p-1 text-muted transition-colors hover:bg-elevated hover:text-brand-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                >
-                  <Info aria-hidden="true" className="h-4 w-4" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                aria-label={copy.gov.mine.infoTitle}
-                data-testid="me-stake-info-panel"
-              >
-                <p className="px-1 pb-1 text-xs font-semibold text-foreground">
-                  {copy.gov.mine.infoTitle}
-                </p>
-                <dl className="divide-y divide-line/60">
-                  <InfoRow
-                    label={copy.gov.mine.shares}
-                    value={formatTokenAmount(member.liquidityShares, VOTE_DECIMALS)}
-                    testId="me-stake-info-shares"
-                  />
-                  <InfoRow
-                    label={copy.gov.mine.token}
-                    value={amountText(
-                      member.tokenAmountForLiquidity,
-                      token?.decimals,
-                      token?.symbol,
-                    )}
-                    testId="me-stake-info-token"
-                  />
-                  <InfoRow
-                    label={copy.gov.mine.parent}
-                    value={amountText(
-                      member.parentTokenAmountForLiquidity,
-                      parent?.decimals,
-                      parent?.symbol,
-                    )}
-                    testId="me-stake-info-parent"
-                  />
-                  {member.boostShares !== undefined && member.boostShares > 0n ? (
-                    <InfoRow
-                      label={copy.gov.mine.boostAmount}
-                      value={amountText(member.boostShares, token?.decimals, token?.symbol)}
-                      testId="me-stake-info-boost"
-                    />
-                  ) : null}
-                </dl>
-              </PopoverContent>
-            </Popover>
+          <dd
+            className="min-w-0 truncate text-sm font-medium text-foreground"
+            data-testid="me-stake-shares"
+          >
+            {formatTokenAmount(member.liquidityShares, VOTE_DECIMALS)}
           </dd>
         </div>
 

@@ -84,7 +84,7 @@ export function CommunityMenuContent({
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
-          className="h-9 w-full rounded-xl border border-line bg-surface px-2.5 text-sm text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+          className="h-9 w-full rounded-xl border border-line bg-surface px-2.5 text-sm text-foreground outline-none placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20"
         />
       </div>
 
@@ -118,7 +118,7 @@ export function CommunityMenuContent({
                     onClick={() => pick(match.symbol)}
                     className={cn(
                       'flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm',
-                      'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                      'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
                     )}
                   >
                     <span className="font-mono text-[13px] font-semibold text-foreground">
@@ -161,7 +161,7 @@ export function CommunityMenuContent({
                     onClick={() => pick(entry.symbol)}
                     className={cn(
                       'flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm',
-                      'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                      'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
                     )}
                   >
                     <span className="font-mono text-[13px] font-semibold text-foreground">

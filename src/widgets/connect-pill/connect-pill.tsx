@@ -1,9 +1,7 @@
 import { ChevronDown } from '@/shared/ui/icons';
 import { lazy, Suspense, useState } from 'react';
-import { useLocation } from 'react-router-dom';
 import { copy } from '@/shared/config/copy';
 import { shortenAddress } from '@/shared/lib/format';
-import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { useSoftTransition } from '@/shared/model/soft-transition';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import { ConnectWalletButton } from '@/features/connect-wallet/ui/connect-wallet-button';
@@ -32,9 +30,7 @@ const preloadMenus = () => {
  * and the connected pill has two independent triggers.
  */
 export function ConnectPill() {
-  const location = useLocation();
-  const isCompactViewport = useMediaQuery('(max-width: 479px)');
-  const compactChip = location.pathname !== '/' && isCompactViewport;
+  // owner 2026-11-19：只要有空间就展示社区名（不再在窄屏 / 子页退化成首字母圆标）。
   const wallet = useWalletConnection();
   const { symbol, switchSymbol } = useCommunityContext();
   const transition = useSoftTransition();
@@ -97,20 +93,11 @@ export function ConnectPill() {
         aria-expanded={openMenu === 'community'}
         aria-haspopup="dialog"
         title={copy.community.menuTitle}
-        className="flex min-w-0 items-center gap-1 pl-2 pr-1.5 text-left hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand md:pl-3 md:pr-2"
+        className="flex min-w-0 items-center gap-1 pl-2 pr-1.5 text-left hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-strong md:pl-3 md:pr-2"
       >
-        {compactChip ? (
-          <span
-            aria-hidden="true"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-soft font-mono text-xs font-semibold text-brand-strong"
-          >
-            {chipSymbol.slice(0, 1)}
-          </span>
-        ) : (
-          <span className="max-w-[96px] truncate font-mono text-[13px] font-semibold text-foreground">
-            {chipSymbol}
-          </span>
-        )}
+        <span className="max-w-[96px] truncate font-mono text-[13px] font-semibold text-foreground">
+          {chipSymbol}
+        </span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden="true" />
       </button>
 
@@ -123,9 +110,10 @@ export function ConnectPill() {
         onPointerEnter={preloadMenus}
         onFocus={preloadMenus}
         aria-label={copy.wallet.walletMenuAria}
+        title={address}
         aria-expanded={openMenu === 'wallet'}
         aria-haspopup="dialog"
-        className="grid w-[108px] grid-cols-[minmax(0,1fr)_14px] grid-rows-2 items-center gap-x-1 px-2 py-1.5 text-left hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand min-[390px]:w-[132px] md:w-[176px] md:gap-x-1.5 md:px-2.5"
+        className="grid w-[108px] grid-cols-[minmax(0,1fr)_14px] grid-rows-2 items-center gap-x-1 px-2 py-1.5 text-left hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-strong min-[390px]:w-[132px] md:w-[176px] md:gap-x-1.5 md:px-2.5"
       >
         <span className="truncate font-mono text-[13px] leading-4 text-foreground">
           {shortenAddress(address)}

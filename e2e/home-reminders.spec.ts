@@ -163,11 +163,24 @@ test.describe('首页提醒流', () => {
 });
 
 test.describe('我的', () => {
-  test('carries balance + account/about, without the identity NFT card', async ({ page }) => {
+  test('carries the 钱包余额 / 质押资产 tabs, without the identity NFT card', async ({ page }) => {
     await installWallet(page, ACCOUNTS.withIdentity);
     await seedIdentity(page, ACCOUNTS.withIdentity, '1');
     await page.goto('/me?symbol=TestLOVE20');
     await connect(page);
+
+    // Owner 2026-11-18 23:20: /me is two tabs and 钱包余额 is the default one.
+    await expect(page.getByTestId('me-tab-balance')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('me-tab-balance')).toHaveText('钱包余额');
+    await expect(page.getByTestId('me-tab-stake')).toHaveText('质押资产');
+    await expect(page.getByRole('tab', { name: '钱包余额' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    await expect(page.getByRole('tab', { name: '质押资产' })).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
 
     // Owner 2026-11-14: the identity NFT card is gone; /my-nft owns it.
     await expect(page.getByRole('heading', { name: '我的余额' })).toBeVisible({ timeout: 15_000 });
@@ -183,15 +196,14 @@ test.describe('我的', () => {
       'href',
       '/swap?symbol=TestLOVE20',
     );
-    await expect(page.getByRole('heading', { name: '账户' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '关于' })).toBeVisible();
 
-    // QA 2026-11-14 M7: the 关于 block's row label and link must not repeat 开源文档.
-    await expect(page.getByText('开源文档', { exact: true })).toBeVisible();
-    const docsLink = page.getByRole('link', { name: '前往文档' });
-    await expect(docsLink).toBeVisible();
-    await expect(docsLink).toHaveAttribute('target', '_blank');
-    await expect(page.getByRole('link', { name: '开源文档' })).toHaveCount(0);
+    // Owner 2026-11-19: the 账户 / 关于 sections are gone from /me — the wallet
+    // address + network moved into the header wallet dropdown, and the version /
+    // docs entries now live on /about. So none of those strings may render here.
+    await expect(page.getByRole('heading', { name: '账户' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: '关于' })).toHaveCount(0);
+    await expect(page.getByText('开源文档', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: '前往文档' })).toHaveCount(0);
 
     // Settings-ish: no filled action on the page.
     expect(await countSolidButtons(page)).toBe(0);
@@ -199,9 +211,7 @@ test.describe('我的', () => {
     await shot(page, 'me-profile.png');
   });
 
-  test('a wallet without an identity NFT still sees only balance + account/about', async ({
-    page,
-  }) => {
+  test('a wallet without an identity NFT still sees only the balance tab', async ({ page }) => {
     await installWallet(page, ACCOUNTS.outsider);
     await page.goto('/me?symbol=TestLOVE20');
     await connect(page);
@@ -209,6 +219,10 @@ test.describe('我的', () => {
     await expect(page.getByRole('heading', { name: '我的余额' })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('你还没有身份 NFT')).toHaveCount(0);
     await expect(page.getByRole('link', { name: '铸造身份 NFT' })).toHaveCount(0);
-    await expect(page.getByRole('heading', { name: '账户' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '钱包余额' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '质押资产' })).toBeVisible();
+    // Owner 2026-11-19: 账户 / 关于 no longer exist on /me.
+    await expect(page.getByRole('heading', { name: '账户' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: '关于' })).toHaveCount(0);
   });
 });

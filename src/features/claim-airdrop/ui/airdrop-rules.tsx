@@ -23,7 +23,7 @@ export function AirdropRules() {
           href={copy.airdrop.rules.link}
           target="_blank"
           rel="noreferrer"
-          className="break-all font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="break-all font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
         >
           {copy.airdrop.rules.link}
         </a>

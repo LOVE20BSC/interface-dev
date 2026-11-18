@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MePage } from '@/pages/me/me-page';
 import { useCommunityBalance } from '@/entities/community-token/model/use-community-balance';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
-import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
 import type { CommunityToken } from '@/entities/community-token/model/use-community-token';
 import type { TokenBalance } from '@/entities/community-token/model/use-community-balance';
 
@@ -20,10 +19,6 @@ vi.mock('@/entities/community-token/model/use-community-balance', () => ({
   useCommunityBalance: vi.fn(),
 }));
 
-vi.mock('@/features/connect-wallet/model/use-wallet-connection', () => ({
-  useWalletConnection: vi.fn(),
-}));
-
 // 质押资产 tab 的真实面板会挂 wagmi + 治理域读（15 s 轮询），单测里只留一个壳，
 // 用来断言「切到该标签时它才挂载」。
 vi.mock('@/pages/me/stake-assets-panel', () => ({
@@ -32,7 +27,6 @@ vi.mock('@/pages/me/stake-assets-panel', () => ({
 
 const communityToken = vi.mocked(useCommunityToken);
 const communityBalance = vi.mocked(useCommunityBalance);
-const wallet = vi.mocked(useWalletConnection);
 
 const TOKEN: CommunityToken = {
   status: 'ready',
@@ -62,18 +56,6 @@ function renderPage(): void {
 beforeEach(() => {
   communityToken.mockReturnValue(TOKEN);
   communityBalance.mockReturnValue(BALANCE);
-  wallet.mockReturnValue({
-    address: '0x1234567890abcdef1234567890abcdef12345678',
-    isConnected: true,
-    isConnecting: false,
-    isSwitching: false,
-    chainId: 31337,
-    targetChainId: 31337,
-    isWrongChain: false,
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-    switchToTargetChain: vi.fn(),
-  });
 });
 
 describe('MePage', () => {
@@ -86,6 +68,13 @@ describe('MePage', () => {
     expect(screen.queryByRole('link', { name: '转让' })).toBeNull();
     expect(screen.queryByRole('link', { name: '查看全部' })).toBeNull();
     expect(screen.queryByRole('link', { name: '铸造身份 NFT' })).toBeNull();
+    // owner 2026-11-19: 账户 / 关于 sections are gone — wallet address & network
+    // moved into the wallet dropdown; version / docs moved to /about.
+    expect(screen.queryByRole('heading', { name: '账户' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: '关于' })).toBeNull();
+    expect(screen.queryByText('钱包地址')).toBeNull();
+    expect(screen.queryByText('开源文档')).toBeNull();
+    expect(screen.queryByRole('link', { name: '前往文档' })).toBeNull();
   });
 
   it('renders the 钱包余额 / 质押资产 tabs and defaults to 钱包余额 (owner 2026-11-18 23:20)', () => {
@@ -112,9 +101,6 @@ describe('MePage', () => {
     expect(screen.getByTestId('me-tab-balance')).toHaveAttribute('aria-selected', 'false');
     expect(screen.queryByRole('heading', { name: '我的余额' })).toBeNull();
     expect(screen.queryByText('99,799,100 TestLOVE20')).toBeNull();
-    // 账户 / 关于 sit below the tabs, so they stay on both tabs.
-    expect(screen.getByRole('heading', { name: '账户' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: '关于' })).toBeVisible();
 
     fireEvent.click(screen.getByTestId('me-tab-balance'));
 
@@ -135,19 +121,6 @@ describe('MePage', () => {
     );
   });
 
-  it('keeps the 账户 and 关于 sections after the identity card removal', () => {
-    renderPage();
-
-    expect(screen.getByRole('heading', { name: '账户' })).toBeVisible();
-    expect(screen.getByText('钱包地址')).toBeVisible();
-    expect(screen.getByText(/^0x1234…5678$/)).toBeVisible();
-    expect(screen.getByRole('heading', { name: '关于' })).toBeVisible();
-    // QA 2026-11-14 M7: the row label and the link action must not both read 开源文档.
-    expect(screen.getByText('开源文档')).toBeVisible();
-    expect(screen.getByRole('link', { name: '前往文档' })).toBeVisible();
-    expect(screen.queryByRole('link', { name: '开源文档' })).toBeNull();
-  });
-
   it('shows an honest unavailable line when the community token is not configured', () => {
     communityToken.mockReturnValue({
       ...TOKEN,
@@ -166,17 +139,15 @@ describe('MePage', () => {
     expect(screen.queryByRole('link', { name: '兑换' })).toBeNull();
   });
 
-  it('never renders a filled button: the page is a settings-ish list', () => {
+  it('never renders a filled button: the page is two tabs over a plain balance card', () => {
     renderPage();
 
-    // Default tab (owner 2026-11-18 23:20): 3 real <button> elements — the two
-    // 钱包余额 / 质押资产 tabs, which expose role="tab", plus the 全局地址复制
-    // affordance (owner 2026-11-14), which is the page's only role="button".
-    // The page itself stays a settings-ish list with no primary/filled action.
-    expect(document.querySelectorAll('button')).toHaveLength(3);
-    const buttons = screen.queryAllByRole('button');
-    expect(buttons).toHaveLength(1);
-    expect(buttons[0]).toHaveAccessibleName('复制地址：钱包地址');
+    // owner 2026-11-19: the 全局地址复制 affordance moved out with the 账户 section,
+    // so the only <button> elements are the two tabs — both expose role="tab",
+    // never role="button". No role="button" and no filled (.bg-brand) action means
+    // the one-filled-button rule stays satisfied.
+    expect(document.querySelectorAll('button')).toHaveLength(2);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
     const filled = document.querySelectorAll('.bg-brand');
     expect(filled).toHaveLength(0);
   });

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 
 /**
- * 应用 (UX spec §3.6): the fourth tab is a data-driven feature directory.
+ * 应用 (UX spec §3.6): the second tab is a data-driven feature directory.
  *
  * Read-only against the dedicated e2e chain: no wallet is needed and no chain
  * mutation happens here, so this file does not snapshot/revert. It proves the
@@ -23,11 +23,20 @@ test.use({
 });
 
 test.describe('应用目录', () => {
-  test('the fourth tab is 应用, opens /apps and 链群 is gone', async ({ page }) => {
+  test('the second tab is 应用, opens /apps and 链群 is gone', async ({ page }) => {
     await page.goto(`/${QUERY}`);
     const nav = page.getByRole('navigation', { name: '主导航' });
 
     await expect(nav.getByRole('link')).toHaveCount(5);
+    // Owner 2026-11-19: 底导航/侧栏顺序是 首页 / 应用 / 行动 / 治理 / 我的 ——
+    // 应用是第二个 tab，不再是第四个。行动仍是占位页，链接里带一个 sr-only
+    // 「（即将上线）」，所以按底导航单测同样的口径去掉它再比可见文案。
+    const navLabels = await nav
+      .getByRole('link')
+      .evaluateAll((links) =>
+        links.map((link) => (link.textContent ?? '').replace(/（即将上线）/, '').trim()),
+      );
+    expect(navLabels).toEqual(['首页', '应用', '行动', '治理', '我的']);
     await expect(nav.getByRole('link', { name: '链群' })).toHaveCount(0);
     await expect(nav.getByRole('link', { name: '应用' })).toBeVisible();
 

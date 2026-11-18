@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { isolateChain } from './chain';
-import { ACCOUNTS, connect, installWallet } from './wallet-stub';
+import { ACCOUNTS, connect, installWallet, shortAddress } from './wallet-stub';
 
 /**
  * 应用·代币转账 前端线（三线校验 §3）:
@@ -138,7 +138,9 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
       timeout: 30_000,
     });
     const receiptRecipient = page.getByTestId('transfer-receipt-recipient');
-    await expect(receiptRecipient).toHaveText(NATIVE_RECIPIENT);
+    // Owner 2026-11-19：回执里的地址也是中间省略；完整地址在 title 与剪贴板里。
+    await expect(receiptRecipient).toHaveText(shortAddress(NATIVE_RECIPIENT));
+    await expect(receiptRecipient).toHaveAttribute('title', NATIVE_RECIPIENT);
     // 回执里的收款地址同样可点击复制。
     await receiptRecipient.click();
     await expect(receiptRecipient).toContainText('已复制');
@@ -171,7 +173,9 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('transfer-receipt-amount')).toHaveText(`1.5 ${SYMBOL}`, {
       timeout: 30_000,
     });
-    await expect(page.getByTestId('transfer-receipt-recipient')).toHaveText(RECIPIENT);
+    const receiptRecipient = page.getByTestId('transfer-receipt-recipient');
+    await expect(receiptRecipient).toHaveText(shortAddress(RECIPIENT));
+    await expect(receiptRecipient).toHaveAttribute('title', RECIPIENT);
 
     await page.getByRole('button', { name: '好的' }).click();
     // 余额刷新后与理论线 §1 用例 B 的 S_after 逐字相等。
@@ -350,7 +354,13 @@ test.describe('代币转账 前端线（理论线 §1）', () => {
     await expect(page.getByTestId('transfer-receipt-label')).toHaveText(
       '身份 NFT #2 Testdev-member-1',
     );
-    await expect(page.getByTestId('transfer-receipt-recipient')).toHaveText(IDENTITY_2_OWNER);
+    await expect(page.getByTestId('transfer-receipt-recipient')).toHaveText(
+      shortAddress(IDENTITY_2_OWNER),
+    );
+    await expect(page.getByTestId('transfer-receipt-recipient')).toHaveAttribute(
+      'title',
+      IDENTITY_2_OWNER,
+    );
 
     await page.getByRole('button', { name: '好的' }).click();
     await expect(page.getByTestId('transfer-balance')).toHaveText(

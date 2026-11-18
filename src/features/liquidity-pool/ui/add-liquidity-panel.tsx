@@ -73,7 +73,7 @@ export interface AddLiquidityPanelProps {
 const CARD = 'rounded-3xl border border-line bg-surface p-5 shadow-soft';
 /** 右侧留出代币徽标的位置（旧库把代币符号放在输入框右端）。 */
 const INPUT =
-  'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated pl-3 pr-24 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20';
+  'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated pl-3 pr-24 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20';
 const INPUT_LINKED =
   'cursor-default border-dashed bg-elevated/60 text-muted focus:border-line focus:ring-0';
 const BADGE =
@@ -599,7 +599,7 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
               type="button"
               data-testid="liquidity-go-withdraw"
               onClick={onGoWithdraw}
-              className="rounded-full border border-line px-2.5 py-0.5 text-[11px] font-medium text-brand-strong hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className="rounded-full border border-line px-2.5 py-0.5 text-[11px] font-medium text-brand-strong hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
             >
               {copy.liquidity.add.poolWithdraw}
             </button>
@@ -629,8 +629,8 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
             data-testid="liquidity-smart-mode"
             onClick={toggleSmartMode}
             className={cn(
-              'relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
-              smartMode ? 'border-brand bg-brand' : 'border-line bg-elevated',
+              'relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
+              smartMode ? 'border-brand-strong bg-brand' : 'border-line bg-elevated',
             )}
           >
             {/* 修复：button 的内容默认居中，绝对定位的滑块没有左锚点会跑到胶囊中间/外面。
@@ -830,7 +830,7 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
                 data-testid="liquidity-details-toggle"
                 aria-expanded={detailsOpen}
                 onClick={() => setDetailsOpen((current) => !current)}
-                className="mt-2 inline-flex items-center gap-1 rounded-full px-1 py-0.5 text-[11px] font-medium text-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                className="mt-2 inline-flex items-center gap-1 rounded-full px-1 py-0.5 text-[11px] font-medium text-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
               >
                 {detailsOpen ? copy.liquidity.add.detailsHide : copy.liquidity.add.detailsToggle}
                 <ChevronDown
@@ -897,7 +897,7 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
               data-testid="liquidity-price-toggle"
               aria-label={copy.liquidity.add.priceToggle}
               onClick={() => setShowTokenToBase((current) => !current)}
-              className="rounded-full p-0.5 text-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className="rounded-full p-0.5 text-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
             >
               <ArrowUpDown className="h-3.5 w-3.5" aria-hidden="true" />
             </button>

@@ -48,7 +48,7 @@ export function LiquiditySettings({
           type="button"
           onClick={() => setOpen(true)}
           data-testid="liquidity-settings-open"
-          className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
         >
           {copy.liquidity.settings.title}
         </button>
@@ -81,7 +81,7 @@ export function LiquiditySettings({
                     !isPreset
                       ? 'border-line text-muted hover:bg-elevated'
                       : slippagePercent === preset
-                        ? 'border-brand bg-brand-soft text-brand-strong'
+                        ? 'border-brand-strong bg-brand-soft text-brand-strong'
                         : 'border-line text-foreground hover:bg-elevated',
                   )}
                 >

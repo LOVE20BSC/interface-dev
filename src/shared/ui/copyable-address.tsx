@@ -101,7 +101,7 @@ export function CopyableAddress({
       }
       className={cn(
         'inline-flex max-w-full items-center gap-1 rounded-lg text-left text-muted',
-        'hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+        'hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
         className,
       )}
     >

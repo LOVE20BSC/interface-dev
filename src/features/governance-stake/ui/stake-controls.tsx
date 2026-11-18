@@ -63,7 +63,7 @@ export function StakeAmountField({
         disabled={disabled}
         className={cn(
           'mt-1.5 w-full rounded-2xl border border-line bg-surface px-3 py-2.5 text-right text-lg font-semibold text-foreground',
-          'focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30',
+          'focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30',
           'disabled:bg-elevated disabled:text-muted',
         )}
       />
@@ -218,7 +218,7 @@ export function StakeReceiptCard({ title, lines, hash, onClose }: StakeReceiptCa
   const explorerUrl =
     NETWORK.blockExplorerUrl !== null ? `${NETWORK.blockExplorerUrl}/tx/${hash}` : null;
   return (
-    <Card data-testid="gov-receipt" className="border-brand/30 bg-brand-soft/30">
+    <Card data-testid="gov-receipt" className="border-brand-strong/30 bg-brand-soft/30">
       <CardTitle>{title}</CardTitle>
       <CardDescription>{copy.gov.receipt.refreshHint}</CardDescription>
       {lines.length > 0 ? (

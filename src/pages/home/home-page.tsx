@@ -66,7 +66,7 @@ export function HomePage() {
       {/* The page h1: a greeting, never a link. One line, truncating. */}
       <h1
         data-testid="home-greeting"
-        className="truncate text-2xl font-semibold tracking-tight text-foreground"
+        className="truncate text-center text-2xl font-semibold tracking-tight text-foreground"
       >
         {greeting}
       </h1>
@@ -101,7 +101,7 @@ export function HomePage() {
           <button
             type="button"
             onClick={identity.refetch}
-            className="mt-3 inline-flex h-11 items-center justify-center rounded-2xl border border-line px-4 text-sm font-medium text-foreground transition-colors hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="mt-3 inline-flex h-11 items-center justify-center rounded-2xl border border-line px-4 text-sm font-medium text-foreground transition-colors hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {copy.common.retry}
           </button>
@@ -134,7 +134,7 @@ export function HomePage() {
           </h2>
           <Link
             to={{ pathname: '/mint', search }}
-            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-brand px-4 text-sm font-medium text-on-brand shadow-soft transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-brand px-4 text-sm font-medium text-on-brand shadow-soft transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {copy.home.mintIdentity}
           </Link>
@@ -154,7 +154,7 @@ export function HomePage() {
           </h2>
           <Link
             to={{ pathname: '/my-nft', search }}
-            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-brand px-4 text-sm font-medium text-on-brand shadow-soft transition-colors hover:bg-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-2xl bg-brand px-4 text-sm font-medium text-on-brand shadow-soft transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             {copy.home.chooseIdentity}
           </Link>

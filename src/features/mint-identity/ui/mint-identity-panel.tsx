@@ -377,7 +377,7 @@ export function MintIdentityPanel({
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
-          className="mt-2 h-12 w-full rounded-2xl border border-line bg-surface px-3 text-base text-foreground shadow-soft outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+          className="mt-2 h-12 w-full rounded-2xl border border-line bg-surface px-3 text-base text-foreground shadow-soft outline-none placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20"
           aria-describedby={`mint-name-bytes${quote.requiresTestPrefix ? ' mint-name-rule' : ''} mint-name-check`}
         />
         <div

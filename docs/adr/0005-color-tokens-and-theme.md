@@ -6,7 +6,7 @@
 
 ## 背景
 
-到 2026-11-13，本仓只有浅色一套颜色，且颜色散落在两处：`src/index.css` 的 `@theme`（约 14 个语义 token）和组件里的硬编码 Tailwind 色类（49 处 `bg-slate-50` / `text-white` / `bg-slate-950/45` / `from-brand-strong to-indigo-600` 等）。owner 要求新增「主题」应用：浅色 / 深色两套，深色采用币安风格配色。硬编码色类在深色下会直接穿帮，且没有「品牌色上的文字」token（浅色品牌蓝上要白字，深色品牌黄上必须是深色字）。
+到 2026-11-13，本仓只有浅色一套颜色，且颜色散落在两处：`src/index.css` 的 `@theme`（约 14 个语义 token）和组件里的硬编码 Tailwind 色类（49 处 `bg-slate-50` / `text-white` / `bg-slate-950/45` / `from-brand-strong to-indigo-600` 等）。owner 要求新增「主题」应用：浅色 / 深色两套，深色采用币安风格配色。硬编码色类在深色下会直接穿帮，且没有「品牌色上的文字」token（浅色品牌蓝上要白字，深色品牌黄上必须是深色字）。（**2026-11-19 更新**：品牌主色统一为品牌黄，浅色也用 `#fcd535`、`on-brand` 两套都用近黑 `#181a20`，见 §1）
 
 ## 决策
 
@@ -23,14 +23,16 @@
 | `elevated` / `elevated-hover` | 内嵌面板 / 悬停 | `#f2f6fb` / `#e4ebf5` | `#2b3139` / `#2b3139` |
 | `foreground` / `muted` | 正文 / 次要 | `#0f172a` / `#55647a` | `#eaecef` / `#848e9c` |
 | `line` / `line-strong` | 弱 / 强分隔 | `#d9e1ec` / `#b7c3d4` | `#2b3139` / `#474d57` |
-| `brand` / `brand-strong` / `brand-soft` | 品牌填充 / 文字 / 浅底 | `#2563eb` / `#1d4ed8` / `#dbeafe` | `#fcd535` / `#fcd535` / `#3a331a` |
-| `on-brand` | 品牌/危险填充上的文字 | `#ffffff` | `#181a20` |
+| `brand` / `brand-strong` / `brand-soft` | 品牌填充 / 文字 / 浅底 | `#fcd535` / `#856500` / `#fef8dd` | `#fcd535` / `#fcd535` / `#3a331a` |
+| `on-brand` | 品牌/危险填充上的文字 | `#181a20` | `#181a20` |
 | `danger` / `danger-strong` / `danger-soft` | 危险填充 / 文字 / 浅底 | `#dc2626` / `#b91c1c` / `#fee2e2` | `#f6465d` / `#ff6b7a` / `#3a1e24` |
 | `warning` / `warning-soft` | 警示 | `#b45309` / `#fef3c7` | `#f0b90b` / `#3a3212` |
 | `success` / `success-soft` | 成功/涨 | `#047857` / `#d1fae5` | `#0ecb81` / `#123027` |
 | `overlay` | sheet/弹层遮罩 | `rgb(15 23 42 / .45)` | `rgb(0 0 0 / .62)` |
 
-`danger-strong` 是必要缺口：`#f6465d` 作正文色压 `surface` 只有 4.48:1（差 0.02），所以危险**文字**统一用 `#ff6b7a`（5.75:1），`danger` 只作填充/边框。浅色主题的品牌蓝不变。
+`danger-strong` 是必要缺口：`#f6465d` 作正文色压 `surface` 只有 4.48:1（差 0.02），所以危险**文字**统一用 `#ff6b7a`（5.75:1），`danger` 只作填充/边框。
+
+**品牌主色统一（owner 2026-11-19 拍板，取代上表的浅色蓝）**：浅色与深色共用同一个品牌黄 `#fcd535`；浅色下文字链接 / 边框 / focus ring 用同色系深金 `#856500` 保证 AA（on 画布 `#edf1f7` 4.80:1、on 白卡 5.44:1、on `brand-soft` 5.10:1），填充色仍用 `#fcd535`，其上文字两套都是 `#181a20`（12.18:1）；深色 token 一个都没动。实心主按钮的 hover / active 改为 `brightness-95` / `brightness-90` 轻微压暗，不再把底色换成深金。
 
 浅色取值于 2026-11-14 整改（owner：「浅色主题下，很多页面感觉有点不太清楚」）：画布/抬升/悬停/次要文字/弱强分隔加深，深色值全部不动，理论线与逐页核对见 [three-line/theme.md](../product/three-line/theme.md) §1.1.1 / §1.3。禁用态与占位符改为不依赖整控件 `opacity` 的可读色阶（见同文 §1.4）。
 

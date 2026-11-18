@@ -35,7 +35,7 @@ function ModeOption({
         onClick={() => onSelect(mode)}
         className={cn(
           'flex w-full items-center justify-between gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm',
-          'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+          'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
           selected && SELECTED_CLASS,
         )}
       >
@@ -79,7 +79,7 @@ export function IdentityInputModeMenu({
           data-testid={triggerTestId}
           aria-label={`${copy.transfer.modeLabel}：${selectedLabel}`}
           disabled={disabled}
-          className="inline-flex h-11 shrink-0 items-center gap-1 rounded-l-2xl border border-r-0 border-line bg-elevated px-2.5 text-xs font-medium text-foreground hover:bg-elevated focus:outline-none focus:ring-2 focus:ring-brand disabled:opacity-60"
+          className="inline-flex h-11 shrink-0 items-center gap-1 rounded-l-2xl border border-r-0 border-line bg-elevated px-2.5 text-xs font-medium text-foreground hover:bg-elevated focus:outline-none focus:ring-2 focus:ring-brand-strong disabled:opacity-60"
         >
           {selectedLabel}
           <ChevronDown className="h-3.5 w-3.5 text-muted" aria-hidden="true" />
@@ -168,7 +168,7 @@ export function IdentityRecipientField({
           aria-invalid={invalid}
           className={cn(
             'h-11 min-w-0 flex-1 rounded-r-2xl border bg-surface px-3 font-mono text-sm text-foreground',
-            'outline-none focus:ring-2 focus:ring-brand',
+            'outline-none focus:ring-2 focus:ring-brand-strong',
             invalid ? 'border-danger/50' : 'border-line',
           )}
         />

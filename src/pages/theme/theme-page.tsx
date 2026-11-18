@@ -78,9 +78,9 @@ function ThemeCard({
       onClick={() => onSelect(definition)}
       className={cn(
         'rounded-2xl border p-3 text-left transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         selected
-          ? 'border-brand bg-surface shadow-soft'
+          ? 'border-brand-strong bg-surface shadow-soft'
           : 'border-line bg-surface hover:border-line-strong hover:bg-elevated',
       )}
     >

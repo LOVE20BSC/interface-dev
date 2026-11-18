@@ -10,9 +10,9 @@ import { countSolidButtons } from './wallet-stub';
  * so this file does not snapshot/revert. It proves the 应用 catalog entry keeps
  * `?symbol=`, both tabs switch with keyboard/click, the docs link is the
  * configured environment URL, the addresses tab shows the configured MemberNFT
- * and airdrop addresses (no explorer on anvil), the data tab reads a numeric
- * supply, and no filled primary action is spent. It also captures the two
- * 390×844 acceptance screenshots.
+ * and airdrop addresses shortened in the middle with tap-to-copy (no explorer on
+ * anvil), the data tab reads a numeric supply, and no filled primary action is
+ * spent. It also captures the two 390×844 acceptance screenshots.
  */
 
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
@@ -69,49 +69,29 @@ test.describe('关于页', () => {
     const dataTab = page.getByRole('tab', { name: '数据' });
     await expect(contractsTab).toHaveAttribute('aria-selected', 'true');
 
-    // Every configured address is visible in full; zero slots read 未配置.
-    await expect(page.getByTestId('about-address-memberNFT')).toContainText(
-      deployment.addresses.memberNFT,
-    );
-    await expect(page.getByTestId('about-address-airdropDistributor')).toContainText(
-      deployment.addresses.airdropDistributor,
-    );
+    // Owner 2026-11-19: every address in the app is shortened in the middle and
+    // copied on tap, so /about no longer paints the 40-character address in full.
+    // The full string stays in the copy button's `title` (what tapping copies).
+    const memberNft = deployment.addresses.memberNFT;
+    const airdrop = deployment.addresses.airdropDistributor;
+    await expect(page.getByTestId('about-address-memberNFT')).toContainText('身份 NFT');
+    const memberNftCopy = page.getByTestId('about-copy-memberNFT');
+    await expect(memberNftCopy).toHaveText(/^0x[0-9a-f]{4}…[0-9a-f]{4}$/i);
+    await expect(memberNftCopy).toHaveAttribute('title', memberNft);
     await expect(page.getByTestId('about-address-airdropDistributor')).toContainText('空投分发器');
+    const airdropCopy = page.getByTestId('about-copy-airdropDistributor');
+    await expect(airdropCopy).toHaveText(/^0x[0-9a-f]{4}…[0-9a-f]{4}$/i);
+    await expect(airdropCopy).toHaveAttribute('title', airdrop);
+    // The abbreviation is real: no 40-char address is printed anywhere on the tab.
+    await expect(page.getByText(memberNft)).toHaveCount(0);
+    await expect(page.getByText(airdrop)).toHaveCount(0);
     // anvil has no block explorer, so no explorer link may be rendered.
     await expect(page.getByRole('link', { name: /在区块浏览器查看/ })).toHaveCount(0);
 
-    // QA 2026-11-14 B7: at 390 the full address must not wrap into a last line
-    // holding a single character (the old `break-all` left `8` alone on line 2).
-    const memberNftButton = page.getByTestId('about-copy-memberNFT');
-    // 0x + 40 hex chars, soft break opportunities every 4 characters.
-    await expect(memberNftButton.locator('wbr')).toHaveCount(10);
-    const lineWidths = await memberNftButton
-      .locator('span')
-      .first()
-      .evaluate((element) => {
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        const lines = new Map<number, number>();
-        for (const rect of range.getClientRects()) {
-          if (rect.width <= 0.5) continue;
-          const top = Math.round(rect.top);
-          lines.set(top, (lines.get(top) ?? 0) + rect.width);
-        }
-        return [...lines.values()];
-      });
-    expect(lineWidths.length).toBeGreaterThan(0);
-    // At most two lines, and each line holds at least a full 4-char group (~26px):
-    // no single-character orphan line.
-    expect(lineWidths.length).toBeLessThanOrEqual(2);
-    expect(Math.min(...lineWidths)).toBeGreaterThan(20);
-
-    // Copy button gives immediate feedback in place.
-    const copyButton = page.getByTestId('about-copy-memberNFT');
-    await copyButton.click();
-    await expect(copyButton).toContainText('已复制');
-    await expect
-      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-      .toBe(deployment.addresses.memberNFT);
+    // Copy button gives immediate feedback in place and still copies the full address.
+    await memberNftCopy.click();
+    await expect(memberNftCopy).toContainText('已复制');
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(memberNft);
 
     // Click switches the tab; ArrowLeft returns to 合约地址 with focus.
     await dataTab.click();

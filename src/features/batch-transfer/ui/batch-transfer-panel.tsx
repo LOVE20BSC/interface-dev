@@ -671,7 +671,7 @@ export function BatchTransferPanel({
             autoCapitalize="off"
             spellCheck={false}
             disabled={busy}
-            className="mt-1.5 w-full resize-y rounded-2xl border border-line bg-surface p-2.5 font-mono text-[11px] leading-4 text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20 disabled:opacity-60"
+            className="mt-1.5 w-full resize-y rounded-2xl border border-line bg-surface p-2.5 font-mono text-[11px] leading-4 text-foreground outline-none placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20 disabled:opacity-60"
           />
           {parse.truncated ? (
             <p className="mt-1 text-[11px] leading-4 text-muted">
@@ -917,7 +917,7 @@ export function BatchTransferPanel({
               disabled={busy}
               autoComplete="off"
               spellCheck={false}
-              className="h-9 w-28 rounded-xl border border-line bg-surface px-2.5 font-mono text-xs text-foreground outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/20 disabled:opacity-60"
+              className="h-9 w-28 rounded-xl border border-line bg-surface px-2.5 font-mono text-xs text-foreground outline-none focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20 disabled:opacity-60"
             />
           </div>
           <p className="mt-1.5 text-[11px] leading-4 text-muted">

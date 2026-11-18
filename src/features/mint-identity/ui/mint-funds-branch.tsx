@@ -44,7 +44,7 @@ export function MintFundsBranch({
         : undefined;
 
     return (
-      <Card className="border-brand/25 bg-brand-soft/30">
+      <Card className="border-brand-strong/25 bg-brand-soft/30">
         <div className="flex items-start gap-3">
           <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-soft text-brand-strong">
             <Gift className="h-5 w-5" aria-hidden="true" />

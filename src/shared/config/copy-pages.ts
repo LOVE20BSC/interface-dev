@@ -29,12 +29,11 @@ export const copy = {
     copiedAddressAria: '钱包地址已复制',
     identityLabel: '身份 NFT',
     tokenBalanceLabel: (symbol: string) => `${symbol} 余额`,
-    viewNft: '查看NFT',
-    goSelect: '去选择',
-    goMint: '去铸造',
+    viewNft: '切换',
+    goSelect: '去设置',
+    goMint: '去设置',
     /** Wallet-menu identity row: every state must agree with useMemberIdentity(). */
     identityUnconfigured: '这个环境还没有部署身份 NFT 合约',
-    nativeFeeNote: `${NATIVE_SYMBOL} 用于支付网络手续费`,
     nativeBalanceLabel: (symbol: string) => `${symbol} 余额`,
     disconnect: '断开连接',
     footer: '当前身份 NFT 保存在这台设备；换浏览器需要重新选择。',
@@ -534,17 +533,8 @@ export const copy = {
     balanceTitle: '我的余额',
     balanceUnavailable: '这个环境还没有配置社区代币，暂时看不到余额。',
     swap: '兑换',
-    accountTitle: '账户',
-    walletLabel: '钱包地址',
-    walletNotConnected: '未连接',
     networkLabel: '网络',
     networkValue: (name: string, chainId: number) => `${name} · chain ${chainId}`,
-    aboutTitle: '关于',
-    versionLabel: '版本',
-    versionValue: (buildId: string, variant: string) => `${buildId} · ${variant}`,
-    docs: '开源文档',
-    /** The link action must not repeat the row label (QA 2026-11-14, M7). */
-    docsAction: '前往文档',
   },
   // ───────────────────────────────────────────────────────────────────────────
   // 应用目录 (UX spec §3.6). Appended as its own block: the lazy /apps page is
@@ -1591,8 +1581,8 @@ export const copy = {
       myShare: '我的治理权占比',
       myBoostShare: '加速质押占比',
       /** 两个质押入口（旧版「质押 获取治理票 / 质押 增加治理收益」）。 */
-      liquidityLink: '流动性质押获取治理权',
-      boostLink: '加速质押增加加速激励',
+      liquidityLink: '增加治理权',
+      boostLink: '增加加速激励',
       mintRewardAction: '铸造 治理激励',
       /** 「社区」摘要：头条数字 + 一个行动入口 + 四格。 */
       communityVotes: '社区总治理权',

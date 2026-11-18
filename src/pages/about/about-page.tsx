@@ -27,7 +27,7 @@ type AboutTab = 'contracts' | 'data';
 const TAB_ORDER: readonly AboutTab[] = ['contracts', 'data'];
 
 const TEXT_LINK =
-  'inline-flex items-center gap-1.5 text-sm font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
+  'inline-flex items-center gap-1.5 text-sm font-medium text-brand-strong underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong';
 
 function Intro() {
   return (
@@ -110,9 +110,9 @@ function Tabs({
             onKeyDown={onKeyDown}
             className={cn(
               '-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-strong',
               selected
-                ? 'border-brand text-brand-strong'
+                ? 'border-brand-strong text-brand-strong'
                 : 'border-transparent text-muted hover:text-foreground',
             )}
           >
@@ -154,7 +154,7 @@ function AddressRow({ row }: { readonly row: AboutAddressRow }) {
             target="_blank"
             rel="noreferrer"
             aria-label={copy.about.addresses.explorer(label)}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-elevated hover:text-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-elevated hover:text-brand-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
           >
             <ArrowUpLeft className="h-3.5 w-3.5" aria-hidden="true" />
           </a>
@@ -164,7 +164,6 @@ function AddressRow({ row }: { readonly row: AboutAddressRow }) {
         <CopyableAddress
           address={row.address}
           label={label}
-          display="full"
           testId={`about-copy-${row.key}`}
           className="mt-1 text-foreground"
         />

@@ -40,7 +40,7 @@ export function AirdropReminder({ primary, search }: AirdropReminderProps) {
   return (
     <section
       aria-labelledby="home-reminder-airdrop"
-      className="rounded-2xl border border-brand/25 bg-brand-soft/30 p-4"
+      className="rounded-2xl border border-brand-strong/25 bg-brand-soft/30 p-4"
     >
       <h2 id="home-reminder-airdrop" className="text-base font-semibold leading-6 text-foreground">
         {title}

@@ -100,7 +100,7 @@ function AppRow({ entry, search }: { readonly entry: AppEntry; readonly search: 
       <Link
         to={{ pathname: entry.route, search }}
         data-app-id={entry.id}
-        className="flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-soft/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+        className="flex min-h-14 items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-soft/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-strong"
       >
         {body}
         <ChevronRight className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />

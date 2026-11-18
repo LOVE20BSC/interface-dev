@@ -116,7 +116,7 @@ export function IncreasePhasesSheet({
             onChange={(event) => setInput(event.target.value)}
             aria-label={copy.gov.phasesAdjust.title}
             data-testid={`${testIdPrefix}-input`}
-            className="w-20 rounded-xl border border-line bg-surface px-2 py-1.5 text-right text-sm text-foreground focus:border-brand focus:outline-none"
+            className="w-20 rounded-xl border border-line bg-surface px-2 py-1.5 text-right text-sm text-foreground focus:border-brand-strong focus:outline-none"
           />
           <span className="text-xs text-muted">{copy.gov.liquidity.phasesUnit}</span>
         </div>

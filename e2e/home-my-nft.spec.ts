@@ -453,7 +453,9 @@ test('wallet menu: identity row agrees with the pill when the chain is unreachab
   // No confident cached name/id and no entry to an NFT page that can only error.
   await expect(sheet.getByText(SEEDED_NAME)).toHaveCount(0);
   await expect(sheet.getByText(/^NFT #/)).toHaveCount(0);
-  await expect(sheet.getByText('查看NFT')).toHaveCount(0);
+  // The identity row's action is now 「切换」 (was 查看NFT); in the error state it
+  // must not render, otherwise the negative assertion above is vacuously true.
+  await expect(sheet.getByText('切换')).toHaveCount(0);
   expect(await sheet.locator('a[href^="/my-nft"]').count()).toBe(0);
 
   await shot(page, 'wallet-menu-identity-error.png');

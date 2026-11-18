@@ -222,10 +222,28 @@ export async function connect(page: Page): Promise<void> {
   await expect(trigger).toBeVisible({ timeout: 15_000 });
 }
 
+/**
+ * The visible text of a `CopyableAddress` row: `src/shared/ui/copyable-address.tsx`
+ * shows `shortenAddress(address, front, back)` with default 4 hex characters kept
+ * on each side of the ellipsis. Owner 2026-11-19: every address in the app is
+ * shortened in the middle; the full string stays in the button's `title` and in
+ * the clipboard, so the full value belongs in `toHaveAttribute('title', …)` or a
+ * clipboard poll, never in `toHaveText`.
+ */
+export function shortAddress(address: string, front = 4, back = 4): string {
+  return `${address.slice(0, 2 + front)}…${address.slice(-back)}`;
+}
+
 /** Primary buttons are the only solid brand-color controls; count the visible ones. */
 export async function countSolidButtons(page: Page): Promise<number> {
   return page.evaluate(() => {
-    const solid = new Set(['rgb(37, 99, 235)', 'rgb(29, 78, 216)', 'rgb(220, 38, 38)']);
+    // Owner 2026-11-19: the brand primary is unified to Binance yellow #fcd535 in
+    // both palettes, so `bg-brand` computes to rgb(252, 213, 53). The old blue pair
+    // (#2563eb / #1d4ed8) is gone: hover/active now use `brightness-*` on the same
+    // yellow, so the idle computed background stays around the brand colour. The
+    // strong variant (#856500) is kept for any surface that paints text/border
+    // tokens as a fill, and danger (#dc2626) is unchanged.
+    const solid = new Set(['rgb(252, 213, 53)', 'rgb(133, 101, 0)', 'rgb(220, 38, 38)']);
     const nodes = Array.from(document.querySelectorAll('button, a'));
     return nodes.filter((node) => {
       const element = node as HTMLElement;

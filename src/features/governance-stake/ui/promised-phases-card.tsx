@@ -29,7 +29,7 @@ export function PromisedPhasesCard({ ctx }: PromisedPhasesCardProps) {
 
   return (
     <>
-      <Card data-testid="gov-phases-card" className="border-brand/25 bg-brand-soft/20">
+      <Card data-testid="gov-phases-card" className="border-brand-strong/25 bg-brand-soft/20">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-medium text-foreground">{copy.gov.phasesAdjust.title}</p>

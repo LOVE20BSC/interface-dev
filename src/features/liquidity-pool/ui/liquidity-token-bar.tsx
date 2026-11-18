@@ -68,7 +68,7 @@ export function LiquidityTokenBar({ catalog, selected, compact = false }: Liquid
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
           className={cn(
-            'inline-flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+            'inline-flex shrink-0 items-center gap-1 rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-brand-strong hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
             compact && 'ml-auto',
           )}
         >
@@ -96,7 +96,7 @@ export function LiquidityTokenBar({ catalog, selected, compact = false }: Liquid
               value={catalog.customInput}
               onChange={(event) => catalog.setCustomInput(event.target.value)}
               placeholder={copy.liquidity.customPlaceholder}
-              className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-2.5 font-mono text-xs text-foreground outline-none placeholder:font-sans placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+              className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-2.5 font-mono text-xs text-foreground outline-none placeholder:font-sans placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20"
             />
             <Button
               variant="secondary"

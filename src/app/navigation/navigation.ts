@@ -24,12 +24,11 @@ export const NAV_ITEMS: readonly NavItem[] = [
     placeholder: false,
   },
   {
-    key: 'gov',
-    to: '/gov',
-    label: copy.nav.gov,
-    ariaLabel: copy.nav.govAria,
-    icon: Vote,
-    // 治理页自 2026-11-17 起是真实页面（流动性质押 + 加速质押），不再是占位页。
+    key: 'apps',
+    to: '/apps',
+    label: copy.nav.apps,
+    ariaLabel: copy.nav.appsAria,
+    icon: LayoutGrid,
     placeholder: false,
   },
   {
@@ -41,11 +40,12 @@ export const NAV_ITEMS: readonly NavItem[] = [
     placeholder: true,
   },
   {
-    key: 'apps',
-    to: '/apps',
-    label: copy.nav.apps,
-    ariaLabel: copy.nav.appsAria,
-    icon: LayoutGrid,
+    key: 'gov',
+    to: '/gov',
+    label: copy.nav.gov,
+    ariaLabel: copy.nav.govAria,
+    icon: Vote,
+    // 治理页自 2026-11-17 起是真实页面（流动性质押 + 加速质押），不再是占位页。
     placeholder: false,
   },
   {

@@ -133,7 +133,7 @@ export function WalletMenuContent({
   const rowClass = cn(
     'flex items-center gap-3 rounded-xl px-2.5 py-2.5',
     row.href !== null &&
-      'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+      'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
   );
   const rowBody = (
     <>
@@ -171,10 +171,19 @@ export function WalletMenuContent({
         <CopyableAddress
           address={address}
           label={copy.wallet.addressLabel}
-          display="full"
           testId="wallet-menu-address"
           className="mt-1 text-foreground"
         />
+        {/* owner 2026-11-19：原「我的」页的账户信息（钱包地址 / 网络）挪进钱包下拉。 */}
+        <div
+          className="mt-2 flex items-center justify-between gap-3"
+          data-testid="wallet-menu-network"
+        >
+          <span className="text-xs text-muted">{copy.me.networkLabel}</span>
+          <span className="text-xs font-medium text-foreground">
+            {copy.me.networkValue(NETWORK.name, NETWORK.chainId)}
+          </span>
+        </div>
       </div>
 
       <Separator className="my-2" />
@@ -192,27 +201,6 @@ export function WalletMenuContent({
       <Separator className="my-2" />
 
       <dl className="space-y-2.5 px-2.5 py-1">
-        <div className="flex items-center justify-between gap-3">
-          <dt className="text-xs text-muted">{copy.wallet.tokenBalanceLabel(token.symbol)}</dt>
-          <dd>
-            <BalanceValue
-              status={
-                tokenBalance.status === 'ready'
-                  ? 'ready'
-                  : tokenBalance.status === 'loading'
-                    ? 'loading'
-                    : tokenBalance.status === 'unconfigured'
-                      ? 'unavailable'
-                      : 'error'
-              }
-              display={
-                tokenBalance.value !== undefined && tokenBalance.decimals !== undefined
-                  ? formatTokenAmount(tokenBalance.value, tokenBalance.decimals)
-                  : UNKNOWN
-              }
-            />
-          </dd>
-        </div>
         <div className="flex items-center justify-between gap-3">
           <dt className="text-xs text-muted">
             {copy.wallet.nativeBalanceLabel(nativeBalance.symbol)}
@@ -234,8 +222,28 @@ export function WalletMenuContent({
             />
           </dd>
         </div>
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-xs text-muted">{copy.wallet.tokenBalanceLabel(token.symbol)}</dt>
+          <dd>
+            <BalanceValue
+              status={
+                tokenBalance.status === 'ready'
+                  ? 'ready'
+                  : tokenBalance.status === 'loading'
+                    ? 'loading'
+                    : tokenBalance.status === 'unconfigured'
+                      ? 'unavailable'
+                      : 'error'
+              }
+              display={
+                tokenBalance.value !== undefined && tokenBalance.decimals !== undefined
+                  ? formatTokenAmount(tokenBalance.value, tokenBalance.decimals)
+                  : UNKNOWN
+              }
+            />
+          </dd>
+        </div>
       </dl>
-      <p className="px-2.5 pt-1 text-[11px] text-muted">{copy.wallet.nativeFeeNote}</p>
 
       <Separator className="my-2" />
 

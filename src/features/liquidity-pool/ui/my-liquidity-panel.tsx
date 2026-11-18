@@ -49,7 +49,7 @@ export interface MyLiquidityPanelProps {
 const CARD = 'rounded-3xl border border-line bg-surface p-5 shadow-soft';
 /** 右侧留出「流动性凭证」徽标的位置（旧库把 LP 徽标放在输入框右端）。 */
 const INPUT =
-  'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated pl-3 pr-28 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20';
+  'mt-1.5 h-12 w-full rounded-2xl border border-line bg-elevated pl-3 pr-28 text-xl font-semibold text-foreground outline-none placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20';
 const BADGE =
   'pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-medium text-foreground';
 const QUICK_BUTTON = 'rounded-full border px-3 py-1 text-xs font-medium';
@@ -292,7 +292,7 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
                   className={cn(
                     QUICK_BUTTON,
                     activePreset === preset
-                      ? 'border-brand bg-brand-soft text-brand-strong'
+                      ? 'border-brand-strong bg-brand-soft text-brand-strong'
                       : 'border-line text-foreground hover:bg-elevated',
                   )}
                 >
@@ -307,7 +307,7 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
                 className={cn(
                   QUICK_BUTTON,
                   activePreset === 100
-                    ? 'border-brand bg-brand-soft text-brand-strong'
+                    ? 'border-brand-strong bg-brand-soft text-brand-strong'
                     : 'border-line text-foreground hover:bg-elevated',
                 )}
               >
@@ -472,7 +472,7 @@ function LiquiditySettingsInline(props: MyLiquidityPanelProps) {
               className={cn(
                 'rounded-full border px-2 py-1 text-[11px] font-medium',
                 slippagePercent === preset
-                  ? 'border-brand bg-brand-soft text-brand-strong'
+                  ? 'border-brand-strong bg-brand-soft text-brand-strong'
                   : 'border-line text-muted hover:bg-elevated',
               )}
             >

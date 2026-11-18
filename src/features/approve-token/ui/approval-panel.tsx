@@ -49,7 +49,7 @@ export interface ApprovalsPanelProps {
 }
 
 const TEXT_LINK =
-  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
+  'inline-flex items-center text-sm font-medium text-muted underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong';
 
 function StateCard({
   title,
@@ -427,7 +427,7 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
                     aria-label={copy.approvals.customPlaceholder}
                     autoComplete="off"
                     spellCheck={false}
-                    className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-2.5 font-mono text-xs text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+                    className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface px-2.5 font-mono text-xs text-foreground outline-none placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20"
                   />
                   <Button
                     size="sm"
@@ -546,7 +546,7 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
           aria-invalid={spenderCheck === 'invalid' || spenderCheck === 'zero'}
           className={cn(
             'mt-3 h-11 w-full rounded-2xl border bg-surface px-3 font-mono text-sm text-foreground',
-            'outline-none focus:ring-2 focus:ring-brand',
+            'outline-none focus:ring-2 focus:ring-brand-strong',
             spenderCheck === 'invalid' || spenderCheck === 'zero'
               ? 'border-danger/50'
               : 'border-line',

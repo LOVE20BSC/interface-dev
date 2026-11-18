@@ -280,7 +280,7 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
               mode === 'id' ? copy.gov.query.idPlaceholder : copy.gov.query.namePlaceholder
             }
             data-testid="gov-query-input"
-            className="mt-1 w-full rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm text-foreground focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30"
+            className="mt-1 w-full rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm text-foreground focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
           />
         </label>
         {invalid ? (
@@ -370,7 +370,6 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
                   <CopyableAddress
                     address={owner}
                     label={copy.gov.query.target}
-                    display="full"
                     testId="gov-query-target-address"
                   />
                 </div>

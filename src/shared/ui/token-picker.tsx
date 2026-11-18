@@ -100,7 +100,7 @@ function TokenRow({
       onClick={() => onSelect(item)}
       className={cn(
         'flex w-full items-center justify-between gap-3 rounded-xl px-2.5 py-2.5 text-left text-sm',
-        'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+        'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
         selected && 'bg-brand-soft/60',
       )}
     >
@@ -186,7 +186,7 @@ function TokenList({
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
-          className="h-10 w-full rounded-xl border border-line bg-surface pl-8 pr-2.5 text-sm text-foreground outline-none placeholder:text-muted focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+          className="h-10 w-full rounded-xl border border-line bg-surface pl-8 pr-2.5 text-sm text-foreground outline-none placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20"
         />
       </label>
       <p className="mt-1.5 px-1 text-[11px] leading-4 text-muted">{props.labels.searchHint}</p>
@@ -297,7 +297,7 @@ export function TokenPicker(props: TokenPickerProps) {
       className={cn(
         'inline-flex h-10 items-center gap-1.5 rounded-2xl border border-line bg-surface px-3 text-sm font-semibold text-foreground shadow-soft',
         triggerLabel === undefined ? 'max-w-[11rem]' : 'max-w-none',
-        'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60',
+        'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong disabled:opacity-60',
         triggerClassName,
       )}
     >

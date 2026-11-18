@@ -28,11 +28,14 @@
   --color-muted: #55647a;
   --color-line: #d9e1ec;
   --color-line-strong: #b7c3d4;
-  --color-brand: #2563eb;
-  --color-brand-strong: #1d4ed8;
-  --color-brand-soft: #dbeafe;
-  /* Text/glyph colour drawn on top of --color-brand (white on blue, near-black on yellow). */
-  --color-on-brand: #ffffff;
+  /* 品牌主色统一（owner 2026-11-19）：浅色/深色都用 Binance 黄 #fcd535。
+     浅色下文字链接、边框、focus ring 用同色系深金 #856500 保证对比度（AA：画布 4.80 / 白卡 5.44），
+     填充色（按钮/chip/选中态）仍用 #fcd535，on-brand 用近黑。 */
+  --color-brand: #fcd535;
+  --color-brand-strong: #856500;
+  --color-brand-soft: #fef8dd;
+  /* Text/glyph colour drawn on top of --color-brand (near-black on yellow). */
+  --color-on-brand: #181a20;
   --color-danger: #dc2626;
   --color-danger-strong: #b91c1c;
   --color-danger-soft: #fee2e2;

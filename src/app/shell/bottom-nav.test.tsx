@@ -20,14 +20,14 @@ describe('BottomNav', () => {
     expect(links).toHaveLength(5);
     expect(links.map((link) => link.textContent?.replace(/（即将上线）/, '').trim())).toEqual([
       '首页',
-      '治理',
-      '行动',
       '应用',
+      '行动',
+      '治理',
       '我的',
     ]);
     // M0: the 行动 page is a placeholder, so this build has no raised center tab.
     expect(NAV_ITEMS.some((item) => 'raised' in item)).toBe(false);
-    expect(NAV_ITEMS.map((item) => item.key)).toEqual(['home', 'gov', 'act', 'apps', 'me']);
+    expect(NAV_ITEMS.map((item) => item.key)).toEqual(['home', 'apps', 'act', 'gov', 'me']);
     // Owner 2026-11-11: the 链群 tab is replaced by the 应用 feature directory.
     expect(within(nav).queryByRole('link', { name: /链群/ })).toBeNull();
     // 我的 is a real page now: no 即将上线 suffix/badge. 治理 is a real page since

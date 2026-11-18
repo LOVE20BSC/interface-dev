@@ -60,7 +60,6 @@ function ReceiptBody({ record, onDismiss }: TransferReceiptProps) {
             <CopyableAddress
               address={record.recipient}
               label={copy.transfer.receiptTo}
-              display="full"
               testId="transfer-receipt-recipient"
               className="text-foreground"
             />

@@ -56,7 +56,7 @@ export function AppHeader() {
               type="button"
               onClick={goBack}
               aria-label={copy.header.backAria}
-              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
             >
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </button>

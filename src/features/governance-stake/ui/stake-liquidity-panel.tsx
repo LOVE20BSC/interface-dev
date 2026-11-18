@@ -464,7 +464,7 @@ export function StakeLiquidityPanel({
           disabled={!smartAvailable || disabled}
           onClick={handleSmartToggle}
           className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors ${
-            hubPath ? 'border-brand bg-brand' : 'border-line bg-surface'
+            hubPath ? 'border-brand-strong bg-brand' : 'border-line bg-surface'
           } disabled:opacity-60`}
         >
           <span
@@ -548,7 +548,7 @@ export function StakeLiquidityPanel({
                   aria-label={copy.gov.liquidity.phasesLabel}
                   data-testid="gov-liquidity-phases-select"
                   disabled={disabled}
-                  className="mt-1.5 w-full rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm text-foreground focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30 disabled:text-muted"
+                  className="mt-1.5 w-full rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm text-foreground focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30 disabled:text-muted"
                 >
                   {phaseOptions.map((value) => (
                     <option key={value.toString()} value={value.toString()}>

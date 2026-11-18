@@ -36,7 +36,7 @@ export interface SwapInfoProps {
   readonly feePercent: string | undefined;
 }
 
-const ACTIVE_PILL = 'border-brand bg-brand-soft text-brand-strong';
+const ACTIVE_PILL = 'border-brand-strong bg-brand-soft text-brand-strong';
 const IDLE_PILL = 'border-line bg-surface text-foreground hover:bg-elevated';
 
 function Row({
@@ -194,7 +194,7 @@ export function SwapInfo(props: SwapInfoProps) {
                   onChange={(event) => onCustomSlippageChange(event.target.value)}
                   placeholder={copy.swap.slippageCustomPlaceholder}
                   aria-label={copy.swap.slippageLabel}
-                  className="h-8 w-20 rounded-lg border border-line bg-surface px-2 text-right text-xs text-foreground outline-none focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+                  className="h-8 w-20 rounded-lg border border-line bg-surface px-2 text-right text-xs text-foreground outline-none focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20"
                 />
                 <span>{copy.swap.slippageCustomUnit}</span>
               </label>

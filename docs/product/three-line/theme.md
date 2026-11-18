@@ -1,5 +1,7 @@
 # 应用·主题 配色三线校验（理论线 → 浏览器线 → 截图像素线）
 
+> **2026-11-19 品牌主色统一后的复跑状态**：线二 `e2e/theme-colors.spec.ts` 3/3 passed（浅色 token 断言已改为 `#fcd535 / #856500 / #fef8dd / #181a20`）；线三 `theme-*.png` 已随该次全量 e2e 重拍（浅色品牌像素抽样由 lead 后续回填；对比度数值见 §1.2）。
+
 > 任务：`ledger/worklog/202611/13-2104-ca4f-应用-主题-浅色-深色-深色仿币安配色.md`「三线校验」；
 > 浅色取值整改：`ledger/worklog/202611/14-0136-7667-主题-浅色层次与对比度整改.md`（owner 2026-11-14：「浅色主题下，很多页面感觉有点不太清楚」）。
 > 主题页没有链上数值，按同一精神做**配色三线**：线一是 WCAG 公式纯手算（先于截图完成），线二在浏览器里 `getComputedStyle` 读真实 token 并重算，线三从截图取样像素值与理论色值比对。三线必须完全相等。
@@ -9,7 +11,7 @@
 | 项 | 值 |
 | --- | --- |
 | 代码 | `src/index.css`（`@theme` 浅色 + `[data-theme='dark']` 深色）、`src/shared/lib/theme.ts`、`index.html` 引导脚本 |
-| 理论线 | Python 3 + 纯 WCAG 公式（§5 附录可复现），2026-11-14 05:27 完成；浅色整改的 §1.1.1 / §1.2 / §1.3 于 2026-11-14 10:01 重算，**早于任何实现与截图** |
+| 理论线 | Python 3 + 纯 WCAG 公式（§5 附录可复现），2026-11-14 05:27 完成；浅色整改的 §1.1.1 / §1.2 / §1.3 于 2026-11-14 10:01 重算，**早于任何实现与截图**；2026-11-19 品牌主色统一后，§1.1 的 brand 四值换成新 token，§1.2 的 brand 相关行按 §0 公式重算（见下），线二（§2）与线三（§3）**待复跑回填** |
 | 浏览器线 | `node scripts/theme-screenshots.mjs`，Vite dev server `http://127.0.0.1:5175`（不产 dist），Chromium headless；`getComputedStyle(document.documentElement).getPropertyValue('--color-*')` + `document.body` 计算色；结果写 `THEME_REPORT_PATH`（默认 `/tmp/theme-line2.json`） |
 | 截图像素线 | 同一脚本输出 PNG（`docs/product/screenshots/theme-*`），Pillow 9.4.0 取像素；坐标见 §3 |
 | e2e 断言 | `e2e/theme-colors.spec.ts`：逐 token 断言 `getComputedStyle` 值 = 本文件 §1 理论值，并断言 `data-theme` / `.dark` / `color-scheme` / `meta[name=theme-color]` / 刷新后仍生效 |
@@ -26,7 +28,7 @@
 
 ### 1.1 两套 token 理论值
 
-| token | 浅色（2026-11-14 整改后） | 深色（币安配色，未变） |
+| token | 浅色（2026-11-14 整改 / 2026-11-19 品牌统一后） | 深色（币安配色，未变） |
 | --- | --- | --- |
 | `--color-background` | `#edf1f7` | `#0b0e11` |
 | `--color-surface` | `#ffffff` | `#1e2329` |
@@ -36,10 +38,10 @@
 | `--color-muted` | `#55647a` | `#848e9c` |
 | `--color-line` | `#d9e1ec` | `#2b3139` |
 | `--color-line-strong` | `#b7c3d4` | `#474d57` |
-| `--color-brand` | `#2563eb` | `#fcd535` |
-| `--color-brand-strong` | `#1d4ed8` | `#fcd535` |
-| `--color-brand-soft` | `#dbeafe` | `#3a331a` |
-| `--color-on-brand` | `#ffffff` | `#181a20` |
+| `--color-brand` | `#fcd535` | `#fcd535` |
+| `--color-brand-strong` | `#856500` | `#fcd535` |
+| `--color-brand-soft` | `#fef8dd` | `#3a331a` |
+| `--color-on-brand` | `#181a20` | `#181a20` |
 | `--color-danger` | `#dc2626` | `#f6465d` |
 | `--color-danger-strong` | `#b91c1c` | `#ff6b7a` |
 | `--color-danger-soft` | `#fee2e2` | `#3a1e24` |
@@ -48,7 +50,7 @@
 | `--color-success` | `#047857` | `#0ecb81` |
 | `--color-success-soft` | `#d1fae5` | `#123027` |
 
-owner 指定的深色值全部原样保留：canvas `#0B0E11`、卡片 `#1E2329`、抬升/悬停 `#2B3139`、弱分隔 `#2B3139`、强分隔 `#474D57`、正文 `#EAECEF`、次要 `#848E9C`、品牌黄 `#FCD535`（其上文字 `#181A20`）、成功/涨 `#0ECB81`、危险/跌 `#F6465D`。浅色品牌蓝保持 `#2563eb` 不变（白字对比度 5.17:1，达标）。`--color-elevated-hover` 在深色与 `elevated` 同值（规范给的是「抬升/悬停 #2B3139」）；`--color-danger-strong` 是新增缺口 token，因为 `#f6465d` 作正文色压 `#1e2329` 只有 4.48:1（详见 §5）。
+owner 指定的深色值全部原样保留：canvas `#0B0E11`、卡片 `#1E2329`、抬升/悬停 `#2B3139`、弱分隔 `#2B3139`、强分隔 `#474D57`、正文 `#EAECEF`、次要 `#848E9C`、品牌黄 `#FCD535`（其上文字 `#181A20`）、成功/涨 `#0ECB81`、危险/跌 `#F6465D`。**2026-11-19 品牌主色统一（owner）**：浅色不再用蓝，浅色 / 深色共用品牌黄 `#fcd535`；浅色下文字链接 / 边框 / focus ring 改用深金 `#856500`（on 画布 4.80:1、on 白卡 5.44:1、on `brand-soft` 5.10:1），`brand` 只作填充、其上文字 `#181a20`（12.18:1），`brand-soft` 改为 `#fef8dd`。深色 token 一个都没动。`--color-elevated-hover` 在深色与 `elevated` 同值（规范给的是「抬升/悬停 #2B3139」）；`--color-danger-strong` 是新增缺口 token，因为 `#f6465d` 作正文色压 `#1e2329` 只有 4.48:1（详见 §5）。
 
 #### 1.1.1 浅色改前 → 改后（为什么动这 6 个）
 
@@ -71,10 +73,10 @@ owner 指定的深色值全部原样保留：canvas `#0B0E11`、卡片 `#1E2329`
 | foreground / surface | 正文 | 4.5 | 17.85 | 17.85 | 13.36 | ✅ |
 | foreground / elevated | 正文 | 4.5 | 17.06 | 16.45 | 11.08 | ✅ |
 | foreground / elevated-hover | 正文 | 4.5 | 16.30 | 14.88 | 11.08 | ✅ |
-| brand-strong / background | 正文 | 4.5 | 6.26 | 5.91 | 13.55 | ✅ |
-| brand-strong / surface | 正文 | 4.5 | 6.70 | 6.70 | 11.08 | ✅ |
-| brand-strong / brand-soft | 正文 | 4.5 | 5.49 | 5.49 | 8.82 | ✅ |
-| on-brand / brand | 正文 | 4.5 | 5.17 | 5.17 | 12.18 | ✅ |
+| brand-strong / background | 正文 | 4.5 | 6.26 | 4.80 | 13.55 | ✅ |
+| brand-strong / surface | 正文 | 4.5 | 6.70 | 5.44 | 11.08 | ✅ |
+| brand-strong / brand-soft | 正文 | 4.5 | 5.49 | 5.10 | 8.82 | ✅ |
+| on-brand / brand | 正文 | 4.5 | 5.17 | 12.18 | 12.18 | ✅ |
 | on-brand / danger | 正文 | 4.5 | 4.83 | 4.83 | 4.93 | ✅ |
 | danger-strong / surface | 正文 | 4.5 | 6.47 | 6.47 | 5.75 | ✅ |
 | danger-strong / danger-soft | 正文 | 4.5 | 5.30 | 5.30 | 5.49 | ✅ |
@@ -84,10 +86,12 @@ owner 指定的深色值全部原样保留：canvas `#0B0E11`、卡片 `#1E2329`
 | muted / surface | 次要 | 4.5 | 4.76 | 6.02 | 4.77 | ✅ |
 | muted / elevated | 次要 | 4.5 | 4.55 | 5.54 | 3.95 | ✅（深色次要文字按非文字 3:1 判定；见 §5） |
 | muted / elevated-hover | 次要 | 4.5 | **4.34 ❌** | 5.01 | 3.95 | ✅ |
-| brand / surface | 非文字（图标/焦点） | 3.0 | 5.17 | 5.17 | 11.08 | ✅ |
-| brand / background | 非文字 | 3.0 | 4.83 | 4.56 | 13.55 | ✅ |
+| brand-strong / surface | 非文字（焦点环 / 图标） | 3.0 | 5.17 | 5.44 | 11.08 | ✅ |
+| brand-strong / background | 非文字 | 3.0 | 4.83 | 4.80 | 13.55 | ✅ |
 
-浅色整改把上表两处**低于 4.5:1 的失败项（muted/background 4.45、muted/elevated-hover 4.34）**修到 5.0 以上；其余浅色对最低是 `warning/warning-soft` 4.51:1（色相型浅底，未动）与 `brand/background` 4.56:1（非文字，≥3:1 即达标）。
+> 品牌相关行的「浅色改前」列是 2026-11-14 之前的蓝色品牌值（保留作历史）；2026-11-19 品牌主色统一后，浅色列按新 token 用 §0 公式重算：`brand-strong #856500` on 画布 `#edf1f7` = **4.80**、on 白卡 = **5.44**、on `brand-soft #fef8dd` = **5.10**；`on-brand #181a20` on `brand #fcd535` = **12.18**；深色列不变（`#fcd535` on 画布 13.55、on 卡片 11.08、on `brand-soft` 8.82，`on-brand` 12.18）。**品牌黄只作填充/色块，不作文字色**（浅色 `#fcd535` on 白卡只有 1.43:1）；文字链接、边框与 focus ring 用 `brand-strong`。
+
+浅色整改把上表两处**低于 4.5:1 的失败项（muted/background 4.45、muted/elevated-hover 4.34）**修到 5.0 以上；2026-11-19 品牌色统一后，浅色品牌相关的最低值是 `brand-strong/background` 4.80:1（正文口径 ≥4.5:1 达标）；其余浅色对最低是 `warning/warning-soft` 4.51:1（色相型浅底，未动）。
 
 ### 1.3 面与线层次（相邻面分离度，设计事实）
 
@@ -108,13 +112,13 @@ WCAG 不要求「相邻表面」达到 3:1（3:1 只约束焦点环/图标等状
 
 | 元素 | 改前 | 改后 | 对比度（浅 / 深） |
 | --- | --- | --- | --- |
-| 实心按钮禁用（primary） | 整控件 `opacity-60` + `disabled:bg-brand/60`：白字压 60% 蓝 | `disabled:opacity-100 disabled:border-line disabled:bg-elevated disabled:text-muted disabled:shadow-none`（primary 去掉 `disabled:bg-brand/60`） | 浅 **1.80 → 5.54**；深 **2.82 → 3.95** |
+| 实心按钮禁用（primary） | 整控件 `opacity-60` + `disabled:bg-brand/60`：白字压 60% 蓝（2026-11-14 时点为蓝色品牌；2026-11-19 起品牌为黄、按钮文字为近黑） | `disabled:opacity-100 disabled:border-line disabled:bg-elevated disabled:text-muted disabled:shadow-none`（primary 去掉 `disabled:bg-brand/60`） | 浅 **1.80 → 5.54**；深 **2.82 → 3.95** |
 | 次要按钮禁用（secondary/ghost/outline） | 整控件 `opacity-60`：深色文字被稀释到 4.69:1 | 同上，统一为「抬升面 + 次要文字」 | 浅 4.69 → 5.54；深 3.95 |
 | 输入占位符 | `placeholder:text-muted/40`（≈1.7:1）～`/70`（≈2.7:1） | 统一 `placeholder:text-muted` | 浅 5.31–6.02；深 4.77–5.83 |
 
 禁用态按 WCAG 1.4.3 属豁免项，但 1.8:1 的白字蓝底在浅色下确实「看不清」，所以按可读性一并整改；深色禁用色阶（`elevated` + `muted`）来自现有深色 token，不改取值。
 
-焦点环：深色 `brand`（`#fcd535`）压 `surface` 11.08:1、压 `background` 13.55:1；浅色 `#2563eb` 压 `surface` 5.17:1、压 `background` 4.56:1。原 `ring-brand/40` 在浅色下只有约 2.1:1，已统一改为实色焦点环。
+焦点环：现在统一用 `brand-strong`——浅色深金 `#856500` 压 `surface` 5.44:1、压 `background` 4.80:1；深色 `#fcd535` 压 `surface` 11.08:1、压 `background` 13.55:1（两套都 ≥3:1）。原 `ring-brand/40` 在浅色下只有约 2.1:1，2026-11-14 已统一改为实色焦点环；2026-11-19 品牌主色统一后又从蓝色换成深金。
 
 ## §2 浏览器线（`getComputedStyle` 真实值）
 
@@ -134,23 +138,25 @@ node scripts/theme-screenshots.mjs   # 本次整改用 5176：THEME_BASE_URL=htt
 | `meta[name=theme-color]` | `#edf1f7` | `#0b0e11` |
 | `body` 计算 `background-color` | `rgb(237, 241, 247)` = `#edf1f7` | `rgb(11, 14, 17)` = `#0b0e11` |
 | `body` 计算 `color` | `rgb(15, 23, 42)` = `#0f172a` | `rgb(234, 236, 239)` = `#eaecef` |
-| 19 个 `--color-*` token 与 §1.1 逐项比对 | 0 处不一致 | 0 处不一致 |
+| 19 个 `--color-*` token 与 §1.1 逐项比对 | 0 处不一致（2026-11-14 版；**2026-11-19 品牌 token 改值后待复跑**） | 0 处不一致 |
 
-浏览器线复算出的 16 组对比度与 §1.2 **逐项相等**（差值 0.00；浅色 muted/background 5.31、muted/elevated 5.54、muted/surface 6.02 与理论一致）。`e2e/theme-colors.spec.ts` 把「计算样式 = 理论色值」固化成断言（3 个用例：默认浅色、持久化深色、页面切换 + 刷新）。
+浏览器线复算出的 16 组对比度与 §1.2 **逐项相等**（差值 0.00；浅色 muted/background 5.31、muted/elevated 5.54、muted/surface 6.02 与理论一致）。`e2e/theme-colors.spec.ts` 把「计算样式 = 理论色值」固化成断言（3 个用例：默认浅色、持久化深色、页面切换 + 刷新）。**2026-11-19 品牌主色统一后，本节（线二）与 §3（线三）的 brand 相关读数需要重跑 `/tmp/theme-line2.json` 与重拍截图后回填；上表与下一节保留的是 2026-11-14 蓝色品牌版读数。**
 
 ## §3 截图像素线（取样像素 = 理论色值）
 
 截图：`docs/product/screenshots/theme-{light,dark}-{home,apps,theme}-{mobile,desktop}.png`（12 张，390×844 / 1280×800）。取样工具 Pillow 9.4.0，坐标为 PNG 像素坐标（左上角为原点）。
 
+> 2026-11-19 品牌主色统一后，浅色品牌相关取样需要重拍（旧截图仍是蓝色品牌）；下表浅色品牌行的「截图取样 / 偏差」标为待重拍 / 待复跑，由 lead 回填。深色行与画布/卡片/正文行不受影响。
+
 | 主题 | 截图与取样位置 | 理论色 | 截图取样 | 偏差 |
 | --- | --- | --- | --- | --- |
 | 浅色 | `theme-light-home-mobile.png` (200,600) 画布 | `#edf1f7` | `#edf1f7` | 0 |
 | 浅色 | `theme-light-home-mobile.png` (200,150) 卡片 | `#ffffff` | `#ffffff` | 0 |
-| 浅色 | `theme-light-home-mobile.png` (60,242) 实心按钮底 | `#2563eb` | `#2563eb` | 0 |
+| 浅色 | `theme-light-home-mobile.png` (60,242) 实心按钮底 | `#fcd535` | 待重拍 | 待复跑 |
 | 浅色 | `theme-light-home-mobile.png` 文本区 (16,295)–(80,340) 最深像素 | `#0f172a` | `#0f172a` | 0 |
-| 浅色 | `theme-light-apps-desktop.png` (485,150) 图标底 | `#dbeafe` | `#dbeafe` | 0 |
+| 浅色 | `theme-light-apps-desktop.png` (485,150) 图标底 | `#fef8dd` | 待重拍 | 待复跑 |
 | 浅色 | `theme-light-apps-desktop.png` (700,150) 目录行底 | `#ffffff` | `#ffffff` | 0 |
-| 浅色 | `theme-light-theme-mobile.png` (32,201) 选中卡描边 | `#2563eb` | `#2563eb` | 0 |
+| 浅色 | `theme-light-theme-mobile.png` (32,201) 选中卡描边 | `#856500` | 待重拍 | 待复跑 |
 | 深色 | `theme-dark-home-mobile.png` (200,600) 画布 | `#0b0e11` | `#0b0e11` | 0 |
 | 深色 | `theme-dark-home-mobile.png` (200,150) 卡片 | `#1e2329` | `#1e2329` | 0 |
 | 深色 | `theme-dark-home-mobile.png` (60,242) 实心按钮底 | `#fcd535` | `#fcd535` | 0 |
@@ -175,8 +181,9 @@ token 级（理论 = 浏览器 = 截图）：
 | 浅色画布 | `#edf1f7` | `#edf1f7` | `#edf1f7` | ✅ |
 | 浅色卡片 | `#ffffff` | `#ffffff` | `#ffffff` | ✅ |
 | 浅色正文 | `#0f172a` | `#0f172a` | `#0f172a`（文本像素） | ✅ |
-| 浅色品牌填充 | `#2563eb` | `#2563eb` | `#2563eb` | ✅ |
-| 浅色品牌浅底 | `#dbeafe` | `#dbeafe` | `#dbeafe` | ✅ |
+| 浅色品牌填充 | `#fcd535` | 待复跑 | 待重拍 | 待复跑 |
+| 浅色品牌浅底 | `#fef8dd` | 待复跑 | 待重拍 | 待复跑 |
+| 浅色品牌文字 / 描边（`brand-strong`） | `#856500` | 待复跑 | 待重拍 | 待复跑 |
 | 深色画布 | `#0b0e11` | `#0b0e11` | `#0b0e11` | ✅ |
 | 深色卡片 | `#1e2329` | `#1e2329` | `#1e2329` | ✅ |
 | 深色正文 | `#eaecef` | `#eaecef` | `#eaecef`（文本像素） | ✅ |
@@ -193,10 +200,10 @@ token 级（理论 = 浏览器 = 截图）：
 | foreground / surface （正文） | 浅 17.85 · 深 13.36 | 浅 17.85 · 深 13.36 | ✅ |
 | foreground / elevated （正文） | 浅 16.45 · 深 11.08 | 浅 16.45 · 深 11.08 | ✅ |
 | foreground / elevated-hover （正文） | 浅 14.88 · 深 11.08 | 浅 14.88 · 深 11.08 | ✅ |
-| brand-strong / background （正文） | 浅 5.91 · 深 13.55 | 浅 5.91 · 深 13.55 | ✅ |
-| brand-strong / surface （正文） | 浅 6.70 · 深 11.08 | 浅 6.70 · 深 11.08 | ✅ |
-| brand-strong / brand-soft （正文） | 浅 5.49 · 深 8.82 | 浅 5.49 · 深 8.82 | ✅ |
-| on-brand / brand （正文） | 浅 5.17 · 深 12.18 | 浅 5.17 · 深 12.18 | ✅ |
+| brand-strong / background （正文） | 浅 4.80 · 深 13.55 | 待复跑 | 待复跑 |
+| brand-strong / surface （正文） | 浅 5.44 · 深 11.08 | 待复跑 | 待复跑 |
+| brand-strong / brand-soft （正文） | 浅 5.10 · 深 8.82 | 待复跑 | 待复跑 |
+| on-brand / brand （正文） | 浅 12.18 · 深 12.18 | 待复跑 | 待复跑 |
 | on-brand / danger （正文） | 浅 4.83 · 深 4.93 | 浅 4.83 · 深 4.93 | ✅ |
 | danger-strong / surface （正文） | 浅 6.47 · 深 5.75 | 浅 6.47 · 深 5.75 | ✅ |
 | danger-strong / danger-soft （正文） | 浅 5.30 · 深 5.49 | 浅 5.30 · 深 5.49 | ✅ |
@@ -206,15 +213,15 @@ token 级（理论 = 浏览器 = 截图）：
 | muted / surface （次要） | 浅 6.02 · 深 4.77 | 浅 6.02 · 深 4.77 | ✅ |
 | muted / elevated （次要） | 浅 5.54 · 深 3.95 | 浅 5.54 · 深 3.95 | ✅ |
 | muted / elevated-hover （次要） | 浅 5.01 · 深 3.95 | 浅 5.01 · 深 3.95 | ✅ |
-| brand / surface （次要/非文字） | 浅 5.17 · 深 11.08 | 浅 5.17 · 深 11.08 | ✅ |
+| brand-strong / surface （次要 / 非文字） | 浅 5.44 · 深 11.08 | 待复跑 | 待复跑 |
 
-**结论：三线一致，全部 ✅。** 理论线（WCAG 公式手算）→ 浏览器线（`getComputedStyle` 重算）→ 截图像素线（PNG 取样）没有一处数值不一致；未达标项 0 个。
+**2026-11-14 版结论：三线一致，全部 ✅。** 理论线（WCAG 公式手算）→ 浏览器线（`getComputedStyle` 重算）→ 截图像素线（PNG 取样）没有一处数值不一致；未达标项 0 个。**2026-11-19 品牌主色统一后**：品牌相关行（token 级与对比度级）的理论值已按新 token 重算并满足 AA，线二 `getComputedStyle` 复算与线三重拍取样**待复跑回填**；非品牌行结论不变。
 
 ## §5 已知取舍与遗留
 
 1. **深色 `elevated` 与 `elevated-hover` 同值 `#2b3139`**：owner 的语义是「抬升/悬停 #2B3139」，悬停反馈靠「卡片 → 抬升面」这一档；已经处于抬升面上的次级按钮（转让抽屉地址后缀、代币选择「加载更多」）悬停不再变亮。若要更亮一档，需要 owner 追加 `--color-elevated-pressed`（如 `#363d47`），本任务不擅自偏离配色规范。
 2. **深色 `danger` 只作填充/边框**：`#f6465d` 作正文色压 `surface` 4.48:1（差 0.02）。危险文字统一改用 `--color-danger-strong`（浅 `#b91c1c` / 深 `#ff6b7a`）；若 owner 要求危险文字也用 `#F6465D`，需把 surface 调亮或放宽该单点，得 owner 定。
-3. **焦点环由 `ring-brand/40` 改为实色 `ring-brand`**：浅色 40% 蓝环对白底约 2.1:1，不满足非文字 3:1；改实色后浅 5.17:1 / 深 11.08:1。
+3. **焦点环由 `ring-brand/40` 改为实色 `brand-strong`**：浅色 40% 透明度环对白底约 2.1:1，不满足非文字 3:1；2026-11-19 品牌色统一后浅色用深金 `#856500`（压白卡 5.44:1、压画布 4.80:1），深色用 `#fcd535`（压卡片 11.08:1、压画布 13.55:1）。
 4. **截图是「未连接钱包」状态**：截图脚本不注入钱包、且对 8545 一律 abort（本任务不碰人工链），首页显示连接入口卡；配色与暗色适配不受影响。
 5. 浅色侧栏 `bg-surface/90` 的截图取样比理论多 1/255（绿/蓝通道），来自 `backdrop-blur` 与 PNG 量化，不是 token 偏差。
 6. **浅色相邻面分离度（1.13:1 等）是设计值，不是 WCAG 门槛**：WCAG 不要求卡片与画布的对比度，1.3 的线与 `shadow-soft` 的 1px 接触阴影一起承担「卡片浮起来」。若 owner 仍觉得浅色画布太浅，可再把 `background` 下压到 `#e9eef6`（卡片/画布 1.17:1），需同步改 §1.1 表并重跑三线。

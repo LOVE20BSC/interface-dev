@@ -52,8 +52,8 @@ export function AssetProtectionSwitch({
           onClick={() => setEnabled(!enabled)}
           className={cn(
             'relative mt-0.5 h-6 w-11 shrink-0 rounded-full border transition-colors',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
-            enabled ? 'border-brand bg-brand' : 'border-line bg-surface',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
+            enabled ? 'border-brand-strong bg-brand' : 'border-line bg-surface',
             disabled ? 'opacity-60' : '',
           )}
         >

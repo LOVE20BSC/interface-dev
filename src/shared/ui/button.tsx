@@ -7,7 +7,7 @@ export type ButtonVariant =
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-brand text-on-brand shadow-soft hover:bg-brand-strong active:bg-brand-strong',
+  primary: 'bg-brand text-on-brand shadow-soft hover:brightness-95 active:brightness-90',
   secondary:
     'border border-line bg-surface text-foreground hover:bg-elevated active:bg-elevated-hover',
   ghost: 'text-foreground hover:bg-elevated active:bg-line-strong',
@@ -16,7 +16,7 @@ const VARIANTS: Record<ButtonVariant, string> = {
   'danger-outline':
     'border border-danger bg-transparent text-danger-strong hover:bg-danger-soft/60 active:bg-danger-soft',
   outline:
-    'border border-brand/30 bg-brand-soft/40 text-brand-strong hover:bg-brand-soft active:bg-brand-soft',
+    'border border-brand-strong/30 bg-brand-soft/40 text-brand-strong hover:bg-brand-soft active:bg-brand-soft',
 };
 
 const SIZES: Record<ButtonSize, string> = {
@@ -33,7 +33,7 @@ export function buttonStyles(
 ): string {
   return cn(
     'inline-flex select-none items-center justify-center font-medium transition-colors',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong focus-visible:ring-offset-2 focus-visible:ring-offset-background',
     // Disabled is a neutral "raised surface + secondary text" state instead of a
     // washed-out 60% opacity: 60% white on 60% blue was 1.80:1 (light) and read as
     // broken, not disabled. Muted on elevated is 5.54:1 light / 3.95:1 dark.

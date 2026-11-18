@@ -45,11 +45,11 @@ export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
         <Link
           to={{ pathname: '/', search: location.search }}
           aria-label={copy.header.brandAria(wordmark)}
-          className="flex min-w-0 items-center gap-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="flex min-w-0 items-center gap-2 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
         >
           <span
             aria-hidden="true"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand to-brand-strong text-[11px] font-bold text-on-brand shadow-sm"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand text-[11px] font-bold text-on-brand shadow-sm"
           >
             L20
           </span>
@@ -73,7 +73,7 @@ export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
                   title={collapsed ? item.label : undefined}
                   className={cn(
                     'relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
                     collapsed && 'justify-center px-0',
                     active
                       ? 'bg-brand-soft/60 text-brand-strong'
@@ -120,7 +120,7 @@ export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
           title={collapsed ? copy.header.expandSidebar : copy.header.collapseSidebar}
           className={cn(
             'inline-flex h-10 w-full items-center gap-2 rounded-xl px-2.5 text-xs text-muted hover:bg-elevated hover:text-foreground',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
             collapsed && 'justify-center',
           )}
         >
