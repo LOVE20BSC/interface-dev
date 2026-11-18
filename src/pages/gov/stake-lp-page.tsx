@@ -6,7 +6,9 @@ import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-
 import { useGovContext } from '@/features/governance-stake/model/use-gov-context';
 import { GovGate, GovTxFeedback } from '@/features/governance-stake/ui/gov-gate';
 import { GovIntro, GovTips } from '@/features/governance-stake/ui/gov-intro';
-import { hasStakePosition, MyStakeSummary } from '@/features/governance-stake/ui/my-stake-summary';
+import { hasStakePosition } from '@/features/governance-stake/ui/my-stake-summary';
+import { PromisedPhasesCard } from '@/features/governance-stake/ui/promised-phases-card';
+import { MyStakeSummary } from '@/features/governance-stake/ui/my-stake-summary';
 import { StakeLiquidityPanel } from '@/features/governance-stake/ui/stake-liquidity-panel';
 
 /**
@@ -24,6 +26,8 @@ export function StakeLpPage() {
       <h1 className="text-lg font-bold text-foreground">{copy.gov.pageTitles.stakeLp}</h1>
       <GovGate ctx={ctx} isWrongChain={isWrongChain}>
         <GovTxFeedback ctx={ctx} />
+        {/* owner 2026-11-18：已有流动性质押时，承诺解锁期放在最上面单独调整。 */}
+        {hasStakePosition(ctx.member) ? <PromisedPhasesCard ctx={ctx} /> : null}
         <GovIntro />
         <StakeLpBody ctx={ctx} hub={hub} q={q} />
         <GovTips />

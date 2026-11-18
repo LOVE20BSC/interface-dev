@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { amountShortfall, estimateLpMinted, parsePhaseCount, parseStakeAmount } from './stake-form';
+import {
+  amountShortfall,
+  estimateLpMinted,
+  parsePhaseCount,
+  parseStakeAmount,
+  resolveStakePhases,
+} from './stake-form';
 
 describe('parseStakeAmount', () => {
   it('parses plain decimals into wei', () => {
@@ -110,5 +116,20 @@ describe('estimateLpMinted', () => {
         lpTotalSupply: 0n,
       }),
     ).toBeNull();
+  });
+});
+
+describe('resolveStakePhases', () => {
+  it('keeps the current value once there is a position', () => {
+    expect(resolveStakePhases(10n, 1n)).toBe(10n);
+    expect(resolveStakePhases(10n, undefined)).toBe(10n);
+  });
+
+  it('uses the contract minimum for a first stake', () => {
+    expect(resolveStakePhases(0n, 1n)).toBe(1n);
+  });
+
+  it('returns undefined when the minimum is unknown (never guesses)', () => {
+    expect(resolveStakePhases(0n, undefined)).toBeUndefined();
   });
 });

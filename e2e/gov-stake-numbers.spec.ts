@@ -80,10 +80,20 @@ const EXPECTED = {
     queryBoost: '0',
   },
   c1: {
-    votesAdded: '+223.606797',
+    /**
+     * owner 2026-11-18：新增流动性质押不再选择承诺解锁期——首次质押固定取合约最小值
+     * （1 个阶段），质押后在页面顶部的「调整承诺解锁期」卡里加大。
+     * 所以 C1 分两段：首押 shares 22360679774997896964、phases 1 → 治理权 22.360679；
+     * 再调整 1 → 10，增量 = shares × 9 = 201246117974981072676 → 治理权 223.606797。
+     */
+    votesAddedFirst: '+22.360679',
     optimal: '按池子比例实际存入 1,000 TestLOVE20 + 0.5 TestWETH。',
-    receiptVotes: '治理权 +223.606797',
-    receiptShares: '流动性质押份额 +22.360679',
+    receiptVotesFirst: '治理权 +22.360679',
+    receiptSharesFirst: '流动性质押份额 +22.360679',
+    myVotesFirst: '22.360679',
+    myPhasesFirst: '1 个阶段（约 2 分钟）',
+    increaseToTenPreview: '治理权 +201.246117',
+    increaseToTenReceiptNote: '承诺解锁期现在是 10 个阶段。',
     myVotes: '223.606797',
     myShares: '22.360679',
     myPhases: '10 个阶段（约 20 分钟）',
@@ -101,10 +111,12 @@ const EXPECTED = {
     capAfter: '9,571.385499 TestLOVE20',
     used: '9,571.385499',
     receipt: '加速质押 9,571.385499 TestLOVE20',
+    phasesCard: '10 个阶段（约 20 分钟）',
   },
   c3: {
     preview: '治理权 +335.410196',
     phases: '25 个阶段（约 50 分钟）',
+    receiptNote: '承诺解锁期现在是 25 个阶段。',
     votes: '559.016994',
   },
   c4: {
@@ -357,7 +369,11 @@ test.describe('治理域 验收截图', () => {
           await expect(page.getByTestId('gov-boost-cap')).toHaveText(EXPECTED.c2.capBefore, {
             timeout: 30_000,
           });
-          await scrollTo(page, 'gov-accelerated-summary', 64);
+          // 页面最上面是「调整承诺解锁期」卡（staketoken 页也有），下一屏是我的加速质押。
+          await expect(page.getByTestId('gov-phases-card-value')).toHaveText(
+            EXPECTED.c2.phasesCard,
+          );
+          await scrollTo(page, 'gov-phases-card', 64);
           await shoot(page, `stake-token-${suffix}`);
 
           await page.goto(`/stake/unstake${QUERY}`);
@@ -371,24 +387,30 @@ test.describe('治理域 验收截图', () => {
           await revertChain(staked);
         }
 
-        // B. 空仓位：质押LP 智能模式（Hub 报价）。
-        const clean = await snapshotChain();
+        // B. 已有仓位：质押LP 表单（无承诺解锁期选择器）+ 承诺解锁期卡上下文。
+        const stakedLp = await snapshotChain();
         try {
           await prepare(page, theme, viewport.width, viewport.height, '/stake/stakelp');
-          await expect(page.getByTestId('gov-liquidity-smart-mode')).toHaveAttribute(
-            'aria-checked',
-            'true',
-            { timeout: 30_000 },
+          stakeFixture();
+          await page.reload();
+          await connect(page);
+          await expect(page.getByTestId('gov-phases-card-value')).toHaveText(EXPECTED.c1.myPhases, {
+            timeout: 30_000,
+          });
+          // 表单里不再有承诺解锁期选择器，只有说明行（已有质押时提示保持当前值）。
+          await expect(page.getByTestId('gov-liquidity-phases-input')).toHaveCount(0);
+          await expect(page.getByTestId('gov-liquidity-phases-note')).toContainText(
+            '已有质押：承诺解锁期保持 10 个阶段',
           );
           await page.getByTestId('gov-liquidity-token-input').fill('1000');
           await expect(page.getByTestId('gov-liquidity-hub-quote')).toContainText('实际进池', {
             timeout: 30_000,
           });
           await expect(page.getByTestId('gov-liquidity-preview-votes')).not.toHaveText('—');
-          await scrollTo(page, 'gov-liquidity-smart-mode', 64);
+          await scrollTo(page, 'gov-liquidity-card', 64);
           await shoot(page, `stake-lp-${suffix}`);
         } finally {
-          await revertChain(clean);
+          await revertChain(stakedLp);
         }
 
         // C. 旧版占位页。
@@ -463,6 +485,14 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-liquidity-native-input')).toBeVisible();
     await expect(page.getByTestId('gov-liquidity-parent-input')).toHaveCount(0);
     await expect(page.getByTestId('gov-liquidity-preview-votes')).toHaveText('—');
+    // owner 2026-11-18：新增质押不再选择承诺解锁期——没有阶段输入框/预设，只有一行说明。
+    await expect(page.getByTestId('gov-liquidity-phases-input')).toHaveCount(0);
+    await expect(page.getByTestId('gov-liquidity-phases-preset-10')).toHaveCount(0);
+    await expect(page.getByTestId('gov-liquidity-phases-note')).toContainText(
+      '首次质押按 1 个阶段（最小值）',
+    );
+    // 空仓位没有「调整承诺解锁期」卡（有仓位才出现）。
+    await expect(page.getByTestId('gov-phases-card')).toHaveCount(0);
     await page.getByTestId('gov-liquidity-smart-mode').click();
     await expect(page.getByTestId('gov-liquidity-smart-mode')).toHaveAttribute(
       'aria-checked',
@@ -496,7 +526,7 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-placeholder')).toContainText('即将上线');
   });
 
-  test('用例 C1：质押LP（关掉智能模式，1,000 TestLOVE20 + 1 TestWETH / 10 阶段）→ 治理权 223.606797', async ({
+  test('用例 C1：质押LP（关智能模式，1,000 + 1）→ 首押 1 阶段治理权 22.360679 → 调整到 10 阶段 223.606797', async ({
     page,
   }) => {
     await openPage(page, '/stake/stakelp');
@@ -509,13 +539,18 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     );
     await page.getByTestId('gov-liquidity-token-input').fill('1000');
     await page.getByTestId('gov-liquidity-parent-input').fill('1');
-    await page.getByTestId('gov-liquidity-phases-input').fill('10');
+    // owner 2026-11-18：新增质押不再选择承诺解锁期，首押固定取合约最小值 1 个阶段。
+    await expect(page.getByTestId('gov-liquidity-phases-input')).toHaveCount(0);
+    await expect(page.getByTestId('gov-liquidity-phases-note')).toContainText(
+      '首次质押按 1 个阶段（最小值）',
+    );
 
     await expect(page.getByTestId('gov-liquidity-optimal')).toHaveText(EXPECTED.c1.optimal, {
       timeout: 20_000,
     });
+    // 预计治理权 = shares × 1 个阶段 = 22.360679（不是 223.606797）。
     await expect(page.getByTestId('gov-liquidity-preview-votes')).toHaveText(
-      EXPECTED.c1.votesAdded,
+      EXPECTED.c1.votesAddedFirst,
     );
     await expect(page.getByTestId('gov-liquidity-submit')).toBeDisabled();
 
@@ -529,22 +564,48 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-receipt')).toContainText('流动性质押已提交');
     const lines = page.getByTestId('gov-receipt-line');
     await expect(lines).toHaveCount(2);
-    await expect(lines.nth(0)).toHaveText(EXPECTED.c1.receiptVotes);
-    await expect(lines.nth(1)).toHaveText(EXPECTED.c1.receiptShares);
+    await expect(lines.nth(0)).toHaveText(EXPECTED.c1.receiptVotesFirst);
+    await expect(lines.nth(1)).toHaveText(EXPECTED.c1.receiptSharesFirst);
     await page.getByTestId('gov-receipt-close').click();
     await expect(page.getByTestId('gov-receipt')).toHaveCount(0);
 
-    // 同一页的「我的流动性质押」摘要（stakelp 页在已有仓位时出现）。
+    // 同一页的「我的流动性质押」摘要（stakelp 页在已有仓位时出现）：首押 = 1 个阶段。
     await expect(page.getByTestId('gov-page-my-stake')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId('gov-my-votes')).toHaveText(EXPECTED.c1.myVotes);
+    await expect(page.getByTestId('gov-my-votes')).toHaveText(EXPECTED.c1.myVotesFirst);
     await expect(page.getByTestId('gov-my-shares')).toHaveText(EXPECTED.c1.myShares);
     await expect(page.getByTestId('gov-my-boost')).toHaveText('0');
-    await expect(page.getByTestId('gov-my-phases')).toHaveText(EXPECTED.c1.myPhases);
+    await expect(page.getByTestId('gov-my-phases')).toHaveText(EXPECTED.c1.myPhasesFirst);
     // §3 显示规则边界 1/2：只截断不四舍五入，不显示成 1,000 / 0.5。
     await expect(page.getByTestId('gov-my-token-amount')).toHaveText(EXPECTED.c1.myTokenAmount);
     await expect(page.getByTestId('gov-my-parent-amount')).toHaveText(EXPECTED.c1.myParentAmount);
     await expect(page.getByTestId('gov-my-unlock-state')).toContainText('正常质押中');
     await expect(page.getByTestId('gov-my-boost-amount')).toHaveCount(0);
+
+    // 页面最上面的「调整承诺解锁期」卡：1 → 10，增量 = shares × 9 = 201.246117。
+    await expect(page.getByTestId('gov-phases-card')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('gov-phases-card-value')).toHaveText(EXPECTED.c1.myPhasesFirst);
+    await page.getByTestId('gov-phases-card-adjust').click();
+    await page.getByTestId('gov-phases-input').fill('10');
+    await expect(page.getByTestId('gov-phases-preview')).toHaveText(
+      EXPECTED.c1.increaseToTenPreview,
+      { timeout: 20_000 },
+    );
+    await page.getByTestId('gov-phases-submit').click();
+
+    await expect(page.getByTestId('gov-receipt')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId('gov-receipt')).toContainText('承诺解锁期已增加');
+    const increaseLines = page.getByTestId('gov-receipt-line');
+    await expect(increaseLines).toHaveCount(2);
+    await expect(increaseLines.nth(0)).toHaveText(EXPECTED.c1.increaseToTenReceiptNote);
+    await expect(increaseLines.nth(1)).toHaveText(EXPECTED.c1.increaseToTenPreview);
+    await page.getByTestId('gov-receipt-close').click();
+
+    // 调整后：治理权 223.606797、承诺解锁期 10 个阶段，顶部卡同步。
+    await expect(page.getByTestId('gov-my-votes')).toHaveText(EXPECTED.c1.myVotes, {
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId('gov-my-phases')).toHaveText(EXPECTED.c1.myPhases);
+    await expect(page.getByTestId('gov-phases-card-value')).toHaveText(EXPECTED.c1.myPhases);
 
     // 首页「我的」「社区」同步到 C1 之后的社区盘子。
     await page.goto(`/gov${QUERY}`);
@@ -568,6 +629,9 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
   }) => {
     await openPage(page, '/stake/staketoken');
     await expect(page.getByTestId('gov-accelerated-summary')).toBeVisible({ timeout: 30_000 });
+    // 已有流动性质押 → 页面最上面也有「调整承诺解锁期」卡（值 = 当前 10 个阶段）。
+    await expect(page.getByTestId('gov-phases-card')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('gov-phases-card-value')).toHaveText(EXPECTED.c2.phasesCard);
     await expect(page.getByTestId('gov-accelerated-valid')).toHaveText('0');
     await expect(page.getByTestId('gov-accelerated-used')).toHaveText('0');
     await expect(page.getByTestId('gov-accelerated-remaining')).toHaveText('19,142.770999');
@@ -605,35 +669,34 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-my-boost-amount')).toHaveText(EXPECTED.c2.used);
   });
 
-  test('用例 C3：取消质押页「增加承诺解锁期」10 → 25 → 治理权 559.016994', async ({ page }) => {
-    await openPage(page, '/stake/unstake');
-    await expect(page.getByTestId('gov-unstake-assets')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId('gov-unstake-votes')).toHaveText(EXPECTED.c1.myVotes);
-    await expect(page.getByTestId('gov-unstake-shares')).toHaveText(EXPECTED.c1.myShares);
-    await expect(page.getByTestId('gov-unstake-phases')).toHaveText(EXPECTED.c1.myPhases);
-    await expect(page.getByTestId('gov-unstake-boost')).toHaveText(EXPECTED.c2.used);
-    await expect(page.getByTestId('gov-unstake-boost-amount')).toHaveText(EXPECTED.c2.used);
+  test('用例 C3：质押LP 顶部「调整承诺解锁期」卡 10 → 25 → 治理权 559.016994', async ({ page }) => {
+    await openPage(page, '/stake/stakelp');
+    await expect(page.getByTestId('gov-phases-card')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('gov-phases-card-value')).toHaveText(EXPECTED.c1.myPhases);
+    await expect(page.getByTestId('gov-my-votes')).toHaveText(EXPECTED.c1.myVotes);
 
-    await page.getByTestId('gov-unstake-increase-phases-button').click();
-    await page.getByTestId('gov-unstake-increase-phases-input').fill('25');
+    await page.getByTestId('gov-phases-card-adjust').click();
+    await page.getByTestId('gov-phases-input').fill('25');
     // 弹层预览的是「这一笔新增的治理权」= shares × (25 − 10)。
-    await expect(page.getByTestId('gov-unstake-increase-preview')).toHaveText(EXPECTED.c3.preview, {
+    await expect(page.getByTestId('gov-phases-preview')).toHaveText(EXPECTED.c3.preview, {
       timeout: 20_000,
     });
-    await page.getByTestId('gov-unstake-increase-phases-submit').click();
+    await page.getByTestId('gov-phases-submit').click();
 
     await expect(page.getByTestId('gov-receipt')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('gov-receipt')).toContainText('承诺解锁期已增加');
     const lines = page.getByTestId('gov-receipt-line');
     await expect(lines).toHaveCount(2);
-    await expect(lines.nth(0)).toHaveText('承诺解锁期现在是 25 个阶段。');
+    await expect(lines.nth(0)).toHaveText(EXPECTED.c3.receiptNote);
     await expect(lines.nth(1)).toHaveText(EXPECTED.c3.preview);
     await page.getByTestId('gov-receipt-close').click();
 
-    await expect(page.getByTestId('gov-unstake-phases')).toHaveText(EXPECTED.c3.phases, {
+    await expect(page.getByTestId('gov-my-phases')).toHaveText(EXPECTED.c3.phases, {
       timeout: 20_000,
     });
-    await expect(page.getByTestId('gov-unstake-votes')).toHaveText(EXPECTED.c3.votes);
+    await expect(page.getByTestId('gov-my-votes')).toHaveText(EXPECTED.c3.votes);
+    // 顶部卡同步到 25 个阶段（约 50 分钟）。
+    await expect(page.getByTestId('gov-phases-card-value')).toHaveText(EXPECTED.c3.phases);
   });
 
   test('用例 C4：申请解锁 → 到期 → 撤出 10,571.385499 TestLOVE20 + 0.499999 TestWETH', async ({
@@ -643,6 +706,14 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-unstake-votes')).toHaveText(EXPECTED.c3.votes, {
       timeout: 30_000,
     });
+    // smoke：取消质押页仍保留「调整承诺解锁期」入口（复用同一弹层；这里只开不提交，不改状态）。
+    await page.getByTestId('gov-unstake-increase-phases-button').click();
+    await expect(page.getByTestId('gov-unstake-increase-phases-input')).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId('gov-unstake-increase-phases-input')).toHaveValue('26');
+    await page.getByRole('dialog').getByRole('button', { name: '取消' }).click();
+    await expect(page.getByTestId('gov-unstake-increase-phases-input')).toHaveCount(0);
     await settleAtPhaseStart();
 
     await page.getByTestId('gov-unstake-unstake-button').click();

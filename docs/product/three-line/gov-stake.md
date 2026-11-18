@@ -472,6 +472,10 @@ spec（**2026-11-17 晚按 TKM 多页面 IA 重写后为 8 条 `test()`**；下�
 
 **新 spec（8 条）**：24 张截图（6 状态 × 390×844 / 1280×800 × 浅/深）1 条 + 前端线 7 条——稳态（首页两个 tab、社区数据、按身份 NFT 编号查询、占位页）/ C1（stakelp 关闭智能模式，1,000 + 1 → 1,000 + 0.5 截断 → 治理权 223.606797）/ C2（staketoken，加速上限 19,142.770999 → 加速 9,571.385499）/ C3（unstake，+335.410196 → 559.016994）/ C4（unstake，解锁 26 阶段 52 分钟 → 撤出 10,571.385499 + 0.499999）/ **智能模式只填社区代币**（Hub token 变体，回执出现）/ **智能模式只填原生币**（Hub native 变体，无需代币授权即回执）。
 
+**2026-11-18 变更（owner：承诺解锁期单独调整）**：新增流动性质押**不再选择承诺解锁期**——与 periphery `LOVE20Hub` 的语义一致（已有仓位时承诺解锁期必须保持当前值）。首次质押按 `PROMISED_WAITING_PHASES_MIN`（本链 1 个阶段）提交；质押后页面最上方出现「调整承诺解锁期」卡，点「调整」弹面板单独加大（`increasePromisedWaitingPhases`）。因此前端线把 C1 拆成两步：**首次质押**（回执 `治理权 +22.360679`、份额 `22.360679`）→ **调整 1→10**（增量 = 份额 × 9 = `201246117974981072676` wei → 显示 `治理权 +201.246117`）→ 末态 `223.606797`，与 §1 的 C1 终值完全一致。C3 的 10→25 也改由这张卡完成（`+335.410196`）。
+
+**2026-11-18 前端线复跑（承诺解锁期单独调整之后）**：spec 8 条，8555 `E2E_REUSE_PREVIEW=0 pnpm e2e --grep "治理域"` → **8 passed（3.2m）EXIT 0**；8566 `E2E_ANVIL_RPC=… pnpm exec playwright test e2e/gov-stake-numbers.spec.ts` → **8 passed（2.7m）EXIT 0**（snapshot 0x0 → reverted 0x0）。C1 两步：首押回执 `治理权 +22.360679` → 顶部卡调整 1→10（`+201.246117`）→ 末态 `223.606797`；C3 由顶部卡完成 10→25（`+335.410196` → `559.016994`）。
+
 **智能模式的合约依据（不在 §1 理论线里，属新增功能）**：单币质押由 periphery `LOVE20Hub` 完成——`stakeLiquidityWithNative`（必须带 value，只填社区代币时会 revert `ZeroNativeTokenAmount`）/ `stakeLiquidityWithToken`（两枚 ERC20，只填社区代币时用它）；页面按「有没有原生币输入」选入口，报价用 `quoteStakeLiquidity(WithNative)` 的 `willSwap / amountToSwap / amountOutFromSwap / prepared* / liquiditySharesAdded / govVotesAdded`，滑点折算后的 `minLiquidityShares` 作为最少份额。C1–C4 的理论值仍走**关闭智能模式**的直接 `Stake.stakeLiquidity` 路径，因此与前文逐 wei 对齐。
 
 ## §4 三线对照表

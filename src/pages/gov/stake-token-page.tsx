@@ -10,6 +10,8 @@ import {
 } from '@/features/governance-stake/model/use-gov-context';
 import { GovGate, GovTxFeedback } from '@/features/governance-stake/ui/gov-gate';
 import { GovTips } from '@/features/governance-stake/ui/gov-intro';
+import { hasStakePosition } from '@/features/governance-stake/ui/my-stake-summary';
+import { PromisedPhasesCard } from '@/features/governance-stake/ui/promised-phases-card';
 import { StakeStatRow } from '@/features/governance-stake/ui/stake-controls';
 import { StakeBoostPanel } from '@/features/governance-stake/ui/stake-boost-panel';
 
@@ -27,6 +29,8 @@ export function StakeTokenPage() {
       <h1 className="text-lg font-bold text-foreground">{copy.gov.pageTitles.stakeToken}</h1>
       <GovGate ctx={ctx} isWrongChain={isWrongChain}>
         <GovTxFeedback ctx={ctx} />
+        {/* owner 2026-11-18：承诺解锁期（已有流动性质押时）放在加速质押表单上面。 */}
+        {hasStakePosition(ctx.member) ? <PromisedPhasesCard ctx={ctx} /> : null}
         <StakeTokenBody ctx={ctx} q={q} />
         <GovTips />
       </GovGate>

@@ -1437,11 +1437,7 @@ export const copy = {
       phasesLabel: '承诺解锁期',
       phasesUnit: '个阶段',
       phasesPreset: (phases: number) => `${phases} 阶段`,
-      phasesHint: '承诺得越久，治理权越多；解锁要等满这么久才能撤出。',
-      phasesRange: (min: string, max: string) => `可以选 ${min}–${max} 个阶段。`,
       phasesInvalid: (min: string, max: string) => `承诺解锁期要在 ${min} 到 ${max} 个阶段之间。`,
-      /** 已经有质押时承诺解锁期只能加大：合约 PromisedWaitingPhasesDecreased. */
-      phasesBelowCurrent: (current: string) => `承诺解锁期不能低于当前的 ${current} 个阶段。`,
       amountInvalid: '请输入有效的金额。',
       amountZero: '两侧数量都要大于 0。',
       amountTooPrecise: (digits: number) => `小数位不能超过 ${digits} 位。`,
@@ -1499,7 +1495,6 @@ export const copy = {
       stateWithdrawableNote: '撤出后这些代币会回到钱包，治理权清零。',
       stateUnknown: '解锁状态暂时读不到。',
       increasePhases: '增加承诺解锁期',
-      increasePhasesHint: '只能加大、不能缩短；每多 1 个阶段，治理权按你的流动性质押份额增加。',
       increasePhasesMin: (phases: string) => `至少要增加到 ${phases} 个阶段。`,
       increasePhasesInvalid: '请输入整数阶段数。',
       increasePhasesSubmit: '确认增加',
@@ -1588,6 +1583,19 @@ export const copy = {
       rewardsAction: '治理激励',
     },
     tips: { title: '提示' },
+    /** 调整承诺解锁期（owner 2026-11-18：已有质押时单独调整，不在新增质押里选）。 */
+    phasesAdjust: {
+      title: '调整承诺解锁期',
+      body: '只能加大、不能缩短；每多 1 个阶段，治理权按你的流动性质押份额增加。',
+      current: (phases: string, minutes: string | null) =>
+        minutes === null
+          ? `当前承诺解锁期：${phases} 个阶段`
+          : `当前承诺解锁期：${phases} 个阶段（约 ${minutes} 分钟）`,
+      action: '调整',
+      cardHint: '质押期间治理权 = 流动性质押份额 × 承诺解锁期；想提高治理权就调整它。',
+      newStakeNote: (phases: string) =>
+        `新增流动性质押不再选择承诺解锁期：首次质押按 ${phases} 个阶段（最小值），质押后可单独调整。`,
+    },
     query: {
       title: '治理权查询',
       hint: '按身份 NFT 编号查询：协议没有「钱包地址 → 身份」的反查索引，所以这里输入编号。',
@@ -1639,7 +1647,7 @@ export const copy = {
       slippageRange: '自定义值需要在 0.01% 到 50% 之间。',
       minShares: (min: string) => `最少获得 ${min} 流动性份额`,
       phasesLocked: (phases: string) =>
-        `已有质押：承诺解锁期保持 ${phases} 个阶段；想加大请用「增加承诺解锁期」。`,
+        `已有质押：承诺解锁期保持 ${phases} 个阶段，可在上方「调整承诺解锁期」里加大。`,
     },
     unstakePage: {
       sectionTitle: '我的治理资产',

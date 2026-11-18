@@ -102,3 +102,16 @@ export const STAKE_DEADLINE_SECONDS = 20 * 60;
 export function stakeDeadline(): bigint {
   return BigInt(Math.floor(Date.now() / 1000) + STAKE_DEADLINE_SECONDS);
 }
+
+/**
+ * 新增流动性质押用哪个承诺解锁期（owner 2026-11-18）：
+ * 已有质押 → 必须保持当前值（Hub 的 `_stake` 要求 `phases == current`，Stake 也不允许
+ * 变小）；首次质押 → 用合约最小值（读不到就不给提交，不猜默认值）。
+ */
+export function resolveStakePhases(
+  currentPhases: bigint,
+  minPhases: bigint | undefined,
+): bigint | undefined {
+  if (currentPhases > 0n) return currentPhases;
+  return minPhases;
+}
