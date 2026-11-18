@@ -33,7 +33,7 @@
 | 10–25m | lead | 先写死契约（testid / 文案 / href / 数据结构），再写核心代码；`tsc` + `eslint` 自查 |
 | 15–40m | 3 个子代理并行 | ① e2e：改 spec + 跑目标 spec；② docs：改三份文档；③ unit：改受影响单测 |
 | 40–52m | lead | 契约复核 + **一次**全量 e2e（可后台跑）+ 看截图 |
-| 52–58m | lead | 清理截图 churn、回填文档数字、commit（pre-commit 跑 check）、push |
+| 52–58m | lead | 清理截图 churn、回填文档数字、commit（pre-commit 跑 check）、push、**确认测试链接可访问**（`pnpm dev --port 5190` → 相关路由） |
 
 可压缩点：3 个子代理的活儿与 lead 写码完全重叠；全量 e2e 用后台跑，和「看截图/整理文档」重叠。
 
@@ -106,15 +106,32 @@
 | 未知值渲染 0 | 违反硬规则 4 | 未知给「—」，读失败给「读不到 + 重试」 |
 | 手改生成物 | errors / network / ABI / build-id 漂移 | 只走 `pnpm gen:errors` / `sync:anvil` |
 | `--no-verify` | 绕过门禁，不可信 | 禁止；紧急情况必须写明原因 |
+| 交付没给测试链接 | owner 要自己找入口，等于没交付 | 每次交付附 `http://localhost:5190/<路由>?symbol=…`（或 Pages 链接）并先自己 curl 一次 200 |
 
 ## 11. 汇报模板（固定四段）
 
 1. **做了什么**：按 owner 的原始要求逐条对应，不复述他的话；
-2. **证据**：命令 + 通过数/耗时/EXIT + 包体数字 + 截图路径（表格优先）；
+2. **证据**：**可访问的测试链接**（必须，见 §13）+ 命令 + 通过数/耗时/EXIT + 包体数字 + 截图路径（表格优先）；
 3. **没做什么 + 原因**：例如「8566 未复跑，因为…」；
 4. **需要拍板的事**：一次只问真正需要决策的（合 main、发 test、范围取舍）。
 
-## 12. 本文件怎么维护
+## 12. 交付的定义（owner 2026-11-19 01:35）
+
+**每次交付都必须带一个可访问的测试链接**，否则视为未交付。标准做法：
+
+```bash
+# 1) 起/确认本地 dev server（默认 5190，服务于当前 worktree、指向 8545 人工链）
+lsof -nP -iTCP:5190 -sTCP:LISTEN || (nohup pnpm dev --port 5190 > /tmp/vite-5190.log 2>&1 &)
+# 2) 自己先验证可访问（HTTP 200 + 路由存在）
+curl -s -o /dev/null -w "%{http_code}\n" "http://127.0.0.1:5190/gov?symbol=TestLOVE20"
+```
+
+- 链接要给到**具体路由**（如 `/gov?symbol=TestLOVE20`、`/me?symbol=TestLOVE20`），不要只给首页；
+- 已发布变体给 Pages 链接，并说明对应 build id / commit；
+- 本地 dev server 不碰链：它只是让 owner 用自己的钱包去连 8545 人工链手测；
+- 交付报告里链接放在「证据」第一条，owner 可以直接点。
+
+## 13. 本文件怎么维护
 
 - 每轮结束问自己三句：**哪里最慢？哪里最险？哪个动作下次可以省掉？** 有答案就改对应章节。
 - 角色/边界问题 → 改 [agent-role.md](agent-role.md)；规则/门禁 → 改 [frontend-standards.md](frontend-standards.md)；只有「经验」留在这里，避免三处漂移。

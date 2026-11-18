@@ -90,3 +90,4 @@ pnpm e2e            # 全量 Playwright（160 条，约 11 分钟；自己起/�
 - [ ] 动过 UI → `pnpm e2e` 对应 spec 通过；动过共享逻辑 → 全量 e2e
 - [ ] 截图归档到 `docs/product/screenshots/`（390×844 / 1280×800，浅色 + 深色）
 - [ ] 三线/规范/STATUS 文档已同步；没有留下"文档写 A 代码做 B"
+- [ ] **交付附可访问的测试链接**（本地 `http://localhost:5190/<路由>?symbol=…` 或 Pages），并自己 curl 过 200
