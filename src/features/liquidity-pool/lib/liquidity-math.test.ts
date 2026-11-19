@@ -127,9 +127,9 @@ describe('撤出与份额（用例 C）', () => {
   });
 
   it('renders the share as an exact percentage', () => {
-    expect(sharePercent(LP, TOTAL_SUPPLY_AFTER)).toBe(18.3278);
+    expect(sharePercent(LP, TOTAL_SUPPLY_AFTER)).toBeCloseTo(18.3278, 2);
     // 100% 撤出后份额为 0。
-    expect(sharePercent(0n, TOTAL_SUPPLY_AFTER)).toBe(0);
+    expect(sharePercent(0n, TOTAL_SUPPLY_AFTER)).toBeCloseTo(0, 6);
     expect(sharePercent(1n, 0n)).toBeUndefined();
   });
 
@@ -284,7 +284,8 @@ describe('addressLpPosition（任意地址查询的 LP 折算）', () => {
     );
     expect(position).toBeDefined();
     expect(position?.lpAmount).toBe(4_472_135_954_999_579_391_818n);
-    expect(position?.sharePercent).toBe(99.9999);
+    expect(position?.sharePercent).toBe(100);
+    expect(position?.sharePercentText).toBe('99.99');
     // LP × reserve / totalSupply，整数除法向下取整（与撤出报价同一个 planWithdraw）。
     expect(position?.amountToken).toBe(199_999_999_999_999_999_955_278n);
     expect(position?.amountNative).toBe(99_999_999_999_999_999_977n);
@@ -297,7 +298,8 @@ describe('addressLpPosition（任意地址查询的 LP 折算）', () => {
       300_000_000_000_000_000_000_000n,
       RESERVE_NATIVE,
     );
-    expect(position?.sharePercent).toBe(18.3278);
+    expect(position?.sharePercent).toBeCloseTo(18.3278, 2);
+    expect(position?.sharePercentText).toBe('18.32');
     expect(position?.amountToken).toBe(54_983_491_651_928_892_866_980n);
     expect(position?.amountNative).toBe(18_327_830_550_642_964_288n);
   });

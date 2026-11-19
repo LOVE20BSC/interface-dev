@@ -257,6 +257,7 @@ describe('formatTinyPercent', () => {
     expect(formatTinyPercent(0.0000001)).toBe('0.0000001');
     expect(formatTinyPercent(0.0000000001)).toBe('0.0000000001');
     expect(formatTinyPercent(0.000000000000000001)).toBe('0.000000000000000001');
+    expect(formatTinyPercent(1e-22)).toBe('0.0000000000000000000001');
     // 0.{x}yyyy：x = 前导 0 个数，yyyy = 最多 4 位非零数字；连续 9 也不进位。
     expect(formatTinyPercent(0.0000123)).toBe('0.0000123');
     expect(formatTinyPercent(0.0009999999)).toBe('0.0009999');

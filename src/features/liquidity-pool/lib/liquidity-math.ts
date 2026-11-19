@@ -1,3 +1,5 @@
+import { formatSharePercent } from '@/shared/lib/share-percent';
+
 /**
  * 流动性池纯算术（无 React / 无 chain SDK）。
  *
@@ -145,12 +147,12 @@ export function mirrorAmount(amountIn: bigint, reserveIn: bigint, reserveOut: bi
 /**
  * 我的占比（百分数，0–100），用于「我的占比 18.32%」。
  *
- * 保留 4 位小数：显示层 `formatPercent` 只留 2 位并向下截断。若这里先截到 2 位，
- * `4.64` 在浮点里可能是 `4.639999…`，显示层再截一次会掉成 `4.63`。
+ * 保留 18 位小数：显示层用 `formatTinyPercent`（≥0.01% 两位截断；极小占比用
+ * `0.{x}yyyy`），因此这里不能提前截断，否则 1/10^24 这种占比会先变成 0。
  */
 export function sharePercent(lpBalance: bigint, totalSupply: bigint): number | undefined {
   if (totalSupply <= 0n || lpBalance < 0n) return undefined;
-  return Number((lpBalance * 1_000_000n) / totalSupply) / 10_000;
+  return Number((lpBalance * 100n * 10n ** 18n) / totalSupply) / 1e18;
 }
 
 /**
@@ -164,6 +166,8 @@ export function sharePercent(lpBalance: bigint, totalSupply: bigint): number | u
 export interface AddressLpPosition {
   readonly lpAmount: bigint;
   readonly sharePercent: number | undefined;
+  /** 页面显示的占比文本（不含 %），BigInt 精确截断，见 shared/lib/share-percent。 */
+  readonly sharePercentText: string | undefined;
   readonly amountToken: bigint;
   readonly amountNative: bigint;
 }
@@ -179,6 +183,7 @@ export function addressLpPosition(
   return {
     lpAmount,
     sharePercent: sharePercent(lpAmount, totalSupply),
+    sharePercentText: formatSharePercent(lpAmount, totalSupply),
     amountToken: plan.amountA,
     amountNative: plan.amountB,
   };

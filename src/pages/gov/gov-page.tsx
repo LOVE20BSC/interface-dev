@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
-import { formatTinyPercent } from '@/shared/lib/format-tiny';
+
 import { buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
@@ -11,7 +11,7 @@ import {
   useGovContext,
   type GovContextValue,
 } from '@/features/governance-stake/model/use-gov-context';
-import { sharePercent } from '@/features/governance-stake/lib/gov-share';
+import { govSharePercent } from '@/features/governance-stake/lib/gov-share';
 import { phaseDurationText, phasesValueText } from '@/features/governance-stake/lib/phase-duration';
 import { GovCommunitySummary } from '@/features/governance-stake/ui/gov-community-summary';
 import { GovGate, GovTxFeedback } from '@/features/governance-stake/ui/gov-gate';
@@ -150,8 +150,11 @@ function MineTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string
   }
 
   const phases = ctx.member.promisedWaitingPhases;
-  const myShare = sharePercent(ctx.member.govVotes, ctx.community.totalGovVotes);
-  const boostShare = sharePercent(ctx.member.validBoostShares, ctx.community.totalValidBoostShares);
+  const myShare = govSharePercent(ctx.member.govVotes, ctx.community.totalGovVotes);
+  const boostShare = govSharePercent(
+    ctx.member.validBoostShares,
+    ctx.community.totalValidBoostShares,
+  );
   const phasesDuration =
     phases === undefined ? null : phaseDurationText(phases, ctx.clock.secondsPerPhase ?? null);
 
@@ -172,12 +175,12 @@ function MineTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string
           />
           <GovStatCell
             label={copy.gov.home.myShare}
-            value={myShare === undefined ? UNKNOWN : `${formatTinyPercent(myShare)}%`}
+            value={myShare === undefined ? UNKNOWN : `${myShare}%`}
             testId="gov-my-share"
           />
           <GovStatCell
             label={copy.gov.home.myBoostShare}
-            value={boostShare === undefined ? UNKNOWN : `${formatTinyPercent(boostShare)}%`}
+            value={boostShare === undefined ? UNKNOWN : `${boostShare}%`}
             testId="gov-my-boost-share"
           />
         </div>

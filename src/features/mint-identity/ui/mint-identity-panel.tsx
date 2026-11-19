@@ -8,7 +8,7 @@ import { copy } from '@/shared/config/copy-pages';
 import { approvalKind } from '@/shared/lib/approval-kind';
 import { decideApproveAmount } from '@/shared/lib/approve-amount';
 import { cn } from '@/shared/lib/cn';
-import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatAmount, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { useSoftTransition } from '@/shared/model/soft-transition';
 import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
 import { Button, buttonStyles } from '@/shared/ui/button';
@@ -275,7 +275,7 @@ export function MintIdentityPanel({
   }
 
   const maxBytesText =
-    config.maxNameLength !== undefined ? config.maxNameLength.toString() : UNKNOWN;
+    config.maxNameLength !== undefined ? formatAmount(BigInt(config.maxNameLength), 0) : UNKNOWN;
   const checkText = (() => {
     switch (quote.nameStatus) {
       case 'checking':
@@ -385,7 +385,7 @@ export function MintIdentityPanel({
           className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs leading-5 text-muted"
         >
           <span className="font-mono">
-            {copy.mintIdentity.name.bytes(quote.byteLength.toString(), maxBytesText)}
+            {copy.mintIdentity.name.bytes(formatAmount(BigInt(quote.byteLength), 0), maxBytesText)}
           </span>
           <span>{copy.mintIdentity.name.rule}</span>
         </div>

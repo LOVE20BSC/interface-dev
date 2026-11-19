@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
-import { formatTinyPercent } from '@/shared/lib/format-tiny';
+import { govSharePercent } from '@/features/governance-stake/lib/gov-share';
 import { buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
@@ -41,12 +41,7 @@ function LiquidBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q: str
   const { token, parent } = ctx;
   if (token === undefined || parent === undefined) return null;
 
-  const mySharePercent = (() => {
-    if (ctx.member.govVotes === undefined || ctx.community.totalGovVotes === undefined)
-      return undefined;
-    if (ctx.community.totalGovVotes === 0n) return 0;
-    return Number((ctx.member.govVotes * 10_000n) / ctx.community.totalGovVotes) / 100;
-  })();
+  const mySharePercent = govSharePercent(ctx.member.govVotes, ctx.community.totalGovVotes);
 
   return (
     <div className="space-y-4">
@@ -70,9 +65,7 @@ function LiquidBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q: str
             />
             <StakeStatRow
               label={copy.gov.liquidPage.mySharePercent}
-              value={
-                mySharePercent === undefined ? UNKNOWN : `${formatTinyPercent(mySharePercent)}%`
-              }
+              value={mySharePercent === undefined ? UNKNOWN : `${mySharePercent}%`}
               testId="gov-liquid-my-share"
             />
             <MyStakeSummary

@@ -1,26 +1,32 @@
 /**
  * Share percentages for the airdrop surfaces.
  *
- * Shares are uint256 values (the snapshot uses 1e18 for 100%), so the conversion
- * stays in BigInt: a Number round-trip would silently lose precision for large
- * deployments. Output is trimmed to at most two decimals and never rounds up.
- * `null` means "cannot be displayed", never 0: a tiny-but-positive share is
- * shown as `<0.01%` instead of collapsing to 0%.
+ * Shares are uint256 values (the snapshot uses 1e18 for 100%). 显示规则与治理占比
+ * 一致（owner 2026-11-19）：>= 0.01% 保留两位小数、截断不进位；< 0.01% 用
+ * `0.{x}yyyy`（x = 前导 0 个数、yyyy = 随后最多 4 位非零数字），x 不设上限，
+ * 极小占比绝不显示成 0%。全程 BigInt，避免 Number 先把 1/1e24 截成 0。
+ *
+ * `null` means "cannot be displayed", never 0.
  */
-const FRACTION_DIGITS = 2;
-const SCALE = 10n ** BigInt(FRACTION_DIGITS);
+const HUNDREDTHS_SCALE = 100n;
 
 export function formatSharePercent(share: bigint, totalShare: bigint): string | null {
   if (share < 0n || totalShare <= 0n) return null;
   if (share === 0n) return '0%';
 
-  // percent × 100, so the integer part is the whole percent and the remainder
-  // is the two-decimal fraction (e.g. 10.25% -> 1025).
-  const hundredths = (share * 100n * SCALE) / totalShare;
-  if (hundredths === 0n) return '<0.01%';
+  // 百分数 × 100（两位小数），BigInt 运算保证边界值精确截断。
+  const hundredths = (share * 10_000n) / totalShare;
+  if (hundredths > 0n) {
+    const whole = hundredths / HUNDREDTHS_SCALE;
+    const fraction = (hundredths % HUNDREDTHS_SCALE).toString().padStart(2, '0').replace(/0+$/, '');
+    return fraction.length > 0 ? `${whole}.${fraction}%` : `${whole}%`;
+  }
 
-  const whole = hundredths / SCALE;
-  const fraction = (hundredths % SCALE).toString().padStart(FRACTION_DIGITS, '0');
-  const trimmed = fraction.replace(/0+$/, '');
-  return trimmed.length > 0 ? `${whole.toString()}.${trimmed}%` : `${whole.toString()}%`;
+  // 极小占比：找到第一个有效位，再多取 3 位（合计最多 4 位非零数字）。
+  const base = share * 100n;
+  let exponent = 1;
+  while ((base * 10n ** BigInt(exponent)) / totalShare === 0n && exponent < 80) exponent += 1;
+  const scaled = (base * 10n ** BigInt(exponent + 3)) / totalShare;
+  const digits = scaled.toString().slice(0, 4).replace(/0+$/, '');
+  return `0.${'0'.repeat(exponent - 1)}${digits}%`;
 }

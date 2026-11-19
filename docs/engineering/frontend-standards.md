@@ -618,6 +618,7 @@ cta: '立即铸造', title: '已铸造',
 | `formatTokenAmount` | 所有展示的代币数量 | 整数分组、小数**截断**（不四舍五入）、小数位按数量级自适应（最多 6 位）；**极小非零金额按「首有效位 + 2 位」显示、不设位数上限**（代币精度 ≤ 18，1 wei 就是 `0.000000000000000001`），见 §4.5.1 | `format.ts:186-196`（数量级 `:125-138`、有效位 `:145-159`） |
 | `formatVisibleTokenAmount` | 会真正移动的金额（批量转账/回执/前后余额） | 走与 `formatTokenAmount` 同一套有效位规则（极小非零金额都显示得出来）；`< 最小可见单位` 只作**极端兜底**（显式传了 `maxFractionDigits` 等把值压成 `0` 的情况），如 `formatVisibleTokenAmount(1n, 18, { maxFractionDigits: 2 })` → `< 0.01` | `format-tiny.ts:28-54` |
 | `formatPercent` / `formatBpsPercent` | 百分比、滑点档 | 最多 2 位（截断）；`minimumFractionDigits` 只给固定预置标签 | `format-rates.ts:68-79`、`:53-57` |
+| `formatSharePercent` | 所有「部分 / 总数」占比（治理权占比、加速份额占比、LP 占比、空投份额占比） | BigInt 精确计算（`shared/lib/share-percent.ts`）：≥ 0.01% 两位小数**截断**；< 0.01% 用 `0.{x}yyyy`（同 `formatTinyPercent`），`x` 不设上限、永不落成 `0%`；99.9999% 显示 `99.99%`、不会浮点进位成 100% | `shared/lib/share-percent.ts` |
 | `formatTinyPercent` | **「占比」类百分比**（治理权占比、加速份额占比、查询结果占比） | `≥ 0.01%` 走 2 位；`< 0.01%` 时用 **`0.{x}yyyy`** 形式（`x` = 小数点后前导 0 的个数，`yyyy` = 随后最多 4 位非零数字）显示、**不设 `x` 上限**，**永不落成 0**（§4.5.1） | `format-tiny.ts:64-78` |
 | `formatRate` | 价格 / 汇率（`1 FROM ≈ X TO`） | 默认 2 位；价格行可显式传 6 位，避免反向价格被截成 0 | `format-rates.ts:24-50` |
 | `formatPhase` | 高级视图里的轮次/阶段 | 不加千分位 | `format-rates.ts:60-66` |

@@ -3,7 +3,7 @@ import { Check, RefreshCw } from '@/shared/ui/icons';
 import { Link } from 'react-router-dom';
 import { useAccount } from 'wagmi';
 import { copy } from '@/shared/config/copy-pages';
-import { UNKNOWN } from '@/shared/lib/format';
+import { formatAmount, UNKNOWN } from '@/shared/lib/format';
 import { cn } from '@/shared/lib/cn';
 import {
   captureFlipPositions,
@@ -199,7 +199,7 @@ export function IdentityList({ identity, onRetry, justMinted = null }: IdentityL
     setPendingTokenId(null);
   }, [identity.status, moveGeneration, pendingTokenId]);
 
-  const count = identity.balance !== undefined ? identity.balance.toString() : UNKNOWN;
+  const count = identity.balance !== undefined ? formatAmount(identity.balance, 0) : UNKNOWN;
   // 选中后 ownerOf() 确认期间 status 变成 loading：此时仍用缓存里的枚举渲染列表（顺序
   // 已按新选中身份排好），FLIP 才有「Last」可量，也避免骨架屏闪一下。
   const listHeld =

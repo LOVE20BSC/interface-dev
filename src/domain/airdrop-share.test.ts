@@ -15,9 +15,10 @@ describe('formatSharePercent', () => {
     expect(formatSharePercent(2n, 3n)).toBe('66.66%');
   });
 
-  it('distinguishes a tiny positive share from zero', () => {
-    expect(formatSharePercent(1n, 100_000n)).toBe('<0.01%');
-    expect(formatSharePercent(1n, 1_000_000n)).toBe('<0.01%');
+  it('shows tiny but positive shares as 0.{x}yyyy instead of 0%', () => {
+    expect(formatSharePercent(1n, 100_000n)).toBe('0.001%');
+    expect(formatSharePercent(1n, 1_000_000n)).toBe('0.0001%');
+    expect(formatSharePercent(1n, 10n ** 24n)).toBe('0.0000000000000000000001%');
   });
 
   it('returns null when the total is unusable instead of inventing a value', () => {

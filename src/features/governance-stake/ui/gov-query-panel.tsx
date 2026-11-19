@@ -5,14 +5,14 @@ import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
 import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
-import { formatTinyPercent } from '@/shared/lib/format-tiny';
+import { govSharePercent } from '@/features/governance-stake/lib/gov-share';
 import { parseMemberIdInput } from '@/shared/lib/identity-input';
 import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { Check, Copy } from '@/shared/ui/icons';
 import { useMemberNftAddress } from '@/entities/member-identity/model/use-member-nft-address';
-import { sharePercent } from '@/features/governance-stake/lib/gov-share';
+
 import type { GovContextValue } from '@/features/governance-stake/model/use-gov-context';
 
 const VOTE_DECIMALS = 18;
@@ -238,7 +238,7 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
     (stakeTuple[0] ?? 0n) === 0n &&
     (votes ?? 0n) === 0n;
 
-  const share = sharePercent(votes, community.totalGovVotes);
+  const share = govSharePercent(votes, community.totalGovVotes);
   const displayId = resolvedId ?? (target?.mode === 'id' ? target.id : undefined);
 
   return (
@@ -395,7 +395,7 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
               />
               <ResultStat
                 label={copy.gov.query.share}
-                value={share === undefined ? UNKNOWN : `${formatTinyPercent(share)}%`}
+                value={share === undefined ? UNKNOWN : `${share}%`}
                 testId="gov-query-share"
               />
               <div

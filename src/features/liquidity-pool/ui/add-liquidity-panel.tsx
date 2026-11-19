@@ -6,7 +6,7 @@ import { configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
-import { formatPercent } from '@/shared/lib/format-rates';
+import { formatSharePercent } from '@/shared/lib/share-percent';
 
 import { formatRate } from '@/shared/lib/format-rates';
 import { Button } from '@/shared/ui/button';
@@ -22,7 +22,6 @@ import {
   mirrorAmount,
   planDualAdd,
   priceChangePercent,
-  sharePercent,
 } from '@/features/liquidity-pool/lib/liquidity-math';
 import {
   addSideIssue,
@@ -511,7 +510,7 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
   const nativeLinked = !smartMode && ratioAvailable && linkedSide === 'native';
 
   /** 加池抬头：底池总 LP / 我的 LP（占比）。 */
-  const lpShare = sharePercent(pool.snapshot?.lpBalance ?? 0n, totalSupply);
+  const lpShare = formatSharePercent(pool.snapshot?.lpBalance ?? 0n, totalSupply);
 
   /** 旧库「当前池价格」：默认 1 社区代币 = X 原生币，箭头切换方向。 */
   const stableRateOptions = { maxFractionDigits: 6 } as const;
@@ -594,7 +593,7 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
               {formatTokenAmount(pool.snapshot?.lpBalance, 18)}
             </span>
             {(pool.snapshot?.lpBalance ?? 0n) > 0n && lpShare !== undefined ? (
-              <span className="text-muted">（{formatPercent(lpShare)}%）</span>
+              <span className="text-muted">（{lpShare}%）</span>
             ) : null}
           </p>
           {(pool.snapshot?.lpBalance ?? 0n) > 0n ? (

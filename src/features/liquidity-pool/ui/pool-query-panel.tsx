@@ -4,7 +4,6 @@ import { isHexAddress } from '@/config/deployments/types';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount } from '@/shared/lib/format';
-import { formatPercent } from '@/shared/lib/format-rates';
 
 import { formatRate } from '@/shared/lib/format-rates';
 import { ArrowDownUp } from '@/shared/ui/icons';
@@ -509,9 +508,9 @@ export function PoolQueryPanel({
                   <div className={ROW}>
                     <dt className="text-muted">{copy.liquidity.query.resultShare}</dt>
                     <dd className="font-medium text-foreground" data-testid="liquidity-query-share">
-                      {position.sharePercent === undefined
+                      {position.sharePercentText === undefined
                         ? EMPTY_CELL
-                        : `${formatPercent(position.sharePercent)}%`}
+                        : `${position.sharePercentText}%`}
                     </dd>
                   </div>
                 </dl>

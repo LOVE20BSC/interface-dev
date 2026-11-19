@@ -5,6 +5,7 @@ import { configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
+import { formatSharePercent } from '@/shared/lib/share-percent';
 import { formatPercent } from '@/shared/lib/format-rates';
 
 import { Button } from '@/shared/ui/button';
@@ -19,7 +20,6 @@ import {
   applySlippageDown,
   lpForPercent,
   planWithdraw,
-  sharePercent,
 } from '@/features/liquidity-pool/lib/liquidity-math';
 import {
   approvalNeed,
@@ -104,7 +104,7 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
   const bps = percentToBps(slippagePercent);
   const minToken = applySlippageDown(plan.amountA, bps);
   const minNative = applySlippageDown(plan.amountB, bps);
-  const share = sharePercent(lpBalance, totalSupply);
+  const share = formatSharePercent(lpBalance, totalSupply);
 
   const lpError = (() => {
     if (parsedLp.kind === 'invalid') return copy.liquidity.mine.lpInvalid;
@@ -247,7 +247,7 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
           <div className="flex items-center justify-between gap-3">
             <dt className="text-muted">{copy.liquidity.mine.shareLabel}</dt>
             <dd className="font-medium text-foreground" data-testid="liquidity-my-share">
-              {share === undefined ? copy.liquidity.query.none : `${formatPercent(share)}%`}
+              {share === undefined ? copy.liquidity.query.none : `${share}%`}
             </dd>
           </div>
         </dl>

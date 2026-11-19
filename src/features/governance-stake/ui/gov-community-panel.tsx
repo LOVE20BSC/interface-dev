@@ -2,7 +2,7 @@ import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { formatPercent } from '@/shared/lib/format-rates';
 
-import { formatTinyPercent } from '@/shared/lib/format-tiny';
+import { govSharePercent } from '@/features/governance-stake/lib/gov-share';
 import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import type { StakeCommunity } from '@/entities/stake/model/use-stake-community';
@@ -37,11 +37,7 @@ export function GovCommunityPanel({
       ? undefined
       : formatPercent(Number(params.feeSettlementRatio) / 1e16);
 
-  const mySharePercent = (() => {
-    if (myVotes === undefined || community.totalGovVotes === undefined) return undefined;
-    if (community.totalGovVotes === 0n) return 0;
-    return Number((myVotes * 10_000n) / community.totalGovVotes) / 100;
-  })();
+  const mySharePercent = govSharePercent(myVotes, community.totalGovVotes);
 
   if (community.status === 'error') {
     return (
@@ -73,7 +69,7 @@ export function GovCommunityPanel({
         />
         <StakeStatRow
           label={copy.gov.community.myShare}
-          value={mySharePercent === undefined ? UNKNOWN : `${formatTinyPercent(mySharePercent)}%`}
+          value={mySharePercent === undefined ? UNKNOWN : `${mySharePercent}%`}
           testId="gov-community-share"
         />
         <StakeStatRow

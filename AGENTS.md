@@ -29,7 +29,7 @@ LOVE20BSC 协议前端的 **dev 变体**：纯静态、移动优先、无后端�
 ## 2. 十条硬规则（违反会被门禁、验收或线上打回）
 
 1. **不加新依赖**，不换库，不引动画库（FLIP 用原生 Web Animations）。首屏包体 gzip 预算
-   dev 161 / prod 160 kB，现在 160.7 / 159.3，**余量不到 1 kB**。
+   dev 161 / prod 160 kB，现在 160.7 / 159.2，**余量不到 1 kB**。
 2. **不把合约函数映射成界面**：按用户任务组织（拿到身份 / 空投铸造 / 买到币），
    一个任务可以调多个方法；合约有但用户不需要的能力（融合、默认身份、限额）不出现。
 3. **所有用户可见中文只能写在** `src/shared/config/copy.ts`（首屏）或
@@ -57,7 +57,7 @@ LOVE20BSC 协议前端的 **dev 变体**：纯静态、移动优先、无后端�
 ## 3. 提交前必跑
 
 ```bash
-pnpm check          # format:check + typecheck + lint + 单测（892 条），pre-commit 钩子自动调这个
+pnpm check          # format:check + typecheck + lint + 单测（897 条），pre-commit 钩子自动调这个
 pnpm build          # 包体门禁（scripts/check-bundle.mjs）+ 404.html + build-id
 pnpm e2e            # 全量 Playwright（160 条，约 11 分钟；自己起/复用 8555 链）
 ```

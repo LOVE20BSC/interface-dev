@@ -540,7 +540,7 @@ spec（**2026-11-17 晚按 TKM 多页面 IA 重写后为 8 条 `test()`**；下�
 - **`/stake/staketoken` 版面**：还没有加速质押时「加速激励质押的作用」卡在最前；**已有加速质押时挪到最后**（先看数据与表单，说明放页尾）。
 - **极小数字**：`formatTinyPercent` 在占比 `< 0.01%` 时用 **`0.{x}yyyy`** 形式（`x` = 小数点后前导 0 的个数，`yyyy` = 随后最多 4 位非零数字）显示、**不设 `x` 上限**，**永不落成 0**；`formatTokenAmount` 对极小非零金额同样不设位数上限（`0.0000001`；18 位精度 1 wei = `0.000000000000000001`），`formatVisibleTokenAmount` 的 `< 最小可见单位` 只作极端兜底；**一律截断、不四舍五入**。旧的「8 位 / `<0.00000001%` / 12 位上限」口径已被本轮覆盖。本 spec 种子下占比是 `4.76%` / `100%` / `0%`、金额是常规量级，**C1–C4 页面字符串与断言不变**。
 - **P2 读失败态**：社区读模型**任一子读失败**即整块显示「社区数据暂时读不到。」+「重试」（不再把失败字段摆成「—」却没有重试出口）；承诺解锁期参数读失败时，表单里该控件显示「网络可能不稳，你的质押没有变化。」+「重试」（`gov-liquidity-phases-error`），主按钮保持禁用、不拿旧值提交。
-- **复跑与截图**：2026-11-19 四轮复跑（收尾版）：全量 e2e **160/160（11.1m，EXIT 0）**、单测 **892 passed**、治理 spec 8/8 仍含在全量内；截图 **207 张（81 张更新）**；首屏 prod **159.3** / dev **160.7** kB（无 WARN）。
+- **复跑与截图**：2026-11-19 四轮复跑（收尾版）：全量 e2e **160/160（10.5m，EXIT 0）**、单测 **897 passed**、治理 spec 8/8 仍含在全量内；截图 **207 张（87 张更新）**；首屏 prod **159.2** / dev **160.7** kB（无 WARN）。
 
 **智能模式的合约依据（不在 §1 理论线里，属新增功能）**：单币质押由 periphery `LOVE20Hub` 完成——`stakeLiquidityWithNative`（必须带 value，只填社区代币时会 revert `ZeroNativeTokenAmount`）/ `stakeLiquidityWithToken`（两枚 ERC20，只填社区代币时用它）；页面按「有没有原生币输入」选入口，报价用 `quoteStakeLiquidity(WithNative)` 的 `willSwap / amountToSwap / amountOutFromSwap / prepared* / liquiditySharesAdded / govVotesAdded`，滑点折算后的 `minLiquidityShares` 作为最少份额。**2026-11-19 三轮起**：父币是 WETH 时，关闭智能模式也走 `stakeLiquidityWithNative`（Hub 内置 wrap，用户不需要封装 WETH；只有一笔社区代币授权）；父币不是 WETH 时才走 `Stake.stakeLiquidity` 的两枚 ERC20 路径。**C1–C4 的数值 / wei 不变**，只更新路径与授权口径说明；C2 加速仍走 `Stake.stakeBoost`。
 
