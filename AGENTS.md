@@ -64,6 +64,7 @@ pnpm e2e            # 全量 Playwright（160 条，约 11 分钟；自己起/�
 
 - 钩子安装一次即可：`pnpm hooks:install`（写 `core.hooksPath=.githooks`，本机生效，不入库）。
   纯文档提交会自动跳过；紧急逃生 `SKIP_PRE_COMMIT=1 git commit …`，但要在提交信息里写明原因。
+- **按改动分级验证（owner 2026-11-20）**：细节调整（文案/样式/局部渲染、不碰链上读写）只跑相关 spec，并复用现有 8555 与 preview——**别加 `E2E_REUSE_PREVIEW=0`、别 `e2e:reset-chain`、别停链**；共享逻辑/数值/链上改动才 `pnpm check` + 全量 e2e。判据表见规范 §7.12。
 - **e2e 不在 CI 里**（CI 只跑 typecheck/lint/test/build）。"CI 绿了"**不能**代替跑 e2e。
 - 改了会读写链上数值的页面 → 三线校验的四个交付物缺一不可（规范 §7.5）。
 

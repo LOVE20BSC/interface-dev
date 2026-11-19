@@ -1354,6 +1354,23 @@ const restoreAnchorFocus = (event: Event) => {
 
 ---
 
+### 7.12 验证节奏：先复用现有链与预览，再全量（owner 2026-11-20）
+
+**结论**：细节调整不要在每条 spec 前重新起链 / bootstrap / 强制重建。全量 e2e 约 10–13 分钟，而「复用 8555 + 复用 preview + 只跑相关 spec」通常 1–3 分钟——同样的绿灯，差一个数量级。默认 `pnpm e2e` 已经会复用健康 8555 与 build id 匹配的 preview，**慢的是有人手动加了 `E2E_REUSE_PREVIEW=0`、`e2e:reset-chain` 或每次都跑全量**。
+
+| 改动级别 | 典型改动 | 必跑 | 不跑 |
+| --- | --- | --- | --- |
+| A 细节 | 文案、间距、颜色、图标、局部组件渲染；不碰链上读写与共享数值逻辑 | `npx vitest run <相关>`（改到共享模块时用 `pnpm check`）+ `pnpm e2e <受影响 spec>` | 全量 e2e、`pnpm build` 双变体、`e2e:reset-chain`、手动 `E2E_REUSE_PREVIEW=0` |
+| B 共享 | 共享 formatter、状态机、跨页组件 | `pnpm check` + 相关 spec；**提交前**跑一次全量 | 每改一次都双 build |
+| C 高危 | 链上读写路径、合约交互、e2e harness、交付/发布 | `pnpm check` + `pnpm build`（prod+dev）+ 全量 e2e（harness 改动连跑两遍） | — |
+
+**链复用规则**：
+
+- 一轮自动化验证开始时确保 8555 起来（`pnpm e2e:ensure-chain`），**跑完保持运行**，下一轮直接复用；不要两次 targeted spec 之间停链。
+- `pnpm e2e:reset-chain` 只在链脏 / 被强杀 / 改过部署脚本时用；`node scripts/e2e-chain-doctor.mjs` 只在出现 wedge（端口 LISTEN 但 RPC 超时）时用。
+- 一条时间只留一条空闲链：自动化轮次留 8555，人工验证轮次留 8545；**8545 仍永不被自动化触碰**（§7.7 三层拦截）。
+- 连续「改 → 跑」同一轮时，第二次起都不应触发 bootstrap；若日志出现 bootstrap，说明链被停了或坏了，先查原因再加规则外动作。
+
 ## 8. 依赖与包体
 
 结论先行：**首屏 gzip 是本项目唯一会静默劣化的指标**，所以它同时是产品约束（移动优先、非加密原生用户）和架构约束（`base` 烘进产物、无服务端）。

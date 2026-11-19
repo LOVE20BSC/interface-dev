@@ -7,7 +7,7 @@
 > - `http://127.0.0.1:8545` = **人工链**：开发者浏览器钱包连着的链，自动化运行**永不触碰**。
 > - `http://127.0.0.1:8555` = **自动化链**：`pnpm e2e` 自己启动 / bootstrap / 快照 / 回滚的链。
 >
-> **单 agent 开发时（owner 2026-11-19）**：常驻实例只保留 8545 一条；8555 只在跑 `pnpm e2e` 时临时启动、跑完停掉；8566 只在跑合约线校验时临时起。不要同时留多条空闲链。
+> **单 agent 开发时（owner 2026-11-19 / 2026-11-20 修订）**：一条时间只留一条空闲链——自动化验证轮次让 8555 起来后**保持运行并复用**（不要每轮 reset/bootstrap，细则见「快速回归」），人工验证轮次保留 8545；8566 只在跑合约线校验时临时起。8545 自动化永不触碰。
 >
 > 事故经过：套件原先直接跑在共享的 8545 上，每个 spec 文件做 `anvil_snapshot`/`anvil_revert`。产品负责人在浏览器里手工测 /mint 时，一次自动化运行在 8545 上重新 bootstrap/回滚，导致账户 #1（`0x70997970C51812dc3A010C7d01b50e0d17dc79C8`）的链上 nonce 从 68 变回 3，他签名的 `approve(...)`（tx `0x94071607…ec6cb1`）永远进不了块，页面卡在「确认中…」；期间 `anvil_getAutomine` 还一度被留成 `false`、块高从 943 回退到 936。**快照/回滚只保证「同一条链可重复」，并不能阻止自动化运行去动人工链**——隔离必须靠独立链。
 
@@ -32,6 +32,23 @@ pnpm e2e:reset-chain
 端口不影响地址）。之后每次 `pnpm e2e` 检测到 8555 已有完整部署就直接复用。
 
 `playwright.config.ts` 的 `webServer` 会先跑 `pnpm build`（`VITE_ENV=dev`）再起 preview；它会把本次解析出的 RPC 作为 `VITE_ANVIL_RPC` 烘进构建，页面里的 viem 和 spec 的直连 RPC 因此永远指向同一条链。本地默认允许复用已有 preview，但复用前会先校验 build id（见下节「Harness guards」）；CI 总是重新构建，`E2E_REUSE_PREVIEW=0` 可强制重启本地 preview。其它可选环境变量：`E2E_PORT`（默认 4173）、`E2E_BASE_PATH`（默认 `/`）。
+
+### 快速回归（细节改动，owner 2026-11-20）
+
+细节调整（文案、样式、局部组件、不碰链上读写）**不要重新起链 / bootstrap / 强制重建 preview**：默认 `pnpm e2e` 就会复用健康 8555 与 build id 匹配的 preview，慢的是手动加 `E2E_REUSE_PREVIEW=0`、`e2e:reset-chain` 或每次都跑全量。
+
+```bash
+# 1) 确保/复用现有 8555（已运行时几乎零成本；不要每次 reset/bootstrap）
+pnpm e2e:ensure-chain
+
+# 2) 只跑受影响 spec：复用现有链 + 现有 preview
+pnpm e2e e2e/gov-stake-numbers.spec.ts
+pnpm e2e e2e/liquidity-numbers.spec.ts --grep "用例 E"
+
+# 3) 连续改 → 跑同一轮：不要停链，也不要加 E2E_REUSE_PREVIEW=0
+```
+
+分级判据（A 细节 / B 共享 / C 高危）与例外见 `docs/engineering/frontend-standards.md` §7.12。全量 e2e 只在共享逻辑、链上读写、harness 改动或交付前才跑。
 
 ### Harness guards（2026-11-12）
 
