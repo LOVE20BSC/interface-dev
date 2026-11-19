@@ -68,15 +68,15 @@ export function formatVisibleTokenAmount(
 }
 
 /**
- * 极小百分比的显示（owner 2026-11-19）：占比小于 0.01% 时至少要「看得见」——按
- * 第一个有效位 + 2 位有效数字输出，不设位数上限；极长（超 60 位小数）时用
- * 科学计数法，绝不再退化成 0 或 `< 最小可见`。
+ * 极小百分比的显示（owner 2026-11-19）：采用 `0.{x}yyyy` 形式——
+ * `x` 是小数点后前导 0 的个数，`yyyy` 是随后的**最多 4 位非零数字**；
+ * 只截断、不四舍五入，也不设 `x` 的上限（多小都显示出来）。
  *
- * 字符串由 `toString()` 的精确十进制展开截断而来，**只截断、不四舍五入**
- * （资金安全：连续 9 也不能进位）。
+ * 例：0.0000123 → `0.0000123`（x=4，后接有效数字 123）；
+ * 0.0009999999 → `0.0009999`；0.0000004 → `0.0000004`；
+ * 0.005 → `0.005`。
  *
- * 例：0.000012 → `0.000012`；0.0000000001 → `0.0000000001`；
- * 1.23e-120 → `1.23e-120`。
+ * 占比 ≥ 0.01% 时仍走两位小数的 `formatPercent`（截断）。
  */
 export function formatTinyPercent(value: number, locale: string = DEFAULT_LOCALE): string {
   if (!Number.isFinite(value)) return UNKNOWN;
@@ -85,14 +85,8 @@ export function formatTinyPercent(value: number, locale: string = DEFAULT_LOCALE
 
   const plain = toPlainDecimal(value);
   const fraction = plain.split('.')[1] ?? '';
-  const firstSignificant = fraction.search(/[1-9]/);
-  if (firstSignificant < 0) return formatPercent(value, { locale });
-  const decimals = firstSignificant + 3; // 第一个有效位 + 再 2 位
-  if (decimals > 60) {
-    // 过长的 0 串不再铺开：用科学计数法展示，尾数同样截断。
-    const [mantissa = '', power = ''] = value.toExponential(2).split('e');
-    const truncated = mantissa.slice(0, mantissa.includes('.') ? 4 : mantissa.length);
-    return `${truncated}e${power}`;
-  }
-  return `0.${fraction.slice(0, decimals).replace(/0+$/, '')}`;
+  const leadingZeros = /^0*/.exec(fraction)?.[0].length ?? 0;
+  const significant = fraction.slice(leadingZeros).replace(/0+$/, '').slice(0, 4);
+  if (significant.length === 0) return formatPercent(value, { locale });
+  return `0.${'0'.repeat(leadingZeros)}${significant}`;
 }

@@ -24,6 +24,8 @@ LOVE20BSC 协议前端的 **dev 变体**：纯静态、移动优先、无后端�
 | 6   | [e2e/README.md](e2e/README.md)                                                                          | 跑 e2e 前（8545/8555 硬边界，违反会毁掉人工测试链）                                                                                                             |
 | 7   | [docs/adr/](docs/adr/)、[docs/contract-issues/](docs/contract-issues/)                                  | 要改架构、或怀疑合约缺陷时                                                                                                                                      |
 
+**设计速查（不另建 Design.md）**：动 UI 前按 §1 表第 3 行读 [m0-ux-spec.md](docs/product/m0-ux-spec.md) §0（设计原则）+ §4（横切交互）；样式/文案/可点态/数字看 [frontend-standards.md](docs/engineering/frontend-standards.md) §4 / §4.5.1 / §6；术语与禁用词看 [GLOSSARY.md](GLOSSARY.md)。设计规则只维护这几处，新增文档前先确认不会形成第四处真相来源。
+
 ## 2. 十条硬规则（违反会被门禁、验收或线上打回）
 
 1. **不加新依赖**，不换库，不引动画库（FLIP 用原生 Web Animations）。首屏包体 gzip 预算

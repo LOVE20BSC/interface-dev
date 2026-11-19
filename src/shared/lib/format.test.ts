@@ -257,10 +257,11 @@ describe('formatTinyPercent', () => {
     expect(formatTinyPercent(0.0000001)).toBe('0.0000001');
     expect(formatTinyPercent(0.0000000001)).toBe('0.0000000001');
     expect(formatTinyPercent(0.000000000000000001)).toBe('0.000000000000000001');
-    // 资金安全：连续 9 也不许进位（截断，不四舍五入）。
-    expect(formatTinyPercent(0.0009999999)).toBe('0.000999');
-    expect(formatTinyPercent(0.009999999)).toBe('0.00999');
-    expect(formatTinyPercent(1.9999e-7)).toBe('0.000000199');
+    // 0.{x}yyyy：x = 前导 0 个数，yyyy = 最多 4 位非零数字；连续 9 也不进位。
+    expect(formatTinyPercent(0.0000123)).toBe('0.0000123');
+    expect(formatTinyPercent(0.0009999999)).toBe('0.0009999');
+    expect(formatTinyPercent(0.009999999)).toBe('0.009999');
+    expect(formatTinyPercent(1.9999e-7)).toBe('0.0000001999');
   });
 
   it('passes non-positive values through formatPercent', () => {
