@@ -4,7 +4,9 @@ import { NETWORK } from '@/config/networks';
 import { formatSharePercent } from '@/domain/airdrop-share';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
-import { formatDateTime, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatDateTime } from '@/shared/lib/format-rates';
+
 import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';

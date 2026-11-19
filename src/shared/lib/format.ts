@@ -83,7 +83,7 @@ function groupInteger(whole: string, locale: string): string {
   return whole.replace(/\B(?=(\d{3})+(?!\d))/g, group);
 }
 
-function normalizedDigits(value: number | undefined, fallback: number): number {
+export function normalizedDigits(value: number | undefined, fallback: number): number {
   if (value === undefined || !Number.isFinite(value)) return fallback;
   return Math.max(0, Math.trunc(value));
 }
@@ -93,7 +93,7 @@ function normalizedDigits(value: number | undefined, fallback: number): number {
  * the fraction, then cap it at `maxFractionDigits`. Never rounds up, so a balance
  * can never be overstated.
  */
-function formatScaled(
+export function formatScaled(
   value: bigint,
   decimals: number,
   maxFractionDigits: number,
@@ -138,10 +138,30 @@ export function fractionDigitsForMagnitude(
 }
 
 /**
+ * 极小非零金额的显示位数（owner 2026-11-19：不要因为截断把「有余额」显示成 0）。
+ * 取「第一个有效位 + 2 位」，最多到 12 位小数（再小就交给 formatVisibleTokenAmount
+ * 的「< 最小可见单位」）；返回 undefined 表示按常规数量级规则即可。
+ */
+export function tinyFractionDigits(
+  value: bigint | undefined | null,
+  decimals: number,
+): number | undefined {
+  if (value === undefined || value === null || value === 0n || decimals <= 0) {
+    return undefined;
+  }
+  const absolute = value < 0n ? -value : value;
+  const unit = 10n ** BigInt(decimals);
+  if (!Number.isInteger(decimals) || absolute >= unit) return undefined;
+  const base = fractionDigitsForMagnitude(value, decimals);
+  const first = (absolute % unit).toString().padStart(decimals, '0').search(/[1-9]/) + 1;
+  return first <= base ? undefined : Math.min(decimals, first + 2, 12);
+}
+
+/**
  * Low-level amount formatter: integer part grouped with thousands separators and
  * at most `maxFractionDigits` decimals (truncated, never rounded up). Prefer
  * `formatTokenAmount` for displayed token balances, quotes and receipts; it
- * applies the single 6-digit rule.
+ * applies the magnitude-aware fraction rule documented above.
  *
  * `undefined` / `null` means "not loaded", which stays `—`: rendering 0 would
  * read as "my money is gone" (ADR-0003 §4).
@@ -168,58 +188,10 @@ export function formatTokenAmount(
   options: AmountFormatOptions = {},
 ): string {
   if (decimals === undefined || decimals === null) return UNKNOWN;
-  return formatAmount(
-    value,
-    decimals,
-    options.maxFractionDigits ?? fractionDigitsForMagnitude(value, decimals),
-    options.locale,
-  );
-}
-
-/**
- * Smallest non-zero amount the amount rule can display, in base units. With the
- * default six fraction digits an 18-decimals asset resolves to 10^12 wei
- * (`0.000001`); a lower-decimals asset resolves to its smallest unit.
- */
-export function smallestVisibleTokenAmount(
-  decimals: number,
-  maxFractionDigits = TOKEN_AMOUNT_MAX_FRACTION_DIGITS,
-): bigint {
-  const digits = normalizedDigits(maxFractionDigits, TOKEN_AMOUNT_MAX_FRACTION_DIGITS);
-  if (decimals <= digits) return 1n;
-  return 10n ** BigInt(decimals - digits);
-}
-
-/**
- * `formatTokenAmount` with one extra guarantee for money that actually moves:
- * a **non-zero** amount the display rule would collapse to `0` renders as
- * `< 0.000001` (the smallest visible amount) instead of a literal `0`.
- *
- * A bare `0` therefore always means exactly zero. 批量转账 uses this for the
- * batch total, per-row amounts, receipt totals and the before → after balances,
- * so a 0.0000001 ETH transfer can never look like 「什么都没转」.
- */
-export function formatVisibleTokenAmount(
-  value: bigint | undefined | null,
-  decimals: number | undefined | null,
-  options: AmountFormatOptions = {},
-): string {
-  const formatted = formatTokenAmount(value, decimals, options);
-  if (
-    formatted !== '0' ||
-    value === undefined ||
-    value === null ||
-    value === 0n ||
-    decimals === undefined ||
-    decimals === null
-  ) {
-    return formatted;
-  }
-  const smallest = smallestVisibleTokenAmount(
-    decimals,
-    options.maxFractionDigits ?? fractionDigitsForMagnitude(value, decimals),
-  );
-  return `< ${formatUnits(smallest, decimals)}`;
+  const tiny = tinyFractionDigits(value, decimals);
+  const digits =
+    options.maxFractionDigits ?? Math.max(fractionDigitsForMagnitude(value, decimals), tiny ?? 0);
+  return formatAmount(value, decimals, digits, options.locale);
 }
 
 /**
@@ -227,93 +199,11 @@ export function formatVisibleTokenAmount(
  * fraction digits. Values are truncated, never rounded up. `minimumFractionDigits`
  * exists for fixed preset labels such as `1.0`.
  */
-export function formatPercent(value: number, options: PercentFormatOptions = {}): string {
-  if (!Number.isFinite(value)) return UNKNOWN;
-  const digits = normalizedDigits(options.maxFractionDigits, RATE_MAX_FRACTION_DIGITS);
-  const scaled = Math.trunc(value * 10 ** digits);
-  return formatScaled(
-    BigInt(scaled),
-    digits,
-    digits,
-    options.locale ?? DEFAULT_LOCALE,
-    options.minimumFractionDigits,
-  );
-}
-
-/**
- * 极小百分比的显示（owner 2026-11-19）：占比小到两位小数会变成 0.00% 时，改用
- * 最多 6 位小数显示（如 0.000012%）；仍小于 0.000001% 则显示 <0.000001%，让用户
- * 知道「有份额但极小」，而不是误读成 0。
- */
-export function formatTinyPercent(value: number, locale: string = DEFAULT_LOCALE): string {
-  if (!Number.isFinite(value)) return UNKNOWN;
-  if (value <= 0) return formatPercent(value, { locale });
-  // 用格式化后的字符串判断是否为 0：Number() 解析会破坏千分位与非默认 locale。
-  const two = formatPercent(value, { locale });
-  if (two !== '0') return two;
-  const six = formatPercent(value, { locale, maxFractionDigits: 6 });
-  if (six !== '0') return six;
-  return '<' + formatPercent(0.000001, { locale, maxFractionDigits: 6 });
-}
-
-/** Basis points -> percentage with at most two decimals, e.g. 123 -> `1.23`. */
-export function formatBpsPercent(bps: number): string {
-  if (!Number.isFinite(bps)) return UNKNOWN;
-  const clamped = Math.max(0, Math.round(bps));
-  return formatAmount(BigInt(clamped), 2, RATE_MAX_FRACTION_DIGITS);
-}
-
-/**
- * 1 FROM ≈ rate TO, derived from the amount quote so no extra chain read is
- * needed. Rates are display-only, use the two-digit rate rule and never round
- * up; the UI still labels the value 预计.
- */
-export function formatRate(
-  quoteOut: bigint,
-  amountIn: bigint,
-  fromDecimals: number,
-  toDecimals: number,
-  options: AmountFormatOptions = {},
-): string {
-  if (
-    amountIn <= 0n ||
-    quoteOut < 0n ||
-    fromDecimals < 0 ||
-    toDecimals < 0 ||
-    !Number.isInteger(fromDecimals) ||
-    !Number.isInteger(toDecimals)
-  ) {
-    return UNKNOWN;
-  }
-  const digits = normalizedDigits(options.maxFractionDigits, RATE_MAX_FRACTION_DIGITS);
-  const scale = 10n ** BigInt(digits);
-  const numerator = quoteOut * 10n ** BigInt(fromDecimals) * scale;
-  const denominator = amountIn * 10n ** BigInt(toDecimals);
-  if (denominator === 0n) return UNKNOWN;
-  return formatScaled(numerator / denominator, digits, digits, options.locale ?? DEFAULT_LOCALE);
-}
-
-export function formatPhase(
-  value: bigint | undefined | null,
-  locale: string = DEFAULT_LOCALE,
-): string {
-  if (value === undefined || value === null) return UNKNOWN;
-  return new Intl.NumberFormat(locale, { useGrouping: false }).format(value);
-}
-
-export function formatBuildId(buildId: string): string {
-  return buildId.length > 12 ? buildId.slice(0, 12) : buildId;
-}
-
 /**
  * Locale-aware date/time display for future history surfaces. No user-facing
  * date exists yet, but keeping the locale explicit here prevents a later `toLocaleString()`
  * from silently pinning the browser locale.
  */
-export function formatDateTime(
-  value: Date | number,
-  locale: string = DEFAULT_LOCALE,
-  options: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' },
-): string {
-  return new Intl.DateTimeFormat(locale, options).format(value);
+export function formatBuildId(buildId: string): string {
+  return buildId.length > 12 ? buildId.slice(0, 12) : buildId;
 }

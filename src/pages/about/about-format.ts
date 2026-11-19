@@ -1,4 +1,5 @@
-import { UNKNOWN, formatAmount, formatPhase, formatTokenAmount } from '@/shared/lib/format';
+import { UNKNOWN, formatAmount, formatTokenAmount } from '@/shared/lib/format';
+import { formatPhase } from '@/shared/lib/format-rates';
 
 /**
  * Data-tab formatting for the 关于 page. Every helper keeps the app-wide rule:

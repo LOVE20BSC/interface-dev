@@ -3,7 +3,10 @@ import { useAccount } from 'wagmi';
 import { isHexAddress } from '@/config/deployments/types';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { formatPercent, formatRate, formatTokenAmount } from '@/shared/lib/format';
+import { formatTokenAmount } from '@/shared/lib/format';
+import { formatPercent } from '@/shared/lib/format-rates';
+
+import { formatRate } from '@/shared/lib/format-rates';
 import { ArrowDownUp } from '@/shared/ui/icons';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';

@@ -61,9 +61,12 @@ export function useStakeParams(): StakeParams {
     if (stake !== undefined) read.refetch();
   };
 
+  // 任一子读失败都算「读不到」：否则输入框会卡在「读取中…」且没有重试出口。
+  const entries = read.data ?? [];
+  const anyFailure = entries.some((entry) => entry.status === 'failure');
   let status: StakeParamsStatus;
   if (stake === undefined) status = 'unconfigured';
-  else if (read.isError) status = 'error';
+  else if (read.isError || anyFailure) status = 'error';
   else if (read.isLoading) status = 'loading';
   else status = 'ready';
 

@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
 import { stakeUnlockState } from '@/domain/gov-stake';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
-import { Card, CardTitle } from '@/shared/ui/card';
+import { Card } from '@/shared/ui/card';
 import { Info } from '@/shared/ui/icons';
-import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
+import { Sheet } from '@/shared/ui/sheet';
 import type { GovContextValue } from '@/features/governance-stake/model/use-gov-context';
 import { hasStakePosition } from '@/features/governance-stake/ui/my-stake-summary';
 import { StakeStateCard } from '@/features/governance-stake/ui/stake-controls';
@@ -60,10 +61,14 @@ function InfoRow({
  * - 申请解锁（或撤出 / 查看解锁进度）改成卡片右上角的链接，而不是按钮。
  */
 export function MyStakeAssetsCard({ ctx }: MyStakeAssetsCardProps) {
-  const { member, clock, token, parent } = ctx;
+  const { member, clock, token, parent, selected } = ctx;
+  const [infoOpen, setInfoOpen] = useState(false);
+  const memberLabel =
+    selected === null ? copy.common.unknown : copy.identity.memberId(selected.tokenId.toString());
+  const memberName = selected?.name ?? copy.common.unknown;
   const q = `?symbol=${encodeURIComponent(ctx.symbol)}`;
   const unstakePath = `/stake/unstake${q}`;
-  const goStakePath = `/stake/stakelp${q}`;
+  const goStakePath = `/stake/liquidity${q}`;
 
   if (member.status === 'loading' || member.status === 'idle') {
     return (
@@ -121,53 +126,21 @@ export function MyStakeAssetsCard({ ctx }: MyStakeAssetsCardProps) {
   return (
     <Card data-testid="me-stake-card">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <CardTitle>{copy.gov.myLiquidityTitle}</CardTitle>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label={copy.gov.mine.infoAria}
-                data-testid="me-stake-info"
-                className="shrink-0 rounded-full p-1 text-muted transition-colors hover:bg-elevated hover:text-brand-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-              >
-                <Info aria-hidden="true" className="h-4 w-4" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent aria-label={copy.gov.mine.infoTitle} data-testid="me-stake-info-panel">
-              <p className="px-1 pb-1 text-xs font-semibold text-foreground">
-                {copy.gov.mine.infoTitle}
-              </p>
-              <dl className="divide-y divide-line/60">
-                <InfoRow
-                  label={copy.gov.mine.shares}
-                  value={formatTokenAmount(member.liquidityShares, VOTE_DECIMALS)}
-                  testId="me-stake-info-shares"
-                />
-                <InfoRow
-                  label={copy.gov.mine.token}
-                  value={amountText(member.tokenAmountForLiquidity, token?.decimals, token?.symbol)}
-                  testId="me-stake-info-token"
-                />
-                <InfoRow
-                  label={copy.gov.mine.parent}
-                  value={amountText(
-                    member.parentTokenAmountForLiquidity,
-                    parent?.decimals,
-                    parent?.symbol,
-                  )}
-                  testId="me-stake-info-parent"
-                />
-                {member.boostShares !== undefined && member.boostShares > 0n ? (
-                  <InfoRow
-                    label={copy.gov.mine.boostAmount}
-                    value={amountText(member.boostShares, token?.decimals, token?.symbol)}
-                    testId="me-stake-info-boost"
-                  />
-                ) : null}
-              </dl>
-            </PopoverContent>
-          </Popover>
+        <div className="flex min-w-0 items-center gap-2">
+          {/* owner 2026-11-19：标题位改为身份 NFT 的编号与名字 */}
+          <span className="shrink-0 font-mono text-base font-semibold text-foreground">
+            {memberLabel}
+          </span>
+          <span className="min-w-0 truncate text-sm font-medium text-muted">{memberName}</span>
+          <button
+            type="button"
+            aria-label={copy.gov.mine.infoAria}
+            data-testid="me-stake-info"
+            onClick={() => setInfoOpen(true)}
+            className="shrink-0 rounded-full p-1 text-muted transition-colors hover:bg-elevated hover:text-brand-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          >
+            <Info aria-hidden="true" className="h-4 w-4" />
+          </button>
         </div>
         <Link
           to={unstakePath}
@@ -212,6 +185,39 @@ export function MyStakeAssetsCard({ ctx }: MyStakeAssetsCardProps) {
           {copy.gov.mine.stateUnknown}
         </p>
       ) : null}
+
+      <Sheet open={infoOpen} onOpenChange={setInfoOpen} title={copy.gov.mine.infoTitle}>
+        <div data-testid="me-stake-info-panel">
+          <dl className="divide-y divide-line/60">
+            <InfoRow
+              label={copy.gov.mine.shares}
+              value={formatTokenAmount(member.liquidityShares, VOTE_DECIMALS)}
+              testId="me-stake-info-shares"
+            />
+            <InfoRow
+              label={copy.gov.mine.token}
+              value={amountText(member.tokenAmountForLiquidity, token?.decimals, token?.symbol)}
+              testId="me-stake-info-token"
+            />
+            <InfoRow
+              label={copy.gov.mine.parent}
+              value={amountText(
+                member.parentTokenAmountForLiquidity,
+                parent?.decimals,
+                parent?.symbol,
+              )}
+              testId="me-stake-info-parent"
+            />
+            {member.boostShares !== undefined && member.boostShares > 0n ? (
+              <InfoRow
+                label={copy.gov.mine.boostAmount}
+                value={amountText(member.boostShares, token?.decimals, token?.symbol)}
+                testId="me-stake-info-boost"
+              />
+            ) : null}
+          </dl>
+        </div>
+      </Sheet>
     </Card>
   );
 }

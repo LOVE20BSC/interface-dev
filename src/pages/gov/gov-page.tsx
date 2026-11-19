@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { formatTinyPercent, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatTinyPercent } from '@/shared/lib/format-tiny';
 import { buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
@@ -53,7 +54,7 @@ export function GovPage() {
 
         <div
           role="tablist"
-          aria-label={copy.gov.home.tabs.mine}
+          aria-label={copy.gov.pageTitles.home}
           className="grid grid-cols-2 gap-1 rounded-2xl border border-line bg-elevated p-1 text-xs"
         >
           {(['mine', 'community'] as const).map((value) => (
@@ -115,7 +116,7 @@ function MineTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string
             <CardTitle>{copy.gov.home.becomeTitle}</CardTitle>
             <CardDescription>{copy.gov.home.becomeBody}</CardDescription>
             <div className="mt-3">
-              <Link to={`/stake/stakelp${q}`} className={buttonStyles('primary', 'md', 'w-full')}>
+              <Link to={`/stake/liquidity${q}`} className={buttonStyles('primary', 'md', 'w-full')}>
                 {copy.gov.home.becomeAction}
               </Link>
             </div>

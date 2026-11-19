@@ -4,7 +4,9 @@ import { uniswapV2Router02Abi } from '@/config/abis';
 import { configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { formatPercent, formatTokenAmount, formatUnits } from '@/shared/lib/format';
+import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
+import { formatPercent } from '@/shared/lib/format-rates';
+
 import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';

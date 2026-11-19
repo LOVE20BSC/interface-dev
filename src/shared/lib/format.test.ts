@@ -2,19 +2,19 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_LOCALE,
   formatAmount,
+  formatTokenAmount,
+  formatUnits,
+  fractionDigitsForMagnitude,
+  TOKEN_AMOUNT_MAX_FRACTION_DIGITS,
+  UNKNOWN,
+} from '@/shared/lib/format';
+import {
   formatBpsPercent,
   formatDateTime,
   formatPercent,
   formatRate,
-  formatTinyPercent,
-  formatTokenAmount,
-  formatUnits,
-  formatVisibleTokenAmount,
-  fractionDigitsForMagnitude,
-  smallestVisibleTokenAmount,
-  TOKEN_AMOUNT_MAX_FRACTION_DIGITS,
-  UNKNOWN,
-} from '@/shared/lib/format';
+} from '@/shared/lib/format-rates';
+import { formatTinyPercent, formatVisibleTokenAmount } from '@/shared/lib/format-tiny';
 
 const E18 = 10n ** 18n;
 
@@ -182,10 +182,11 @@ describe('formatTokenAmount', () => {
 
 describe('formatVisibleTokenAmount', () => {
   it('never renders a non-zero amount the display rule truncates as a bare 0', () => {
-    // 1 wei of an 18-decimals asset is 0.000000000000000001: below 6 digits.
-    expect(formatVisibleTokenAmount(1n, 18)).toBe('< 0.000001');
-    expect(formatVisibleTokenAmount(100000000000n, 18)).toBe('< 0.000001'); // 1e-7 ETH
-    expect(formatVisibleTokenAmount(999999999999n, 18)).toBe('< 0.000001');
+    // 极小非零金额改为展示有效位（owner 2026-11-19）：1e-7 显示 0.0000001；
+    // 1 wei（18 位）超出 12 位小数上限，退化为「< 最小可见单位」。
+    expect(formatVisibleTokenAmount(1n, 18)).toBe('< 0.000000000001');
+    expect(formatVisibleTokenAmount(100000000000n, 18)).toBe('0.0000001'); // 1e-7 ETH
+    expect(formatVisibleTokenAmount(999999999999n, 18)).toBe('0.000000999');
     expect(formatVisibleTokenAmount(1000000000000n, 18)).toBe('0.000001');
   });
 
@@ -197,9 +198,9 @@ describe('formatVisibleTokenAmount', () => {
   });
 
   it('derives the smallest visible amount from the decimals and the cap', () => {
-    expect(smallestVisibleTokenAmount(18)).toBe(1000000000000n);
-    expect(smallestVisibleTokenAmount(6)).toBe(1n);
-    expect(smallestVisibleTokenAmount(18, 2)).toBe(10000000000000000n);
+    // 12 位内优先显示有效位；只有超出 12 位才退化成「< 最小可见单位」。
+    expect(formatVisibleTokenAmount(1n, 18)).toBe('< 0.000000000001');
+    expect(formatVisibleTokenAmount(1n, 6)).toBe('0.000001');
     expect(formatVisibleTokenAmount(1n, 6)).toBe('0.000001');
     expect(formatVisibleTokenAmount(1n, 2)).toBe('0.01');
     // 显式 cap 同样决定「最小可见单位」，不是写死 6 位。
@@ -250,11 +251,12 @@ describe('formatTinyPercent', () => {
     expect(formatTinyPercent(0.0000019)).toBe('0.000001');
   });
 
-  it('marks shares below 0.000001% as <0.000001 instead of 0', () => {
-    expect(formatTinyPercent(0.0000004)).toBe('<0.000001');
-    expect(formatTinyPercent(0.0000001)).toBe('<0.000001');
-    // 1e-9 这种远小于显示精度、但仍非零的份额也不许落成 0。
-    expect(formatTinyPercent(0.0000000001)).toBe('<0.000001');
+  it('shows tiny shares as 0.00000xxx instead of collapsing to 0', () => {
+    // owner 2026-11-19：0.00000xxx 这类极小占比也要看得见。
+    expect(formatTinyPercent(0.0000004)).toBe('0.0000004');
+    expect(formatTinyPercent(0.0000001)).toBe('0.0000001');
+    // 1e-9 远超 8 位小数：才退化为「< 最小可见百分比」。
+    expect(formatTinyPercent(0.0000000001)).toBe('<0.00000001');
   });
 
   it('passes non-positive values through formatPercent', () => {

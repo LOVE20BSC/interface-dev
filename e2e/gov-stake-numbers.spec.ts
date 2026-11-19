@@ -14,30 +14,42 @@ import { connect, installWallet, seedIdentity } from './wallet-stub';
  * 视觉），并把流动性质押改成支持「智能模式」（单币即可，或关掉后两侧都填）。本轮
  * 页面拆成 5 条路由：
  * - `/gov`                  治理首页（我的 / 社区 两个 tab）
- * - `/stake/stakelp`        流动性质押（流动性质押表单，默认智能模式）
- * - `/stake/staketoken`     质押代币（加速质押）
- * - `/stake/unstake`        取消质押（增加承诺解锁期 / 申请解锁 / 撤出）
+ * - `/stake/liquidity`      流动性质押（智能模式默认**关闭**，两侧按池子比例联动）
+ * - `/stake/staketoken`     质押代币（加速激励质押）
+ * - `/stake/unstake`        申请解锁（增加承诺解锁期 / 申请解锁 / 撤出）
  * - `/stake/liquid`         流动性质押数据（只读）
  * 以及 `/vote` 等旧版页面的占位。「我的流动性质押」明细卡在 2026-11-18 23:20 从
  * `/gov` 移到 `/me` 的「质押资产」tab（`me-tab-stake`），`/gov` 只留摘要卡与入口。
  *
  * owner 2026-11-19 的这一轮改版（本文件相应重写）：
+ * - **路由改名** `/stake/stakelp` → `/stake/liquidity`（owner 2026-11-19）；
+ *   `gov-section` 对旧路径做 `<Navigate replace>` 并保留 `?symbol=`（本文件有兼容断言）。
  * - **父币是 WETH → 直接用原生币**（`stake-liquidity-panel`）：不再渲染「父币」输入框
  *   （`gov-liquidity-parent-input` count 0），改渲染原生币输入（testid 仍是
- *   `gov-liquidity-native-input`，label「原生币 ETH」）；两种模式都走 Hub
- *   （`stakeLiquidityWithNative`），只有一笔社区代币授权（`…-approve-parent` count 0）。
- *   输入框顺序改为「原生币（父币）在上、社区代币在下」，用 DOM 顺序断言。
+ *   `gov-liquidity-native-input`，label/aria-label 只是「原生币」——symbol 只出现在右侧
+ *   小字，余额行也只写「余额 X」）；两种模式都走 Hub（`stakeLiquidityWithNative`），
+ *   只有一笔社区代币授权（`…-approve-parent` count 0）。输入框顺序改为
+ *   「原生币（父币）在上、社区代币在下」，用 DOM 顺序断言。
+ * - **智能模式默认关闭**：初始 `aria-checked=false`（两侧都填、按池子比例联动）；
+ *   要测单币（Hub 兑换）必须先点开关打开。C1 因此不再「先关开关」。
  * - **交易回执改成自下而上的 Sheet**（`gov-gate`）：`gov-receipt` 与
  *   `gov-receipt-close` 的 testid 不变，但现在落在 `role="dialog"` 里。
  * - **流动性质押页删卡/并卡**：删 `gov-page-my-stake`（`gov-my-*` 在该页不再出现），
  *   「提示」+「治理权的作用」合并为 `gov-rules-card`（`gov-tips`/`gov-intro` 不再出现），
  *   顺序是 承诺解锁期卡 → 质押卡 → 规则卡。
- * - **加速激励质押页**：新增 `gov-boost-about`（标题 + 两段说明），删 `gov-tips`，
- *   `gov-accelerated-summary` 不再有 capNote 说明行；加速回执同样走底部 Sheet。
- * - **取消质押页**：未申请解锁时不再渲染 `gov-unstake-unlock-state`（只有
- *   「已申请解锁 / 可撤出」才出现）。
- * - **极小占比**（`formatTinyPercent`）：<0.01% 且 >0 时最多 6 位小数，再小显示
- *   `<0.000001%`。本种子数据下占比仍是 4.76% / 100% / 0% 这类常规值，断言不变。
+ * - **加速激励质押页**：新增 `gov-boost-about`（标题 + 两段说明）。顺序随仓位变化：
+ *   还没有加速质押时在摘要卡**之前**；`boostShares > 0` 时挪到页面**最后**（表单之后）。
+ *   删 `gov-tips`，`gov-accelerated-summary` 不再有 capNote 说明行；回执同样走底部 Sheet。
+ * - **`/me` 质押资产卡**：标题不再是「我的流动性质押」，第一行是身份 `NFT #5` + 名字；
+ *   信息按钮 `me-stake-info` 改成弹**底部 Sheet**（`role="dialog"`），面板与行 testid 不变。
+ * - **申请解锁页**（`/stake/unstake`）：页面标题改为「申请解锁」；未申请解锁时不再渲染
+ *   `gov-unstake-unlock-state`（只有「已申请解锁 / 可撤出」才出现）。
+ * - **极小数字**：`formatTinyPercent` 最多 8 位小数（如 `0.0000004`），再小显示
+ *   `<0.00000001%`；`formatTokenAmount` 对极小非零金额会显示有效位（如 `0.0000001`），
+ *   `formatVisibleTokenAmount` 的最小可见单位放到 12 位（1 wei → `< 0.000000000001`）。
+ *   本种子数据下占比/金额仍是 4.76% / 100% / 0% / 999.9999 这类常规值，断言不变。
+ * - **P2 读失败**：承诺解锁期参数读失败时渲染 `gov-liquidity-phases-error` + 重试按钮
+ *   （不再是永久「读取中…」）——正常态本文件断言它 count 0。
  *
  * 断言只读页面渲染出来的文字（规范 §7.10）：金额/份额/治理权/上限一律 `toHaveText`
  * 整串精确相等，不用 `toContainText`/正则；只对非数值文案（状态标签、说明句）用
@@ -134,6 +146,8 @@ const EXPECTED = {
     myBoostPercent: '0%',
     myTokenAmount: '999.9999',
     myParentAmount: '0.499999',
+    /** /me 质押资产卡第一行是身份 NFT 编号（owner 2026-11-19 换掉「我的流动性质押」标题）。 */
+    memberLabel: 'NFT #5',
     communityVotes: '4,695.74',
     communityShares: '4,494.49',
     communityShare: '4.76%',
@@ -376,6 +390,43 @@ async function smartHint(page: Page): Promise<string> {
 }
 
 /**
+ * 两侧联动依赖「池子储备」这次链上读：读得慢时，先填的那一侧不会立刻联动
+ * （联动只在 onChange 里算一次）。这里「清空 + 重填」直到另一侧确实跟着变。
+ *
+ * 注意必须先 `fill('')` 再 `fill(value)`：Playwright 对「值没变」的输入不会派发
+ * input 事件，同值重填不会让 React 重算联动（2026-11-19 实测：同值重试 30s 仍为空）。
+ */
+async function fillAndExpectLinked(
+  page: Page,
+  fromTestId: string,
+  fromValue: string,
+  toTestId: string,
+  toValue: string,
+): Promise<void> {
+  await expect(async () => {
+    const input = page.getByTestId(fromTestId);
+    await input.fill('');
+    await input.fill(fromValue);
+    await expect(page.getByTestId(toTestId)).toHaveValue(toValue, { timeout: 1_500 });
+  }).toPass({ timeout: 30_000 });
+}
+
+/**
+ * 关掉智能模式时用当前代币输入同步原生币；储备未就绪时这一下会同步不出值。
+ * 保险做法：先确保开关在「开」，再点一次「关」，直到原生币侧拿到期望值。
+ */
+async function turnSmartModeOffAndExpectNative(page: Page, expectedNative: string): Promise<void> {
+  const toggle = page.getByTestId('gov-liquidity-smart-mode');
+  await expect(async () => {
+    if ((await toggle.getAttribute('aria-checked')) !== 'true') await toggle.click();
+    await toggle.click();
+    await expect(page.getByTestId('gov-liquidity-native-input')).toHaveValue(expectedNative, {
+      timeout: 1_500,
+    });
+  }).toPass({ timeout: 30_000 });
+}
+
+/**
  * 授权阶梯（UX spec §4.1）：额度不够时按钮可点，成交后原地变「已授权 X」。
  *
  * 授权行有四种稳定/过渡态：读取授权额度中…（禁用）→ 授权 X（可点）/ 已授权 X（禁用）
@@ -516,20 +567,28 @@ test.describe('治理域 验收截图', () => {
           await revertChain(staked);
         }
 
-        // B. 首次质押（无仓位）：表单含承诺解锁期选择器 + 智能模式 Hub 报价。
+        // B. 首次质押（无仓位）：默认关闭智能模式（两侧联动），表单含承诺解锁期选择器 +
+        // Hub 报价；owner 2026-11-19 智能模式默认关闭，截图拍的就是这个默认态。
         const clean = await snapshotChain();
         try {
-          await prepare(page, theme, viewport.width, viewport.height, '/stake/stakelp');
+          await prepare(page, theme, viewport.width, viewport.height, '/stake/liquidity');
           await expect(page.getByTestId('gov-liquidity-smart-mode')).toHaveAttribute(
             'aria-checked',
-            'true',
+            'false',
             { timeout: 30_000 },
           );
           // owner 2026-11-18 20:05：承诺解锁期改为下拉列表（阶段数 + 预估时间）。
           await expect(page.getByTestId('gov-liquidity-phases')).toBeVisible();
           await expect(page.getByTestId('gov-liquidity-phases-select')).toHaveValue('1');
           await expect(page.getByTestId('gov-liquidity-phases-note')).toHaveCount(0);
-          await page.getByTestId('gov-liquidity-token-input').fill('1000');
+          // 默认关闭：填社区代币后原生币侧自动联动（储备读得慢时重填一次，同真实用户）。
+          await fillAndExpectLinked(
+            page,
+            'gov-liquidity-token-input',
+            '1000',
+            'gov-liquidity-native-input',
+            EXPECTED.c1.nativeSynced,
+          );
           await expect(page.getByTestId('gov-liquidity-hub-quote')).toContainText('实际进池', {
             timeout: 30_000,
           });
@@ -636,27 +695,36 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
       EXPECTED.seed.communityFeeRatio,
     );
 
-    // 流动性质押：默认智能模式（单币）；父币是 WETH → 输入框直接用原生币。
+    // 流动性质押（owner 2026-11-19 路由改名 /stake/stakelp → /stake/liquidity）：
+    // 旧路径由 gov-section 做 <Navigate replace>，必须保留 ?symbol= 并正常渲染页面。
     await page.goto(`/stake/stakelp${QUERY}`);
+    await expect(page).toHaveURL(new RegExp(`/stake/liquidity\\?symbol=${SYMBOL}$`));
     await expect(page.getByTestId('gov-liquidity-card')).toBeVisible({ timeout: 30_000 });
+    // 智能模式默认关闭；父币是 WETH → 输入框直接用原生币（label/aria-label 去重成「原生币」，
+    // symbol 只在右侧小字出现一次，余额行只写「余额 X」）。
     await expect(page.getByTestId('gov-liquidity-smart-mode')).toHaveAttribute(
       'aria-checked',
-      'true',
+      'false',
     );
     const nativeInput = page.getByTestId('gov-liquidity-native-input');
     await expect(nativeInput).toBeVisible();
-    // owner 2026-11-19：父币是 WETH 时不再渲染「父币」输入框，改成原生币输入。
-    await expect(nativeInput).toHaveAttribute('aria-label', '原生币 ETH');
+    await expect(nativeInput).toHaveAttribute('aria-label', '原生币');
+    await expect(page.getByTestId('gov-liquidity-token-input')).toHaveAttribute(
+      'aria-label',
+      '社区代币',
+    );
     await expect(page.getByTestId('gov-liquidity-parent-input')).toHaveCount(0);
     // owner 2026-11-19：原生币（父币）在上、社区代币在下（DOM 顺序契约）。
     expect(await domOrder(page, 'gov-liquidity-native-input', 'gov-liquidity-token-input')).toBe(
       true,
     );
     await expect(page.getByTestId('gov-liquidity-preview-votes')).toHaveText('—');
-    // 智能模式开着：说明是「只填一侧也行」（父币是 WETH → 原生币会先配平）。
-    expect(await smartHint(page)).toContain('只填一侧也行');
+    // 默认关闭：说明是「两侧自动按池子比例联动」。
+    expect(await smartHint(page)).toContain('两侧自动按池子比例联动');
     // owner 2026-11-18 12:58：首次质押可以自选承诺解锁期——表单里有选择器（默认最小值）。
     await expect(page.getByTestId('gov-liquidity-phases')).toBeVisible();
+    // P2（owner 2026-11-19）：承诺解锁期参数正常读到时不渲染读失败卡。
+    await expect(page.getByTestId('gov-liquidity-phases-error')).toHaveCount(0);
     const phaseSelect = page.getByTestId('gov-liquidity-phases-select');
     await expect(phaseSelect).toHaveValue('1');
     // 每个选项都带预估时长：10 阶段 ≈ 20 分钟，100 阶段 ≈ 3.3 小时（120 s/阶段）。
@@ -665,26 +733,39 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     // 首次质押没有「保持当前值」说明行；空仓位也没有「调整承诺解锁期」卡。
     await expect(page.getByTestId('gov-liquidity-phases-note')).toHaveCount(0);
     await expect(page.getByTestId('gov-phases-card')).toHaveCount(0);
-    await page.getByTestId('gov-liquidity-smart-mode').click();
-    // 父币是 WETH 时开关仍可切（关掉 = 两侧都填，但依旧走 Hub、依旧只有社区代币一笔授权）。
-    await expect(page.getByTestId('gov-liquidity-smart-mode')).toHaveAttribute(
-      'aria-checked',
-      'false',
+    // 默认两侧都填：改一侧，另一侧立刻按池子比例联动（原生币这侧自动算好）。
+    await fillAndExpectLinked(
+      page,
+      'gov-liquidity-token-input',
+      '1000',
+      'gov-liquidity-native-input',
+      EXPECTED.c1.nativeSynced,
     );
-    expect(await smartHint(page)).toContain('两侧自动按池子比例联动');
-    await expect(nativeInput).toBeVisible();
-    await expect(page.getByTestId('gov-liquidity-parent-input')).toHaveCount(0);
-    // 非智能模式：改一侧，另一侧立刻按池子比例联动（原生币这侧自动算好）。
-    await page.getByTestId('gov-liquidity-token-input').fill('1000');
-    await expect(nativeInput).toHaveValue(EXPECTED.c1.nativeSynced);
     // 走 Hub → 没有「按池子比例实际存入…」行，改成 Hub 报价两行（不兑换 + 实际进池）。
     await expect(page.getByTestId('gov-liquidity-optimal')).toHaveCount(0);
     const quote = page.getByTestId('gov-liquidity-hub-quote');
     await expect(quote).toContainText(EXPECTED.c1.quoteNoSwap, { timeout: 20_000 });
     await expect(quote).toContainText(EXPECTED.c1.quotePrepared);
-    await nativeInput.fill('1');
-    await expect(page.getByTestId('gov-liquidity-token-input')).toHaveValue('2000');
+    await fillAndExpectLinked(
+      page,
+      'gov-liquidity-native-input',
+      '1',
+      'gov-liquidity-token-input',
+      '2000',
+    );
     await expect(quote).toContainText('实际进池 2,000 TestLOVE20 + 1 TestWETH');
+    // 打开智能模式 = 单币：说明切到「只填一侧也行」，清掉原生币后只填社区代币走兑换。
+    await page.getByTestId('gov-liquidity-smart-mode').click();
+    await expect(page.getByTestId('gov-liquidity-smart-mode')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(await smartHint(page)).toContain('只填一侧也行');
+    await expect(nativeInput).toBeVisible();
+    await expect(page.getByTestId('gov-liquidity-parent-input')).toHaveCount(0);
+    await nativeInput.fill('');
+    await page.getByTestId('gov-liquidity-token-input').fill('1000');
+    await expect(quote).toContainText('会先换成', { timeout: 20_000 });
     await page.getByTestId('gov-liquidity-token-input').fill('');
     await nativeInput.fill('');
     // owner 2026-11-19：本页「提示」与「治理权的作用」合并成一张规则卡，两张旧卡都不再渲染。
@@ -702,9 +783,12 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-boost-about')).toHaveCount(0);
     await expect(page.getByTestId('gov-tips')).toHaveCount(0);
 
-    // 取消质押：空态是「我的治理资产」卡（不是 0 值表格）。
+    // 申请解锁（原「取消质押」）：页面标题改名（owner 2026-11-19）；空态是「我的治理资产」卡。
     await page.goto(`/stake/unstake${QUERY}`);
-    await expect(page.getByTestId('gov-unstake-empty')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { level: 1, name: '申请解锁' })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId('gov-unstake-empty')).toBeVisible();
     await expect(page.getByTestId('gov-unstake-assets')).toHaveCount(0);
 
     // 流动性质押数据（只读）：空态文案 + 社区数据面板。
@@ -720,29 +804,39 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-placeholder')).toContainText('即将上线');
   });
 
-  test('用例 C1：流动性质押（关智能模式，填 1,000 TestLOVE20 自动联动 0.5 原生币 / 10 阶段）→ 治理权 223.6067', async ({
+  test('用例 C1：流动性质押（默认两侧联动，填 1,000 TestLOVE20 自动联动 0.5 原生币 / 10 阶段）→ 治理权 223.6067', async ({
     page,
   }) => {
-    await openPage(page, '/stake/stakelp');
+    await openPage(page, '/stake/liquidity');
     await expect(page.getByTestId('gov-liquidity-card')).toBeVisible({ timeout: 30_000 });
     // 父币是 WETH（owner 2026-11-19）：没有父币输入框，原生币输入框在上、社区代币在下。
     const nativeInput = page.getByTestId('gov-liquidity-native-input');
     await expect(nativeInput).toBeVisible();
-    await expect(nativeInput).toHaveAttribute('aria-label', '原生币 ETH');
+    await expect(nativeInput).toHaveAttribute('aria-label', '原生币');
+    await expect(page.getByTestId('gov-liquidity-token-input')).toHaveAttribute(
+      'aria-label',
+      '社区代币',
+    );
     await expect(page.getByTestId('gov-liquidity-parent-input')).toHaveCount(0);
     expect(await domOrder(page, 'gov-liquidity-native-input', 'gov-liquidity-token-input')).toBe(
       true,
     );
-    // 关掉智能模式：仍是 Hub 通道（原生币由合约 wrap），但两侧都填、按池子比例联动。
-    await page.getByTestId('gov-liquidity-smart-mode').click();
+    // owner 2026-11-19：智能模式默认关闭（两侧都填），不用再点开关。
     await expect(page.getByTestId('gov-liquidity-smart-mode')).toHaveAttribute(
       'aria-checked',
       'false',
     );
     expect(await smartHint(page)).toContain('两侧自动按池子比例联动');
-    await page.getByTestId('gov-liquidity-token-input').fill('1000');
+    // P2：承诺解锁期参数正常读到 → 没有读失败卡。
+    await expect(page.getByTestId('gov-liquidity-phases-error')).toHaveCount(0);
     // owner 2026-11-19：填社区代币 → 原生币侧按池子比例联动成 0.5（父币没有输入框了）。
-    await expect(nativeInput).toHaveValue(EXPECTED.c1.nativeSynced);
+    await fillAndExpectLinked(
+      page,
+      'gov-liquidity-token-input',
+      '1000',
+      'gov-liquidity-native-input',
+      EXPECTED.c1.nativeSynced,
+    );
     // 首次质押可以自选承诺解锁期（本链 1–100），这里从下拉里选 10。
     await expect(page.getByTestId('gov-liquidity-phases')).toBeVisible();
     await expect(page.getByTestId('gov-liquidity-phases-select')).toHaveValue('1');
@@ -822,11 +916,17 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await connect(page);
     await page.getByTestId('me-tab-stake').click();
     await expect(page.getByTestId('me-stake-card')).toBeVisible({ timeout: 30_000 });
+    // owner 2026-11-19：卡标题不再是「我的流动性质押」，第一行是身份 NFT 编号 + 名字。
+    await expect(page.getByTestId('me-stake-card')).toContainText(EXPECTED.c1.memberLabel);
+    await expect(page.getByTestId('me-stake-card')).toContainText(/Testdev-member-\d+/);
+    await expect(page.getByTestId('me-stake-card')).not.toContainText('我的流动性质押');
     await expect(page.getByTestId('me-stake-shares')).toHaveText(EXPECTED.c1.myShares);
     await expect(page.getByTestId('me-stake-boost')).toHaveText('0');
-    // 信息弹层：份额 + 预计可取回两侧代币（加速量为 0 → 不出现那一行）。
+    // 信息面板改成底部 Sheet（owner 2026-11-19）：面板与行 testid 不变，落在 role="dialog" 里。
     await page.getByTestId('me-stake-info').click();
-    await expect(page.getByTestId('me-stake-info-panel')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('dialog').getByTestId('me-stake-info-panel')).toBeVisible({
+      timeout: 20_000,
+    });
     await expect(page.getByTestId('me-stake-info-shares')).toHaveText(EXPECTED.c1.myShares);
     await expect(page.getByTestId('me-stake-info-token')).toHaveText(
       `${EXPECTED.c1.myTokenAmount} ${SYMBOL}`,
@@ -835,6 +935,9 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
       `${EXPECTED.c1.myParentAmount} ${PARENT_SYMBOL}`,
     );
     await expect(page.getByTestId('me-stake-info-boost')).toHaveCount(0);
+    // Sheet 的关闭按钮（aria-label「关闭」）收起面板。
+    await page.getByRole('dialog').getByRole('button', { name: '关闭' }).click();
+    await expect(page.getByTestId('me-stake-info-panel')).toHaveCount(0);
     // 右上角是解锁动作链接（未申请解锁 → 「申请解锁」），不是按钮。
     const stakeAction = page.getByTestId('me-stake-action-link');
     await expect(stakeAction).toHaveText('申请解锁');
@@ -895,6 +998,14 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-accelerated-used')).toHaveText(EXPECTED.c2.used);
     await expect(page.getByTestId('gov-accelerated-remaining')).toHaveText(EXPECTED.c2.used);
 
+    // owner 2026-11-19：已有加速质押（boostShares > 0）时作用说明卡挪到页面最后。
+    // 重新进页（从链上读仓位），确认顺序：摘要 → 加速表单 → 作用说明。
+    await page.goto(`/stake/staketoken${QUERY}`);
+    await connect(page);
+    await expect(page.getByTestId('gov-boost-about')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('gov-accelerated-summary')).toBeVisible();
+    await expectTopOrder(page, ['gov-accelerated-summary', 'gov-boost-card', 'gov-boost-about']);
+
     // 加速质押不产生治理权：首页「我的」的治理权仍是 C1 的 223.6067。
     await page.goto(`/gov${QUERY}`);
     await expect(page.getByTestId('gov-my-votes')).toHaveText(EXPECTED.c1.myVotes, {
@@ -911,7 +1022,7 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
   });
 
   test('用例 C3：流动性质押页顶部「承诺解锁期」卡 10 → 25 → 治理权 559.0169', async ({ page }) => {
-    await openPage(page, '/stake/stakelp');
+    await openPage(page, '/stake/liquidity');
     await expect(page.getByTestId('gov-phases-card')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('gov-phases-card-value')).toHaveText(EXPECTED.c1.myPhases);
     // owner 2026-11-19：本页的「我的流动性质押」明细卡已删（`gov-my-votes` 不再出现），
@@ -1057,12 +1168,19 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
   });
 
   test('新增：智能模式单币质押（只填社区代币，Hub 报价 → 授权 → 提交）', async ({ page }) => {
-    await openPage(page, '/stake/stakelp');
+    await openPage(page, '/stake/liquidity');
     await expect(page.getByTestId('gov-liquidity-card')).toBeVisible({ timeout: 30_000 });
+    // owner 2026-11-19：智能模式默认关闭，单币用例先点开关打开。
+    await expect(page.getByTestId('gov-liquidity-smart-mode')).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    await page.getByTestId('gov-liquidity-smart-mode').click();
     await expect(page.getByTestId('gov-liquidity-smart-mode')).toHaveAttribute(
       'aria-checked',
       'true',
     );
+    expect(await smartHint(page)).toContain('只填一侧也行');
     await expect(page.getByTestId('gov-liquidity-native-input')).toBeVisible();
     await expect(page.getByTestId('gov-liquidity-parent-input')).toHaveCount(0);
     await expect(page.getByTestId('gov-liquidity-preview-votes')).toHaveText('—');
@@ -1098,22 +1216,33 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     // 上面这笔经 Hub 兑换+质押后池子储备已经变了（不再是 C1 前的 2000:1），所以期望值按
     // 「当前链上储备」推，而不是写死 0.5。
     const reserves = readPoolReserves();
-    const nativeInput = page.getByTestId('gov-liquidity-native-input');
-    await page.getByTestId('gov-liquidity-smart-mode').click();
+    const linkedNative = linkedAmount(
+      1000n * 10n ** 18n,
+      reserves.reserveToken,
+      reserves.reserveParent,
+    );
+    const linkedToken = linkedAmount(
+      25n * 10n ** 16n,
+      reserves.reserveParent,
+      reserves.reserveToken,
+    );
+    // 提交后表单保留 1000；关掉智能模式会用当前代币输入同步出原生币侧。
+    await turnSmartModeOffAndExpectNative(page, linkedNative);
     await expect(page.getByTestId('gov-liquidity-smart-mode')).toHaveAttribute(
       'aria-checked',
       'false',
     );
     expect(await smartHint(page)).toContain('两侧自动按池子比例联动');
+    const nativeInput = page.getByTestId('gov-liquidity-native-input');
     await expect(nativeInput).toBeVisible();
     await expect(page.getByTestId('gov-liquidity-parent-input')).toHaveCount(0);
-    // 提交后表单保留 1000，切到「两侧都填」立刻把原生币侧补成当前比例对应的量。
-    await expect(nativeInput).toHaveValue(
-      linkedAmount(1000n * 10n ** 18n, reserves.reserveToken, reserves.reserveParent),
-    );
-    await nativeInput.fill('0.25');
-    await expect(page.getByTestId('gov-liquidity-token-input')).toHaveValue(
-      linkedAmount(25n * 10n ** 16n, reserves.reserveParent, reserves.reserveToken),
+    // 改原生币侧 → 社区代币侧按当前储备联动。
+    await fillAndExpectLinked(
+      page,
+      'gov-liquidity-native-input',
+      '0.25',
+      'gov-liquidity-token-input',
+      linkedToken,
     );
     // 再切回智能模式：改社区代币不再联动原生币（单币走 Hub 报价）。
     await page.getByTestId('gov-liquidity-smart-mode').click();
@@ -1127,12 +1256,18 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
   });
 
   test('新增：智能模式单币质押（只填原生币，Hub 报价 → 提交）', async ({ page }) => {
-    await openPage(page, '/stake/stakelp');
+    await openPage(page, '/stake/liquidity');
     await expect(page.getByTestId('gov-liquidity-card')).toBeVisible({ timeout: 30_000 });
+    // owner 2026-11-19：智能模式默认关闭，单币用例先点开关打开。
+    await expect(page.getByTestId('gov-liquidity-smart-mode')).toHaveAttribute(
+      'aria-checked',
+      'false',
+      { timeout: 20_000 },
+    );
+    await page.getByTestId('gov-liquidity-smart-mode').click();
     await expect(page.getByTestId('gov-liquidity-smart-mode')).toHaveAttribute(
       'aria-checked',
       'true',
-      { timeout: 20_000 },
     );
     await expect(page.getByTestId('gov-liquidity-native-input')).toBeVisible();
     await expect(page.getByTestId('gov-liquidity-parent-input')).toHaveCount(0);

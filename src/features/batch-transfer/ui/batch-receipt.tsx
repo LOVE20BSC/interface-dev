@@ -4,7 +4,7 @@ import { NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
 import { cn } from '@/shared/lib/cn';
-import { formatVisibleTokenAmount } from '@/shared/lib/format';
+import { formatVisibleTokenAmount } from '@/shared/lib/format-tiny';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';

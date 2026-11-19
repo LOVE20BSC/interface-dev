@@ -1,6 +1,7 @@
 import { DEPLOYMENT } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import { formatPercent } from '@/shared/lib/format';
+import { formatPercent } from '@/shared/lib/format-rates';
+
 import { Card, CardTitle } from '@/shared/ui/card';
 
 /** 部署参数是 1e18 定点比例（1e18 = 100%），转成百分数用于文案。 */

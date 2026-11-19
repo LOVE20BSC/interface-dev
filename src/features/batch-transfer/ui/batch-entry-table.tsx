@@ -1,5 +1,5 @@
 import { copy } from '@/shared/config/copy-pages';
-import { formatVisibleTokenAmount } from '@/shared/lib/format';
+import { formatVisibleTokenAmount } from '@/shared/lib/format-tiny';
 import { Button } from '@/shared/ui/button';
 import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { RefreshCw } from '@/shared/ui/icons';

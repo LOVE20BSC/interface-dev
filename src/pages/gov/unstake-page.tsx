@@ -53,7 +53,7 @@ function UnstakeBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q: st
         <CardTitle>{copy.gov.unstakePage.sectionTitle}</CardTitle>
         <CardDescription>{copy.gov.unstakePage.noStake}</CardDescription>
         <div className="mt-4">
-          <Link to={`/stake/stakelp${q}`} className={buttonStyles('primary', 'md', 'w-full')}>
+          <Link to={`/stake/liquidity${q}`} className={buttonStyles('primary', 'md', 'w-full')}>
             {copy.gov.unstakePage.goStake}
           </Link>
         </div>

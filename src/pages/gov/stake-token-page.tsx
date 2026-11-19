@@ -57,7 +57,7 @@ function StakeTokenBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q:
         <CardTitle>{copy.gov.boost.lockedTitle}</CardTitle>
         <CardDescription>{copy.gov.boost.lockedBody}</CardDescription>
         <div className="mt-4">
-          <Link to={`/stake/stakelp${q}`} className={buttonStyles('primary', 'md', 'w-full')}>
+          <Link to={`/stake/liquidity${q}`} className={buttonStyles('primary', 'md', 'w-full')}>
             {copy.gov.boost.lockedAction}
           </Link>
         </div>
@@ -69,10 +69,12 @@ function StakeTokenBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q:
     ctx.member.boostCap !== undefined && ctx.member.boostUsed !== undefined
       ? ctx.member.boostCap - ctx.member.boostUsed
       : undefined;
+  // owner 2026-11-19：已经有加速激励质押时，作用说明卡放到最后（先看数据与表单）。
+  const hasBoost = (ctx.member.boostShares ?? 0n) > 0n;
 
   return (
     <div className="space-y-4">
-      <BoostAboutCard />
+      {hasBoost ? null : <BoostAboutCard />}
       <Card data-testid="gov-accelerated-summary">
         <CardTitle>{copy.gov.accelerated.title}</CardTitle>
         <div className="mt-3">
@@ -106,6 +108,7 @@ function StakeTokenBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q:
         }
         onGoLiquidity={() => undefined}
       />
+      {hasBoost ? <BoostAboutCard /> : null}
     </div>
   );
 }

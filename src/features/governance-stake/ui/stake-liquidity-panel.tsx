@@ -4,13 +4,9 @@ import { love20HubAbi, love20TokenAbi, stakeAbi } from '@/config/abis';
 import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { decideApproveAmount } from '@/shared/lib/approve-amount';
-import {
-  formatPercent,
-  formatTokenAmount,
-  formatUnits,
-  isSameAddress,
-  UNKNOWN,
-} from '@/shared/lib/format';
+import { formatTokenAmount, formatUnits, isSameAddress, UNKNOWN } from '@/shared/lib/format';
+import { formatPercent } from '@/shared/lib/format-rates';
+
 import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
 import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
@@ -120,7 +116,8 @@ export function StakeLiquidityPanel({
   const [tokenInput, setTokenInput] = useState('');
   const [parentInput, setParentInput] = useState('');
   const [nativeInput, setNativeInput] = useState('');
-  const [smartMode, setSmartMode] = useState(true);
+  // owner 2026-11-19：智能模式默认关闭（两侧都填、按池子比例联动）。
+  const [smartMode, setSmartMode] = useState(false);
   const [slippagePercent, setSlippagePercent] = useState<number>(DEFAULT_SLIPPAGE_PERCENT);
   const [phasesInput, setPhasesInput] = useState('');
 
@@ -485,6 +482,64 @@ export function StakeLiquidityPanel({
     setSmartMode(next);
   };
 
+  /**
+   * 池子储备比输入晚到时的补联动（owner 2026-11-19 的 e2e 稳定性根因）：用户先填一侧、
+   * Reserve 读得慢，另一侧就不会自动补上，需要重填一次。这里在 reserveReady 变 true
+   * 或输入变化时补一次同步。
+   */
+  /* eslint-disable react-hooks/set-state-in-effect -- 同步另一侧输入是受控表单的派生动作 */
+  useEffect(() => {
+    if (!reserveReady) return;
+    if (hubPath && !nativeTwoSide) return;
+    const { reserveToken, reserveParent } = pool;
+    if (reserveToken === undefined || reserveParent === undefined) return;
+    const nativeDecimals = NETWORK.nativeCurrency.decimals;
+    const tokenDecimals = token.decimals ?? 18;
+    const parentDecimals = parent.decimals ?? 18;
+    if (nativeTwoSide) {
+      if (tokenInput !== '' && nativeInput === '') {
+        const parsed = parseStakeAmount(tokenInput, tokenDecimals);
+        if (parsed.kind === 'ok') {
+          setNativeInput(
+            rawInputValue((parsed.value * reserveParent) / reserveToken, nativeDecimals),
+          );
+        }
+      } else if (nativeInput !== '' && tokenInput === '') {
+        const parsed = parseStakeAmount(nativeInput, nativeDecimals);
+        if (parsed.kind === 'ok') {
+          setTokenInput(
+            rawInputValue((parsed.value * reserveToken) / reserveParent, tokenDecimals),
+          );
+        }
+      }
+      return;
+    }
+    if (tokenInput !== '' && parentInput === '') {
+      const parsed = parseStakeAmount(tokenInput, tokenDecimals);
+      if (parsed.kind === 'ok') {
+        setParentInput(
+          rawInputValue((parsed.value * reserveParent) / reserveToken, parentDecimals),
+        );
+      }
+    } else if (parentInput !== '' && tokenInput === '') {
+      const parsed = parseStakeAmount(parentInput, parentDecimals);
+      if (parsed.kind === 'ok') {
+        setTokenInput(rawInputValue((parsed.value * reserveToken) / reserveParent, tokenDecimals));
+      }
+    }
+  }, [
+    hubPath,
+    nativeInput,
+    nativeTwoSide,
+    parent.decimals,
+    parentInput,
+    pool,
+    reserveReady,
+    token.decimals,
+    tokenInput,
+  ]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   const votesPreview = hubPath
     ? hubReady && hubQuote !== undefined
       ? hubQuote.govVotesAdded
@@ -523,12 +578,12 @@ export function StakeLiquidityPanel({
           disabled={!smartAvailable || disabled}
           onClick={handleSmartToggle}
           className={`relative h-7 w-12 shrink-0 rounded-full border transition-colors ${
-            smartMode ? 'border-brand-strong bg-brand' : 'border-line bg-surface'
+            smartMode ? 'border-brand-strong bg-brand' : 'border-line-strong bg-elevated'
           } disabled:opacity-60`}
         >
           <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow-soft transition-all ${
-              smartMode ? 'left-6' : 'left-0.5'
+            className={`absolute top-0.5 h-5 w-5 rounded-full shadow-soft transition-all ${
+              smartMode ? 'left-6 bg-on-brand' : 'left-0.5 bg-muted'
             }`}
             aria-hidden="true"
           />
@@ -539,7 +594,7 @@ export function StakeLiquidityPanel({
         {/* owner 2026-11-19：父币（原生币）在上、社区代币在下 */}
         {hubPath ? (
           <StakeAmountField
-            label={copy.gov.smart.nativeLabel(NETWORK.nativeCurrency.symbol)}
+            label={copy.gov.smart.nativeLabel}
             symbol={NETWORK.nativeCurrency.symbol}
             decimals={NETWORK.nativeCurrency.decimals}
             value={nativeInput}
@@ -557,7 +612,7 @@ export function StakeLiquidityPanel({
           />
         ) : (
           <StakeAmountField
-            label={copy.gov.liquidity.parentLabel(parent.symbol)}
+            label={copy.gov.liquidity.parentLabel}
             symbol={parent.symbol}
             decimals={parent.decimals}
             value={parentInput}
@@ -575,7 +630,7 @@ export function StakeLiquidityPanel({
         )}
 
         <StakeAmountField
-          label={copy.gov.liquidity.tokenLabel(token.symbol)}
+          label={copy.gov.liquidity.tokenLabel}
           symbol={token.symbol}
           decimals={token.decimals}
           value={tokenInput}
@@ -616,6 +671,13 @@ export function StakeLiquidityPanel({
                     </option>
                   ))}
                 </select>
+              ) : params.status === 'error' ? (
+                <div className="mt-1.5 space-y-1" data-testid="gov-liquidity-phases-error">
+                  <p className="text-sm text-danger-strong">{copy.gov.stats.errorBody}</p>
+                  <Button variant="secondary" size="sm" onClick={params.refetch}>
+                    {copy.gov.stats.retry}
+                  </Button>
+                </div>
               ) : (
                 <p className="mt-1.5 text-sm text-muted" data-testid="gov-liquidity-phases-loading">
                   {copy.gov.stats.loading}

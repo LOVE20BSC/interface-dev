@@ -45,7 +45,7 @@ describe('approvalDisplayText', () => {
 
   it('never renders a non-zero allowance as 0', () => {
     expect(approvalDisplayText(1n, SYMBOL, 18)).toBe(`< 0.000001 ${SYMBOL}`);
-    expect(approvalDisplayText(999999999999n, SYMBOL, 18)).toBe(`< 0.000001 ${SYMBOL}`);
+    expect(approvalDisplayText(999999999999n, SYMBOL, 18)).toBe(`0.000000999 ${SYMBOL}`);
     expect(approvalDisplayText(1000000000000n, SYMBOL, 18)).toBe(`0.000001 ${SYMBOL}`);
   });
 

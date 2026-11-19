@@ -200,7 +200,7 @@ export function StakeBoostPanel({
 
       <div className="mt-4 space-y-4">
         <StakeAmountField
-          label={copy.gov.boost.amountLabel(token.symbol)}
+          label={copy.gov.boost.amountLabel}
           symbol={token.symbol}
           decimals={token.decimals}
           value={amountInput}

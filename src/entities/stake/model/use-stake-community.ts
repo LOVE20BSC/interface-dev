@@ -125,9 +125,11 @@ export function useStakeCommunity(
   const uintOf = (entry: { status: string; result?: unknown } | undefined): bigint | undefined =>
     entry?.status === 'success' && typeof entry.result === 'bigint' ? entry.result : undefined;
 
+  // 任何一项子读失败都算「读不到」：否则页面会把失败的字段显示成「—」却没有重试出口。
+  const entries = [totalEntry, burnedEntry, principalEntry, govVotesEntry, boostEntry];
   let status: StakeCommunityStatus = 'ready';
   if (read.isLoading) status = 'loading';
-  else if (read.isError || totalEntry?.status === 'failure') status = 'error';
+  else if (read.isError || entries.some((entry) => entry?.status === 'failure')) status = 'error';
 
   return {
     status,

@@ -133,9 +133,9 @@ export const copy = {
     approvals: '代币授权',
     liquidity: '流动性池',
     gov: '治理',
-    stakeLp: '流动性质押',
+    stakeLiquidity: '流动性质押',
     stakeToken: '质押代币',
-    unstake: '取消质押',
+    unstake: '申请解锁',
     stakeLiquid: '流动性质押数据',
   },
   /** Page titles the eager router/header needs; bodies live in ./copy-pages. */

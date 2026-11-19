@@ -37,7 +37,7 @@ export function GovStakeLinks({ q }: { readonly q: string }) {
   return (
     <div className="grid grid-cols-2 gap-x-3 border-t border-line/60 pt-3">
       <Link
-        to={`/stake/stakelp${q}`}
+        to={`/stake/liquidity${q}`}
         className="whitespace-nowrap text-[13px] font-medium text-brand-strong underline-offset-4 hover:underline"
       >
         {copy.gov.home.liquidityLink}

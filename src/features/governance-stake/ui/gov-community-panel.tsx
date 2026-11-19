@@ -1,5 +1,8 @@
 import { copy } from '@/shared/config/copy-pages';
-import { formatPercent, formatTinyPercent, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatPercent } from '@/shared/lib/format-rates';
+
+import { formatTinyPercent } from '@/shared/lib/format-tiny';
 import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import type { StakeCommunity } from '@/entities/stake/model/use-stake-community';

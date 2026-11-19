@@ -71,7 +71,7 @@ export function StakeAmountField({
         <span data-testid={`${testId}-balance`}>
           {balanceLoading
             ? copy.gov.liquidity.balanceLoading
-            : copy.gov.liquidity.balance(formatTokenAmount(balance, decimals), symbol)}
+            : copy.gov.liquidity.balance(formatTokenAmount(balance, decimals))}
         </span>
         <button
           type="button"

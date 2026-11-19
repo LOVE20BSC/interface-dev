@@ -487,8 +487,10 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     );
   });
 
-  // D3：非零但低于 6 位精度的小额，全链路必须写 `< 0.000001`，不能写成 0。
-  test('用例 H 极小金额：合计 / 行金额 / 回执差额都显示 < 0.000001', async ({ page }) => {
+  // D3：非零但低于 6 位精度的小额，按新显示规则给有效位（owner 2026-11-19：
+  // formatTokenAmount 对极小非零金额显示到第一位有效数字 + 2 位，最多 12 位；
+  // 只有小到 12 位仍显示不出才退化成 `< 最小可见单位`），不能写成 0。
+  test('用例 H 极小金额：合计 / 行金额 / 回执差额按有效位显示（不塌成 0）', async ({ page }) => {
     await openBatch(page, NATIVE_SENDER);
     // 本用例在 A 之后运行，发送方余额已被 A 扣减；只要求余额读到了真实值。
     await expect(page.getByTestId('batch-transfer-balance')).toContainText('余额', {
@@ -499,10 +501,8 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
       '0x0000000000000000000000000000000000002001 0.0000001',
       '0x0000000000000000000000000000000000002002 0.0000002',
     ]);
-    await expect(page.getByTestId('batch-transfer-total')).toHaveText(`合计 < 0.000001 ${NATIVE}`);
-    await expect(page.getByTestId('batch-transfer-row-amount-0')).toHaveText(
-      `< 0.000001 ${NATIVE}`,
-    );
+    await expect(page.getByTestId('batch-transfer-total')).toHaveText(`合计 0.0000003 ${NATIVE}`);
+    await expect(page.getByTestId('batch-transfer-row-amount-0')).toHaveText(`0.0000001 ${NATIVE}`);
     // 先等预余额读完成，否则回执是「核对不完整」而不是逐行 matched。
     await expect(page.getByTestId('batch-transfer-row-balance-0')).toHaveText('0', {
       timeout: 20_000,
@@ -511,11 +511,11 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
 
     await page.getByTestId('batch-transfer-submit').click();
     await expect(page.getByTestId('batch-transfer-receipt-total')).toHaveText(
-      `< 0.000001 ${NATIVE}`,
+      `0.0000003 ${NATIVE}`,
       { timeout: 30_000 },
     );
-    await expect(page.getByTestId('batch-transfer-receipt-delta-0')).toHaveText('< 0.000001');
-    await expect(page.getByTestId('batch-transfer-receipt-delta-1')).toHaveText('< 0.000001');
+    await expect(page.getByTestId('batch-transfer-receipt-delta-0')).toHaveText('+0.0000001');
+    await expect(page.getByTestId('batch-transfer-receipt-delta-1')).toHaveText('+0.0000002');
     await expect(page.getByTestId('batch-transfer-receipt-atomic')).toHaveText(
       '整批一起执行：上表每一行都已到账。',
     );

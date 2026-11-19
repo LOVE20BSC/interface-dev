@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
-import { formatTinyPercent, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
+import { formatTinyPercent } from '@/shared/lib/format-tiny';
 import { buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
@@ -86,7 +87,7 @@ function LiquidBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q: str
           <>
             <CardDescription>{copy.gov.liquidPage.empty}</CardDescription>
             <div className="mt-3">
-              <Link to={`/stake/stakelp${q}`} className={buttonStyles('primary', 'md', 'w-full')}>
+              <Link to={`/stake/liquidity${q}`} className={buttonStyles('primary', 'md', 'w-full')}>
                 {copy.gov.liquidPage.goStake}
               </Link>
             </div>

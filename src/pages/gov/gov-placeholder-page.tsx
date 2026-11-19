@@ -45,7 +45,7 @@ export function GovPlaceholderPage() {
         <Link to="/gov" className={buttonStyles('secondary', 'md')}>
           {copy.gov.placeholders.backToGov}
         </Link>
-        <Link to="/stake/stakelp" className={buttonStyles('primary', 'md')}>
+        <Link to="/stake/liquidity" className={buttonStyles('primary', 'md')}>
           {copy.gov.placeholders.goStake}
         </Link>
       </div>

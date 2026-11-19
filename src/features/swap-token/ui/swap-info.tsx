@@ -1,12 +1,10 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/shared/lib/cn';
 import { copy } from '@/shared/config/copy-pages';
-import {
-  formatBpsPercent,
-  formatPercent,
-  formatRate,
-  formatTokenAmount,
-} from '@/shared/lib/format';
+import { formatTokenAmount } from '@/shared/lib/format';
+import { formatPercent } from '@/shared/lib/format-rates';
+
+import { formatBpsPercent, formatRate } from '@/shared/lib/format-rates';
 import { SLIPPAGE_PRESETS } from '@/features/swap-token/lib/swap-amount';
 import type { SwapRoute, SwapToken } from '@/features/swap-token/lib/swap-types';
 import { Skeleton } from '@/shared/ui/skeleton';

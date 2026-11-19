@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { formatPercent } from '@/shared/lib/format';
+import { formatPercent } from '@/shared/lib/format-rates';
+
 import {
   DEADLINE_MINUTES,
   MAX_SLIPPAGE_PERCENT,

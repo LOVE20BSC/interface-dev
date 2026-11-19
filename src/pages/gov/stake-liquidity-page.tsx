@@ -9,17 +9,17 @@ import { PromisedPhasesCard } from '@/features/governance-stake/ui/promised-phas
 import { StakeLiquidityPanel } from '@/features/governance-stake/ui/stake-liquidity-panel';
 
 /**
- * 流动性质押（复刻 TKM `/stake/stakelp`）：治理权说明 → 我的流动性质押 → 质押表单
+ * 流动性质押（复刻 TKM `/stake/liquidity`）：治理权说明 → 我的流动性质押 → 质押表单
  * （智能模式：单币即可，或关掉后两侧按池子比例自动联动）→ 提示。
  */
-export function StakeLpPage() {
+export function StakeLiquidityPage() {
   const ctx = useGovContext();
   const { isWrongChain } = useWalletConnection();
   const hub = configuredAddress('hub');
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-bold text-foreground">{copy.gov.pageTitles.stakeLp}</h1>
+      <h1 className="text-lg font-bold text-foreground">{copy.gov.pageTitles.stakeLiquidity}</h1>
       <GovGate ctx={ctx} isWrongChain={isWrongChain}>
         <GovTxFeedback ctx={ctx} />
         {/* owner 2026-11-18：已有流动性质押时，承诺解锁期放在最上面单独调整。 */}
