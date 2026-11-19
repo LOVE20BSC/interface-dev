@@ -162,7 +162,7 @@ describe('formatTokenAmount', () => {
     // 999.999999 → 999.9999（不是 1,000）、0.123456789 → 0.123456（不是 .123457）。
     expect(formatTokenAmount(2_236_067_970_000_000_000_000n, 18)).toBe('2,236.06');
     expect(formatTokenAmount(1_999_999_999_999_999_999_999n, 18)).toBe('1,999.99');
-    expect(formatTokenAmount(1n, 18)).toBe('0');
+    expect(formatTokenAmount(1n, 18)).toBe('0.000000000000000001');
     expect(formatTokenAmount(1n, 6)).toBe('0.000001');
   });
 
@@ -184,7 +184,7 @@ describe('formatVisibleTokenAmount', () => {
   it('never renders a non-zero amount the display rule truncates as a bare 0', () => {
     // 极小非零金额改为展示有效位（owner 2026-11-19）：1e-7 显示 0.0000001；
     // 1 wei（18 位）超出 12 位小数上限，退化为「< 最小可见单位」。
-    expect(formatVisibleTokenAmount(1n, 18)).toBe('< 0.000000000001');
+    expect(formatVisibleTokenAmount(1n, 18)).toBe('0.000000000000000001');
     expect(formatVisibleTokenAmount(100000000000n, 18)).toBe('0.0000001'); // 1e-7 ETH
     expect(formatVisibleTokenAmount(999999999999n, 18)).toBe('0.000000999');
     expect(formatVisibleTokenAmount(1000000000000n, 18)).toBe('0.000001');
@@ -199,7 +199,7 @@ describe('formatVisibleTokenAmount', () => {
 
   it('derives the smallest visible amount from the decimals and the cap', () => {
     // 12 位内优先显示有效位；只有超出 12 位才退化成「< 最小可见单位」。
-    expect(formatVisibleTokenAmount(1n, 18)).toBe('< 0.000000000001');
+    expect(formatVisibleTokenAmount(1n, 18)).toBe('0.000000000000000001');
     expect(formatVisibleTokenAmount(1n, 6)).toBe('0.000001');
     expect(formatVisibleTokenAmount(1n, 6)).toBe('0.000001');
     expect(formatVisibleTokenAmount(1n, 2)).toBe('0.01');
@@ -248,15 +248,19 @@ describe('formatTinyPercent', () => {
     // 0.000001% 正好是 6 位可显示的最小值（不是 < 标记）。
     expect(formatTinyPercent(0.000001)).toBe('0.000001');
     // 6 位同样截断，不四舍五入。
-    expect(formatTinyPercent(0.0000019)).toBe('0.000001');
+    expect(formatTinyPercent(0.0000019)).toBe('0.0000019');
   });
 
-  it('shows tiny shares as 0.00000xxx instead of collapsing to 0', () => {
-    // owner 2026-11-19：0.00000xxx 这类极小占比也要看得见。
+  it('shows tiny shares with all needed digits instead of collapsing to 0', () => {
+    // owner 2026-11-19：多小都要显示出来，不再设位数上限。
     expect(formatTinyPercent(0.0000004)).toBe('0.0000004');
     expect(formatTinyPercent(0.0000001)).toBe('0.0000001');
-    // 1e-9 远超 8 位小数：才退化为「< 最小可见百分比」。
-    expect(formatTinyPercent(0.0000000001)).toBe('<0.00000001');
+    expect(formatTinyPercent(0.0000000001)).toBe('0.0000000001');
+    expect(formatTinyPercent(0.000000000000000001)).toBe('0.000000000000000001');
+    // 资金安全：连续 9 也不许进位（截断，不四舍五入）。
+    expect(formatTinyPercent(0.0009999999)).toBe('0.000999');
+    expect(formatTinyPercent(0.009999999)).toBe('0.00999');
+    expect(formatTinyPercent(1.9999e-7)).toBe('0.000000199');
   });
 
   it('passes non-positive values through formatPercent', () => {

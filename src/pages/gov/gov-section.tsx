@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { NotFoundPage } from '@/pages/not-found/not-found-page';
 import { GovPage } from '@/pages/gov/gov-page';
 import { StakeLiquidityPage } from '@/pages/gov/stake-liquidity-page';
@@ -15,14 +15,10 @@ import { GovPlaceholderPage } from '@/pages/gov/gov-placeholder-page';
  * 入口，省下十几条 loader/route 的 eager 字节（首屏包体预算只有 160 kB）。
  */
 export function GovSection() {
-  const { pathname, search } = useLocation();
+  const { pathname } = useLocation();
   // 去掉尾斜杠（旧库 Next.js 配置的是 trailingSlash，外部链接可能带 /）
   const path = pathname.replace(/\/+$/, '') || '/';
   if (path === '/gov') return <GovPage />;
-  // 旧路径兼容：/stake/stakelp 重定向到 /stake/liquidity（owner 2026-11-19）。
-  if (path === '/stake/stakelp') {
-    return <Navigate to={{ pathname: '/stake/liquidity', search }} replace />;
-  }
   if (path === '/stake/liquidity') return <StakeLiquidityPage />;
   if (path === '/stake/staketoken') return <StakeTokenPage />;
   if (path === '/stake/unstake') return <UnstakePage />;

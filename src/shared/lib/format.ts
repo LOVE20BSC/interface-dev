@@ -154,7 +154,8 @@ export function tinyFractionDigits(
   if (!Number.isInteger(decimals) || absolute >= unit) return undefined;
   const base = fractionDigitsForMagnitude(value, decimals);
   const first = (absolute % unit).toString().padStart(decimals, '0').search(/[1-9]/) + 1;
-  return first <= base ? undefined : Math.min(decimals, first + 2, 12);
+  // 不设位数上限（代币精度本身 ≤ 18 位）：多小都要显示出来，绝不落成 0。
+  return first <= base ? undefined : Math.min(decimals, first + 2);
 }
 
 /**

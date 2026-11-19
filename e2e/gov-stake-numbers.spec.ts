@@ -44,9 +44,8 @@ import { connect, installWallet, seedIdentity } from './wallet-stub';
  *   信息按钮 `me-stake-info` 改成弹**底部 Sheet**（`role="dialog"`），面板与行 testid 不变。
  * - **申请解锁页**（`/stake/unstake`）：页面标题改为「申请解锁」；未申请解锁时不再渲染
  *   `gov-unstake-unlock-state`（只有「已申请解锁 / 可撤出」才出现）。
- * - **极小数字**：`formatTinyPercent` 最多 8 位小数（如 `0.0000004`），再小显示
- *   `<0.00000001%`；`formatTokenAmount` 对极小非零金额会显示有效位（如 `0.0000001`），
- *   `formatVisibleTokenAmount` 的最小可见单位放到 12 位（1 wei → `< 0.000000000001`）。
+ * - **极小数字**： *   `formatTinyPercent` 不设位数上限（多小都显示）；`formatTokenAmount` 对极小非零金额
+ *   会显示全部有效位（如 `0.0000001`，1 wei → `0.000000000000000001`）。
  *   本种子数据下占比/金额仍是 4.76% / 100% / 0% / 999.9999 这类常规值，断言不变。
  * - **P2 读失败**：承诺解锁期参数读失败时渲染 `gov-liquidity-phases-error` + 重试按钮
  *   （不再是永久「读取中…」）——正常态本文件断言它 count 0。
@@ -695,10 +694,9 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
       EXPECTED.seed.communityFeeRatio,
     );
 
-    // 流动性质押（owner 2026-11-19 路由改名 /stake/stakelp → /stake/liquidity）：
-    // 旧路径由 gov-section 做 <Navigate replace>，必须保留 ?symbol= 并正常渲染页面。
-    await page.goto(`/stake/stakelp${QUERY}`);
-    await expect(page).toHaveURL(new RegExp(`/stake/liquidity\\?symbol=${SYMBOL}$`));
+    // 流动性质押（owner 2026-11-19 路由改名 /stake/stakelp → /stake/liquidity；
+    // 开发阶段不做旧路径兼容，旧路径直接 404）。
+    await page.goto(`/stake/liquidity${QUERY}`);
     await expect(page.getByTestId('gov-liquidity-card')).toBeVisible({ timeout: 30_000 });
     // 智能模式默认关闭；父币是 WETH → 输入框直接用原生币（label/aria-label 去重成「原生币」，
     // symbol 只在右侧小字出现一次，余额行只写「余额 X」）。

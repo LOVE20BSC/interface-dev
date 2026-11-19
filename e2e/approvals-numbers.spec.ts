@@ -49,7 +49,7 @@ const CUSTOM_AMOUNT = 2500000000000000000n;
 // owner 2026-11-19 数字显示规范：1–999 → 4 位小数；≥1e6 → 0 位小数（截断）。
 const CONCRETE_TEXT = `1.2345 ${SYMBOL}`;
 const BOUNDARY_TEXT = `57,896,044,618,658,097,711,785,492,504,343,953,926,634,992,332,820,282,019,728 ${SYMBOL}`;
-const BELOW_MINIMUM_TEXT = `< 0.000001 ${SYMBOL}`;
+const BELOW_MINIMUM_TEXT = `0.000000000000000001 ${SYMBOL}`;
 
 const ERC20 = parseAbi(['function approve(address spender, uint256 amount) returns (bool)']);
 const rpcClient = createPublicClient({ transport: http(ANVIL_RPC) });
