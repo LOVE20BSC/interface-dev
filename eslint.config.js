@@ -60,6 +60,7 @@ export default tseslint.config(
       'playwright-report',
       'test-results',
       '.research',
+      '.agents',
       'docs',
       'src/config/errors.generated.ts',
       'src/config/build-id.generated.ts',
