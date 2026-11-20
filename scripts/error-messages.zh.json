@@ -125,6 +125,7 @@
   "ProposalNotSubmitted": "这个提案还没有完成推举。",
   "ProposalPoolEmpty": "本轮没有可铸造的提案激励。",
   "ProposalRewardAlreadyMinted": "这个提案的激励已经铸造过了。",
+  "ProposalRewardAlreadyBurned": "这个提案的激励已经销毁过了，不能重复操作。",
   "ProposalRewardRoundedToZero": "提案激励不足一个最小单位，本轮无法铸造。",
   "ProposalVoteAmountsLengthMismatch": "提案与投票数量不一致，请刷新后重试。",
   "RoundNotEnded": "这一轮还没有结束，请稍后再试。",
