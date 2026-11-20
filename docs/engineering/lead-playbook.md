@@ -11,6 +11,8 @@
 
 **验证节奏（owner 2026-11-20）**：细节改动用「现有 8555 + 现有 preview + 相关 spec」，全量 e2e 只留给共享逻辑/链上读写/harness/交付前。默认 `pnpm e2e` 已复用健康链与匹配 build id 的 preview；慢的是手动 `E2E_REUSE_PREVIEW=0`、`e2e:reset-chain`、每轮停链。连续改→跑同一轮不要停链；规范见 frontend-standards §7.12，命令见 e2e/README「快速回归」。
 
+- **bootstrap 的 python 依赖**（2026-11-20 踩坑）：本机 `/usr/local/bin/python3` 是 3.6（跑 `--version` 都被 macOS `Killed: 9`），而 `make -C ../anvil bootstrap` 会调 `python3` 生成空投快照。用 `PATH="/usr/bin:$PATH"` 让它拿到系统 3.9 即可；这不是链/脚本问题，别去 reset 链。
+
 ## 1. 一句话结论
 
 **慢不在写代码，在验证基础设施。** 2026-11-18 两轮同规模改版的实测：串行做 135 分钟 → 拆并行 + 去掉重复验证后约 55 分钟。下面每一条都是为了守住这个数字。
