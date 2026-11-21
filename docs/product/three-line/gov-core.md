@@ -42,6 +42,17 @@
 | 激励预留触发 | **本轮第一票**时 `Mint.reserveRoundReward`（`Vote.sol:304-307`） | 投完后 `Mint.govReward(round) > 0` |
 | 加速份额 | 首次投票记录 `Stake.validBoostShares`；本次种子无加速质押 → 0（`Vote.sol:264-277`） | `voterBoost = 0`、`totalVoterBoost = 0` |
 
+### §1.2b 治理首页「我的投票」卡
+
+| 量 | 公式（合约行号） | 期望 |
+| --- | --- | --- |
+| 本轮可投 | `maxVoteAmount = Stake.govVotes(token, currentPhase, member1)`（`Vote.sol:117-119`） | `4472135954999579391818`（页面 `4,472.13`） |
+| 本轮已投 / 未投 | `voteAmountByMemberId(round, member1)`；未投 = 可投 − 已投（下限 0，`Vote.sol:282-286` 同口径） | 投票后 `100e18` / `4372135954999579391818`（页面 `100` / `4,372.13`） |
+| 按轮记录 | `votedProposalIdsByMemberId(token, round, member1, 0, 50, false)` → (提案 id 列表, 我在每个提案的票数, 总数)（`Vote.sol:183-197`） | 投票那一轮返回 `[1]`、`[100e18]`、`1` |
+| 该轮我投出合计 | 上面票数数组求和 | `100e18`（页面 `共投出 100 票`） |
+| 占本轮 | `formatSharePercent(我的票数, Vote.totalVoteAmount(round))`（规则见 `shared/lib/share-percent.ts`） | `100e18 / 100e18` → `100%` |
+| 标题 | `Submit.proposalInfosByProposalIds(token, [ids])` 的 `body.title`（`ISubmit.sol:157-160`） | 与提案标题逐字相同 |
+
 ### §1.3 治理激励（`Mint`）
 
 设预留时刻 `available = MAX_SUPPLY − totalSupply − reservedAvailable`（`Mint.sol:421-428`；种子态 `available = 9000004500000900000090000003`）：
@@ -112,6 +123,7 @@
 | G2 | 推举 / 投票两态四档截图（`suspendMining` 冻结当轮再拍） | 20 张 `gov-core-*`（390×844 / 1280×800 × 浅/深） |
 | G3 | `anvil_mine` 推一轮 → `/gov/rewards` 出现可铸造行 → 铸造（真实交易）→ 行变「已铸造」 | `1 轮可铸造` → `2,250,001` → `已铸造` / `0 轮可铸造` |
 | G4 | `/gov/proposal-rewards` 默认上一轮 → 池 / 总票数 / 门槛 / 行金额 / 达标说明 → `prev` 到空轮 → `next` 回 | `4,500,002` / `100` / `5` / `100 / 5` / `待结算` |
+| G5 | `/gov` 「我的投票」卡：三格额度（按**当前轮**现读现算）+ 按轮记录（编号 / 标题 / 我的投票 / 占本轮）+ 「去投票」入口 | 额度 `4,472.13` / 已投按当轮读回值 / `我的投票 100` / `占本轮 100%`；footer 与链深度解耦（三态只取其一） |
 
 实跑（2026-11-21 07:30 前后，8555，复用链与 preview）：
 
@@ -121,7 +133,7 @@ Running 4 tests using 1 worker
   ✓ 2 用例 G2 · 治理核心：推举 / 投票两态的验收截图 (7.5s)
   ✓ 3 用例 G3 · 推进阶段后 /gov/rewards 铸造治理激励 (10.4s)
   ✓ 4 用例 G4 · /gov/proposal-rewards 提案激励结算（上一轮） (4.2s)
-  4 passed (48.9s)   EXIT=0
+  5 passed (1.1m)   EXIT=0     # 2026-11-21 增补 G5（我的投票卡）
 ```
 
 同一条 8555 链第二遍：`4 passed (49.1s) EXIT=0`；跑后回读 `automine=false`、`intervalMining=1`（挖矿模式未泄漏）。**8545 全程未被自动化触碰。**
@@ -146,6 +158,10 @@ Running 4 tests using 1 worker
 | 达标提案份额 | `4500002250000450000045000` | 同左（§7：`floor(pool×票/总票)`） | `4,500,002` + 说明「票数已过门槛，由提案目标合约铸造。」 | ✅ |
 | 未达标提案销毁 | `ceil` 门槛不足的份额 | 同左（`status=2`、`totalRewardBurned` 增量、事件逐字相等；重复销毁不 revert） | 前端线未覆盖（需同轮第二个被投票的提案 + 第二个有治理权的身份，见 §3 说明） | ✅（合约线覆盖） |
 | `burnUnusedBoostReward` | `gov − gov/2` | 同左（§8） | 前端线不覆盖（页面没有入口） | ✅（合约线覆盖） |
+| 我的投票卡 · 本轮额度 | `maxVoteAmount` / `voteAmountByMemberId` | 同左（§1.2b / §3 G5；前端线按**当前轮**重新读） | `4,472.13` / `100` / `4,372.13`（`gov-my-votes-max/used/remaining`） | ✅ |
+| 我的投票卡 · 按轮记录 | `votedProposalIdsByMemberId` + `totalVoteAmount` | 同左 | `治理第 R 轮 · 共投出 100 票`、`#1 …`、`我的投票 100`、`占本轮 100%` | ✅ |
+| 我的投票卡 · 本轮额度 | `maxVoteAmount` / `voteAmountByMemberId` | 同左（§1.2b / §3；前端线按当前轮重新读） | `4,472.13` / `100` / `4,372.13`（`gov-my-votes-max/used/remaining`） | ✅ |
+| 我的投票卡 · 按轮记录 | `votedProposalIdsByMemberId` + `totalVoteAmount` | 同左 | `治理第 R 轮 · 共投出 100 票`、`#1 …`、`我的投票 100`、`占本轮 100%` | ✅ |
 
 **结论**：
 

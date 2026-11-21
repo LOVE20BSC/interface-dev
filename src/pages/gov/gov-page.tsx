@@ -18,6 +18,7 @@ import { GovGate, GovTxFeedback } from '@/features/governance-stake/ui/gov-gate'
 import { GovStakeLinks, GovStatCell } from '@/features/governance-stake/ui/gov-home-parts';
 import { GovIntro } from '@/features/governance-stake/ui/gov-intro';
 import { GovQueryPanel } from '@/features/governance-stake/ui/gov-query-panel';
+import { MyVotesCard } from '@/features/governance-vote/ui/my-votes-card';
 import { hasStakePosition } from '@/features/governance-stake/ui/my-stake-summary';
 import { StakeStateCard } from '@/features/governance-stake/ui/stake-controls';
 
@@ -198,6 +199,14 @@ function MineTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string
           <span aria-hidden="true"> &gt;&gt;</span>
         </Link>
       </Card>
+
+      {/* owner 2026-11-21：仿旧库 `MyVotingPanel` + `/vote/records`，加一张「我的投票」卡。 */}
+      <MyVotesCard
+        tokenAddress={ctx.token?.address}
+        memberId={ctx.memberId}
+        round={ctx.clock.currentPhase}
+        symbol={ctx.symbol}
+      />
 
       <GovIntro />
     </div>

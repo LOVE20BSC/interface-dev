@@ -818,9 +818,14 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
         '没有投票',
       );
     }
-    // 本链只推进了一轮，分页 footer 是「已经到底」（加载更多要 > 20 轮才会出现）。
-    await expect(page.getByTestId('gov-rewards-exhausted')).toHaveText('已经到底');
-    await expect(page.getByTestId('gov-rewards-load-more')).toHaveCount(0);
+    // 分页 footer 与链深度有关：8555 是复用链，阶段数可能早已超过一页（20 轮）。
+    // 只断言「底部恰好是三态之一」，不绑定「刚好一页」这个与历史相关的假设。
+    const exhaustedFooter = page.getByTestId('gov-rewards-exhausted');
+    const loadMoreFooter = page.getByTestId('gov-rewards-load-more');
+    expect((await exhaustedFooter.count()) + (await loadMoreFooter.count())).toBe(1);
+    if ((await exhaustedFooter.count()) === 1) {
+      await expect(exhaustedFooter).toHaveText('已经到底');
+    }
     await expect(page.getByTestId('gov-rewards-error-text')).toHaveCount(0);
 
     await captureState(
@@ -979,6 +984,82 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
         );
       },
       'gov-proposal-rewards-summary',
+    );
+  });
+
+  /**
+   * 用例 G5 · 治理首页「我的投票」卡（owner 2026-11-21：仿旧库 `MyVotingPanel` +
+   * `/vote/records` 的呈现内容，布局重做）。
+   *
+   * 数据全部来自 G1 那一笔真实投票：本轮额度 = 治理权 − 已投；记录按轮分组，
+   * 每条显示「编号 + 标题 + 我的投票 + 占本轮」。期望值同样从链上读回后派生。
+   */
+  test('用例 G5 · 治理核心：/gov 我的投票卡（额度 / 按轮记录 / 占比）', async ({ page }) => {
+    // 卡片上的额度是**当前轮**的：G1 投票之后链可能又推进了阶段，所以这里重新读一次。
+    const nowRound = (await client.readContract({
+      address: deployment.addresses.phase,
+      abi: PHASE_ABI,
+      functionName: 'currentPhase',
+    })) as bigint;
+    const maxVote = (await client.readContract({
+      address: deployment.addresses.vote,
+      abi: VOTE_ABI,
+      functionName: 'maxVoteAmount',
+      args: [deployment.addresses.tokenAddress, BigInt(MEMBER_ID)],
+    })) as bigint;
+    const usedNow = (await client.readContract({
+      address: deployment.addresses.vote,
+      abi: VOTE_ABI,
+      functionName: 'voteAmountByMemberId',
+      args: [deployment.addresses.tokenAddress, nowRound, BigInt(MEMBER_ID)],
+    })) as bigint;
+    const remaining = maxVote - usedNow;
+
+    await openPage(page, '/gov');
+    const card = page.getByTestId('gov-my-votes-card');
+    await expect(card).toBeVisible({ timeout: 30_000 });
+
+    // 概览三格：本轮可投 / 已投 / 未投（都是 18 位小数格式化的治理票）。
+    await expect(page.getByTestId('gov-my-votes-max')).toHaveText(expectedAmount(maxVote), {
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId('gov-my-votes-used')).toHaveText(expectedAmount(usedNow));
+    await expect(page.getByTestId('gov-my-votes-remaining')).toHaveText(expectedAmount(remaining));
+    await expect(page.getByTestId('gov-my-votes-round')).toHaveText(roundLabelOf(nowRound));
+
+    // 按轮记录：投票那一轮的标题 + 我的投票 + 占本轮（这一轮只有我一个人投票 → 100%）。
+    const record = page.getByTestId(`gov-my-votes-round-${round.toString()}`);
+    await expect(record).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId(`gov-my-votes-round-line-${round.toString()}`)).toHaveText(
+      `治理第 ${round.toString()} 轮 · 共投出 ${expectedAmount(VOTE_AMOUNT)} 票`,
+    );
+    await expect(
+      page.getByTestId(`gov-my-votes-entry-${round.toString()}-${proposalId.toString()}`),
+    ).toContainText(`#${proposalId.toString()} ${TITLE}`);
+    await expect(
+      page.getByTestId(`gov-my-votes-mine-${round.toString()}-${proposalId.toString()}`),
+    ).toHaveText(`我的投票 ${expectedAmount(VOTE_AMOUNT)}`);
+    await expect(
+      page.getByTestId(`gov-my-votes-share-${round.toString()}-${proposalId.toString()}`),
+    ).toHaveText('占本轮 100%');
+    await expect(page.getByTestId('gov-my-votes-error')).toHaveCount(0);
+    // 还有票没投完 → 主按钮是「去投票」链接；投完了就是禁用的「本轮票已经投完」。
+    if (remaining > 0n) {
+      await expect(page.getByTestId('gov-my-votes-go-vote')).toBeVisible();
+      await expect(page.getByTestId('gov-my-votes-go-vote')).toHaveText('去投票');
+    } else {
+      await expect(page.getByTestId('gov-my-votes-go-vote')).toHaveCount(0);
+    }
+
+    await captureState(
+      page,
+      'gov-core-home-my-votes',
+      '/gov',
+      async (target) => {
+        await expect(target.getByTestId('gov-my-votes-card')).toBeVisible({ timeout: 30_000 });
+        await expect(target.getByTestId('gov-my-votes-used')).toHaveText(expectedAmount(usedNow));
+      },
+      'gov-my-votes-card',
     );
   });
 });

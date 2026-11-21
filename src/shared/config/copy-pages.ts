@@ -1846,6 +1846,34 @@ export const copy = {
       receiptTotal: (votes: string) => `本轮合计投出 ${votes} 票`,
     },
     /**
+     * 治理首页「我的投票」卡：旧库 `MyVotingPanel`（已投 / 未投 + 去投票 + 轮次）
+     * 与 `/vote/records`（按轮分组：编号 + 标题 + 我的投票 + 占比）合成一张卡。
+     * 沿用新协议口径：主体是身份 NFT、轮次带类型前缀、不出现「占比」以外的技术词。
+     */
+    myVotes: {
+      title: '我的投票',
+      roundLabel: (round: string) => `治理第 ${round} 轮`,
+      statMax: '本轮可投',
+      statVoted: '已投',
+      statRemaining: '未投',
+      unit: '票',
+      goVote: '去投票',
+      allVoted: '本轮票已经投完',
+      noPower: '当前身份 NFT 本轮没有治理权，先质押流动性。',
+      recordTitle: '我的投票记录',
+      emptyRecord: '还没有投票记录',
+      emptyRecordHint: '给本轮提案投票后，这里会按轮次列出你投过的提案。',
+      roundHeader: (round: string, votes: string) => `治理第 ${round} 轮 · 共投出 ${votes} 票`,
+      entryLine: (id: string, title: string) => (title.length > 0 ? `#${id} ${title}` : `#${id}`),
+      entryMine: (votes: string) => `我的投票 ${votes}`,
+      entryShare: (percent: string) => `占本轮 ${percent}%`,
+      loadMore: '加载更多轮次',
+      loadingMore: '读取更多轮次中…',
+      loading: '读取投票记录中…',
+      readFailed: '投票记录暂时读不到。',
+      retry: '重试',
+    },
+    /**
      * 治理·提案（core `Submit`）。一个身份每轮只能推举一个提案；
      * 本版本只做「不回调」的提案（回调数据由目标合约定义，属于行动域）。
      */
