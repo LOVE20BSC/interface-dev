@@ -187,6 +187,11 @@ describe('AddLiquidityPanel · QA 缺陷回归', () => {
   it('D8：原生币单边把「不需要授权」写对，不冒充「已授权」', () => {
     quoteState.value.data = undefined;
     renderPanel();
+    // 走查 2026-11-21（P2-7）：还没输入任何数量时，授权行不渲染——空态下结论
+    // 「这一笔不需要代币授权」会让人误以为这页永远不用授权（当时 allowance 是 0）。
+    expect(screen.queryByTestId('liquidity-add-approve')).toBeNull();
+
+    fireEvent.change(screen.getByTestId('liquidity-native-amount'), { target: { value: '1' } });
     const approve = screen.getByTestId('liquidity-add-approve');
     expect(approve).toBeDisabled();
     expect(approve).toHaveTextContent('这一笔不需要代币授权');

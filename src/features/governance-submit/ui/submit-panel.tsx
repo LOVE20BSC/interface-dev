@@ -319,12 +319,16 @@ function EligibilityCard({
               </CardDescription>
             </>
           )}
-          <p
-            className="text-xs leading-5 text-muted"
-            data-testid="gov-submit-eligibility-threshold"
-          >
-            {copy.gov.submit.eligibilityThreshold(requiredText)}
-          </p>
+          {/* P2-5（走查 2026-11-21）：能推举时只给门槛数字；不能推举时原因句里已经
+              包含门槛，不再重复第二行（规范 §4.7 同一内容不在同页出现两次）。 */}
+          {context.canSubmit === true ? (
+            <p
+              className="text-xs leading-5 text-muted"
+              data-testid="gov-submit-eligibility-threshold"
+            >
+              {copy.gov.submit.eligibilityThreshold(requiredText)}
+            </p>
+          ) : null}
         </div>
       )}
     </Card>

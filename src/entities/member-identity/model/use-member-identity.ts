@@ -127,12 +127,28 @@ export function useMemberIdentity(): MemberIdentityState {
 
   const identities = enumeration.identities;
 
+  // 走查 2026-11-21（P1）：铸造后点「设为当前身份 NFT」是纯本地选择，但枚举列表
+  // （按 balanceOf/tokenOfOwnerByIndex 读）此刻还没含新 token，页头药丸就会停在
+  // 「—」直到刷新。这里对「已选中但不在列表里」的 token 单读一次 memberName 回填，
+  // 让本地选择立刻有名字（不再依赖各 hook 实例的枚举何时刷新）。
+  const selectedInList = identities.find((identity) => identity.tokenId === selectedTokenId);
+  const nameFallbackEnabled =
+    nft !== undefined && selectedTokenId !== null && selectedInList === undefined;
+  const nameFallback = useReadContract({
+    address: nft,
+    abi: memberNftAbi,
+    functionName: 'memberName',
+    args: selectedTokenId !== null ? [selectedTokenId] : undefined,
+    query: { enabled: nameFallbackEnabled },
+  });
+  const fallbackName = typeof nameFallback.data === 'string' ? nameFallback.data : null;
+
   const selected: MemberIdentity | null =
     selectedTokenId === null
       ? null
-      : (identities.find((identity) => identity.tokenId === selectedTokenId) ?? {
+      : (selectedInList ?? {
           tokenId: selectedTokenId,
-          name: null,
+          name: fallbackName,
         });
 
   const select = (tokenId: bigint) => {

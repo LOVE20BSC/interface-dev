@@ -254,8 +254,15 @@ export function StakeLiquidityPanel({
     return shortfall > 0n ? shortfall : undefined;
   })();
 
+  // P2-6（走查 2026-11-21）：两侧都空、用户还没开始填时，不该首屏就报红
+  // 「两侧数量都要大于 0。」——这是提示而非错误。
+  const nothingEntered =
+    tokenParsed.kind === 'empty' && parentParsed.kind === 'empty' && nativeParsed.kind === 'empty';
+
   let validationMessage: string | undefined;
-  if (phasesReady === undefined) {
+  if (nothingEntered) {
+    validationMessage = undefined;
+  } else if (phasesReady === undefined) {
     validationMessage = copy.gov.stats.loading;
   } else if (
     tokenParsed.kind === 'too-precise' ||
@@ -805,7 +812,9 @@ export function StakeLiquidityPanel({
           </p>
         ) : null}
 
-        <div className="space-y-2">
+        {/* P2-7（走查 2026-11-21）：没输入数量时不渲染授权行——空态断言「不需要授权」
+            会让人以为这页永远不需要授权（当时 allowance 其实是 0）。 */}
+        <div className="space-y-2" hidden={nothingEntered}>
           <p className="text-xs font-medium text-muted">
             {hubPath ? copy.gov.liquidity.approveTitleSingle : copy.gov.liquidity.approveTitle}
           </p>

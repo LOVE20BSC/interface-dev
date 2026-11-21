@@ -968,44 +968,50 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
           The 授权 button stays visible after a long-term approval as a read-only
           「已长期授权」 state instead of disappearing. */}
       <ActionStack>
-        <Button
-          variant={needsApproval ? 'primary' : 'secondary'}
-          size="lg"
-          className="w-full"
-          data-testid="liquidity-add-approve"
-          onClick={() => {
-            void handleApprove();
-          }}
-          disabled={
-            !needsApproval ||
-            tx.approveStage !== 'idle' ||
-            amountError !== null ||
-            customSlippageError !== undefined
-          }
-          loading={tx.approveStage === 'wallet'}
-        >
-          {needsApproval
-            ? useUnlimitedApproval
-              ? copy.approve.longTermAction(token.symbol)
-              : copy.liquidity.add.approveToken(token.symbol)
-            : approval === 'not-needed'
-              ? copy.approve.notNeeded
-              : allowance.value === undefined
-                ? copy.approve.loading
-                : approvalKind(allowance.value) === 'unlimited'
-                  ? copy.approve.longTermActive
-                  : copy.liquidity.add.approvedToken(token.symbol)}
-        </Button>
-        {approval !== 'not-needed' && (needsApproval || allowance.value !== undefined) ? (
-          <p className="text-xs leading-5 text-muted">
-            {needsApproval
-              ? useUnlimitedApproval
-                ? copy.approve.longTermApproveNote(token.symbol)
-                : copy.liquidity.add.approveNote
-              : approvalKind(allowance.value ?? 0n) === 'unlimited'
-                ? copy.approve.longTermNote
-                : copy.approve.approvedNote}
-          </p>
+        {/* P2-7（走查 2026-11-21）：没输入数量时不渲染授权行——空态断言「不需要授权」
+            会让人误以为这页永远不用授权（当时 allowance 其实是 0）。 */}
+        {hasInput ? (
+          <>
+            <Button
+              variant={needsApproval ? 'primary' : 'secondary'}
+              size="lg"
+              className="w-full"
+              data-testid="liquidity-add-approve"
+              onClick={() => {
+                void handleApprove();
+              }}
+              disabled={
+                !needsApproval ||
+                tx.approveStage !== 'idle' ||
+                amountError !== null ||
+                customSlippageError !== undefined
+              }
+              loading={tx.approveStage === 'wallet'}
+            >
+              {needsApproval
+                ? useUnlimitedApproval
+                  ? copy.approve.longTermAction(token.symbol)
+                  : copy.liquidity.add.approveToken(token.symbol)
+                : approval === 'not-needed'
+                  ? copy.approve.notNeeded
+                  : allowance.value === undefined
+                    ? copy.approve.loading
+                    : approvalKind(allowance.value) === 'unlimited'
+                      ? copy.approve.longTermActive
+                      : copy.liquidity.add.approvedToken(token.symbol)}
+            </Button>
+            {approval !== 'not-needed' && (needsApproval || allowance.value !== undefined) ? (
+              <p className="text-xs leading-5 text-muted">
+                {needsApproval
+                  ? useUnlimitedApproval
+                    ? copy.approve.longTermApproveNote(token.symbol)
+                    : copy.liquidity.add.approveNote
+                  : approvalKind(allowance.value ?? 0n) === 'unlimited'
+                    ? copy.approve.longTermNote
+                    : copy.approve.approvedNote}
+              </p>
+            ) : null}
+          </>
         ) : null}
         {tx.approveWatch.hash !== null ? <TxWatchCard watch={tx.approveWatch} /> : null}
         <Button

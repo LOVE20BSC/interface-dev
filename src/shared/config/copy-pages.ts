@@ -315,6 +315,8 @@ export const copy = {
       hashLabel: '交易哈希',
       explorer: '在区块浏览器里查看',
       goMint: '去铸造身份 NFT',
+      /** 走查 2026-11-21（P2-1）：已有身份 NFT 的用户，已铸造态该去治理而不是去铸造。 */
+      goGovernance: '去治理',
     },
     rules: {
       summary: '规则',
@@ -482,7 +484,7 @@ export const copy = {
   txWatch: {
     pending: {
       submitted: '交易已经提交，等待上链。',
-      remaining: (seconds: string) => `约 ${seconds} 秒后仍未确认，可以重新提交一笔。`,
+      remaining: (seconds: string) => `再等约 ${seconds} 秒仍没有结果的话，可以重新提交一笔。`,
       refresh: '重新查询',
     },
     titles: {
@@ -1595,7 +1597,7 @@ export const copy = {
       /** 两个质押入口（旧版「质押 获取治理票 / 质押 增加治理收益」）。 */
       liquidityLink: '增加治理权',
       boostLink: '增加加速激励',
-      mintRewardAction: '铸造 治理激励',
+      mintRewardAction: '铸造治理激励',
       /** 「社区」摘要：头条数字 + 一个行动入口 + 四格。 */
       communityVotes: '社区总治理权',
       communityShares: '社区流动性质押份额',
@@ -1839,6 +1841,8 @@ export const copy = {
       amountInvalid: '投票票数要是大于 0 的整数。',
       amountTooMany: (remaining: string) => `合计超过还能投的 ${remaining} 票。`,
       amountNone: '至少给一个提案分票。',
+      /** 走查 2026-11-21（P2-3）：额度用完是中性状态，不该复用「超额」的错误口吻。 */
+      quotaUsed: '本轮票已经投完，等下一轮再投。',
       submit: '确认投票',
       submitting: '提交中…',
       waitingWallet: '等待你在钱包确认',

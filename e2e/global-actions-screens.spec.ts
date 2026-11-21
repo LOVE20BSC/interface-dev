@@ -129,7 +129,10 @@ test.describe('全局动作按钮与回执整改截图', () => {
         await shot(page, 'batch-transfer', theme, viewport.name);
 
         // 流动性：授权按钮在前、确认按钮在后，都在流内。
+        // 走查 2026-11-21（P2-7）：没输入数量时授权行不渲染（空态不能断言「不需要授权」），
+        // 所以这里先像真人一样填一笔，再看授权阶梯。
         await open(page, `/liquidity${QUERY}`, theme);
+        await page.getByTestId('liquidity-token-amount').fill('100');
         await expect(page.getByTestId('liquidity-add-approve')).toBeVisible({ timeout: 20_000 });
         await expect(page.getByTestId('liquidity-add-approve')).not.toContainText('读取授权额度中');
         await expect(page.getByTestId('liquidity-add-submit')).toBeVisible();

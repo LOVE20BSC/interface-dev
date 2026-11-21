@@ -96,10 +96,15 @@ export function buildProposalBody(draft: SubmitDraft): ProposalBodyInput | undef
 }
 
 /**
- * 推举门槛占社区总治理权的比例（`SUBMIT_MIN_RATIO`，1e18 定点）→ 百分数文案。
- * 读不到就是 undefined，页面用「—」兜底，绝不显示 0。
+ * 推举门槛占社区总治理权的比例（`SUBMIT_MIN_RATIO`，1e18 定点）→ 带 `%` 的百分数文案。
+ *
+ * 走查 2026-11-21 发现过这个坑：`formatPercent()` 的约定是**不带百分号**（由调用方补），
+ * 但资格句直接把返回值插进「社区总治理权的 ${ratio}」里，渲染成「0.5」——读起来像
+ * 「0.5 倍 = 50%」，与真实门槛（0.5%）差 100 倍。所以这里直接返回 `0.5%`，
+ * 调用方只负责「读不到 → —」。
  */
 export function submitRatioPercent(ratio: bigint | undefined): string | undefined {
   if (ratio === undefined) return undefined;
-  return formatPercent(Number(ratio) / RATIO_PERCENT_DIVISOR);
+  const text = formatPercent(Number(ratio) / RATIO_PERCENT_DIVISOR);
+  return `${text}%`;
 }

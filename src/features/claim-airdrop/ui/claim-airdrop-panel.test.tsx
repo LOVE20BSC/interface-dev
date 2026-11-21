@@ -35,6 +35,7 @@ const h = vi.hoisted(() => {
   };
   return {
     eligible,
+    identity: { balance: 0n as bigint | undefined },
     claim: { ...eligible },
     tx: {
       stage: 'idle',
@@ -73,6 +74,10 @@ vi.mock('@/features/claim-airdrop/model/use-claimed-amount', () => ({
   useClaimedAmount: () => ({ amount: undefined, isLoading: false }),
 }));
 
+vi.mock('@/entities/member-identity/model/use-member-identity', () => ({
+  useMemberIdentity: () => ({ balance: h.identity.balance }),
+}));
+
 const RULES_BODY =
   '空投资格：从TKM链公平发射开始，参与或部分参与1年多的社群铸币实验，并参与资产销毁锁定活动的社群成员，基于每个人在每个社区的销毁锁定份额计算出本链创世代币的空投份额，具体份额计算规则详见销毁活动：';
 const RULES_LINK = 'https://love20tkm.github.io/interface/apps/burn/';
@@ -90,6 +95,7 @@ function renderPanel(props: { isConnected?: boolean; isWrongChain?: boolean } = 
 }
 
 beforeEach(() => {
+  h.identity.balance = 0n;
   Object.assign(h.claim, h.eligible);
   h.tx.stage = 'idle';
   h.tx.error = null;
@@ -164,6 +170,26 @@ describe('ClaimAirdropPanel rules fold', () => {
     h.claim.status = 'ineligible';
     renderPanel();
     expect(screen.getByTestId('airdrop-rules')).toHaveAttribute('open');
+  });
+});
+
+describe('ClaimAirdropPanel 已铸造态（S6）的主 CTA', () => {
+  beforeEach(() => {
+    Object.assign(h.claim, { status: 'claimed' });
+  });
+
+  it('钱包没有身份 NFT 时，主 CTA 是「去铸造身份 NFT」', () => {
+    h.identity.balance = 0n;
+    renderPanel();
+    expect(screen.getByRole('link', { name: '去铸造身份 NFT' })).toBeVisible();
+    expect(screen.queryByRole('link', { name: '去治理' })).toBeNull();
+  });
+
+  it('钱包已有身份 NFT 时，主 CTA 改成「去治理」（走查 2026-11-21 P2-1）', () => {
+    h.identity.balance = 1n;
+    renderPanel();
+    expect(screen.getByRole('link', { name: '去治理' })).toBeVisible();
+    expect(screen.queryByRole('link', { name: '去铸造身份 NFT' })).toBeNull();
   });
 });
 

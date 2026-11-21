@@ -557,9 +557,12 @@ test.describe('流动性池 前端线（理论线 §1）', () => {
       await openLiquidity(page, NATIVE_ONLY);
       await expect(primary).toBeVisible({ timeout: 20_000 });
       await expect(primary).toBeDisabled();
-      await expect(approve).toBeDisabled();
+      // 走查 2026-11-21（P2-7）：空表单不渲染授权行（空态不能断言「不需要授权」）。
+      await expect(approve).toHaveCount(0);
 
       await page.getByTestId('liquidity-token-amount').fill('1');
+      await expect(approve).toBeVisible({ timeout: 20_000 });
+      await expect(approve).toBeDisabled();
       await expect(page.getByTestId('liquidity-amount-error')).toHaveText(
         'TestLOVE20 不够，还差 1',
       );

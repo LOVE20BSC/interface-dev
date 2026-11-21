@@ -64,12 +64,13 @@ export function VotePanel({
     draft.kind === 'ok' ? validateVoteAllocation(draft.allocations, remaining ?? 0n) : null;
 
   const busy = write.stage !== 'idle' || write.receipt !== null;
-  const closedReason =
-    remaining === undefined
-      ? copy.gov.vote.loading
-      : remaining === 0n
-        ? copy.gov.vote.amountTooMany(formatTokenAmount(0n, VOTE_DECIMALS))
-        : null;
+  const noPower = power.status === 'ready' && power.maxVoteAmount === 0n;
+  const noRemaining = remaining === 0n;
+  // P2-4（走查 2026-11-21）：超额时按钮会禁用，所以原因必须立刻可见，不能等到点提交。
+  const liveError =
+    allocationIssue === 'exceeds-remaining'
+      ? copy.gov.vote.amountTooMany(formatTokenAmount(remaining ?? 0n, VOTE_DECIMALS))
+      : null;
   const canSubmit =
     !busy &&
     remaining !== undefined &&
@@ -165,9 +166,9 @@ export function VotePanel({
         </ul>
       )}
 
-      {localError !== null ? (
+      {localError !== null || liveError !== null ? (
         <p role="alert" data-testid="gov-vote-local-error" className="text-sm text-danger-strong">
-          {localError}
+          {localError ?? liveError}
         </p>
       ) : null}
       {write.error !== null ? (
@@ -192,14 +193,14 @@ export function VotePanel({
               ? copy.gov.vote.pending
               : copy.gov.vote.submit}
         </Button>
-        {remaining === 0n && !busy ? (
+        {noRemaining && !noPower && !busy ? (
           <p className="text-xs text-muted" data-testid="gov-vote-no-remaining">
-            {copy.gov.vote.amountTooMany(formatTokenAmount(0n, VOTE_DECIMALS))}
+            {copy.gov.vote.quotaUsed}
           </p>
         ) : null}
-        {closedReason !== null && remaining !== 0n ? (
+        {remaining === undefined ? (
           <p className="text-xs text-muted" data-testid="gov-vote-busy-reason">
-            {closedReason}
+            {copy.gov.vote.loading}
           </p>
         ) : null}
       </div>

@@ -492,6 +492,19 @@ test('mint: 首个身份铸造成功后，回执可直接把新 NFT 设为当前
   await setIdentity.click();
   await expect(setIdentity).toHaveText('已设为当前身份 NFT');
   await expect(setIdentity).toBeDisabled();
+  // 走查 2026-11-21（P1）：本地选择后页头药丸必须立刻显示名字，不能停在「—」。
+  // 回执 Sheet 打开时背景被 aria-hidden，role 选择器取不到药丸，直接读 DOM 文本。
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            document.querySelector('button[aria-label="打开钱包与身份 NFT 菜单"]')?.textContent ??
+            '',
+        ),
+      { timeout: 15_000 },
+    )
+    .toContain(FIRST_NFT_NAME);
   expect(
     await page.evaluate((key) => window.localStorage.getItem(key), identityCacheKey(newcomer)),
   ).not.toBeNull();

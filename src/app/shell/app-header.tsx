@@ -61,7 +61,9 @@ export function AppHeader() {
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </button>
             <h1 className="truncate text-base font-semibold">
-              {title ?? copy.brand.protocolLabel}
+              {/* P2-2（走查 2026-11-21）：未知路由的页头曾回落成协议名，与浏览器标题
+                  「页面不存在」矛盾；首页仍用协议名，其余未知路径与 document-title 同源。 */}
+              {title ?? (isHome ? copy.brand.protocolLabel : copy.notFound.title)}
             </h1>
           </div>
         )}

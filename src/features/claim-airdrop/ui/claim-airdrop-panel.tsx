@@ -16,6 +16,7 @@ import { selectAirdropReceiptView } from '@/features/claim-airdrop/lib/airdrop-r
 import { useAirdropClaim } from '@/features/claim-airdrop/model/use-airdrop-claim';
 import { useAirdropClaimTransaction } from '@/features/claim-airdrop/model/use-airdrop-claim-transaction';
 import { useClaimedAmount } from '@/features/claim-airdrop/model/use-claimed-amount';
+import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import { AirdropReceipt } from '@/features/claim-airdrop/ui/airdrop-receipt';
 import { AirdropRules } from '@/features/claim-airdrop/ui/airdrop-rules';
 
@@ -89,6 +90,9 @@ export function ClaimAirdropPanel({
 }: ClaimAirdropPanelProps) {
   const [dismissedReceipt, setDismissedReceipt] = useState(false);
   const claim = useAirdropClaim();
+  // P2-1（走查 2026-11-21）：已铸造后的下一步由「有没有身份 NFT」决定。
+  const identity = useMemberIdentity();
+  const hasIdentity = (identity.balance ?? 0n) > 0n;
   const tx = useAirdropClaimTransaction({
     airdropAddress: claim.airdropAddress,
     tokenAddress: claim.tokenAddress,
@@ -322,9 +326,15 @@ export function ClaimAirdropPanel({
           </p>
         ) : null}
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <Link to="/mint" className={buttonStyles('primary', 'md', 'w-full sm:w-auto')}>
-            {copy.airdrop.claimed.goMint}
-          </Link>
+          {hasIdentity ? (
+            <Link to="/gov" className={buttonStyles('primary', 'md', 'w-full sm:w-auto')}>
+              {copy.airdrop.claimed.goGovernance}
+            </Link>
+          ) : (
+            <Link to="/mint" className={buttonStyles('primary', 'md', 'w-full sm:w-auto')}>
+              {copy.airdrop.claimed.goMint}
+            </Link>
+          )}
           <Link to="/" className={buttonStyles('ghost', 'md', 'w-full sm:w-auto')}>
             {copy.airdrop.states.backHome}
           </Link>
