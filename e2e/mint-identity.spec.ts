@@ -488,6 +488,7 @@ test('mint: 首个身份铸造成功后，回执可直接把新 NFT 设为当前
   await expect(setIdentity).toHaveText('设为当前身份 NFT');
   // 有按钮时不再同时显示「还没有设为当前身份 NFT。」这句说明
   await expect(page.getByText('还没有设为当前身份 NFT。')).toHaveCount(0);
+  await shot(page, 'mint-receipt-first-nft.png');
   await setIdentity.click();
   await expect(setIdentity).toHaveText('已设为当前身份 NFT');
   await expect(setIdentity).toBeDisabled();
