@@ -6,6 +6,7 @@ import { StakeTokenPage } from '@/pages/gov/stake-token-page';
 import { UnstakePage } from '@/pages/gov/unstake-page';
 import { StakeLiquidPage } from '@/pages/gov/stake-liquid-page';
 import { VotePage } from '@/pages/gov/vote-page';
+import { VoteRecordsPage } from '@/pages/gov/vote-records-page';
 import { SubmitPage } from '@/pages/gov/submit-page';
 import { RewardsPage } from '@/pages/gov/rewards-page';
 import { ProposalRewardsPage } from '@/pages/gov/proposal-rewards-page';
@@ -29,6 +30,7 @@ export function GovSection() {
   if (path === '/stake/liquid') return <StakeLiquidPage />;
   if (path === '/gov/rewards') return <RewardsPage />;
   if (path === '/gov/proposal-rewards') return <ProposalRewardsPage />;
+  if (path === '/vote/records') return <VoteRecordsPage />;
   if (path === '/vote' || path.startsWith('/vote/')) return <VotePage />;
   if (path === '/submit' || path.startsWith('/submit/')) return <SubmitPage />;
   if (/^\/(verify|acting|action)(\/|$)/.test(path)) {

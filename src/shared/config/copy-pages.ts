@@ -1853,7 +1853,6 @@ export const copy = {
     myVotes: {
       title: '我的投票',
       roundLabel: (round: string) => `治理第 ${round} 轮`,
-      statMax: '本轮可投',
       statVoted: '已投',
       statRemaining: '未投',
       unit: '票',
@@ -1861,6 +1860,7 @@ export const copy = {
       allVoted: '本轮票已经投完',
       noPower: '当前身份 NFT 本轮没有治理权，先质押流动性。',
       recordTitle: '我的投票记录',
+      previewLink: '查看全部投票记录',
       emptyRecord: '还没有投票记录',
       emptyRecordHint: '给本轮提案投票后，这里会按轮次列出你投过的提案。',
       roundHeader: (round: string, votes: string) => `治理第 ${round} 轮 · 共投出 ${votes} 票`,
@@ -1872,6 +1872,10 @@ export const copy = {
       loading: '读取投票记录中…',
       readFailed: '投票记录暂时读不到。',
       retry: '重试',
+      /** 独立页 `/vote/records`。 */
+      recordsTitle: '我的投票记录',
+      recordsIntro: '按轮次倒序列出你投过票的提案；占比是你在该提案的票数占该轮总投出票数的比例。',
+      recordsEmptyAction: '去投票',
     },
     /**
      * 治理·提案（core `Submit`）。一个身份每轮只能推举一个提案；

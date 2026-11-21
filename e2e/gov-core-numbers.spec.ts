@@ -1019,29 +1019,16 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     const card = page.getByTestId('gov-my-votes-card');
     await expect(card).toBeVisible({ timeout: 30_000 });
 
-    // 概览三格：本轮可投 / 已投 / 未投（都是 18 位小数格式化的治理票）。
-    await expect(page.getByTestId('gov-my-votes-max')).toHaveText(expectedAmount(maxVote), {
+    // 两格：已投 / 未投（「本轮可投」= 上面摘要卡的有效治理权，不在本卡重复，owner 2026-11-21）。
+    await expect(page.getByTestId('gov-my-votes-max')).toHaveCount(0);
+    await expect(page.getByTestId('gov-my-votes-used')).toHaveText(expectedAmount(usedNow), {
       timeout: 30_000,
     });
-    await expect(page.getByTestId('gov-my-votes-used')).toHaveText(expectedAmount(usedNow));
     await expect(page.getByTestId('gov-my-votes-remaining')).toHaveText(expectedAmount(remaining));
     await expect(page.getByTestId('gov-my-votes-round')).toHaveText(roundLabelOf(nowRound));
 
-    // 按轮记录：投票那一轮的标题 + 我的投票 + 占本轮（这一轮只有我一个人投票 → 100%）。
-    const record = page.getByTestId(`gov-my-votes-round-${round.toString()}`);
-    await expect(record).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId(`gov-my-votes-round-line-${round.toString()}`)).toHaveText(
-      `治理第 ${round.toString()} 轮 · 共投出 ${expectedAmount(VOTE_AMOUNT)} 票`,
-    );
-    await expect(
-      page.getByTestId(`gov-my-votes-entry-${round.toString()}-${proposalId.toString()}`),
-    ).toContainText(`#${proposalId.toString()} ${TITLE}`);
-    await expect(
-      page.getByTestId(`gov-my-votes-mine-${round.toString()}-${proposalId.toString()}`),
-    ).toHaveText(`我的投票 ${expectedAmount(VOTE_AMOUNT)}`);
-    await expect(
-      page.getByTestId(`gov-my-votes-share-${round.toString()}-${proposalId.toString()}`),
-    ).toHaveText('占本轮 100%');
+    // 卡片只预览最近两轮：给「查看全部投票记录」入口；完整记录在独立页断言。
+    await expect(page.getByTestId('gov-my-votes-all-link')).toHaveText('查看全部投票记录 >>');
     await expect(page.getByTestId('gov-my-votes-error')).toHaveCount(0);
     // 还有票没投完 → 主按钮是「去投票」链接；投完了就是禁用的「本轮票已经投完」。
     if (remaining > 0n) {
@@ -1060,6 +1047,51 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
         await expect(target.getByTestId('gov-my-votes-used')).toHaveText(expectedAmount(usedNow));
       },
       'gov-my-votes-card',
+    );
+  });
+
+  /**
+   * 用例 G6 · 独立页 `/vote/records`（旧库 `/vote/records` 的对应页，owner 2026-11-21 要求拆出来）。
+   *
+   * 断言：标题 +「去投票」入口 + 按轮记录（轮次行 / 编号 + 标题 / 我的投票 / 占本轮）
+   * + 空态与读失败分支存在性；期望值仍由链上读回派生。
+   */
+  test('用例 G6 · 治理核心：/vote/records 独立投票记录页（按轮分组）', async ({ page }) => {
+    await openPage(page, '/vote/records');
+    await expect(page.getByTestId('gov-vote-records-title')).toHaveText('我的投票记录', {
+      timeout: 30_000,
+    });
+    await expect(page.getByTestId('gov-vote-records-go-vote')).toHaveText('去投票 >>');
+    await expect(page.getByTestId('gov-vote-records-body')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('gov-vote-records-error')).toHaveCount(0);
+
+    // 投票那一轮的记录：轮次行 + 编号标题 + 我的投票 + 占本轮。
+    await expect(page.getByTestId(`gov-vote-records-round-line-${round.toString()}`)).toHaveText(
+      `治理第 ${round.toString()} 轮 · 共投出 ${expectedAmount(VOTE_AMOUNT)} 票`,
+    );
+    await expect(
+      page.getByTestId(`gov-vote-records-entry-${round.toString()}-${proposalId.toString()}`),
+    ).toContainText(`#${proposalId.toString()} ${TITLE}`);
+    await expect(
+      page.getByTestId(`gov-vote-records-mine-${round.toString()}-${proposalId.toString()}`),
+    ).toHaveText(`我的投票 ${expectedAmount(VOTE_AMOUNT)}`);
+    await expect(
+      page.getByTestId(`gov-vote-records-share-${round.toString()}-${proposalId.toString()}`),
+    ).toHaveText('占本轮 100%');
+
+    await captureState(
+      page,
+      'gov-core-vote-records',
+      '/vote/records',
+      async (target) => {
+        await expect(target.getByTestId('gov-vote-records-body')).toBeVisible({
+          timeout: 30_000,
+        });
+        await expect(
+          target.getByTestId(`gov-vote-records-entry-${round.toString()}-${proposalId.toString()}`),
+        ).toContainText(`#${proposalId.toString()} ${TITLE}`);
+      },
+      'gov-vote-records-title',
     );
   });
 });

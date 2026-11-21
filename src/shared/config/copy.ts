@@ -138,6 +138,7 @@ export const copy = {
     unstake: '申请解锁',
     stakeLiquid: '流动性质押数据',
     vote: '投票',
+    voteRecords: '投票记录',
     submit: '提案',
     rewards: '治理激励',
     proposalRewards: '提案激励',
