@@ -28,14 +28,14 @@ export interface MyVoteEntry {
   readonly title: string;
   /** 我在这个提案上累计投出的票数。 */
   readonly myVotes: bigint;
+  /** 这个提案在本轮收到的**总票数**（`Vote.voteAmountByProposalId`）——占比的分母。 */
+  readonly proposalTotalVotes: bigint;
 }
 
 export interface MyVoteRound {
   readonly round: bigint;
   /** 这一轮我投出的票合计。 */
   readonly myTotalVotes: bigint;
-  /** 这一轮全社区投出的票合计，用于算「占本轮」。 */
-  readonly roundTotalVotes: bigint;
   readonly entries: readonly MyVoteEntry[];
 }
 
@@ -135,6 +135,35 @@ export function useMyVotes(tokenAddress: HexAddress | undefined, options: MyVote
     return result;
   }, [rounds, votes.data]);
 
+  const proposalRefs = useMemo(
+    () =>
+      perRound.flatMap((item) => item.ids.map((proposalId) => ({ round: item.round, proposalId }))),
+    [perRound],
+  );
+
+  // 占比的分母是**该提案获得的总票数**（owner 2026-11-21 明确），不是该轮总票数。
+  const proposalTotals = useReadContracts({
+    contracts:
+      voteAddress !== undefined && tokenAddress !== undefined && proposalRefs.length > 0
+        ? proposalRefs.map((ref) => ({
+            address: voteAddress,
+            abi: voteAbi,
+            functionName: 'voteAmountByProposalId' as const,
+            args: [tokenAddress, ref.round, ref.proposalId] as const,
+          }))
+        : [],
+    query: { enabled: proposalRefs.length > 0, placeholderData: keepPreviousData },
+  });
+
+  const proposalTotalById = useMemo(() => {
+    const map = new Map<string, bigint>();
+    proposalRefs.forEach((ref, index) => {
+      const value = proposalTotals.data?.[index]?.result;
+      if (typeof value === 'bigint') map.set(`${ref.round}:${ref.proposalId}`, value);
+    });
+    return map;
+  }, [proposalRefs, proposalTotals.data]);
+
   const allProposalIds = useMemo(() => {
     const ids = new Set<bigint>();
     for (const item of perRound) for (const id of item.ids) ids.add(id);
@@ -169,16 +198,18 @@ export function useMyVotes(tokenAddress: HexAddress | undefined, options: MyVote
       perRound.map((item) => ({
         round: item.round,
         myTotalVotes: item.amounts.reduce((sum, amount) => sum + amount, 0n),
-        roundTotalVotes: item.roundTotalVotes,
         entries: item.ids.map((proposalId, index) => ({
           proposalId,
           // 标题还没读回来时不给占位串：卡片按「条目数已齐」渲染，标题缺就是空串，
           // 由 UI 用「#编号」兜底，不编造数据。
           title: titleById.get(proposalId) ?? '',
           myVotes: item.amounts[index] ?? 0n,
+          // 读不到就是 undefined 语义：`formatSharePercent` 会返回 undefined，UI 不显示占比，
+          // 绝不拿「我的票数」当分母凑一个 100%。
+          proposalTotalVotes: proposalTotalById.get(`${item.round}:${proposalId}`) ?? -1n,
         })),
       })),
-    [perRound, titleById],
+    [perRound, proposalTotalById, titleById],
   );
 
   const lowestScanned = rounds.length > 0 ? rounds[rounds.length - 1] : undefined;
@@ -188,9 +219,9 @@ export function useMyVotes(tokenAddress: HexAddress | undefined, options: MyVote
       ? 'unconfigured'
       : memberId === undefined || currentPhase === undefined
         ? 'loading'
-        : votes.isError || infos.isError
+        : votes.isError || infos.isError || proposalTotals.isError
           ? 'error'
-          : votes.isLoading || infos.isLoading
+          : votes.isLoading || infos.isLoading || proposalTotals.isLoading
             ? 'loading'
             : 'ready';
 
@@ -203,6 +234,7 @@ export function useMyVotes(tokenAddress: HexAddress | undefined, options: MyVote
     refetch: () => {
       votes.refetch();
       infos.refetch();
+      proposalTotals.refetch();
     },
   };
 }

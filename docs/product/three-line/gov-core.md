@@ -16,10 +16,12 @@
 | 禁止 | **8545 人工链**（自动化永不触碰）、8555（e2e 套件自有链，跑前端线用） |
 | 地址簿 | `../anvil/export/deployments/anvil31337_dev.json`（前端副本 `src/config/network/anvil31337_dev/network.json` 同源；端口不影响地址） |
 | ABI | `../anvil/export/abis/{Vote,Submit,Mint,Phase,Stake}.json`（前端副本 `src/config/abis/{vote,submit,mint,phase,stake}.ts` 由 `pnpm sync:anvil` 生成） |
-| 核心参数（dev） | `PRECISION = 1e18`、`SUBMIT_MIN_RATIO = 5e15`（0.5%）、`PROPOSAL_REWARD_MIN_VOTE_RATIO = 5e16`（5%）、`ROUND_REWARD_GOV_RATIO = ROUND_REWARD_PROPOSAL_RATIO = 5e14`（各 0.05%）、`VOTE_POOL_DIVISOR = 2`、`MAX_TITLE_LENGTH = MAX_DETAILS_LENGTH = 1024`、`MAX_TARGET_DATA_COUNT = 16`、`SUBMIT_ROUND_LIMIT = 1000`（私有常量，界面不显示） |
-| 合约基线 | core `f5707ce`（`feat(core): add target-filtered proposal pagination`）——本轮开发用的就是最新 core，`anvil/export/abis` 里已含该提交新增的 `votedProposalIdsByTarget` / `submitInfosByTarget` 等函数 |
+| 核心参数（dev） | `PRECISION = 1e18`、`SUBMIT_MIN_RATIO = 5e15`（0.5%）、`PROPOSAL_REWARD_MIN_VOTE_RATIO = 5e16`（5%）、`ROUND_REWARD_GOV_RATIO = ROUND_REWARD_PROPOSAL_RATIO = 5e14`（各 0.05%）、`VOTE_POOL_DIVISOR = 2`、`MAX_TITLE_LENGTH = MAX_DETAILS_LENGTH = 1024`、`MAX_CREATION_DATA_BYTES = 16384`、`SUBMIT_ROUND_LIMIT = 1000`（私有常量，界面不显示） |
+| 合约基线 | core `f5707ce` 加上工作区的回调参数改动 |
 | 地址 | `Vote 0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82`、`Submit 0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0`、`Mint 0x9A676e781A523b5d0C0e43731313A708CB607508`、`Phase 0xa513E6E4b8f2a923D98304ec87F64353C4D5C853`、`Stake 0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e`、`MemberNFT 0x610178dA211FEF7D417bC0e6FeD39F05609AD788`、`TestLOVE20 0x8aCd85898458400f7Db866d53FCFF6f0D49741FF` |
 | 操作账户 | anvil #0 `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`（= 身份 NFT #1、种子把**全部**流动性质押记在 memberId #1） |
+
+回调参数复验使用从区块 0 新建的 `127.0.0.1:8574` 临时链，`8566` 已有进程运行。理论值沿用 §1。
 
 ## §1 理论线（先手算，再看链）
 
@@ -48,10 +50,10 @@
 | --- | --- | --- |
 | 本轮可投 | `maxVoteAmount = Stake.govVotes(token, currentPhase, member1)`（`Vote.sol:117-119`） | `4472135954999579391818`（页面 `4,472.13`） |
 | 本轮已投 / 未投 | `voteAmountByMemberId(round, member1)`；未投 = 可投 − 已投（下限 0，`Vote.sol:282-286` 同口径）。**本轮可投不在卡片重复**（= 摘要卡的有效治理权，owner 2026-11-21 复核删掉） | 投票后 `100e18` / `4372135954999579391818`（页面 `100` / `4,372.13`） |
-| 记录页 `/vote/records` | 同一组读数（`votedProposalIdsByMemberId` + `totalVoteAmount` + 标题），一页 10 轮 + 加载更多 | 与卡片同口径；`治理第 111 轮 · 共投出 100 票`、`我的投票 100`、`占本轮 100%` |
+| 记录页 `/vote/records` | 同一组读数（`votedProposalIdsByMemberId` + `voteAmountByProposalId` + 标题），一页 10 轮 + 加载更多 | 与卡片同口径；`治理第 111 轮 · 共投出 100 票`、`我的投票 100`、`占该提案票数 100%` |
 | 按轮记录 | `votedProposalIdsByMemberId(token, round, member1, 0, 50, false)` → (提案 id 列表, 我在每个提案的票数, 总数)（`Vote.sol:183-197`） | 投票那一轮返回 `[1]`、`[100e18]`、`1` |
 | 该轮我投出合计 | 上面票数数组求和 | `100e18`（页面 `共投出 100 票`） |
-| 占本轮 | `formatSharePercent(我的票数, Vote.totalVoteAmount(round))`（规则见 `shared/lib/share-percent.ts`） | `100e18 / 100e18` → `100%` |
+| 占该提案票数 | `myVoteSharePercent(我的票数, Vote.voteAmountByProposalId(round, 提案))` —— **分母是该提案的总票数**（owner 2026-11-21 更正；不是该轮总票数） | 本用例只有我投票 → `100e18 / 100e18` → `100%`；单测 `my-votes-share.test.ts` 用 100/400 证明分母不是轮总票数 |
 | 标题 | `Submit.proposalInfosByProposalIds(token, [ids])` 的 `body.title`（`ISubmit.sol:157-160`） | 与提案标题逐字相同 |
 
 ### §1.3 治理激励（`Mint`）
@@ -80,18 +82,16 @@
 
 ## §2 合约线
 
-> 脚本：`scripts/verify/gov-core-contract.mjs`（**1527 行**，只打 8566；启动时按端口拒绝 8545/8555，实测两条都退出 1 且不发任何 RPC）。
+> 脚本 `scripts/verify/gov-core-contract.mjs` 默认连接 8566，支持通过 `--rpc` 指定临时链，拒绝 8545 和 8555。
 > 运行：`make -C ../anvil bootstrap PORT=8566` 后 `node scripts/verify/gov-core-contract.mjs`（或 `VERIFY_RPC=…`）。
 
 跑法：viem test client + `anvil_mine`；每组 `snapshot`/`revert`，跑完链状态逐 wei 回到跑前；先关 interval mining 再开 automine（顺序反了 anvil 会忽略 `setAutomine`），`finally` 恢复原值。
 
 | 项 | 结果 |
 | --- | --- |
-| 权威跑 | `[§0] block=357 phase=3 phaseBlocks=120` → **190 PASS / 0 FAIL**，**EXIT=0** |
-| 复现性 | 干净链连跑 3 次均 190/190 EXIT=0；在阶段末尾（只剩 3–4 块）起跑，守卫触发后仍 190/190 |
-| 阶段推进实测 | 3→4（+4 块，剩块守卫前置）、4→5（+118）、5→6（+114）、6→7（+741，`Phase.sync` 把下一阶段拉长到 744） |
-| 跑后状态 | block 357 / phase 3；`proposalIds=0`、`totalRewardReserved/Minted/Burned=0`、memberStake(1) 回到种子、memberStake(5) 全 0 |
-| 8545 / 8555 | 全程未触碰（8545 只在本地读过一次 `eth_blockNumber`；8555 属于 e2e 套件） |
+| 新 ABI 复验 | `node scripts/verify/gov-core-contract.mjs --rpc http://127.0.0.1:8574`，**191 PASS / 0 FAIL**。新增 `ProposalCreated.creationData` 读回断言，期望 `0x`，实际 `0x` |
+| 阶段推进实测 | 3→4（+63 块）、4→5（+114）、5→6（+117） |
+| 跑后状态 | 两组用例均回滚，回到起始区块 296、治理第 3 轮 |
 
 按节覆盖（每条都是「链上读回 ↔ 手算」成对断言，不抄常量）：
 
@@ -99,7 +99,7 @@
 | --- | --- | --- |
 | §0 | 4 | `ownerOf(1)`、`ownerOf(5)`、无治理权成员 `canSubmit=false`、无 NFT 账户余额 0 |
 | §1 | 7 | `SUBMIT_MIN_RATIO=5000000000000000`；`totalGovVotes=govVotes(1)=4472135954999579391818`；`required=ceil(total×ratio/1e18)=22360679774997896960`；`canSubmit(1)=true` |
-| §2 | 15 | `proposalIds` 0→1、`ProposalCreated.proposalId=旧 count+1`、`authorId=1`、`isSubmitted=true`、`proposalIdBySubmitterId=1`；同轮再推举回滚 `MemberAlreadySubmitted(0xc3487d0d)` 且三个参数逐个相等 |
+| §2 | 16 | `proposalIds` 0→1、`ProposalCreated.proposalId=旧 count+1`、`authorId=1`、`creationData=0x`、`isSubmitted=true`、`proposalIdBySubmitterId=1`；同轮再推举回滚 `MemberAlreadySubmitted(0xc3487d0d)` 且三个参数逐个相等 |
 | §3 | 23 | 投 `1e21` 后三个票数读数相等；`maxVoteAmount ≥ 累计`；`max+1` 回滚 `VoteLimitExceeded(0xb60c38d3)` 且参数逐字相等；`VoteCast` 4 项；`voterBoost=totalVoterBoost=1e21` |
 | §4 | 30 | 投票前 `rewardAvailable=9000004500000900000090000003`、`govReward=0`；第一票后 `gov=proposal=4500002250000450000045000`（= `floor(available×5e14/1e18)`）；`totalRewardReserved` 增量 = `9000004500000900000090000`；`RoundRewardReserved` 逐字相等；预留后 `rewardAvailable` 恰好减少 `gov+proposal` |
 | §5 | 11 | 按 `phaseInfo(next).startBlock − 当前块` 推进；`currentPhase` 恰 +1；`isRoundEnded(旧轮)=true`、`isRoundEnded(新轮)=false`（三轮各验） |
@@ -121,11 +121,11 @@
 | 用例 | 覆盖 | 断言口径 |
 | --- | --- | --- |
 | G1 | `/vote` 空态 → `/submit` 填表推举（真实交易）→ 回执 → `/vote` 投 100 票（真实交易）→ 回执 | 55 处 `toHaveText` 整串精确；期望值由 spec **直连 RPC 读回**再派生，`expectedAmount()` 独立实现格式化规则（不 import `src/`，避免页面格式化写错时静默通过） |
-| G2 | 推举 / 投票两态四档截图（`suspendMining` 冻结当轮再拍） | 20 张 `gov-core-*`（390×844 / 1280×800 × 浅/深） |
+| G2 | 推举 / 投票两态四档截图（`suspendMining` 冻结当轮再拍） | `gov-core-submit-submitted-*` 与 `gov-core-vote-voted-*` 各四张（390×844 / 1280×800 × 浅/深） |
 | G3 | `anvil_mine` 推一轮 → `/gov/rewards` 出现可铸造行 → 铸造（真实交易）→ 行变「已铸造」 | `1 轮可铸造` → `2,250,001` → `已铸造` / `0 轮可铸造` |
 | G4 | `/gov/proposal-rewards` 默认上一轮 → 池 / 总票数 / 门槛 / 行金额 / 达标说明 → `prev` 到空轮 → `next` 回 | `4,500,002` / `100` / `5` / `100 / 5` / `待结算` |
 | G5 | `/gov` 「我的投票」卡：两格额度（已投 / 未投，按**当前轮**现读现算）+ 「查看全部投票记录」入口 + 「去投票」 | `gov-my-votes-max` **不存在**（不重复）；已投按当轮读回值；卡片只预览两轮 |
-| G6 | `/vote/records` 独立记录页：标题 + 「去投票」+ 按轮分组（轮次行 / 编号标题 / 我的投票 / 占本轮） | `治理第 R 轮 · 共投出 100 票`、`#1 …`、`我的投票 100`、`占本轮 100%` |
+| G6 | `/vote/records` 独立记录页：标题 + 「去投票」+ 按轮分组（轮次行 / 编号标题 / 我的投票 / 占该提案票数） | `治理第 R 轮 · 共投出 100 票`、`#1 …`、`我的投票 100`、`占该提案票数 100%` |
 
 实跑（2026-11-21 07:30 前后，8555，复用链与 preview）：
 
@@ -139,6 +139,8 @@ Running 4 tests using 1 worker
 ```
 
 同一条 8555 链第二遍：`4 passed (49.1s) EXIT=0`；跑后回读 `automine=false`、`intervalMining=1`（挖矿模式未泄漏）。**8545 全程未被自动化触碰。**
+
+回调参数复验使用同一条 8574 临时链。`gov-core-numbers.spec.ts` 的 G1–G6 均通过，G1 的投票回执显示 100 票。G2 重新生成推举和投票成功状态的八张截图，分别核对了主题和视口尺寸。
 
 ## §4 三线对照表
 
@@ -161,9 +163,9 @@ Running 4 tests using 1 worker
 | 未达标提案销毁 | `ceil` 门槛不足的份额 | 同左（`status=2`、`totalRewardBurned` 增量、事件逐字相等；重复销毁不 revert） | 前端线未覆盖（需同轮第二个被投票的提案 + 第二个有治理权的身份，见 §3 说明） | ✅（合约线覆盖） |
 | `burnUnusedBoostReward` | `gov − gov/2` | 同左（§8） | 前端线不覆盖（页面没有入口） | ✅（合约线覆盖） |
 | 我的投票卡 · 本轮额度 | `voteAmountByMemberId` / 治理权 − 已投 | 同左（§1.2b / §3 G5；前端线按**当前轮**重新读） | `100` / `4,372.13`（`gov-my-votes-used/remaining`）；**不再出现** `gov-my-votes-max` | ✅ |
-| 记录（卡片预览两轮 / `/vote/records` 全量） | `votedProposalIdsByMemberId` + `totalVoteAmount` | 同左（§3 G5/G6） | 卡片：`查看全部投票记录 >>`；记录页：`治理第 R 轮 · 共投出 100 票`、`#1 …`、`我的投票 100`、`占本轮 100%` | ✅ |
+| 记录（卡片预览两轮 / `/vote/records` 全量） | `votedProposalIdsByMemberId` + `voteAmountByProposalId`（分母=提案总票数） | 同左（§3 G5/G6） | 卡片：`查看全部投票记录 >>`；记录页：`治理第 R 轮 · 共投出 100 票`、`#1 …`、`我的投票 100`、`占该提案票数 100%` | ✅ |
 | 我的投票卡 · 本轮额度 | `maxVoteAmount` / `voteAmountByMemberId` | 同左（§1.2b / §3；前端线按当前轮重新读） | `4,472.13` / `100` / `4,372.13`（`gov-my-votes-max/used/remaining`） | ✅ |
-| 记录（卡片预览两轮 / `/vote/records` 全量） | `votedProposalIdsByMemberId` + `totalVoteAmount` | 同左（§3 G5/G6） | 卡片：`查看全部投票记录 >>`；记录页：`治理第 R 轮 · 共投出 100 票`、`#1 …`、`我的投票 100`、`占本轮 100%` | ✅ |
+| 记录（卡片预览两轮 / `/vote/records` 全量） | `votedProposalIdsByMemberId` + `voteAmountByProposalId`（分母=提案总票数） | 同左（§3 G5/G6） | 卡片：`查看全部投票记录 >>`；记录页：`治理第 R 轮 · 共投出 100 票`、`#1 …`、`我的投票 100`、`占该提案票数 100%` | ✅ |
 
 **结论**：
 

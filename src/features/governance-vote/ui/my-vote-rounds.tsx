@@ -1,6 +1,6 @@
 import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount } from '@/shared/lib/format';
-import { formatSharePercent } from '@/shared/lib/share-percent';
+import { myVoteSharePercent } from '../lib/my-votes-share';
 import type { MyVoteRound } from '@/entities/gov-core/model/use-my-votes';
 
 /** 治理票是 18 位小数的数量（`Stake.govVotes`）。 */
@@ -35,7 +35,8 @@ export function MyVoteRounds({ rounds, testIdPrefix }: MyVoteRoundsProps) {
           </p>
           <ul className="mt-1 space-y-1.5 rounded-2xl bg-elevated/60 px-3 py-2">
             {item.entries.map((entry) => {
-              const share = formatSharePercent(entry.myVotes, item.roundTotalVotes);
+              // 占比 = 我在这个提案的票数 / 这个提案获得的总票数（owner 2026-11-21）。
+              const share = myVoteSharePercent(entry.myVotes, entry.proposalTotalVotes);
               return (
                 <li
                   key={entry.proposalId.toString()}

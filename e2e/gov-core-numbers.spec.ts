@@ -493,6 +493,18 @@ async function settleFreshPhase(): Promise<bigint> {
 // 页面操作
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * 占比期望文本（独立实现，规则同 `shared/lib/share-percent.ts`：两位小数、截断不进位、
+ * 百分数 ×100）。分母是**该提案获得的总票数**（owner 2026-11-21），不是该轮总票数。
+ */
+function expectedSharePercent(part: bigint, total: bigint): string {
+  if (total === 0n) return '0';
+  const hundredths = (part * 10_000n) / total;
+  const whole = hundredths / 100n;
+  const fraction = (hundredths % 100n).toString().padStart(2, '0').replace(/0+$/, '');
+  return fraction.length > 0 ? `${whole}.${fraction}` : whole.toString();
+}
+
 async function openPage(page: Page, path: string): Promise<void> {
   await installWallet(page, ACCOUNT);
   await seedIdentity(page, ACCOUNT, MEMBER_ID);
@@ -992,7 +1004,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
    * `/vote/records` 的呈现内容，布局重做）。
    *
    * 数据全部来自 G1 那一笔真实投票：本轮额度 = 治理权 − 已投；记录按轮分组，
-   * 每条显示「编号 + 标题 + 我的投票 + 占本轮」。期望值同样从链上读回后派生。
+   * 每条显示「编号 + 标题 + 我的投票 + 占该提案票数」。期望值同样从链上读回后派生。
    */
   test('用例 G5 · 治理核心：/gov 我的投票卡（额度 / 按轮记录 / 占比）', async ({ page }) => {
     // 卡片上的额度是**当前轮**的：G1 投票之后链可能又推进了阶段，所以这里重新读一次。
@@ -1053,7 +1065,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
   /**
    * 用例 G6 · 独立页 `/vote/records`（旧库 `/vote/records` 的对应页，owner 2026-11-21 要求拆出来）。
    *
-   * 断言：标题 +「去投票」入口 + 按轮记录（轮次行 / 编号 + 标题 / 我的投票 / 占本轮）
+   * 断言：标题 +「去投票」入口 + 按轮记录（轮次行 / 编号 + 标题 / 我的投票 / 占该提案票数）
    * + 空态与读失败分支存在性；期望值仍由链上读回派生。
    */
   test('用例 G6 · 治理核心：/vote/records 独立投票记录页（按轮分组）', async ({ page }) => {
@@ -1065,7 +1077,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     await expect(page.getByTestId('gov-vote-records-body')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId('gov-vote-records-error')).toHaveCount(0);
 
-    // 投票那一轮的记录：轮次行 + 编号标题 + 我的投票 + 占本轮。
+    // 投票那一轮的记录：轮次行 + 编号标题 + 我的投票 + 占该提案票数。
     await expect(page.getByTestId(`gov-vote-records-round-line-${round.toString()}`)).toHaveText(
       `治理第 ${round.toString()} 轮 · 共投出 ${expectedAmount(VOTE_AMOUNT)} 票`,
     );
@@ -1075,9 +1087,15 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     await expect(
       page.getByTestId(`gov-vote-records-mine-${round.toString()}-${proposalId.toString()}`),
     ).toHaveText(`我的投票 ${expectedAmount(VOTE_AMOUNT)}`);
+    const proposalVotes = (await client.readContract({
+      address: deployment.addresses.vote,
+      abi: VOTE_ABI,
+      functionName: 'voteAmountByProposalId',
+      args: [deployment.addresses.tokenAddress, round, proposalId],
+    })) as bigint;
     await expect(
       page.getByTestId(`gov-vote-records-share-${round.toString()}-${proposalId.toString()}`),
-    ).toHaveText('占本轮 100%');
+    ).toHaveText(`占该提案票数 ${expectedSharePercent(VOTE_AMOUNT, proposalVotes)}%`);
 
     await captureState(
       page,
