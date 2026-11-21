@@ -257,9 +257,9 @@ export const voteAbi = [
         internalType: 'uint256[]',
       },
       {
-        name: 'targetData',
-        type: 'bytes[][]',
-        internalType: 'bytes[][]',
+        name: 'voteData',
+        type: 'bytes[]',
+        internalType: 'bytes[]',
       },
     ],
     outputs: [],
@@ -807,7 +807,7 @@ export const voteAbi = [
   },
   {
     type: 'error',
-    name: 'TargetDataLengthMismatch',
+    name: 'VoteDataLengthMismatch',
     inputs: [
       {
         name: 'proposalIdsLength',
@@ -815,7 +815,7 @@ export const voteAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'targetDataLength',
+        name: 'voteDataLength',
         type: 'uint256',
         internalType: 'uint256',
       },

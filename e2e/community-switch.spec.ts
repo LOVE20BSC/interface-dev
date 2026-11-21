@@ -96,11 +96,14 @@ function ensureChildCommunity(): string {
     [deployment.addresses.tokenAddress, '1', '1'],
     deployment.addresses.mint,
   );
-  castSend(
-    deployment.addresses.launch,
-    'launchToken(string,address,uint256,address,uint8,bytes[])',
-    [CHILD_INPUT_SYMBOL, deployment.addresses.tokenAddress, '1', ACCOUNTS.withIdentity, '0', '[]'],
-  );
+  castSend(deployment.addresses.launch, 'launchToken(string,address,uint256,address,uint8,bytes)', [
+    CHILD_INPUT_SYMBOL,
+    deployment.addresses.tokenAddress,
+    '1',
+    ACCOUNTS.withIdentity,
+    '0',
+    '0x',
+  ]);
   const child = addressOf(
     deployment.addresses.launch,
     'tokenAddressBySymbol(string)(address)',

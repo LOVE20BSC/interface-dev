@@ -409,7 +409,7 @@ function proposalBody(tag) {
     details: `three-line verification (contract) ${tag}`,
     target: PROPOSAL_TARGET,
     targetMode: 0, // TargetMode.NoCallback
-    targetData: [],
+    creationData: '0x',
   };
 }
 
@@ -433,6 +433,7 @@ async function submitProposal(from, memberId, tag) {
       CONTRACTS.token.address,
       memberId,
       proposalBody(tag),
+      '0x',
     ]),
   });
   await guardRound(roundBefore, `submit ${tag}`);
@@ -697,6 +698,7 @@ async function runGovFlow() {
     String(submitEvent.args.target).toLowerCase(),
   );
   check('§2 ProposalCreated.targetMode = 0（NoCallback）', 0, Number(submitEvent.args.targetMode));
+  check('§2 ProposalCreated.creationData = 0x', '0x', submitEvent.args.creationData);
   // 同一身份同一轮再推举一次必须 revert：只走 eth_call，不发第二笔真交易
   await expectRevert(
     '§2 同一身份同轮再推举一次',
@@ -707,6 +709,7 @@ async function runGovFlow() {
         CONTRACTS.token.address,
         MEMBER,
         proposalBody('A-dup'),
+        '0x',
       ]),
     },
     'Submit',

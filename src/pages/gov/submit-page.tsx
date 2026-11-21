@@ -20,11 +20,7 @@ import { GovAccessGate } from '@/widgets/gov-access-gate/gov-access-gate';
  * - 推举权 = 本轮治理权 ≥ `ceil(totalGovVotes * SUBMIT_MIN_RATIO / PRECISION)`，
  *   且社区本轮有人质押；`useSubmitContext` 已经把这些算好；
  * - 一个身份每轮**只能推举 1 个**（`MemberAlreadySubmitted`），已推举时页面只显示
- *   链上记下的提案编号与标题，不再渲染表单；
- * - 本版本只做「不回调」的提案（`targetMode = 0`、`targetData = []`），回调数据属于
- *   行动域，不在这一页。
- *
- * 写链只有一笔：`Submit.submitNewProposal(tokenAddress, memberId, proposalBody)`。
+ *   链上记下的提案编号与标题，不再渲染表单。
  */
 export function SubmitPage() {
   const { symbol } = useCommunityContext();

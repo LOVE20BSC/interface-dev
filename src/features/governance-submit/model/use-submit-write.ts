@@ -7,8 +7,6 @@ import { useContractWrite, type ContractCall } from '@/shared/model/use-contract
 import type { ProposalBodyInput } from '../lib/submit-form';
 
 /**
- * 推举的写链状态机：一笔 `Submit.submitNewProposal(token, memberId, proposalBody)`。
- *
  * 治理域没有代币授权，所以只有「签名 → 上链 → 回执」一段（与投票一致）；页面要显示的
  * 提案编号与标题来自回执里的 `ProposalCreated` 事件（`submitAbi`），不拿表单输入冒充
  * 链上结果——标题以链上记下的那一份为准。
@@ -87,7 +85,7 @@ export function useSubmitWrite(
       address: input.submitAddress,
       abi: submitAbi,
       functionName: 'submitNewProposal',
-      args: [input.tokenAddress, input.memberId, input.body],
+      args: [input.tokenAddress, input.memberId, input.body, '0x'],
     };
     void write.run(call);
   };

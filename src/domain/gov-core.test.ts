@@ -155,19 +155,24 @@ describe('validateProposalDraft', () => {
   const limits: ProposalLimits = {
     maxTitleLength: 8n,
     maxDetailsLength: 16n,
-    maxTargetDataCount: 16n,
-    maxTargetDataBytes: 16384n,
+    maxCreationDataBytes: 16384n,
   };
   const base = {
     title: '标题',
     details: '详情',
     target: '0x0000000000000000000000000000000000000001',
-    targetDataCount: 0,
-    targetDataBytes: 0,
+    creationDataBytes: 0,
   };
 
   it('合法草稿通过', () => {
     expect(validateProposalDraft(base, limits)).toBeNull();
+  });
+
+  it('创建数据按字节校验 16 KiB 上限', () => {
+    expect(validateProposalDraft({ ...base, creationDataBytes: 16384 }, limits)).toBeNull();
+    expect(validateProposalDraft({ ...base, creationDataBytes: 16385 }, limits)).toBe(
+      'creation-data-too-large',
+    );
   });
 
   it('标题空 / 超字节 / 目标非法逐项报出', () => {

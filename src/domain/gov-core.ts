@@ -136,16 +136,14 @@ export function mintableRounds(
 export interface ProposalLimits {
   readonly maxTitleLength: bigint;
   readonly maxDetailsLength: bigint;
-  readonly maxTargetDataCount: bigint;
-  readonly maxTargetDataBytes: bigint;
+  readonly maxCreationDataBytes: bigint;
 }
 
 export interface ProposalDraft {
   readonly title: string;
   readonly details: string;
   readonly target: string;
-  readonly targetDataCount: number;
-  readonly targetDataBytes: number;
+  readonly creationDataBytes: number;
 }
 
 export type ProposalDraftIssue =
@@ -153,8 +151,7 @@ export type ProposalDraftIssue =
   | 'title-too-long'
   | 'details-too-long'
   | 'target-invalid'
-  | 'target-data-too-many'
-  | 'target-data-too-large';
+  | 'creation-data-too-large';
 
 /**
  * UTF-8 字节数。合约按 `bytes(...).length` 校验（`Submit.sol:264,268`），
@@ -196,7 +193,7 @@ export function validateProposalDraft(
   if (titleBytes > Number(limits.maxTitleLength)) return 'title-too-long';
   if (utf8ByteLength(draft.details) > Number(limits.maxDetailsLength)) return 'details-too-long';
   if (!isProposalTargetValid(draft.target)) return 'target-invalid';
-  if (draft.targetDataCount > Number(limits.maxTargetDataCount)) return 'target-data-too-many';
-  if (draft.targetDataBytes > Number(limits.maxTargetDataBytes)) return 'target-data-too-large';
+  if (draft.creationDataBytes > Number(limits.maxCreationDataBytes))
+    return 'creation-data-too-large';
   return null;
 }

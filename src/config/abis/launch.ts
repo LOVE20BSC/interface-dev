@@ -376,8 +376,8 @@ export const launchAbi = [
       },
       {
         name: 'distributorData',
-        type: 'bytes[]',
-        internalType: 'bytes[]',
+        type: 'bytes',
+        internalType: 'bytes',
       },
     ],
     outputs: [

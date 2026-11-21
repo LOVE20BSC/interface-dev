@@ -386,7 +386,7 @@ export const airdropDistributorAbi = [
         internalType: 'address',
       },
       {
-        name: '',
+        name: 'parentTokenAddress',
         type: 'address',
         internalType: 'address',
       },
@@ -397,8 +397,8 @@ export const airdropDistributorAbi = [
       },
       {
         name: 'distributorData',
-        type: 'bytes[]',
-        internalType: 'bytes[]',
+        type: 'bytes',
+        internalType: 'bytes',
       },
     ],
     outputs: [],
@@ -557,22 +557,6 @@ export const airdropDistributorAbi = [
       },
       {
         name: 'claimableFromRound',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'InvalidDistributorDataCount',
-    inputs: [
-      {
-        name: 'count',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'expectedCount',
         type: 'uint256',
         internalType: 'uint256',
       },

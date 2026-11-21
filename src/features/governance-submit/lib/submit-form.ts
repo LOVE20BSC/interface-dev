@@ -3,7 +3,6 @@ import {
   isProposalTargetValid,
   utf8ByteLength,
   validateProposalDraft,
-  type ProposalDraftIssue,
   type ProposalLimits,
 } from '@/domain/gov-core';
 import { formatPercent } from '@/shared/lib/format-rates';
@@ -14,16 +13,10 @@ import { formatPercent } from '@/shared/lib/format-rates';
  * 页面只收集三个输入（标题 / 详情 / 目标地址），合约要的是 `ProposalBody`
  * （`Submit._checkProposalBody`，`Submit.sol:263-287`），这一层负责把用户输入翻成
  * 合约口径：不碰 React、不碰写链状态机，方便页面与写链共用同一份判断。
- *
- * 本版本只推举「不回调」的提案（`TargetMode.NoCallback`）：`targetMode` 恒为 0、
- * `targetData` 恒为空数组——回调数据由目标合约定义，属于行动域。
  */
 
 /** `ISubmit.TargetMode.NoCallback`。 */
 const NO_CALLBACK_TARGET_MODE = 0;
-/** 不回调就没有回调数据，所以这两项在合约校验里恒为 0。 */
-const NO_CALLBACK_DATA_COUNT = 0;
-const NO_CALLBACK_DATA_BYTES = 0;
 /** `SUBMIT_MIN_RATIO` 是 18 位定点比例（1e18 = 100%），除它得到百分数。 */
 const RATIO_PERCENT_DIVISOR = 1e16;
 
@@ -48,7 +41,6 @@ export function measureSubmitDraft(draft: SubmitDraft): SubmitDraftBytes {
   return { title: utf8ByteLength(draft.title), details: utf8ByteLength(draft.details) };
 }
 
-/** 页面能显示文案的四种正文问题；targetData 的两条本版本不可能命中，已收敛掉。 */
 export type SubmitDraftIssue =
   'title-empty' | 'title-too-long' | 'details-too-long' | 'target-invalid';
 
@@ -61,28 +53,16 @@ export function submitDraftIssue(
   draft: SubmitDraft,
   limits: ProposalLimits,
 ): SubmitDraftIssue | null {
-  const issue: ProposalDraftIssue | null = validateProposalDraft(
+  const issue = validateProposalDraft(
     {
       title: draft.title,
       details: draft.details,
       target: draft.target,
-      targetDataCount: NO_CALLBACK_DATA_COUNT,
-      targetDataBytes: NO_CALLBACK_DATA_BYTES,
+      creationDataBytes: 0,
     },
     limits,
   );
-  switch (issue) {
-    case null:
-    case 'target-data-too-many':
-    case 'target-data-too-large':
-      // 本版本 `targetData` 恒为空，这两条只可能由回调数据触发。
-      return null;
-    case 'title-empty':
-    case 'title-too-long':
-    case 'details-too-long':
-    case 'target-invalid':
-      return issue;
-  }
+  return issue === 'creation-data-too-large' ? null : issue;
 }
 
 /** 目标地址：去掉首尾空白后必须是 0x + 40 位十六进制，且不能是零地址。 */
@@ -91,13 +71,12 @@ export function parseProposalTarget(raw: string): HexAddress | undefined {
   return isProposalTargetValid(trimmed) ? (trimmed as HexAddress) : undefined;
 }
 
-/** `Submit.submitNewProposal(tokenAddress, memberId, proposalBody)` 的 `proposalBody` 参数。 */
 export interface ProposalBodyInput {
   readonly title: string;
   readonly details: string;
   readonly target: HexAddress;
   readonly targetMode: number;
-  readonly targetData: readonly `0x${string}`[];
+  readonly creationData: `0x${string}`;
 }
 
 /**
@@ -112,7 +91,7 @@ export function buildProposalBody(draft: SubmitDraft): ProposalBodyInput | undef
     details: draft.details,
     target,
     targetMode: NO_CALLBACK_TARGET_MODE,
-    targetData: [],
+    creationData: '0x',
   };
 }
 

@@ -31,33 +31,20 @@ export const submitAbi = [
   },
   {
     type: 'function',
+    name: 'MAX_CREATION_DATA_BYTES',
+    inputs: [],
+    outputs: [
+      {
+        name: '',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'MAX_DETAILS_LENGTH',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'MAX_TARGET_DATA_BYTES',
-    inputs: [],
-    outputs: [
-      {
-        name: '',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    name: 'MAX_TARGET_DATA_COUNT',
     inputs: [],
     outputs: [
       {
@@ -473,9 +460,9 @@ export const submitAbi = [
                 internalType: 'enum TargetMode',
               },
               {
-                name: 'targetData',
-                type: 'bytes[]',
-                internalType: 'bytes[]',
+                name: 'creationData',
+                type: 'bytes',
+                internalType: 'bytes',
               },
             ],
           },
@@ -531,6 +518,11 @@ export const submitAbi = [
         name: 'proposalId',
         type: 'uint256',
         internalType: 'uint256',
+      },
+      {
+        name: 'submitData',
+        type: 'bytes',
+        internalType: 'bytes',
       },
     ],
     outputs: [],
@@ -693,11 +685,16 @@ export const submitAbi = [
             internalType: 'enum TargetMode',
           },
           {
-            name: 'targetData',
-            type: 'bytes[]',
-            internalType: 'bytes[]',
+            name: 'creationData',
+            type: 'bytes',
+            internalType: 'bytes',
           },
         ],
+      },
+      {
+        name: 'submitData',
+        type: 'bytes',
+        internalType: 'bytes',
       },
     ],
     outputs: [
@@ -773,10 +770,10 @@ export const submitAbi = [
         internalType: 'enum TargetMode',
       },
       {
-        name: 'targetData',
-        type: 'bytes[]',
+        name: 'creationData',
+        type: 'bytes',
         indexed: false,
-        internalType: 'bytes[]',
+        internalType: 'bytes',
       },
       {
         name: 'title',
@@ -832,6 +829,22 @@ export const submitAbi = [
         name: 'target',
         type: 'address',
         internalType: 'address',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'CreationDataTooLarge',
+    inputs: [
+      {
+        name: 'length',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'maxLength',
+        type: 'uint256',
+        internalType: 'uint256',
       },
     ],
   },
@@ -973,38 +986,6 @@ export const submitAbi = [
       },
       {
         name: 'limit',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'TargetDataTooLarge',
-    inputs: [
-      {
-        name: 'totalLength',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'maxLength',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'TargetDataTooMany',
-    inputs: [
-      {
-        name: 'count',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'maxCount',
         type: 'uint256',
         internalType: 'uint256',
       },

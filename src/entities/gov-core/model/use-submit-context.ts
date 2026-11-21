@@ -1,7 +1,7 @@
 import { useReadContract, useReadContracts } from 'wagmi';
 import { stakeAbi, submitAbi } from '@/config/abis';
 import { configuredAddress, type HexAddress } from '@/config/networks';
-import { requiredSubmitVotes } from '@/domain/gov-core';
+import { requiredSubmitVotes, type ProposalLimits } from '@/domain/gov-core';
 
 /**
  * 提案（推举）页的资格与限制。
@@ -10,19 +10,10 @@ import { requiredSubmitVotes } from '@/domain/gov-core';
  * - 推举权 = `validVotes >= ceil(totalGovVotes * SUBMIT_MIN_RATIO / PRECISION)`
  *   且 `totalGovVotes != 0`（`Submit.sol:76-99`）；`canSubmit` 就是这条规则的封装；
  * - 每个身份每轮**只能推举 1 个**（`MemberAlreadySubmitted`，`Submit.sol:329-341`），
- *   整轮上限 `SUBMIT_ROUND_LIMIT = 1000`（私有常量，读不到，界面不显示数字）；
- * - 正文上限由 `MAX_TITLE_LENGTH` / `MAX_DETAILS_LENGTH` / `MAX_TARGET_DATA_*` 给出，
- *   一律按 **UTF-8 字节**算（`Submit.sol:264-281`），所以中文字符不等于 1 个字节。
+ *   整轮上限 `SUBMIT_ROUND_LIMIT = 1000`（私有常量，读不到，界面不显示数字）。
  */
 
 export type SubmitContextStatus = 'unconfigured' | 'loading' | 'error' | 'ready';
-
-export interface SubmitLimits {
-  readonly maxTitleLength: bigint;
-  readonly maxDetailsLength: bigint;
-  readonly maxTargetDataCount: bigint;
-  readonly maxTargetDataBytes: bigint;
-}
 
 export interface SubmitContext {
   readonly status: SubmitContextStatus;
@@ -32,7 +23,7 @@ export interface SubmitContext {
   readonly myGovVotes: bigint | undefined;
   /** 按比例算出的门槛；`canSubmit` 是合约的最终答案，这个数只用于向用户解释差多少。 */
   readonly requiredVotes: bigint | undefined;
-  readonly limits: SubmitLimits | undefined;
+  readonly limits: ProposalLimits | undefined;
   /** 本轮我是否已经推举过（`proposalIdBySubmitterId` 非 0 即已推举）。 */
   readonly submittedProposalThisRound: bigint | undefined;
   readonly refetch: () => void;
@@ -66,12 +57,7 @@ export function useSubmitContext(
             {
               address: submitAddress,
               abi: submitAbi,
-              functionName: 'MAX_TARGET_DATA_COUNT' as const,
-            },
-            {
-              address: submitAddress,
-              abi: submitAbi,
-              functionName: 'MAX_TARGET_DATA_BYTES' as const,
+              functionName: 'MAX_CREATION_DATA_BYTES' as const,
             },
           ]
         : [],
@@ -107,14 +93,12 @@ export function useSubmitContext(
   const values = constants.data;
   const maxTitleLength = values?.[1]?.result;
   const maxDetailsLength = values?.[2]?.result;
-  const maxTargetDataCount = values?.[3]?.result;
-  const maxTargetDataBytes = values?.[4]?.result;
-  const limits: SubmitLimits | undefined =
+  const maxCreationDataBytes = values?.[3]?.result;
+  const limits: ProposalLimits | undefined =
     typeof maxTitleLength === 'bigint' &&
     typeof maxDetailsLength === 'bigint' &&
-    typeof maxTargetDataCount === 'bigint' &&
-    typeof maxTargetDataBytes === 'bigint'
-      ? { maxTitleLength, maxDetailsLength, maxTargetDataCount, maxTargetDataBytes }
+    typeof maxCreationDataBytes === 'bigint'
+      ? { maxTitleLength, maxDetailsLength, maxCreationDataBytes }
       : undefined;
 
   const submitMinRatio = toBigInt(values?.[0]?.result);

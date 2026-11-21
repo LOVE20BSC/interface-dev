@@ -6,13 +6,8 @@ import { useContractWrite, type ContractCall } from '@/shared/model/use-contract
 import { parseVoteReceipt, type VoteReceiptLine } from '../lib/vote-receipt';
 
 /**
- * 投票的写链状态机：一笔 `Vote.vote(token, memberId, proposalIds[], voteAmounts[], targetData[][])`。
- *
  * 治理域没有代币授权，所以只有「签名 → 上链 → 回执」一段；要显示什么数字由回执里的
  * `VoteCast` 事件决定（`lib/vote-receipt`），不拿页面输入冒充链上结果。
- *
- * `targetData`：不回调的提案传空数组（长度必须与 `proposalIds` 一致，否则合约
- * `TargetDataLengthMismatch`）。回调提案本页不投，所以在 core 覆盖范围内永远是空。
  */
 export interface VoteInput {
   readonly voteAddress: `0x${string}`;
@@ -60,13 +55,7 @@ export function useVoteWrite(messages: VoteWriteMessages, onConfirmed: () => voi
       address: input.voteAddress,
       abi: voteAbi,
       functionName: 'vote',
-      args: [
-        input.tokenAddress,
-        input.memberId,
-        input.proposalIds,
-        input.voteAmounts,
-        input.proposalIds.map(() => [] as `0x${string}`[]),
-      ],
+      args: [input.tokenAddress, input.memberId, input.proposalIds, input.voteAmounts, []],
     };
     void write.run(call);
   };

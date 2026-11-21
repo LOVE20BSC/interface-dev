@@ -153,13 +153,13 @@ function ensureChildToken(inputSymbol: string, finalSymbol: string): `0x${string
 
   impersonateMint();
   castSend(LAUNCH, 'addLaunchCount(address,uint256,uint256)', [TOKEN, '1', '1'], MINT);
-  castSend(LAUNCH, 'launchToken(string,address,uint256,address,uint8,bytes[])', [
+  castSend(LAUNCH, 'launchToken(string,address,uint256,address,uint8,bytes)', [
     inputSymbol,
     TOKEN,
     '1',
     FIXTURE_OWNER,
     '0',
-    '[]',
+    '0x',
   ]);
   return addressOf(LAUNCH, 'tokenAddressBySymbol(string)(address)', finalSymbol);
 }
