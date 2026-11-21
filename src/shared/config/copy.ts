@@ -137,6 +137,10 @@ export const copy = {
     stakeToken: '质押代币',
     unstake: '申请解锁',
     stakeLiquid: '流动性质押数据',
+    vote: '投票',
+    submit: '提案',
+    rewards: '治理激励',
+    proposalRewards: '提案激励',
   },
   /** Page titles the eager router/header needs; bodies live in ./copy-pages. */
   placeholders: {

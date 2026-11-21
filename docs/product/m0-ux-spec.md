@@ -717,10 +717,11 @@
 | `/stake/staketoken` | 质押代币（`/stake/staketoken`，即加速激励质押） | ✅ 实装 |
 | `/stake/unstake` | **申请解锁**（页面名；路由仍是 `/stake/unstake`，owner 2026-11-19 四轮由「取消质押」改名） | ✅ 实装 |
 | `/stake/liquid` | 流动性质押数据（`/stake/liquid`，只读） | ✅ 实装 |
-| `/gov/rewards` | 治理激励（`/my/govrewards`） | ⏳ 占位（Mint ABI 未导出） |
-| `/vote`、`/vote/{batch,actions,single,records}` | 投票（`/vote/*`） | ⏳ 占位 |
-| `/verify`、`/verify/{actions,action,detail}` | 验证（`/verify/*`） | ⏳ 占位 |
-| `/submit/{actions,submit}` | 推举（`/submit/*`） | ⏳ 占位 |
+| `/gov/rewards` | 治理激励（`/my/govrewards`）：逐轮铸造治理激励 | ✅ 实装（2026-11-21，§3.15） |
+| `/vote`、`/vote/*` | 投票（`/vote/*`）：给本轮被推举的提案分票 | ✅ 实装（2026-11-21，§3.15） |
+| `/submit`、`/submit/*` | 提案 / 推举（`/submit/*`）：创建并推举提案 | ✅ 实装（2026-11-21，§3.15） |
+| `/gov/proposal-rewards` | 提案激励（本轮新增）：提案激励结算与不达标激励销毁 | ✅ 实装（2026-11-21，§3.15） |
+| `/verify`、`/verify/{actions,action,detail}` | 验证（`/verify/*`） | ⏳ 占位（旧协议概念，新协议无验证阶段） |
 | `/acting`、`/acting/join`、`/action/{new,info}` | 社区行动（`/acting/*`、`/action/*`） | ⏳ 占位 |
 
 **所有页面共享的门禁阶梯**（命中只显示一块，每块一个下一步）：未部署质押合约（回首页）→ 未连接（连接钱包）→ 网络不对（切换）→ 身份 NFT 读不到（重试）→ 没有身份 NFT（去铸造）→ 有身份未选中（去我的 NFT）→ 社区读不到（重试）。旧版 Header 不显示标题，本仓的可见大标题在正文里（与旧版一致）；占位页保留旧路径与「回治理首页 / 去质押流动性」两个出口，不编造数据。
@@ -770,6 +771,46 @@
 **术语硬约束**：写「治理权」（界面不写「治理票」「票数」；「治理票」只用于协议口径解释，见上面的治理权口径）、「承诺解锁期」（按阶段计，不写「天」）、「申请解锁 / 撤出」（不写「取消质押 / 赎回 / 提现」）、「加速质押」「加速激励」。界面不出现函数名、allowance、approve、nonce、gas、区块。
 
 **证据**：三线校验见 [three-line/gov-stake.md](three-line/gov-stake.md)（理论值不变，前端线按新路由重写；页面数值字符串按前端规范 §4.5.1 的数量级规则显示，三线文档已按 2026-11-19 数字规范同步）；旧库逐页蓝图见 [reviews/gov-tkm-stake-pages.md](reviews/gov-tkm-stake-pages.md) 与 [reviews/gov-tkm-gov-pages.md](reviews/gov-tkm-gov-pages.md)；截图 `gov-home-*` / `me-stake-*` / `stake-lp*` / `stake-token-*` / `unstake-*` / `stake-liquid-*` / `gov-vote-placeholder-*`（390×844 / 1280×800 × 浅/深；owner 2026-11-19 起默认主题为深色，全部截图按深色重拍，**167 张重拍、总数 207 不变**）。
+
+### 3.15 治理·核心四页（投票 / 提案 / 治理激励 / 提案激励；owner 2026-11-21 要求，仅覆盖 core 合约）
+
+**范围**：owner 2026-11-21 要求「完成治理激励铸币、提案、投票、提案铸币相关页面，先只覆盖 core 合约代码库」。因此这四页只对接 `Vote` / `Submit` / `Mint` / `Phase` / `Stake` 五个 core 合约；**Action（行动 / 链群）域不在本轮范围**，`/verify/*`、`/acting/*`、`/action/*` 仍是占位页。页面交互参考旧库 LOVE20TKM 的对应页，但业务对象按新协议重写（旧的「行动投票 + 打分验证 + SL/ST 双凭证」整套作废，见 [reviews/gov-tkm-gov-pages.md](reviews/gov-tkm-gov-pages.md) §B）。
+
+**四页共用**：
+- 一条门禁阶梯（与 §3.14 相同顺序，组件 `widgets/gov-access-gate`）：未部署合约 → 未连接 → 网络不对 → 身份 NFT 读不到 → 没有身份 NFT → 有身份未选中 → 社区读不到 → 就绪；每块一个下一步，testid 前缀 `gov-access-*`。
+- 一个写链状态机（`shared/model/use-contract-write`）：读 `pending` nonce 显式提交 → 有界等待 90 s → 回执 / 失败 / 恢复卡（`TxWatchCard` 的「重新提交」用同一笔的 nonce 替换），**无全屏遮罩**。
+- 回执一律自下而上 `Sheet`，标题 + 你得到什么 + 唯一按钮「好的」，数字取自本笔交易的日志。
+- 术语：**提案**（不是议题）、**推举**（`Submit`，不是提交/提名）、**治理权**（界面不写「治理票」「票数」）、**治理激励** / **提案激励**（两个对象不混叫）、**铸造**（不写领取/奖励）、**销毁**（不写燃烧/回收）。轮次一律带类型前缀：「治理第 N 轮」。
+
+**`/vote` 投票**（core `Vote`）：
+- 数据：`Phase.currentPhase` = 本轮；`Submit.submitInfos(本轮)` + `Submit.proposalInfosByProposalIds` = 本轮被推举的提案；`Vote.maxVoteAmount` / `voteAmountByMemberId` = 我的本轮额度与已投；`voteAmountByProposalId` + `voteAmountByMemberIdByProposalId` = 每个提案的总票数与我已投。
+- 版面：`我的投票额度`（本轮治理权 / 本轮已投 / 还能投，三格）→ 本轮提案卡列表（`#编号 标题`、本轮总票数、我已投票数、票数输入框）→ 主按钮「确认投票」。
+- 交互：一次可以给多个提案分票，合计不得超过「还能投」；空栏 = 不投该提案（**不填 0**，合约 `ZeroVoteAmount` 会拒）；同一个提案刷新后再投可继续加票（合约累加）。提交前用 `domain/gov-core#validateVoteAllocation` 本地校验，错误写在按钮上方。
+- 边界：`targetMode == 1`（回调）的提案仍列出，但输入框禁用并写明「这个提案由目标合约处理，要在对应的行动页投票」——回调数据由目标合约定义，属行动域。
+- 空态：本轮没有被推举的提案 → 一块空态卡 + 「去推举提案」；治理权为 0 → 额度卡变成「当前身份 NFT 还没有治理权」+「去质押流动性」。
+
+**`/submit` 提案（推举）**（core `Submit`）：
+- 数据：`Submit.canSubmit`（= `govVotes ≥ ceil(社区总治理权 × SUBMIT_MIN_RATIO)`）、`SUBMIT_MIN_RATIO` / `MAX_TITLE_LENGTH` / `MAX_DETAILS_LENGTH` / `MAX_TARGET_DATA_*` 常量、`Stake.totalGovVotes` 与 `govVotes`（用于解释差多少）、`proposalIdBySubmitterId(本轮)`（本轮我是否已推举）。
+- 版面：资格卡（能/不能推举 + 门槛 + 我的治理权）→ 表单（标题、详情、提案目标地址；字段下方按 **UTF-8 字节**计数的上限提示）→ 主按钮「推举提案」。
+- 规则：**一个身份每轮只能推举一个**（合约 `MemberAlreadySubmitted`），所以本轮已推举时表单换成「本轮已经推举」卡并显示提案编号与标题；正文上限按字节（一个中文字 3 字节，`domain/gov-core#utf8ByteLength`）。
+- 边界：本轮**只做「不回调」提案**（`targetMode = 0`、`targetData = []`）；回调模式需要目标合约定义的数据结构，随行动域一起做。页面明确写「本版本只推举不回调的提案」。
+
+**`/gov/rewards` 治理激励**（core `Mint`）：
+- 数据：`Mint.govRewardByMemberId(轮次)` 三件套（我的投票激励 / 我的加速激励 / 是否已铸）+ `Mint.govReward(轮次)`（该轮预留池）+ `Vote.voteAmountByMemberId(轮次)`（该轮我投没投票）。**只有已结束的轮次（`currentPhase > 轮次`）能铸**，所以从 `currentPhase - 1` 往回倒序扫描，一页 20 轮，触底再往前。
+- 版面：摘要卡（`N 轮可铸造` + 批量「铸造这 N 轮」）→ 轮次表（轮次 / 投票激励 / 加速激励 / 状态）→ 底部三态（加载更多 / 读取中 / 已经到底）。
+- 行状态：可铸 → 「铸造」按钮；已铸 → 「已铸造」；该轮没投票 → 「没有投票」（不可铸）。批量只收**已扫描到且确认可铸**的轮次（合约按传入数组逐轮处理，任何一轮失败整笔回滚）。
+- 为什么不做「一次铸完」：`(token, 轮次, 身份)` 三维键没有反向索引（[CI-001](../contract-issues/001-no-member-round-index.md)），前端只能按轮扫描；页面不承诺未扫描到的轮次。
+- 铸给谁：固定铸到当前钱包（合约要求 `msg.sender` 持有该身份 NFT），界面不出现「收款人 / 受益人」。
+
+**`/gov/proposal-rewards` 提案激励**（core `Mint` 的提案侧）：
+- 数据：`Mint.proposalReward(轮次)`（本轮池子）、`Vote.totalVoteAmount(轮次)`、`Mint.PROPOSAL_REWARD_MIN_VOTE_RATIO`（门槛比例）→ `门槛 = ceil(总票数 × 比例)`；逐提案 `Mint.proposalRewardSettlement`（金额 + 状态 0 未结算 / 1 已铸造 / 2 已销毁）与 `Vote.voteAmountByProposalId`。
+- 版面：轮次选择（上一轮 / 下一轮，默认最近一个已结束轮次）→ 汇总卡（提案激励池 / 本轮总票数 / 本轮门槛）→ 提案表（提案、票数 / 门槛、激励金额、状态）+ 每行说明。
+- **只读 + 一个销毁动作**：票数过门槛的提案，激励**只能由提案目标合约铸造**（合约 `onlyProposalTarget`），本页只写「已过门槛，由提案目标合约铸造」、不给按钮；票数没到门槛的，任何人都能销毁（`burnProposalReward`），页面给「销毁这部分」+ 一句不可撤销说明；票数为 0 的提案调用是空操作，所以不给按钮。
+- 本轮没人投票时池子为 0，显示「这一轮没有预留提案激励（本轮没有人投票）」。
+
+**本轮明确不做**（如实记录，避免被当成已实现）：回调提案的推举与投票（行动域）、验证页、行动/链群页、提案正文的链上富文本、提案目标的白名单校验（合约只要求非零地址；回调模式才要求是合约）。
+
+**证据**：三线校验 [three-line/gov-core.md](three-line/gov-core.md)；前端线 `e2e/gov-core-numbers.spec.ts`；合约线 `scripts/verify/gov-core-contract.mjs`；截图 `gov-core-*`（390×844 / 1280×800 × 浅色/深色）。
 
 ## §4 横切交互规范
 

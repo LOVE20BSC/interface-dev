@@ -53,6 +53,9 @@ export const ABI_MODULES = [
   { file: 'launch.ts', exportName: 'launchAbi', contract: 'Launch' },
   { file: 'stake.ts', exportName: 'stakeAbi', contract: 'Stake' },
   { file: 'phase.ts', exportName: 'phaseAbi', contract: 'Phase' },
+  { file: 'vote.ts', exportName: 'voteAbi', contract: 'Vote' },
+  { file: 'submit.ts', exportName: 'submitAbi', contract: 'Submit' },
+  { file: 'mint.ts', exportName: 'mintAbi', contract: 'Mint' },
   {
     file: 'airdrop-distributor.ts',
     exportName: 'airdropDistributorAbi',

@@ -465,7 +465,7 @@ test.beforeAll(() => {
  * - `stake-lp-*`             流动性质押：智能模式单币（原生币输入在上 + Hub 报价；页尾规则卡）
  * - `stake-token-*`          质押代币：加速激励质押作用卡 + 我的加速质押 + 加速表单
  * - `unstake-*`              取消质押：我的治理资产 + 两个动作（未申请解锁 → 无解锁状态卡）
- * - `gov-vote-placeholder-*` 旧版占位页（/vote）
+ * - `gov-verify-placeholder-*` 旧版占位页（/verify；2026-11-21 起 /vote 与 /submit 已是真实页面）
  *
  * 有仓位的状态由链上夹具摆好（approve + stakeLiquidity），每档组合独立快照、拍完
  * 回滚；数字口径本身已由前端线用例逐字断言。
@@ -601,13 +601,13 @@ test.describe('治理域 验收截图', () => {
           await revertChain(clean);
         }
 
-        // C. 旧版占位页。
+        // C. 旧版占位页（2026-11-21：/vote 与 /submit 已接入真实页面，占位样例改用 /verify）。
         const placeholder = await snapshotChain();
         try {
-          await prepare(page, theme, viewport.width, viewport.height, '/vote');
+          await prepare(page, theme, viewport.width, viewport.height, '/verify');
           await expect(page.getByTestId('gov-placeholder')).toBeVisible({ timeout: 30_000 });
           await scrollTo(page, 'gov-placeholder', 96);
-          await shoot(page, `gov-vote-placeholder-${suffix}`);
+          await shoot(page, `gov-verify-placeholder-${suffix}`);
         } finally {
           await revertChain(placeholder);
         }
@@ -796,9 +796,10 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
     await expect(page.getByTestId('gov-community-votes')).toHaveText(EXPECTED.seed.communityVotes);
 
     // 旧版占位页：标题 + 一句说明 + 两个下一步（不编造数据）。
-    await page.goto(`/vote${QUERY}`);
+    // 2026-11-21：/vote 与 /submit 已接入真实页面，占位样例改用仍是占位的 /verify。
+    await page.goto(`/verify${QUERY}`);
     await expect(page.getByTestId('gov-placeholder')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId('gov-placeholder')).toContainText('投票');
+    await expect(page.getByTestId('gov-placeholder')).toContainText('验证');
     await expect(page.getByTestId('gov-placeholder')).toContainText('即将上线');
   });
 
