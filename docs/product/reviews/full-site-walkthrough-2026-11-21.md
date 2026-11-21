@@ -351,12 +351,21 @@
 | P2-7 空态断言「不需要授权」 | ✅ 已修 | `add-liquidity-panel.tsx` / `stake-liquidity-panel.tsx`：没输入数量时不渲染授权行（既有授权阶梯逻辑不变）；更新 `D8` 单测并补「空态不渲染」断言 | 单测（69 条） + `global-actions-screens`（改为先填金额再断言） |
 | P2-10 pending 文案时间基准 | ✅ 已修 | `copy.txWatch.pending.remaining` 改成「再等约 N 秒仍没有结果的话，可以重新提交一笔。」 | `pnpm check` |
 | P3-5 「铸造 治理激励」空格 | ✅ 已修 | 去掉中间空格 | `pnpm check` |
-| P2-8 规范/实现漂移（钱包弹层缺「合约地址」、社区菜单缺「复制本页链接」） | ⏳ 待 owner 拍板 | 是有意精简还是漏实现？若有意 → 回写 mUX §1.5/§1.6；若漏 → 补实现（`/about` 已有地址数据可复用） | — |
-| P2-9 移动端错网络无社区名 | ⏳ 待 owner 拍板 | §1.4 与 §1.3 互相矛盾：错网络时是否保留 chip（或恢复移动端 wordmark） | — |
+| P2-8a 钱包弹层缺「合约地址」入口 | ✅ 按建议**回写规范** | mUX §1.6 第 7 项与侧栏那条改为「合约地址统一在 `/about`；钱包弹层不再有第二个弹层」。理由：钱包弹层是高频小面，合约地址是低频核验动作 | 文档 |
+| P2-8b 社区菜单缺「复制本页链接」 | ✅ 已修 | 社区菜单新增 `community-copy-link`（`copyText(window.location.href)` + 「链接已复制 / 复制失败」反馈） | 目标 e2e（社区菜单）+ 手动复核 |
+| P2-9 移动端错网络无社区名 | ✅ 已修（按 §1.4） | 错网络态保留社区名 chip（`header-community-context`）+ 右侧「网络不对，点此切换」；chip 在此状态只作上下文、不开菜单 | 目标 e2e（batch-transfer 的 D11 错网络用例 + home-my-nft） |
 | P3-1 占比 49.99% 截断 | 维持现状 | 规范 §4.5.1 明确「截断不四舍五入」，非缺陷 | — |
-| P3-2 build id 显示 12 字符 | backlog | 建议改为「版本 2026-11-21 · mwqjfm06」或完整 id | — |
-| P3-3 `/about` 缺两条合约地址 | backlog | 批量转账 / 一键加池（Hub） | — |
-| P3-4 禁用「撤销」无 title | backlog | 给 `title="当前没有可撤销的授权"` | — |
+| P3-2 build id 显示 12 字符 | ✅ 已修 | `formatBuildId` 改为 8 位短 id（`mwqjfm06`），完整 id 放进 `title`（侧栏与 `/about`） | 单测 / `pnpm check` |
+| P3-3 `/about` 缺两条合约地址 | ✅ 已修 | 地址表补「批量转账」「一键加池（Hub）」（22 → 24 槽，单测同步） | 单测（4/4） |
+| P3-4 禁用「撤销」无 title | ✅ 已修 | 未授权行撤销按钮补 `title="当前没有可撤销的授权"` | `pnpm check` |
+
+### §8.2 顺手做的三个系统性改进
+
+| 项 | 内容 |
+| --- | --- |
+| 新规范 §4.9「空态不给肯定结论」 | 写进 [frontend-standards](../engineering/frontend-standards.md) §4.9 + §4.8 检查清单：输入/价格未就绪时，结论行、错误行、授权行都不渲染；口诀「这句话在用户什么都没填时是否仍然成立」。并说明「每修一处空态要补一条单测/e2e 断言」 |
+| `pnpm e2e` 复用链前加健康探测 | `scripts/e2e-chain.mjs` 复用分支新增 `warnWhenChainIsFrozen`：采样 block 两次，链假死时打 WARNING 并给出 `e2e-chain-doctor` / `e2e:reset-chain` 提示（不误杀慢链） |
+| 「加速上限」复核缺口 | 不需要改：`scripts/verify/gov-stake-contract.mjs` 的 C2 已有 `boostStakeCap.memberCap / memberUsed` 断言并通过（走查里那条是它自己签名写错，不是覆盖缺口），已在报告 §3 注明 |
 
 ### §8.1 验证（修复后）
 

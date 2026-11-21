@@ -51,7 +51,25 @@ export function ConnectPill() {
 
   // D11: the injected wallet's own chain answers before the dapp is connected,
   // so an installed wallet on another chain gets the switch pill, not 「连接钱包」.
-  if (wallet.isWrongChain) return <WrongNetworkButton />;
+  // 走查 2026-11-21（P2-9）：错网络时只留一个切换按钮会让用户丢失「我在哪个社区」
+  // （移动端尤其，chip 是唯一社区名位置）。按 §1.4「已连接含错网络 = chip + 地址区」，
+  // 这里保留社区名，右侧换成切换按钮；此状态下 chip 只作上下文展示、不开菜单
+  // （钱包不可用时开社区菜单也没有可用的链上数据）。
+  if (wallet.isWrongChain) {
+    return (
+      <div className="inline-flex h-12 max-w-full min-w-0 items-center gap-2 overflow-hidden rounded-2xl border border-line bg-surface/85 px-3 shadow-sm backdrop-blur">
+        <span
+          data-testid="header-community-context"
+          className="max-w-[96px] truncate font-mono text-[13px] font-semibold text-foreground"
+          title={copy.community.menuTitle}
+        >
+          {chipSymbol}
+        </span>
+        <span className="h-5 w-px shrink-0 bg-line" aria-hidden="true" />
+        <WrongNetworkButton />
+      </div>
+    );
+  }
   if (!wallet.isConnected) {
     return <ConnectWalletButton variant="secondary" className="rounded-full" />;
   }

@@ -22,7 +22,8 @@ describe('about address groups', () => {
     const keys = ABOUT_ADDRESS_GROUPS.flatMap((group) => group.entries);
 
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toHaveLength(22);
+    // 走查 2026-11-21（P3-3）：补了「批量转账」「一键加池」，22 → 24。
+    expect(keys).toHaveLength(24);
     expect(ABOUT_ADDRESS_GROUPS.map((group) => group.key)).toEqual([
       'core',
       'tokenIdentity',
@@ -37,7 +38,7 @@ describe('about address groups', () => {
     const groups = resolveAboutAddressGroups(book, 'https://bscscan.com');
 
     const rows = groups.flatMap((group) => group.rows);
-    expect(rows).toHaveLength(22);
+    expect(rows).toHaveLength(24);
     const member = rows.find((row) => row.key === 'memberNFT');
     const airdrop = rows.find((row) => row.key === 'airdropDistributor');
     expect(member?.address).toBeUndefined();

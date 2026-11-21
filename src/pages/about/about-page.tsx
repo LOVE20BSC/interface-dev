@@ -291,7 +291,9 @@ function DataPanel({ symbol }: { readonly symbol: string }) {
         {renderValue(data.phase, (value) => formatPhaseValue(value))}
       </DataRow>
       <DataRow label={copy.about.data.appVersion}>{variantLabel(APP_ENV.variant)}</DataRow>
-      <DataRow label={copy.about.data.buildNumber}>{formatBuildId(BUILD_ID)}</DataRow>
+      <DataRow label={copy.about.data.buildNumber}>
+        <span title={BUILD_ID}>{formatBuildId(BUILD_ID)}</span>
+      </DataRow>
     </dl>
   );
 }

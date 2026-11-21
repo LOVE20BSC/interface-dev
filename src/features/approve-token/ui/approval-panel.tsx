@@ -632,6 +632,11 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
                     size="sm"
                     variant="secondary"
                     data-testid="approvals-custom-revoke"
+                    title={
+                      !canRevokeAllowance(customAllowance)
+                        ? copy.approvals.revokeDisabled
+                        : undefined
+                    }
                     disabled={busy || !canRevokeAllowance(customAllowance)}
                     onClick={() => openAction(customSpender, customSpenderLabel, 'revoke')}
                   >
@@ -742,6 +747,9 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
                         size="sm"
                         variant="secondary"
                         data-testid={`approvals-revoke-${spender.id}`}
+                        title={
+                          !canRevokeAllowance(allowance) ? copy.approvals.revokeDisabled : undefined
+                        }
                         disabled={busy || !canRevokeAllowance(allowance)}
                         onClick={() => openAction(spender.address, item.label, 'revoke')}
                       >

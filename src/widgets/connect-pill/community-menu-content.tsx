@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ArrowUpLeft, List } from '@/shared/ui/icons';
+import { ArrowUpLeft, Copy, List } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy-pages';
+import { copyText } from '@/shared/lib/clipboard';
 import { cn } from '@/shared/lib/cn';
 import { Separator } from '@/shared/ui/separator';
 import { useCommunitySymbolSearch } from '@/features/switch-community/model/use-community-symbol-search';
@@ -50,7 +51,14 @@ export function CommunityMenuContent({
 }: CommunityMenuContentProps) {
   const { recent } = useRecentCommunities();
   const [query, setQuery] = useState('');
+  const [linkState, setLinkState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const search = useCommunitySymbolSearch(query);
+
+  const copyPageLink = async () => {
+    const ok = await copyText(window.location.href);
+    setLinkState(ok ? 'copied' : 'failed');
+    if (ok) window.setTimeout(() => setLinkState('idle'), 2000);
+  };
   const others = recent.filter((entry) => entry.symbol !== currentSymbol);
   const searching = search.status !== 'idle';
 
@@ -179,6 +187,30 @@ export function CommunityMenuContent({
       )}
 
       <Separator className="my-2" />
+      <button
+        type="button"
+        data-testid="community-copy-link"
+        onClick={() => {
+          void copyPageLink();
+        }}
+        className={cn(
+          'flex w-full items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-sm',
+          'hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong',
+        )}
+      >
+        <Copy className="h-4 w-4 text-muted" aria-hidden="true" />
+        <span className="flex-1">{copy.community.copyLink}</span>
+        {linkState === 'copied' ? (
+          <span className="text-[11px] text-success" role="status">
+            {copy.community.linkCopied}
+          </span>
+        ) : null}
+        {linkState === 'failed' ? (
+          <span className="text-[11px] text-danger-strong" role="alert">
+            {copy.community.linkCopyFailed}
+          </span>
+        ) : null}
+      </button>
       <StubRow
         icon={<ArrowUpLeft className="h-4 w-4" />}
         label={copy.community.parent}

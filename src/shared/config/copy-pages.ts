@@ -74,6 +74,10 @@ export const copy = {
     searchError: '社区列表暂时读不到。',
     searchExact: '精确匹配',
     searchCurrent: '当前',
+    /** 走查 2026-11-21（P2-8b）：规范 §1.5 要求社区菜单能复制本页链接（分享社区入口）。 */
+    copyLink: '复制本页链接',
+    linkCopied: '链接已复制',
+    linkCopyFailed: '复制失败，请手动复制地址栏链接。',
   },
   /** M0 placeholder pages (行动 / 链群 / 我的): only titles are needed by the eager header. */
   placeholders: {
@@ -958,6 +962,7 @@ export const copy = {
     addressCopied: '已复制',
     copyFailed: '复制失败，请手动选中地址',
     revoke: '撤销',
+    revokeDisabled: '当前没有可撤销的授权',
     unlimitedAction: '长期授权',
     preferenceLabel: '默认使用长期授权',
     preferenceBody:
@@ -1151,6 +1156,8 @@ export const copy = {
         groupActionExecutor: '链群行动执行器',
         groupServiceExecutor: '链群服务执行器',
         lpExecutor: 'LP 执行器',
+        batchTransfer: '批量转账',
+        hub: '一键加池',
         groupChat: '链群聊天',
         groupChatMember: '链群成员',
         groupChatAdmin: '链群管理',

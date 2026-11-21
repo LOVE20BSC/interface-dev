@@ -206,5 +206,7 @@ export function formatTokenAmount(
  * from silently pinning the browser locale.
  */
 export function formatBuildId(buildId: string): string {
-  return buildId.length > 12 ? buildId.slice(0, 12) : buildId;
+  // 走查 2026-11-21（P3-2）：截 12 位会切在时间戳中间（`mwqjfm06-6f2` 像乱码）。
+  // 只显示时间戳前缀（8 位），完整 build id 由调用方放进 `title` 供定位构建。
+  return buildId.length > 8 ? buildId.slice(0, 8) : buildId;
 }

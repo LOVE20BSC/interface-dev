@@ -30,6 +30,8 @@ export type AboutAddressKey =
   | 'groupActionExecutor'
   | 'groupServiceExecutor'
   | 'lpExecutor'
+  | 'batchTransfer'
+  | 'hub'
   | 'airdropDistributor';
 
 export type AboutAddressGroupKey = 'core' | 'tokenIdentity' | 'trade' | 'groupChat' | 'other';
@@ -68,6 +70,8 @@ export const ABOUT_ADDRESS_GROUPS: readonly AboutAddressGroupDefinition[] = Obje
       'groupActionExecutor',
       'groupServiceExecutor',
       'lpExecutor',
+      'batchTransfer',
+      'hub',
       'airdropDistributor',
     ],
   },

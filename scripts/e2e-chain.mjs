@@ -463,6 +463,30 @@ function runMake(args) {
   return result.status === 0;
 }
 
+/**
+ * A chain that answers `eth_chainId` but stopped mining (the "anvil 假死"形态) makes every spec
+ * time out 30 s at a time, so a 12-minute suite burns an hour before anyone sees the real cause.
+ * Sample the height twice before reusing: warns when the chain answers but does not progress.
+ */
+async function warnWhenChainIsFrozen(rpcUrl) {
+  try {
+    const first = Number(await rpc(rpcUrl, 'eth_blockNumber', [], 5_000));
+    await new Promise((resolveWait) => setTimeout(resolveWait, 1_200));
+    const second = Number(await rpc(rpcUrl, 'eth_blockNumber', [], 5_000));
+    if (second > first) {
+      console.log(`[e2e-chain] chain alive: block ${first} → ${second} within 1.2 s`);
+      return;
+    }
+    console.warn(
+      `[e2e-chain] WARNING ${rpcUrl} answers but the block height is stuck at ${first}. ` +
+        'A wedged anvil makes every spec time out; run `node scripts/e2e-chain-doctor.mjs` ' +
+        'or `pnpm e2e:reset-chain` before trusting a slow or red full run.',
+    );
+  } catch (error) {
+    console.warn(`[e2e-chain] WARNING could not sample the block height: ${error.message}`);
+  }
+}
+
 async function bootstrapSuiteChain() {
   console.log(
     `[e2e-chain] bootstrapping the dedicated suite chain on ${DEFAULT_SUITE_RPC} ` +
@@ -527,6 +551,8 @@ async function ensureDedicatedChain({ reset }) {
       `[e2e-chain] reusing the bootstrapped suite chain on ${DEFAULT_SUITE_RPC} ` +
         `(chain ${probe.chainId}, memberNFT code present)`,
     );
+    // 走查 2026-11-21：复用前再确认一次「链在出块」，假死链会让全量跑到一半全红。
+    await warnWhenChainIsFrozen(DEFAULT_SUITE_RPC);
     return;
   }
 

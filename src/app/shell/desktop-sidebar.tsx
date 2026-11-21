@@ -108,7 +108,7 @@ export function DesktopSidebar({ collapsed, onToggle }: DesktopSidebarProps) {
                 {variantLabel(APP_ENV.variant)}
               </Badge>
             </div>
-            <p className="font-mono text-[10px] text-muted">
+            <p className="font-mono text-[10px] text-muted" title={BUILD_ID}>
               {copy.build.version(formatBuildId(BUILD_ID))}
             </p>
           </div>
