@@ -47,6 +47,8 @@ const RUN_ID = Math.random().toString(36).slice(2, 8);
 /** Dev builds block names without `Test`; the chain then stores them verbatim. */
 const BRANCH_NAME = `Teste2e-branch-${RUN_ID}`;
 const NEW_NAME = `Teste2e-mint-${RUN_ID}`;
+/** 走查用例（owner 2026-11-21）用的第二个名字：确定性新人账户 #6 首次铸造。 */
+const FIRST_NFT_NAME = `Teste2e-first-${RUN_ID}`;
 const HANDOFF_NAME = `Teste2e-handoff-${RUN_ID}`;
 const NON_TEST_NAME = `e2e-noprefix-${RUN_ID}`;
 /** anvil seed: params/anvil31337_dev/seed.params SEED_MEMBER_NAME_PREFIX=Testdev-member- */
@@ -445,4 +447,51 @@ test('my-nft: the freshly minted identity is listed on the next page', async ({ 
   expect(castCall('ownerOf(uint256)(address)', mintedMemberId).toLowerCase()).toBe(
     ACCOUNTS.funded.toLowerCase(),
   );
+
+  /**
+   * owner 2026-11-21：钱包**原本没有身份 NFT** 时，铸造成功后的回执要能一键
+   * 「设为当前身份 NFT」，不用再绕到「我的 NFT」手动选。
+   *
+   * 用确定性账户 #6（种子不铸造 NFT 给它）当「真新人」：先由 #2 转给它足够的
+   * TestLOVE20，再走完整「授权 → 铸造」。链上 NFT 属于一次性状态，所以这条用例
+   * 任何一次跑都在「钱包无 NFT」的前提下开始。
+   */
+});
+
+test('mint: 首个身份铸造成功后，回执可直接把新 NFT 设为当前身份', async ({ page }) => {
+  const newcomer = '0x976EA74026E726554dB657fA54763abd0C3a0aa9'; // #6：无 NFT、无代币
+  const priceHeadroom = 5_000n * 10n ** 18n;
+  // #2 转给新人足够的 TestLOVE20（#2 持种子分配，余额远大于此）
+  castSend('transfer(address,uint256)', newcomer, priceHeadroom.toString());
+  castSend('approve(address,uint256)', MEMBER_NFT, '0');
+
+  await installWallet(page, newcomer);
+  await page.goto('/mint');
+  await connect(page);
+  const input = page.getByRole('textbox', { name: '给身份 NFT 起个名字' });
+  await expect(input).toBeVisible({ timeout: 15_000 });
+  await input.fill(FIRST_NFT_NAME);
+  await expect(page.getByText('✓ 可以用')).toBeVisible({ timeout: 10_000 });
+
+  await expect(page.getByTestId('mint-approve')).toContainText('授权 TestLOVE20', {
+    timeout: 30_000,
+  });
+  await page.getByTestId('mint-approve').click();
+  await expect(page.getByTestId('mint-approve')).toContainText('已授权', { timeout: 30_000 });
+  const mintButton = page.getByTestId('mint-submit');
+  await expect(mintButton).toBeEnabled({ timeout: 30_000 });
+  await mintButton.click();
+
+  await expect(page.getByRole('heading', { name: '铸造成功' })).toBeVisible({ timeout: 30_000 });
+  const setIdentity = page.getByTestId('mint-receipt-set-identity');
+  await expect(setIdentity).toBeVisible();
+  await expect(setIdentity).toHaveText('设为当前身份 NFT');
+  // 有按钮时不再同时显示「还没有设为当前身份 NFT。」这句说明
+  await expect(page.getByText('还没有设为当前身份 NFT。')).toHaveCount(0);
+  await setIdentity.click();
+  await expect(setIdentity).toHaveText('已设为当前身份 NFT');
+  await expect(setIdentity).toBeDisabled();
+  expect(
+    await page.evaluate((key) => window.localStorage.getItem(key), identityCacheKey(newcomer)),
+  ).not.toBeNull();
 });

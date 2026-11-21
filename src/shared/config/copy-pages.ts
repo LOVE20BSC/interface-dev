@@ -215,6 +215,9 @@ export const copy = {
       explorerLink: '在区块浏览器里查看',
       copyHash: '复制交易哈希',
       notSelected: '还没有设为当前身份 NFT。',
+      /** owner 2026-11-21：钱包原本没有身份时，回执里直接给一个「设为当前身份」的按钮。 */
+      setIdentityAction: '设为当前身份 NFT',
+      identitySelected: '已设为当前身份 NFT',
       missingMessage: '这笔铸造已经提交，但还没有读到身份 NFT 编号，请去「我的 NFT」确认。',
     },
     states: {

@@ -15,10 +15,24 @@ export interface MintReceiptProps {
   readonly paymentSymbol: string | undefined;
   readonly paymentDecimals: number | undefined;
   readonly onDismiss: () => void;
+  /**
+   * Owner 2026-11-21：钱包**原来没有身份 NFT** 时，铸造成功后在回执里直接给一个
+   * 「设为当前身份 NFT」的按钮——新人不必再绕到「我的 NFT」手动选一次。
+   */
+  readonly canSetIdentity?: boolean;
+  readonly onSetIdentity?: () => void;
 }
 
-function ReceiptBody({ receipt, paymentSymbol, paymentDecimals, onDismiss }: MintReceiptProps) {
+function ReceiptBody({
+  receipt,
+  paymentSymbol,
+  paymentDecimals,
+  onDismiss,
+  canSetIdentity = false,
+  onSetIdentity,
+}: MintReceiptProps) {
   const [copied, setCopied] = useState(false);
+  const [identitySelected, setIdentitySelected] = useState(false);
 
   const explorerUrl =
     NETWORK.blockExplorerUrl !== null ? `${NETWORK.blockExplorerUrl}/tx/${receipt.hash}` : null;
@@ -98,7 +112,25 @@ function ReceiptBody({ receipt, paymentSymbol, paymentDecimals, onDismiss }: Min
         </div>
       </dl>
 
-      <p className="text-xs leading-5 text-muted">{copy.mintIdentity.receipt.notSelected}</p>
+      {canSetIdentity ? (
+        <Button
+          variant="secondary"
+          size="lg"
+          className="w-full"
+          data-testid="mint-receipt-set-identity"
+          disabled={identitySelected}
+          onClick={() => {
+            onSetIdentity?.();
+            setIdentitySelected(true);
+          }}
+        >
+          {identitySelected
+            ? copy.mintIdentity.receipt.identitySelected
+            : copy.mintIdentity.receipt.setIdentityAction}
+        </Button>
+      ) : (
+        <p className="text-xs leading-5 text-muted">{copy.mintIdentity.receipt.notSelected}</p>
+      )}
 
       {/* Owner 2026-11-16: one button only —「好的」closes the receipt and the
           panel then lands on 我的 NFT with the new identity highlighted. The

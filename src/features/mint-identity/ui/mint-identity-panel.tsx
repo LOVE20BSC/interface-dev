@@ -18,6 +18,7 @@ import { ActionStack } from '@/shared/ui/action-stack';
 import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 import { useAirdropEligibility } from '@/entities/airdrop/model/use-airdrop-eligibility';
+import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
 import { approveAmountFor } from '@/features/mint-identity/lib/approve-amount';
 import { describeMintError } from '@/features/mint-identity/lib/mint-errors';
 import { useMintConfig } from '@/features/mint-identity/model/use-mint-config';
@@ -96,6 +97,13 @@ export function MintIdentityPanel({
   // A stale wallet chain view can also break the eth_call preflight; the card
   // then needs the same 「刷新」 action as a send-time stale-block failure.
   const [preflightStaleBlock, setPreflightStaleBlock] = useState(false);
+  const identity = useMemberIdentity();
+  /**
+   * 点「铸造身份 NFT」那一刻钱包里有没有身份：用于决定回执里要不要给
+   * 「设为当前身份 NFT」按钮（owner 2026-11-21）。只在事件回调里写 state，
+   * 不在渲染期读 ref（React 19 的 lint 会拦）。
+   */
+  const [hadNoIdentityAtMint, setHadNoIdentityAtMint] = useState(false);
   // The eth_call preflight is async; without this a double tap could send two mints.
   const [isPreflighting, setIsPreflighting] = useState(false);
   // 默认使用长期授权 (owner 2026-11-16): the approvals-page switch decides whether
@@ -178,6 +186,7 @@ export function MintIdentityPanel({
         quote.refetch();
         return;
       }
+      setHadNoIdentityAtMint(identity.balance === 0n);
       tx.mint(name);
     } finally {
       setIsPreflighting(false);
@@ -207,13 +216,16 @@ export function MintIdentityPanel({
     });
   };
 
-  if (tx.receipt !== null) {
+  const receipt = tx.receipt;
+  if (receipt !== null) {
     return (
       <MintReceipt
-        receipt={tx.receipt}
+        receipt={receipt}
         paymentSymbol={config.paymentTokenSymbol}
         paymentDecimals={config.paymentTokenDecimals}
         onDismiss={closeReceipt}
+        canSetIdentity={hadNoIdentityAtMint}
+        onSetIdentity={() => identity.select(receipt.memberId)}
       />
     );
   }
