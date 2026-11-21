@@ -178,6 +178,42 @@ test('社区菜单：输入 symbol 精确匹配并切换社区，保留最近访
   await page.keyboard.press('Escape');
 });
 
+test('社区菜单：「复制本页链接」是第 8 项（§1.5）且真的复制本页 URL', async ({ page }) => {
+  await installWallet(page, ACCOUNTS.withIdentity);
+  await page.goto(`/?symbol=${GENESIS_SYMBOL}`);
+  await connect(page);
+
+  await page.getByRole('button', { name: /社区/ }).first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  const copyLink = page.getByTestId('community-copy-link');
+  await expect(copyLink).toBeVisible();
+  // §1.5 顺序：父币 / 子币之后才是「复制本页链接」（末项，不夹在中间）。
+  expect(
+    await copyLink.evaluate((element) => {
+      const rows = [...document.querySelectorAll('[data-testid="community-copy-link"]')];
+      const parent = document.querySelector('[data-testid="community-parent-row"]');
+      const child = document.querySelector('[data-testid="community-child-row"]');
+      const afterParent =
+        parent !== null &&
+        parent.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING;
+      const afterChild =
+        child !== null && child.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING;
+      return {
+        rows: rows.length,
+        afterParent: Boolean(afterParent),
+        afterChild: Boolean(afterChild),
+      };
+    }),
+  ).toMatchObject({ afterParent: true, afterChild: true });
+
+  await copyLink.click();
+  await expect(copyLink).toContainText('已复制');
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toContain(`symbol=${GENESIS_SYMBOL}`);
+});
+
 test('社区菜单：未知 symbol 给诚实空态，不发切换', async ({ page }) => {
   await installWallet(page, ACCOUNTS.withIdentity);
   await page.goto(`/?symbol=${GENESIS_SYMBOL}`);

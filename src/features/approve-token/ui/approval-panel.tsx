@@ -652,6 +652,14 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
                     {unlimitedButtonLabel(customAllowance)}
                   </Button>
                 </div>
+                {!canRevokeAllowance(customAllowance) ? (
+                  <p
+                    className="mt-1 text-[11px] leading-4 text-muted"
+                    data-testid="approvals-custom-revoke-reason"
+                  >
+                    {copy.approvals.revokeDisabled}
+                  </p>
+                ) : null}
               </>
             )}
           </div>
@@ -765,6 +773,14 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
                         {unlimitedButtonLabel(allowance)}
                       </Button>
                     </div>
+                    {!canRevokeAllowance(allowance) ? (
+                      <p
+                        className="mt-1 text-[11px] leading-4 text-muted"
+                        data-testid={`approvals-revoke-reason-${spender.id}`}
+                      >
+                        {copy.approvals.revokeDisabled}
+                      </p>
+                    ) : null}
                   </li>
                 );
               })}

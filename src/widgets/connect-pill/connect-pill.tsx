@@ -61,7 +61,7 @@ export function ConnectPill() {
         <span
           data-testid="header-community-context"
           className="max-w-[96px] truncate font-mono text-[13px] font-semibold text-foreground"
-          title={copy.community.menuTitle}
+          title={chipSymbol}
         >
           {chipSymbol}
         </span>

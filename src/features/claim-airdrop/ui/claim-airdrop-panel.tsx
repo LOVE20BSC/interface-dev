@@ -91,8 +91,10 @@ export function ClaimAirdropPanel({
   const [dismissedReceipt, setDismissedReceipt] = useState(false);
   const claim = useAirdropClaim();
   // P2-1（走查 2026-11-21）：已铸造后的下一步由「有没有身份 NFT」决定。
+  // review 2026-11-22：余额**读不到**时不能当 0（§5-2「未知不许退化成假值」+ §4.9），
+  // 未知就两个 CTA 都不给，只留「回首页」。
   const identity = useMemberIdentity();
-  const hasIdentity = (identity.balance ?? 0n) > 0n;
+  const hasIdentity = identity.balance === undefined ? undefined : identity.balance > 0n;
   const tx = useAirdropClaimTransaction({
     airdropAddress: claim.airdropAddress,
     tokenAddress: claim.tokenAddress,
@@ -326,15 +328,15 @@ export function ClaimAirdropPanel({
           </p>
         ) : null}
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          {hasIdentity ? (
+          {hasIdentity === true ? (
             <Link to="/gov" className={buttonStyles('primary', 'md', 'w-full sm:w-auto')}>
               {copy.airdrop.claimed.goGovernance}
             </Link>
-          ) : (
+          ) : hasIdentity === false ? (
             <Link to="/mint" className={buttonStyles('primary', 'md', 'w-full sm:w-auto')}>
               {copy.airdrop.claimed.goMint}
             </Link>
-          )}
+          ) : null}
           <Link to="/" className={buttonStyles('ghost', 'md', 'w-full sm:w-auto')}>
             {copy.airdrop.states.backHome}
           </Link>

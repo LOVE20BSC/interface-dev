@@ -814,51 +814,55 @@ export function StakeLiquidityPanel({
 
         {/* P2-7（走查 2026-11-21）：没输入数量时不渲染授权行——空态断言「不需要授权」
             会让人以为这页永远不需要授权（当时 allowance 其实是 0）。 */}
-        <div className="space-y-2" hidden={nothingEntered}>
-          <p className="text-xs font-medium text-muted">
-            {hubPath ? copy.gov.liquidity.approveTitleSingle : copy.gov.liquidity.approveTitle}
-          </p>
-          <StakeApproveRow
-            symbol={token.symbol}
-            allowance={allowances.allowances[0]}
-            required={requiredTokenAmount}
-            stage={isSameAddress(tx.approveTokenAddress, token.address) ? tx.approveStage : 'idle'}
-            unlimitedPreferred={approvalPreference.enabled}
-            testId="gov-liquidity-approve-token"
-            disabled={disabled || tx.stage !== 'idle' || tx.approveStage !== 'idle'}
-            onApprove={() => {
-              if (requiredTokenAmount === undefined || approveSpender === undefined) return;
-              void tx.approve({
-                tokenAddress: token.address,
-                abi: love20TokenAbi,
-                spender: approveSpender,
-                amount: decideApproveAmount(approvalPreference.enabled, requiredTokenAmount),
-              });
-            }}
-          />
-          {hubPath ? null : (
+        {nothingEntered ? null : (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted">
+              {hubPath ? copy.gov.liquidity.approveTitleSingle : copy.gov.liquidity.approveTitle}
+            </p>
             <StakeApproveRow
-              symbol={parent.symbol}
-              allowance={allowances.allowances[1]}
-              required={requiredParentAmount}
+              symbol={token.symbol}
+              allowance={allowances.allowances[0]}
+              required={requiredTokenAmount}
               stage={
-                isSameAddress(tx.approveTokenAddress, parent.address) ? tx.approveStage : 'idle'
+                isSameAddress(tx.approveTokenAddress, token.address) ? tx.approveStage : 'idle'
               }
               unlimitedPreferred={approvalPreference.enabled}
-              testId="gov-liquidity-approve-parent"
+              testId="gov-liquidity-approve-token"
               disabled={disabled || tx.stage !== 'idle' || tx.approveStage !== 'idle'}
               onApprove={() => {
-                if (requiredParentAmount === undefined) return;
+                if (requiredTokenAmount === undefined || approveSpender === undefined) return;
                 void tx.approve({
-                  tokenAddress: parent.address,
+                  tokenAddress: token.address,
                   abi: love20TokenAbi,
-                  spender: stakeAddress,
-                  amount: decideApproveAmount(approvalPreference.enabled, requiredParentAmount),
+                  spender: approveSpender,
+                  amount: decideApproveAmount(approvalPreference.enabled, requiredTokenAmount),
                 });
               }}
             />
-          )}
-        </div>
+            {hubPath ? null : (
+              <StakeApproveRow
+                symbol={parent.symbol}
+                allowance={allowances.allowances[1]}
+                required={requiredParentAmount}
+                stage={
+                  isSameAddress(tx.approveTokenAddress, parent.address) ? tx.approveStage : 'idle'
+                }
+                unlimitedPreferred={approvalPreference.enabled}
+                testId="gov-liquidity-approve-parent"
+                disabled={disabled || tx.stage !== 'idle' || tx.approveStage !== 'idle'}
+                onApprove={() => {
+                  if (requiredParentAmount === undefined) return;
+                  void tx.approve({
+                    tokenAddress: parent.address,
+                    abi: love20TokenAbi,
+                    spender: stakeAddress,
+                    amount: decideApproveAmount(approvalPreference.enabled, requiredParentAmount),
+                  });
+                }}
+              />
+            )}
+          </div>
+        )}
 
         <Button
           variant="primary"

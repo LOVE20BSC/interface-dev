@@ -67,9 +67,11 @@ export function VotePanel({
   const noPower = power.status === 'ready' && power.maxVoteAmount === 0n;
   const noRemaining = remaining === 0n;
   // P2-4（走查 2026-11-21）：超额时按钮会禁用，所以原因必须立刻可见，不能等到点提交。
+  // review 2026-11-22：额度还在读/读失败（remaining === undefined）时不能算「超额」——
+  // 拿 `?? 0n` 会立刻报「合计超过还能投的 0 票。」，等于在未知态给肯定结论（§4.9/§5）。
   const liveError =
-    allocationIssue === 'exceeds-remaining'
-      ? copy.gov.vote.amountTooMany(formatTokenAmount(remaining ?? 0n, VOTE_DECIMALS))
+    remaining !== undefined && allocationIssue === 'exceeds-remaining'
+      ? copy.gov.vote.amountTooMany(formatTokenAmount(remaining, VOTE_DECIMALS))
       : null;
   const canSubmit =
     !busy &&

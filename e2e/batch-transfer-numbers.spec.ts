@@ -591,6 +591,8 @@ test.describe('批量转账 前端线（理论线 §1）', () => {
     ).toBeVisible();
     // 全局头部同时给切换入口，页面不再出现未连接卡。
     await expect(page.getByRole('button', { name: '网络不对，点此切换' })).toBeVisible();
+    // review 2026-11-22（P2-9）：错网络时也要能看出「我在哪个社区」。
+    await expect(page.getByTestId('header-community-context')).toHaveText('TestLOVE20');
     await expect(page.getByText('连接钱包后批量转账。', { exact: true })).toHaveCount(0);
   });
 

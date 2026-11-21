@@ -76,8 +76,6 @@ export const copy = {
     searchCurrent: '当前',
     /** 走查 2026-11-21（P2-8b）：规范 §1.5 要求社区菜单能复制本页链接（分享社区入口）。 */
     copyLink: '复制本页链接',
-    linkCopied: '链接已复制',
-    linkCopyFailed: '复制失败，请手动复制地址栏链接。',
   },
   /** M0 placeholder pages (行动 / 链群 / 我的): only titles are needed by the eager header. */
   placeholders: {

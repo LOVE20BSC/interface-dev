@@ -348,12 +348,12 @@
 | P2-4 超额时禁用无原因 | ✅ 已修 | `vote-panel.tsx` 新增 `liveError`：输入超额立刻渲染「合计超过还能投的 X 票。」，不必等提交 | 目标 e2e（治理核心） |
 | P2-5 门槛信息重复两行 | ✅ 已修 | 门槛行只在「可以推举」时渲染；不能推举时原因句已含门槛数字（规范 §4.7） | 目标 e2e |
 | P2-6 空表单首屏报红 | ✅ 已修 | `stake-liquidity-panel.tsx`：三项输入都为空时不产生校验消息 | 目标 e2e（治理域） |
-| P2-7 空态断言「不需要授权」 | ✅ 已修 | `add-liquidity-panel.tsx` / `stake-liquidity-panel.tsx`：没输入数量时不渲染授权行（既有授权阶梯逻辑不变）；更新 `D8` 单测并补「空态不渲染」断言 | 单测（69 条） + `global-actions-screens`（改为先填金额再断言） |
+| P2-7 空态断言「不需要授权」 | ✅ 已修 | `add-liquidity-panel.tsx` / `stake-liquidity-panel.tsx`：没输入数量时**不渲染**授权行（两份实现统一为条件渲染，不再用 `hidden`）；更新 `D8` 单测并补「空态不渲染」断言 | 单测（69 条）+ `e2e/gov-stake-numbers` C1 空表单断言 count=0 + `global-actions-screens`（先填金额再断言） |
 | P2-10 pending 文案时间基准 | ✅ 已修 | `copy.txWatch.pending.remaining` 改成「再等约 N 秒仍没有结果的话，可以重新提交一笔。」 | `pnpm check` |
 | P3-5 「铸造 治理激励」空格 | ✅ 已修 | 去掉中间空格 | `pnpm check` |
 | P2-8a 钱包弹层缺「合约地址」入口 | ✅ 按建议**回写规范** | mUX §1.6 第 7 项与侧栏那条改为「合约地址统一在 `/about`；钱包弹层不再有第二个弹层」。理由：钱包弹层是高频小面，合约地址是低频核验动作 | 文档 |
-| P2-8b 社区菜单缺「复制本页链接」 | ✅ 已修 | 社区菜单新增 `community-copy-link`（`copyText(window.location.href)` + 「链接已复制 / 复制失败」反馈） | 目标 e2e（社区菜单）+ 手动复核 |
-| P2-9 移动端错网络无社区名 | ✅ 已修（按 §1.4） | 错网络态保留社区名 chip（`header-community-context`）+ 右侧「网络不对，点此切换」；chip 在此状态只作上下文、不开菜单 | 目标 e2e（batch-transfer 的 D11 错网络用例 + home-my-nft） |
+| P2-8b 社区菜单缺「复制本页链接」 | ✅ 已修 | 社区菜单新增 `community-copy-link`（`copyText(window.location.href)`，成功复用全局「已复制」、失败复用 `address.copyFailed`；位置按 §1.5 收在末项） | `e2e/community-switch.spec.ts`：位置断言（父币/子币之后）+ 剪贴板真的拿到 `?symbol=` |
+| P2-9 移动端错网络无社区名 | ✅ 已修（按 §1.4，规范已同步回写） | 错网络态保留社区名 chip（`header-community-context`）+ 右侧「网络不对，点此切换」；chip 在此状态只作上下文、不可点 | `e2e/batch-transfer-numbers.spec.ts` D11：断言 `header-community-context` = `TestLOVE20` |
 | P3-1 占比 49.99% 截断 | 维持现状 | 规范 §4.5.1 明确「截断不四舍五入」，非缺陷 | — |
 | P3-2 build id 显示 12 字符 | ✅ 已修 | `formatBuildId` 改为 8 位短 id（`mwqjfm06`），完整 id 放进 `title`（侧栏与 `/about`） | 单测 / `pnpm check` |
 | P3-3 `/about` 缺两条合约地址 | ✅ 已修 | 地址表补「批量转账」「一键加池（Hub）」（22 → 24 槽，单测同步） | 单测（4/4） |
@@ -406,4 +406,35 @@
 
 - `pnpm check`：**941 passed / 128 文件**（e2e 代码不进单测，这里是 lint/typecheck 结果）
 - `e2e/gov-core-numbers.spec.ts`（9 例）+ `e2e/home-my-nft.spec.ts`（19 例）：**28 passed（3.0m）**
+- 全量 e2e：见提交信息
+
+## §10 独立 review（2026-11-22 04:20，Standards 轴 + Spec 轴并行）
+
+按 /code-review 流程，对 `673a768...HEAD`（3 个提交）做了两轴并行审查。两轴共报 **6 条硬违规 + 7 条判断项**（Standards）与 **3 条须修 + 规格外行为**（Spec）；两轴独立发现的实问题高度重叠。**本轮全部处理完**：
+
+| review 发现 | 轴 | 处理 |
+| --- | --- | --- |
+| `claim-airdrop-panel` 用 `balance ?? 0n`：余额未读到时给「去铸造身份 NFT」的肯定结论 | Standards（§5-2/§4.9） | 改为三态：`undefined` 时两个 CTA 都不给（只留「回首页」），未知不再退化成 0 |
+| `stake-liquidity-panel` 用 `hidden` 保留授权行（§4.9 要求不渲染，且与 add-liquidity 写法不一致） | Standards + Spec | 改为条件渲染 `{nothingEntered ? null : (...)}`，两处实现统一；`gov-stake` C1 补「空表单 count=0」断言 |
+| 授权页禁用「撤销」只有 `title`（§6.6.1 要求可见原因，触屏无 hover） | Standards | 已知 spender 行与自定义地址行各补一行可见说明 `当前没有可撤销的授权`（带 testid） |
+| §1.5 菜单顺序：复制本页链接应在父币/子币之后（第 8 项） | Standards + Spec | 移到末项（第二条分隔线之后），并补 `community-parent-row` / `community-child-row` testid 供顺序断言 |
+| P2-4 只修一半：`remaining ?? 0n` 让「额度读取中」也报「合计超过还能投的 0 票」 | Spec | `liveError` 只在 `remaining !== undefined` 时成立（未知态不给结论） |
+| §1.4 未回写（仍写「链不对 = 单按钮」），与实现/§1.4 chip 可点冲突 | Spec | 回写「链不对 = 社区名（静态不可点）+ 切换按钮」，并注明 owner 2026-11-21 决策理由 |
+| §1.6/§1.3 残留「钱包弹层的合约地址」与坏链 `` [`/about`](§3.8) `` | Spec | 两处清掉，统一写「`/about`（§3.8）」 |
+| 新条件分支没有测试（§4.9 门禁条） | Standards | 补 3 条断言：`header-community-context`（错网络 chip）、`community-copy-link`（位置 + 剪贴板）、`gov-liquidity-approve-*` 空表单 count=0；另补 `formatBuildId` 单测 3 条 |
+| P3-2 声称「单测」但没有单测 | Spec | 新增 `src/shared/lib/format.build-id.test.ts`（3 条） |
+| `app-header` 的 `isHome ? …` 分支不可达 | Standards（判断项） | 简化为 `title ?? copy.notFound.title`（首页走上面的 isHome 分支） |
+| 复制成功/失败文案另造一套 | Standards + Spec | 成功复用 `copy.common.copied`，失败复用 `copy.address.copyFailed`，删掉自造键 |
+| 菜单复制态的 `setTimeout` 无清理 | Standards（判断项） | 用 ref 保存 timer + 卸载清理 |
+| 静态 chip 上挂 `title=community.menuTitle` 暗示可点 | Standards（判断项） | 改为 `title={chipSymbol}` |
+| G7/G8/G9 的 JSDoc 叠在 G9 前 | Standards（判断项） | 按用例归位 |
+| `gov-page` 注释仍写「铸造 治理激励」 | Standards（判断项） | 与 copy 对齐 |
+| 新增 §4.9 未记入 §11.5 变更记录 | Standards | 已补一行（含来源与决策） |
+
+**未采纳（记录理由）**：`about-addresses` 的键表与 `config/deployments/types.ts` 两套手工清单属既有结构，本次只新增 2 个槽位，重构留作 backlog；`connect-pill` 错网络分支与已连接分支的容器/分隔线同形属可读性取舍，未抽组件。
+
+### §10.1 review 后验证
+
+- `pnpm check`：**944 passed / 128 文件**（+3 build id 单测）
+- 受影响 4 个 spec：`community-switch` / `batch-transfer-numbers` / `gov-stake-numbers` / `approvals-numbers` **51 passed（4.3m）**
 - 全量 e2e：见提交信息

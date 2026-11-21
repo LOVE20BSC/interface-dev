@@ -808,6 +808,9 @@ test.describe('治理域 前端线（理论线 §1 / §3）', () => {
   }) => {
     await openPage(page, '/stake/liquidity');
     await expect(page.getByTestId('gov-liquidity-card')).toBeVisible({ timeout: 30_000 });
+    // review 2026-11-22（§4.9 / P2-7）：空表单不渲染授权行——是真的不渲染，不是 hidden。
+    await expect(page.getByTestId('gov-liquidity-approve-token')).toHaveCount(0);
+    await expect(page.getByTestId('gov-liquidity-approve-parent')).toHaveCount(0);
     // 父币是 WETH（owner 2026-11-19）：没有父币输入框，原生币输入框在上、社区代币在下。
     const nativeInput = page.getByTestId('gov-liquidity-native-input');
     await expect(nativeInput).toBeVisible();

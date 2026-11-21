@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowUpLeft, Copy, List } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
@@ -17,14 +17,17 @@ function StubRow({
   icon,
   label,
   value,
+  testId,
 }: {
   readonly icon: React.ReactNode;
   readonly label: string;
   readonly value: string;
+  readonly testId?: string;
 }) {
   return (
     <div
       aria-disabled="true"
+      data-testid={testId}
       className="flex w-full cursor-not-allowed items-center gap-2 rounded-xl px-2.5 py-2.5 text-sm text-muted opacity-70"
     >
       <span className="text-muted" aria-hidden="true">
@@ -52,12 +55,21 @@ export function CommunityMenuContent({
   const { recent } = useRecentCommunities();
   const [query, setQuery] = useState('');
   const [linkState, setLinkState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const resetTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
+    },
+    [],
+  );
   const search = useCommunitySymbolSearch(query);
 
   const copyPageLink = async () => {
     const ok = await copyText(window.location.href);
     setLinkState(ok ? 'copied' : 'failed');
-    if (ok) window.setTimeout(() => setLinkState('idle'), 2000);
+    if (!ok) return;
+    if (resetTimer.current !== null) window.clearTimeout(resetTimer.current);
+    resetTimer.current = window.setTimeout(() => setLinkState('idle'), 2000);
   };
   const others = recent.filter((entry) => entry.symbol !== currentSymbol);
   const searching = search.status !== 'idle';
@@ -186,6 +198,19 @@ export function CommunityMenuContent({
         </>
       )}
 
+      <StubRow
+        icon={<ArrowUpLeft className="h-4 w-4" />}
+        label={copy.community.parent}
+        value={copy.community.notWired}
+        testId="community-parent-row"
+      />
+      <StubRow
+        icon={<List className="h-4 w-4" />}
+        label={copy.community.child}
+        value={copy.community.notWired}
+        testId="community-child-row"
+      />
+
       <Separator className="my-2" />
       <button
         type="button"
@@ -202,26 +227,15 @@ export function CommunityMenuContent({
         <span className="flex-1">{copy.community.copyLink}</span>
         {linkState === 'copied' ? (
           <span className="text-[11px] text-success" role="status">
-            {copy.community.linkCopied}
+            {copy.common.copied}
           </span>
         ) : null}
         {linkState === 'failed' ? (
           <span className="text-[11px] text-danger-strong" role="alert">
-            {copy.community.linkCopyFailed}
+            {copy.address.copyFailed}
           </span>
         ) : null}
       </button>
-      <StubRow
-        icon={<ArrowUpLeft className="h-4 w-4" />}
-        label={copy.community.parent}
-        value={copy.community.notWired}
-      />
-      <StubRow
-        icon={<List className="h-4 w-4" />}
-        label={copy.community.child}
-        value={copy.community.notWired}
-      />
-
       <p className="mt-2 border-t border-line px-2.5 pt-2.5 text-[11px] leading-5 text-muted">
         {copy.community.switchHint}
       </p>
