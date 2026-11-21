@@ -23,6 +23,7 @@ import { describeMintError } from '@/features/mint-identity/lib/mint-errors';
 import { useMintConfig } from '@/features/mint-identity/model/use-mint-config';
 import { useMintQuote, type MintNameStatus } from '@/features/mint-identity/model/use-mint-quote';
 import { useMintTransaction } from '@/features/mint-identity/model/use-mint-transaction';
+import { approvalRowState } from '@/features/mint-identity/lib/approval-row';
 import { mintHandoffState } from '@/features/mint-identity/lib/mint-handoff';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { MintFundsBranch } from '@/features/mint-identity/ui/mint-funds-branch';
@@ -317,25 +318,34 @@ export function MintIdentityPanel({
 
   const longTermApproved =
     effectiveAllowance !== undefined && approvalKind(effectiveAllowance) === 'unlimited';
-  const approveLabel = needsApproval
-    ? tx.approveStage === 'wallet'
-      ? copy.approve.approving
-      : tx.approveStage === 'pending'
-        ? copy.approve.confirming
-        : useUnlimitedApproval
-          ? copy.approve.longTermAction(symbol ?? '')
-          : copy.approve.action(symbol ?? '')
-    : effectiveAllowance === undefined
-      ? copy.approve.loading
-      : longTermApproved
-        ? copy.approve.longTermActive
-        : copy.approve.approved;
+  // owner 2026-11-21 走查 P1：价格未知（名字没填/不合法）时**不渲染授权行**，
+  // 绝不把「不知道」说成「已授权」；价格算出来后再按 allowance 给结论。
+  const approvalState = approvalRowState({
+    cost,
+    allowance: effectiveAllowance,
+    longTermApproved,
+  });
+  const showApprove = approvalState !== 'hidden';
+  const approveLabel =
+    approvalState === 'needs-approval'
+      ? tx.approveStage === 'wallet'
+        ? copy.approve.approving
+        : tx.approveStage === 'pending'
+          ? copy.approve.confirming
+          : useUnlimitedApproval
+            ? copy.approve.longTermAction(symbol ?? '')
+            : copy.approve.action(symbol ?? '')
+      : approvalState === 'checking'
+        ? copy.approve.loading
+        : approvalState === 'long-term'
+          ? copy.approve.longTermActive
+          : copy.approve.approved;
   const approveNote =
-    needsApproval && useUnlimitedApproval
+    approvalState === 'needs-approval' && useUnlimitedApproval
       ? copy.approve.longTermApproveNote(symbol ?? '')
-      : effectiveAllowance === undefined
+      : approvalState === 'checking' || approvalState === 'hidden'
         ? null
-        : longTermApproved
+        : approvalState === 'long-term'
           ? copy.approve.longTermNote
           : copy.approve.note(symbol ?? '');
   const mintLabel =
@@ -476,18 +486,20 @@ export function MintIdentityPanel({
                 flow and *above* the primary action — never a fixed dock below it.
                 A long-term approval keeps its own read-only label (已长期授权). */}
             <ActionStack>
-              <Button
-                variant={needsApproval ? 'primary' : 'secondary'}
-                size="lg"
-                className="w-full"
-                data-testid="mint-approve"
-                onClick={handleApprove}
-                disabled={!needsApproval || !isNameReady || isTxBusy}
-                loading={tx.approveStage === 'wallet'}
-              >
-                {approveLabel}
-              </Button>
-              {approveNote !== null ? (
+              {showApprove ? (
+                <Button
+                  variant={needsApproval ? 'primary' : 'secondary'}
+                  size="lg"
+                  className="w-full"
+                  data-testid="mint-approve"
+                  onClick={handleApprove}
+                  disabled={!needsApproval || !isNameReady || isTxBusy}
+                  loading={tx.approveStage === 'wallet'}
+                >
+                  {approveLabel}
+                </Button>
+              ) : null}
+              {showApprove && approveNote !== null ? (
                 <p className="text-xs leading-5 text-muted">{approveNote}</p>
               ) : null}
               <Button

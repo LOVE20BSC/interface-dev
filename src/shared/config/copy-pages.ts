@@ -1599,7 +1599,7 @@ export const copy = {
       communityLp: '流动性凭证总量',
       communityBoost: '本阶段有效加速份额',
       communityBurned: '累计销毁社区代币',
-      becomeTitle: '想给自己喜欢的行动投票？',
+      becomeTitle: '想给自己喜欢的提案投票？',
       becomeBody: '质押社区代币的流动性，拿到治理权后就能参与投票与激励分配。',
       becomeAction: '立即成为治理者',
       unstakeAction: '取消质押',
@@ -1664,8 +1664,8 @@ export const copy = {
     governorIntro: {
       title: '治理权的作用',
       itemOwner: '治理权来自流动性质押：份额越多、承诺解锁期越长，治理权越大。',
-      itemReward: (percent: string) => `每轮获得 ${percent}% 以上投票支持的行动，有行动激励。`,
-      itemSubmit: (percent: string) => `有 ${percent}% 的治理权，每轮可推举一个行动进入投票列表。`,
+      itemReward: (percent: string) => `每轮获得 ${percent}% 以上投票支持的提案，有提案激励。`,
+      itemSubmit: (percent: string) => `有 ${percent}% 的治理权，每轮可推举一个提案进入投票列表。`,
     },
     smart: {
       label: '智能模式',
@@ -1866,7 +1866,7 @@ export const copy = {
       roundHeader: (round: string, votes: string) => `治理第 ${round} 轮 · 共投出 ${votes} 票`,
       entryLine: (id: string, title: string) => (title.length > 0 ? `#${id} ${title}` : `#${id}`),
       entryMine: (votes: string) => `我的投票 ${votes}`,
-      entryShare: (percent: string) => `占本轮 ${percent}%`,
+      entryShare: (percent: string) => `占该提案票数 ${percent}%`,
       loadMore: '加载更多轮次',
       loadingMore: '读取更多轮次中…',
       loading: '读取投票记录中…',
@@ -1874,7 +1874,7 @@ export const copy = {
       retry: '重试',
       /** 独立页 `/vote/records`。 */
       recordsTitle: '我的投票记录',
-      recordsIntro: '按轮次倒序列出你投过票的提案；占比是你在该提案的票数占该轮总投出票数的比例。',
+      recordsIntro: '按轮次倒序列出你投过票的提案；占比是你在该提案的票数占该提案总票数的比例。',
       recordsEmptyAction: '去投票',
     },
     /**

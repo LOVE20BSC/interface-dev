@@ -101,7 +101,11 @@ test.describe('全局动作按钮与回执整改截图', () => {
         await shot(page, 'swap', theme, viewport.name);
 
         // 铸造：先授权按钮、后铸造主按钮，都在内容流里。
+        // owner 2026-11-21 走查 P1：铸造价格依赖名字，**名字为空时授权行不渲染**
+        // （不能把「不知道要不要授权」说成「已授权」）。所以这里先像真人一样起个名字，
+        // 等价格算出来，再断言授权行出现。
         await open(page, `/mint${QUERY}`, theme);
+        await page.locator('#mint-name').fill('Testshot');
         await expect(page.getByTestId('mint-approve')).toBeVisible({ timeout: 20_000 });
         await expect(page.getByTestId('mint-approve')).not.toContainText('读取授权额度中');
         await expect(page.getByTestId('mint-submit')).toBeVisible();
