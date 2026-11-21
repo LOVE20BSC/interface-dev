@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { createPublicClient, getAddress, http, parseAbi } from 'viem';
 import { anvilRpc, isolateChain, revertChain, snapshotChain } from './chain';
 import {
   expectBusyButtonDuringTransition,
@@ -40,6 +41,8 @@ const DEPLOYMENT = JSON.parse(
 // 地址簿已知合约（交易对）：转让抽屉的 智能资产保护 拦截对象。
 const PAIR = DEPLOYMENT.addresses.pair;
 const MEMBER_NFT = DEPLOYMENT.addresses.memberNFT;
+const client = createPublicClient({ transport: http(RPC_URL) });
+const MEMBER_NFT_ABI = parseAbi(['function ownerOf(uint256 tokenId) view returns (address)']);
 
 test.use({
   permissions: ['clipboard-read', 'clipboard-write'],
@@ -836,4 +839,52 @@ test('my-nft: transfer recipient can be resolved by identity name with a confirm
   // No transfer is sent: cancel leaves the drawer and the list untouched.
   await page.getByRole('button', { name: '取消' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+/**
+ * 走查覆盖缺口（2026-11-21）：转让抽屉此前只覆盖了拦截 / 禁用 / 打开关闭，
+ * **没有真的提交过**。这条用 member1 → 外部地址跑一笔真实转让，并核对：
+ * 抽屉关掉、成功条出现、链上 ownerOf 换人、列表刷新成「没有身份 NFT」。
+ */
+test('my-nft: 转让抽屉真实提交（链上换主人 + 列表刷新）', async ({ page }) => {
+  test.setTimeout(120_000);
+  const snapshot = await snapshotChain();
+  try {
+    // viem 会校验 EIP-55 大小写：`ACCOUNTS.outsider` 的原始大小写不是合法校验和，
+    // 这里用 getAddress 归一化（夹具地址，不是产品问题）。
+    const recipient = getAddress(ACCOUNTS.outsider.toLowerCase());
+    await installWallet(page, ACCOUNTS.withIdentity);
+    await seedIdentity(page, ACCOUNTS.withIdentity, '1');
+    await page.goto('/my-nft');
+    await connect(page);
+
+    await page.getByRole('button', { name: '转让' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await page.getByPlaceholder('0x 开头的 40 位地址').fill(recipient);
+    const confirm = page.getByRole('button', { name: '确认转让' });
+    await expect(confirm).toBeEnabled({ timeout: 20_000 });
+    await confirm.click();
+
+    // 成功条 + 抽屉关闭。
+    await expect(page.getByText(/已转让给/)).toBeVisible({ timeout: 30_000 });
+    await expect(dialog).toHaveCount(0);
+
+    // 链上：ownerOf(1) 变成收款人（这是「真的提交了」的唯一硬证据）。
+    const owner = await client.readContract({
+      address: MEMBER_NFT,
+      abi: MEMBER_NFT_ABI,
+      functionName: 'ownerOf',
+      args: [1n],
+    });
+    expect(owner.toLowerCase()).toBe(recipient.toLowerCase());
+
+    // 列表刷新：钱包里已经没有身份 NFT 了（数量与空态都要变）。
+    await expect(page.getByText(/还没有身份 NFT|持有 0 个身份 NFT/)).toBeVisible({
+      timeout: 20_000,
+    });
+    await shot(page, 'my-nft-transferred.png');
+  } finally {
+    await revertChain(snapshot);
+  }
 });

@@ -140,6 +140,11 @@ export async function installWallet(
           if (method === 'net_version') return String(parseInt(chainHex, 16));
           if (method === 'wallet_switchEthereumChain') return null;
           if (method === 'wallet_addEthereumChain') return null;
+          // viem 的 injected connector 在部分路径上会先请求 EIP-2255 权限；anvil 不实现
+          // 这个方法（-32601），转发会让写交易在发出去之前就失败（2026-11-22 转让抽屉用例）。
+          if (method === 'wallet_requestPermissions') {
+            return [{ parentCapability: 'eth_accounts' }];
+          }
           if (method === 'eth_sendTransaction') {
             const raw = ((params as unknown[] | undefined)?.[0] ?? {}) as Record<string, unknown>;
             const tx: Record<string, unknown> = { ...raw };

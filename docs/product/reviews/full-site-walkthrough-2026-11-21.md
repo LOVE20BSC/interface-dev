@@ -372,3 +372,38 @@
 - `pnpm check`：**941 passed / 128 文件**（新增 6 条单测）
 - 目标 e2e：`mint-identity` 10/10（新增页头名字断言）、`治理核心` 6/6、`liquidity-numbers`、`gov-stake-numbers`、`global-actions-screens`、`transfer-numbers`、`airdrop-numbers` 逐项复跑（详见提交信息）
 - 已知环境故障：复跑期间 8555 anvil 假死一次（`failed to confirm chain ID`），按 `lead-playbook §6` 用 `pnpm e2e:reset-chain` 重建后恢复，与代码无关
+
+## §9 覆盖缺口补齐（lead，2026-11-22 03:30）
+
+走查 §7.1 列了 10 项「未覆盖」。补之前先做了一次**覆盖盘点**（对照现有 spec 的用例标题与断言），
+结论是 **6 项本来就有 e2e 覆盖**，真正缺的是 4 项，已全部补成真实写链用例：
+
+| §7.1 未覆盖项 | 盘点结论 | 补法 |
+| --- | --- | --- |
+| 批量转账真实提交 | 已有：`batch-transfer-numbers.spec.ts` 用例 A/B/E/G/H/I/J/K | 不补 |
+| 添加 / 撤出流动性真实提交 | 已有：`liquidity-numbers.spec.ts` G/H（连续两笔加池 + 撤出） | 不补 |
+| 提高承诺解锁期 | 已有：`gov-stake-numbers.spec.ts` C3（10 → 25） | 不补 |
+| 加速质押真实提交 | 已有：`gov-stake-numbers.spec.ts` C2 | 不补 |
+| 空投无资格 / 轮次未到 / 空池 | 已有：`airdrop-numbers.spec.ts` C/D/E/H | 不补 |
+| RPC 读失败态 | 已有：`transfer-recovery.spec.ts` D3、`home-reminders.spec.ts` unreachable RPC、`approvals-numbers.spec.ts` D3 | 不补 |
+| 自定义 spender 真实提交 | 已有：`approvals-numbers.spec.ts` 用例 G / G2（长期授权、撤销、非法输入） | 不补 |
+| **多提案分票** | ❌ 缺 | **G7**（`gov-core-numbers.spec.ts`）：同一轮两个提案（member1 + member5），一笔交易分票 100 + 50，核对逐提案票数 / 本轮已投 / 剩余额度 / 回执两条 |
+| **提案激励「销毁」不达标分支** | ❌ 缺 | **G8**：同一轮分票 100 + 1，门槛 ceil(101×5%)=5.05 → 第二个提案不达标；真点「销毁」→ 链上 status=2、`totalRewardBurned` 增量 = floor(池×1/101) |
+| **非零加速激励** | ❌ 缺（此前 boost 列只测过 0） | **G9**：先给 member1 一笔上限内加速质押 → 同轮投票 → 下一轮核对 `/gov/rewards` 两列 = floor(池×份额/总量)，且加速激励 > 0 |
+| **/my-nft 转让抽屉真实提交** | ❌ 缺（此前只有拦截 / 禁用 / 开关） | **G10**（`home-my-nft.spec.ts`）：member1 → 外部地址真转让，核对成功条、抽屉关闭、链上 `ownerOf` 换人、列表刷新为空态 |
+
+### §9.1 补测过程中顺手修的两个测试基建问题
+
+1. **`wallet-stub.ts` 缺 `wallet_requestPermissions`**：viem 的 injected connector 在部分路径上先请求
+   EIP-2255 权限，桩把它转发给 anvil → `-32601 Method not found` → 写交易在发出去之前就失败。
+   已补一行返回 `[{ parentCapability: 'eth_accounts' }]`（与真实钱包行为一致）。
+2. **`mineToNextPhase()` 两个竞态**：① 读块号与推块之间 interval mining 会自己出块 → 多跨一轮；
+   ② `Phase.currentPhase()` 是缓存值，上一用例 `revert` 后缓存可能超前于块高 → 读不到新阶段。
+   已改为「先 `sync()` 一次 → 停 interval mining → 读算推原子完成 → 恢复」，并处理 `toNext = 0`
+   （anvil_mine 不接受 0，推 1 块正好跨轮）。
+
+### §9.2 验证
+
+- `pnpm check`：**941 passed / 128 文件**（e2e 代码不进单测，这里是 lint/typecheck 结果）
+- `e2e/gov-core-numbers.spec.ts`（9 例）+ `e2e/home-my-nft.spec.ts`（19 例）：**28 passed（3.0m）**
+- 全量 e2e：见提交信息

@@ -1,8 +1,16 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { createPublicClient, http, parseAbi } from 'viem';
-import { ANVIL_RPC, anvilRpc, isolateChain, restoreMining, suspendMining } from './chain';
+import { createPublicClient, createWalletClient, encodeFunctionData, http, parseAbi } from 'viem';
+import {
+  ANVIL_RPC,
+  anvilRpc,
+  isolateChain,
+  restoreMining,
+  revertChain,
+  snapshotChain,
+  suspendMining,
+} from './chain';
 import { ACCOUNTS, connect, installWallet, seedIdentity } from './wallet-stub';
 
 /**
@@ -89,6 +97,15 @@ const ACCOUNT = ACCOUNTS.withIdentity;
 const MEMBER_ID = '1';
 /** 本用例投出的票数（页面输入「票」，18 位小数展开）。 */
 const VOTE_AMOUNT = 100n * 10n ** BigInt(VOTE_DECIMALS);
+/** G7 里第二个提案的票数（一笔交易分给两个提案：100 + 50）。 */
+const HALF_VOTE_AMOUNT = 50n * 10n ** BigInt(VOTE_DECIMALS);
+/**
+ * G7/G8 需要第二个有治理权的身份：8555 上只种了 member 1–5，其中 #4 持 memberId 5。
+ * member5 原本没有质押 → 没有推举权，夹具里先给它一笔最小流动性质押（1 WETH + 2,000 代币，
+ * 与池子 2000:1 精确配平），治理权 ≈ 44.7 ≥ 推举门槛（≈ 22.6）。
+ */
+const SECOND_ACCOUNT = '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65' as const;
+const SECOND_MEMBER_ID = 5n;
 /** 推举的提案正文（标题的 UTF-8 字节数由 `utf8Bytes` 现算，断言计数器）。 */
 const TITLE = '治理核心回归提案';
 const DETAILS = '推举与投票的真实写链回归，用来核对提案 / 投票 / 激励三页的链上口径。';
@@ -114,22 +131,44 @@ const { tokenAddress, stake, vote, submit, mint, phase, weth } = deployment.addr
  * 由 `playwright.config.ts` 保证）。期望值全部从这里读回来派生。
  */
 const client = createPublicClient({ transport: http(ANVIL_RPC) });
+const wallet = createWalletClient({ transport: http(ANVIL_RPC) });
+
+/** 以 anvil 未锁账户直接发一笔交易（页面外的确定性夹具：第二提案、加速质押、批量投票）。 */
+async function sendAs(from: `0x${string}`, to: `0x${string}`, data: `0x${string}`, value?: bigint) {
+  const hash = await wallet.sendTransaction({
+    account: from,
+    to,
+    data,
+    chain: null,
+    ...(value !== undefined ? { value } : {}),
+  });
+  return client.waitForTransactionReceipt({ hash });
+}
 
 const PHASE_ABI = parseAbi([
+  'function sync() returns (bool, uint256)',
   'function currentPhase() view returns (uint256)',
   'function phaseInfo(uint256 phaseNumber) view returns (uint256 startBlock, uint256 phaseBlocks)',
 ]);
 const STAKE_ABI = parseAbi([
+  'function stakeLiquidity(address tokenAddress, uint256 tokenAmount, uint256 parentTokenAmount, uint256 promisedWaitingPhases, uint256 memberId, uint256 deadline) returns (uint256, uint256)',
+  'function stakeBoost(address tokenAddress, uint256 boostAmount, uint256 promisedWaitingPhases, uint256 memberId, uint256 deadline) returns (uint256)',
+  'function memberStake(address tokenAddress, uint256 memberId) view returns (uint256 liquidityShares, uint256 boostShares, uint256 promisedWaitingPhases, uint256 unlockRequestPhase, uint256 tokenAmountForLiquidity, uint256 parentTokenAmountForLiquidity, uint256 firstGovVoteRound)',
+  'function boostStakeCap(address tokenAddress, uint256 memberId) view returns (uint256 memberCap, uint256 memberUsed)',
   'function govVotes(address tokenAddress, uint256 round, uint256 memberId) view returns (uint256)',
   'function totalGovVotes(address tokenAddress, uint256 round) view returns (uint256)',
 ]);
 const VOTE_ABI = parseAbi([
+  'function voterBoost(address tokenAddress, uint256 round, uint256 memberId) view returns (uint256)',
+  'function totalVoterBoost(address tokenAddress, uint256 round) view returns (uint256)',
+  'function vote(address tokenAddress, uint256 memberId, uint256[] proposalIds, uint256[] voteAmounts, bytes[] voteData)',
   'function maxVoteAmount(address tokenAddress, uint256 memberId) view returns (uint256)',
   'function voteAmountByMemberId(address tokenAddress, uint256 round, uint256 memberId) view returns (uint256)',
   'function voteAmountByProposalId(address tokenAddress, uint256 round, uint256 proposalId) view returns (uint256)',
   'function totalVoteAmount(address tokenAddress, uint256 round) view returns (uint256)',
 ]);
 const SUBMIT_ABI = parseAbi([
+  'function submitNewProposal(address tokenAddress, uint256 memberId, (string title, string details, address target, uint8 targetMode, bytes creationData) proposalBody, bytes submitData) returns (uint256)',
   'function canSubmit(address tokenAddress, uint256 memberId) view returns (bool)',
   'function MAX_TITLE_LENGTH() view returns (uint256)',
   'function SUBMIT_MIN_RATIO() view returns (uint256)',
@@ -137,6 +176,7 @@ const SUBMIT_ABI = parseAbi([
   'function submitInfos(address tokenAddress, uint256 round, uint256 offset, uint256 limit, bool reverse) view returns ((uint256 proposalId, uint256 submitterId)[] infos, uint256 totalCount)',
 ]);
 const MINT_ABI = parseAbi([
+  'function totalRewardBurned(address tokenAddress) view returns (uint256)',
   'function govReward(address tokenAddress, uint256 round) view returns (uint256)',
   'function govRewardByMemberId(address tokenAddress, uint256 round, uint256 memberId) view returns (uint256 voteReward, uint256 boostReward, bool minted)',
   'function proposalReward(address tokenAddress, uint256 round) view returns (uint256)',
@@ -144,6 +184,8 @@ const MINT_ABI = parseAbi([
   'function PROPOSAL_REWARD_MIN_VOTE_RATIO() view returns (uint256)',
 ]);
 const TOKEN_ABI = parseAbi([
+  'function approve(address spender, uint256 amount) returns (bool)',
+  'function balanceOf(address account) view returns (uint256)',
   'function symbol() view returns (string)',
   'function decimals() view returns (uint8)',
 ]);
@@ -192,6 +234,12 @@ function fractionDigitsFor(whole: bigint): number {
  * 与 `src/shared/lib/format.ts#formatTokenAmount` 同一套规则，但这里是**独立实现**：
  * 复用页面的格式化函数会让「格式化本身写错」的回归静默通过。
  */
+function ceilDiv(numerator: bigint, denominator: bigint): bigint {
+  if (denominator === 0n) return 0n;
+  const quotient = numerator / denominator;
+  return numerator % denominator === 0n ? quotient : quotient + 1n;
+}
+
 function expectedAmount(value: bigint, decimals = VOTE_DECIMALS): string {
   if (value === 0n) return '0';
   const absolute = value < 0n ? -value : value;
@@ -453,16 +501,30 @@ async function mine(blocks: bigint): Promise<void> {
  * 起点还差几块」；推完 `currentPhase` 恰好 +1（不会跨多轮，期望值只按这一轮算）。
  */
 async function mineToNextPhase(): Promise<bigint> {
-  const before = await readPhase();
-  const info = await readPhaseInfo(before);
-  const block = await client.getBlockNumber();
-  const toNext = info.startBlock + info.phaseBlocks - block;
-  await mine(toNext);
-  const after = await readPhase();
-  expect(after, `推块后应当只前进一个阶段（${before.toString()} → ${after.toString()}）`).toBe(
-    before + 1n,
-  );
-  return before;
+  // `Phase.currentPhase()` 是缓存值：上一个用例 revert 回滚后缓存可能超前于块高，
+  // 不同步就永远读不到新阶段（G8 顺跑时踩到）。先 sync 一次再算。
+  await sendAs(ACCOUNT, phase, encodeFunctionData({ abi: PHASE_ABI, functionName: 'sync' }));
+  // 先停 interval mining 再算「还差几块」：否则读块号与被推块之间链自己又出块，
+  // 会多跨一轮（G8 顺序执行时踩到过）。suspend 之后读-算-推是原子的。
+  await suspendMining();
+  try {
+    let before = await readPhase();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const info = await readPhaseInfo(before);
+      const block = await client.getBlockNumber();
+      const toNext = info.startBlock + info.phaseBlocks - block;
+      // 恰好停在最后一个块时 toNext = 0：anvil_mine 不接受 0，推 1 块正好跨轮。
+      await anvilRpc('anvil_mine', [`0x${(toNext > 0n ? toNext : 1n).toString(16)}`]);
+      const after = await readPhase();
+      if (after === before + 1n) return before;
+      // 已经在新阶段里（边界被上一次推块吃掉）：结束的轮次就是 after - 1。
+      if (after > before) return after - 1n;
+      before = after;
+    }
+    throw new Error('[gov-core] 推三轮都没能跨过阶段边界，链状态可疑');
+  } finally {
+    await restoreMining();
+  }
 }
 
 /** 本阶段剩余块数（1 块/秒，约等于剩余秒数）。 */
@@ -503,6 +565,101 @@ function expectedSharePercent(part: bigint, total: bigint): string {
   const whole = hundredths / 100n;
   const fraction = (hundredths % 100n).toString().padStart(2, '0').replace(/0+$/, '');
   return fraction.length > 0 ? `${whole}.${fraction}` : whole.toString();
+}
+
+const WETH_ABI = parseAbi([
+  'function deposit() payable',
+  'function approve(address spender, uint256 amount) returns (bool)',
+]);
+const ERC20_APPROVE_ABI = parseAbi([
+  'function approve(address spender, uint256 amount) returns (bool)',
+]);
+
+/** 给 member5（#4 持有）一笔最小流动性质押，让它有推举权；池子当前是 2,000 代币 : 1 WETH。 */
+async function enableSecondProposer(deadline: bigint): Promise<void> {
+  const tokenAmount = 2_000n * 10n ** 18n;
+  const parentAmount = 10n ** 18n;
+  await sendAs(
+    SECOND_ACCOUNT,
+    deployment.addresses.weth,
+    encodeFunctionData({ abi: WETH_ABI, functionName: 'deposit' }),
+    parentAmount,
+  );
+  await sendAs(
+    SECOND_ACCOUNT,
+    tokenAddress,
+    encodeFunctionData({
+      abi: ERC20_APPROVE_ABI,
+      functionName: 'approve',
+      args: [stake, tokenAmount],
+    }),
+  );
+  await sendAs(
+    SECOND_ACCOUNT,
+    deployment.addresses.weth,
+    encodeFunctionData({
+      abi: WETH_ABI,
+      functionName: 'approve',
+      args: [stake, parentAmount],
+    }),
+  );
+  const receipt = await sendAs(
+    SECOND_ACCOUNT,
+    stake,
+    encodeFunctionData({
+      abi: STAKE_ABI,
+      functionName: 'stakeLiquidity',
+      args: [tokenAddress, tokenAmount, parentAmount, 1n, SECOND_MEMBER_ID, deadline],
+    }),
+  );
+  expect(receipt.status, 'member5 的最小流动性质押应当成功（夹具）').toBe('success');
+}
+
+/** 用 anvil 未锁账户直接推举一个提案（页面推举已由 G1 覆盖，这里只做夹具）。 */
+async function seedProposal(
+  round: bigint,
+  account: `0x${string}`,
+  memberId: bigint,
+  title: string,
+): Promise<bigint> {
+  const args = [
+    tokenAddress,
+    memberId,
+    {
+      title,
+      details: '走查覆盖缺口：多提案 / 不达标分支的夹具提案。',
+      target: deployment.addresses.weth,
+      targetMode: 0 as const,
+      creationData: '0x' as const,
+    },
+    '0x' as const,
+  ] as const;
+  try {
+    await client.simulateContract({
+      address: submit,
+      abi: SUBMIT_ABI,
+      functionName: 'submitNewProposal',
+      args,
+      account,
+    });
+  } catch (error) {
+    const reason = (error as { shortMessage?: string }).shortMessage ?? (error as Error).message;
+    throw new Error(`[seedProposal] 推举模拟失败（member${memberId}, round ${round}）: ${reason}`);
+  }
+  const receipt = await sendAs(
+    account,
+    submit,
+    encodeFunctionData({ abi: SUBMIT_ABI, functionName: 'submitNewProposal', args }),
+  );
+  expect(receipt.status).toBe('success');
+  const proposalId = await client.readContract({
+    address: submit,
+    abi: SUBMIT_ABI,
+    functionName: 'proposalIdBySubmitterId',
+    args: [tokenAddress, round, memberId],
+  });
+  expect(proposalId, `第 ${round} 轮 member${memberId} 的推举应当有提案编号`).toBeGreaterThan(0n);
+  return proposalId;
 }
 
 async function openPage(page: Page, path: string): Promise<void> {
@@ -1068,6 +1225,298 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
    * 断言：标题 +「去投票」入口 + 按轮记录（轮次行 / 编号 + 标题 / 我的投票 / 占该提案票数）
    * + 空态与读失败分支存在性；期望值仍由链上读回派生。
    */
+  /**
+   * 用例 G7 · 多提案分票（走查覆盖缺口：G1 只投了 1 个提案，分配式投票从未跑过）。
+   *
+   * 夹具：同一轮里两个身份各推举一个提案（#0 → member1、#5 → member6），然后由 member1
+   * 用**一次交易**给两个提案分票（100 + 50），核对「逐提案票数 / 本轮已投 / 剩余额度 / 回执」。
+   * 夹具里的两笔推举走 anvil 未锁账户直接发交易（页面推举已由 G1 覆盖）。
+   */
+  /**
+   * 用例 G8 · 提案激励的「销毁」分支（走查覆盖缺口：此前只覆盖达标提案的只读结算）。
+   *
+   * 夹具：同一轮两个提案，member1 分票 100 / 1 → 本轮总票数 101；门槛 = ceil(101 × 5%)
+   * = 5.05 票，所以第二个提案（1 票）不达标 → 页面给「销毁这部分」；销毁后链上
+   * `proposalRewardSettlement.status` 变 2，`totalRewardBurned` 增加 floor(池 × 1 / 101)。
+   */
+  /**
+   * 用例 G9 · 非零加速激励（走查覆盖缺口：`/gov/rewards` 的「加速激励」列只测过 0）。
+   *
+   * 夹具：给 member1 一笔加速质押（上限内），在同一轮投票让 `Vote` 记下 `voterBoost`，
+   * 推一轮后核对：加速激励 = floor(boostPool × voterBoost / totalVoterBoost) > 0，
+   * 投票激励 = floor(votePool × 我的票数 / 本轮总票数)，两者都与链上 `govRewardByMemberId` 一致。
+   */
+  test('用例 G9 · 治理核心：加速激励非零时 /gov/rewards 的两列都对', async ({ page }) => {
+    const snapshot = await snapshotChain();
+    try {
+      await mineToNextPhase();
+      const round = await readPhase();
+      const block = await client.getBlock();
+      const deadline = block.timestamp + 600n;
+
+      // 1) 加速质押：金额取「上限内」的一个确定值（1,000 票或剩余额度，取小）。
+      const [memberCap, memberUsed] = await client.readContract({
+        address: stake,
+        abi: STAKE_ABI,
+        functionName: 'boostStakeCap',
+        args: [tokenAddress, BigInt(MEMBER_ID)],
+      });
+      const remainingCap = memberCap - memberUsed;
+      expect(remainingCap, 'member1 应当还有加速质押额度').toBeGreaterThan(0n);
+      const boostAmount = remainingCap < 1_000n * 10n ** 18n ? remainingCap : 1_000n * 10n ** 18n;
+      const [, , promisedPhases] = await client.readContract({
+        address: stake,
+        abi: STAKE_ABI,
+        functionName: 'memberStake',
+        args: [tokenAddress, BigInt(MEMBER_ID)],
+      });
+      await sendAs(
+        ACCOUNT,
+        tokenAddress,
+        encodeFunctionData({
+          abi: ERC20_APPROVE_ABI,
+          functionName: 'approve',
+          args: [stake, boostAmount],
+        }),
+      );
+      const boostReceipt = await sendAs(
+        ACCOUNT,
+        stake,
+        encodeFunctionData({
+          abi: STAKE_ABI,
+          functionName: 'stakeBoost',
+          args: [tokenAddress, boostAmount, promisedPhases, BigInt(MEMBER_ID), deadline],
+        }),
+      );
+      expect(boostReceipt.status, '加速质押应当成功（夹具）').toBe('success');
+
+      // 2) 同一轮推举 + 投票（投票那一刻才会把 voterBoost 记入本轮）。
+      const proposalId = await seedProposal(round, ACCOUNT, BigInt(MEMBER_ID), '加速激励核对提案');
+      const voteReceipt = await sendAs(
+        ACCOUNT,
+        vote,
+        encodeFunctionData({
+          abi: VOTE_ABI,
+          functionName: 'vote',
+          args: [tokenAddress, BigInt(MEMBER_ID), [proposalId], [VOTE_AMOUNT], ['0x']],
+        }),
+      );
+      expect(voteReceipt.status, '投票应当成功（夹具）').toBe('success');
+
+      const voterBoost = await client.readContract({
+        address: vote,
+        abi: VOTE_ABI,
+        functionName: 'voterBoost',
+        args: [tokenAddress, round, BigInt(MEMBER_ID)],
+      });
+      const totalVoterBoost = await client.readContract({
+        address: vote,
+        abi: VOTE_ABI,
+        functionName: 'totalVoterBoost',
+        args: [tokenAddress, round],
+      });
+      expect(voterBoost, '本轮应当记下非零加速份额').toBeGreaterThan(0n);
+      expect(totalVoterBoost).toBe(voterBoost);
+
+      // 3) 推一轮 → 结算读数。
+      await mineToNextPhase();
+      const [voteReward, boostReward, minted] = await client.readContract({
+        address: mint,
+        abi: MINT_ABI,
+        functionName: 'govRewardByMemberId',
+        args: [tokenAddress, round, BigInt(MEMBER_ID)],
+      });
+      const govPool = await client.readContract({
+        address: mint,
+        abi: MINT_ABI,
+        functionName: 'govReward',
+        args: [tokenAddress, round],
+      });
+      const votePool = govPool / 2n;
+      const boostPool = govPool - votePool;
+      const totalVotes = await readTotalVoteAmount(round);
+      const myVotes = await readVoteByMember(round);
+      const expectedVoteReward = totalVotes === 0n ? 0n : (votePool * myVotes) / totalVotes;
+      const expectedBoostReward =
+        totalVoterBoost === 0n ? 0n : (boostPool * voterBoost) / totalVoterBoost;
+      expect(voteReward).toBe(expectedVoteReward);
+      expect(boostReward).toBe(expectedBoostReward);
+      expect(boostReward, '本用例必须真的拿到非零加速激励').toBeGreaterThan(0n);
+      expect(minted).toBe(false);
+
+      // 4) 页面：两列数字逐字相等，且都能铸造。
+      const decimals = await readTokenDecimals();
+      await openPage(page, '/gov/rewards');
+      await expect(page.getByTestId(`gov-rewards-row-${round.toString()}`)).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(page.getByTestId(`gov-rewards-vote-${round.toString()}`)).toHaveText(
+        expectedAmount(voteReward, decimals),
+      );
+      await expect(page.getByTestId(`gov-rewards-boost-${round.toString()}`)).toHaveText(
+        expectedAmount(boostReward, decimals),
+      );
+      await expect(page.getByTestId(`gov-rewards-mint-${round.toString()}`)).toBeVisible();
+      await shoot(page, 'gov-core-rewards-boost');
+    } finally {
+      await revertChain(snapshot);
+    }
+  });
+
+  test('用例 G8 · 治理核心：不达标提案的激励可销毁（真交易）', async ({ page }) => {
+    const snapshot = await snapshotChain();
+    try {
+      await mineToNextPhase();
+      const round = await readPhase();
+      const block = await client.getBlock();
+      await enableSecondProposer(block.timestamp + 600n);
+      const p1 = await seedProposal(round, ACCOUNT, BigInt(MEMBER_ID), '达标提案 A');
+      const p2 = await seedProposal(round, SECOND_ACCOUNT, SECOND_MEMBER_ID, '不达标提案 B');
+
+      const oneVote = 10n ** BigInt(VOTE_DECIMALS);
+      const voteReceipt = await sendAs(
+        ACCOUNT,
+        vote,
+        encodeFunctionData({
+          abi: VOTE_ABI,
+          functionName: 'vote',
+          args: [tokenAddress, BigInt(MEMBER_ID), [p1, p2], [VOTE_AMOUNT, oneVote], ['0x', '0x']],
+        }),
+      );
+      expect(voteReceipt.status, '分票交易应当成功（夹具）').toBe('success');
+
+      const totalVotes = VOTE_AMOUNT + oneVote;
+      expect(await readTotalVoteAmount(round)).toBe(totalVotes);
+      const pool = await client.readContract({
+        address: mint,
+        abi: MINT_ABI,
+        functionName: 'proposalReward',
+        args: [tokenAddress, round],
+      });
+      const threshold = ceilDiv(totalVotes * (await readProposalMinVoteRatio()), PRECISION);
+      expect(threshold, '门槛应当高于第二个提案的 1 票').toBeGreaterThan(oneVote);
+      const burnedBefore = await client.readContract({
+        address: mint,
+        abi: MINT_ABI,
+        functionName: 'totalRewardBurned',
+        args: [tokenAddress],
+      });
+
+      await mineToNextPhase();
+
+      await openPage(page, '/gov/proposal-rewards');
+      await selectProposalRound(page, round);
+      await expect(page.getByTestId('gov-proposal-rewards-list')).toBeVisible({ timeout: 30_000 });
+
+      await expect(page.getByTestId(`gov-proposal-rewards-row-status-${p1.toString()}`)).toHaveText(
+        '待结算',
+      );
+      await expect(page.getByTestId(`gov-proposal-rewards-row-hint-${p1.toString()}`)).toHaveText(
+        '票数已过门槛，由提案目标合约铸造。',
+      );
+      await expect(page.getByTestId(`gov-proposal-rewards-burn-${p1.toString()}`)).toHaveCount(0);
+
+      await expect(page.getByTestId(`gov-proposal-rewards-row-status-${p2.toString()}`)).toHaveText(
+        '待结算',
+      );
+      await expect(page.getByTestId(`gov-proposal-rewards-row-hint-${p2.toString()}`)).toHaveText(
+        '票数没到门槛，这部分激励可以被销毁。',
+      );
+      const burn = page.getByTestId(`gov-proposal-rewards-burn-${p2.toString()}`);
+      await expect(burn).toBeVisible();
+      await shoot(page, 'gov-core-proposal-rewards-burnable');
+
+      await burn.click();
+      await expect(page.getByTestId('gov-proposal-rewards-receipt')).toBeVisible({
+        timeout: 30_000,
+      });
+      await page.getByTestId('gov-proposal-rewards-receipt-close').click();
+      await expect(page.getByTestId(`gov-proposal-rewards-row-status-${p2.toString()}`)).toHaveText(
+        '已销毁',
+        { timeout: 20_000 },
+      );
+      await expect(page.getByTestId(`gov-proposal-rewards-burn-${p2.toString()}`)).toHaveCount(0);
+
+      const [amount, status] = await client.readContract({
+        address: mint,
+        abi: MINT_ABI,
+        functionName: 'proposalRewardSettlement',
+        args: [tokenAddress, round, p2],
+      });
+      expect(status).toBe(2);
+      expect(amount).toBe((pool * oneVote) / totalVotes);
+      const burnedAfter = await client.readContract({
+        address: mint,
+        abi: MINT_ABI,
+        functionName: 'totalRewardBurned',
+        args: [tokenAddress],
+      });
+      expect(burnedAfter - burnedBefore).toBe(amount);
+    } finally {
+      await revertChain(snapshot);
+    }
+  });
+
+  test('用例 G7 · 治理核心：一次交易给两个提案分票（100 + 50）', async ({ page }) => {
+    const snapshot = await snapshotChain();
+    try {
+      // G1 已经在它那一轮推举过 member1；同一身份每轮只能推举一个，所以这里强制换一轮
+      // （`mineToNextPhase` 返回的是**推进前**的阶段，内容要落在新阶段里）。
+      await mineToNextPhase();
+      const round = await readPhase();
+      const block = await client.getBlock();
+      const deadline = block.timestamp + 600n;
+      await enableSecondProposer(deadline);
+      const p1 = await seedProposal(round, ACCOUNT, BigInt(MEMBER_ID), '多提案分票 A');
+      const p2 = await seedProposal(round, SECOND_ACCOUNT, SECOND_MEMBER_ID, '多提案分票 B');
+
+      await openPage(page, '/vote');
+      await expect(page.getByTestId(`gov-vote-proposal-${p1.toString()}`)).toBeVisible({
+        timeout: 30_000,
+      });
+      const maxVote = await readMaxVoteAmount();
+      await expect(page.getByTestId('gov-vote-power-max')).toHaveText(expectedAmount(maxVote));
+
+      await page.getByTestId(`gov-vote-amount-${p1.toString()}`).fill('100');
+      await page.getByTestId(`gov-vote-amount-${p2.toString()}`).fill('50');
+      const submit = page.getByTestId('gov-vote-submit');
+      await expect(submit).toBeEnabled({ timeout: 20_000 });
+      await submit.click();
+
+      // 回执：两条逐提案行 + 合计。
+      await expect(page.getByRole('heading', { name: '投票结果' })).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(page.getByTestId('gov-vote-receipt-line')).toHaveCount(2);
+      await expect(page.getByTestId('gov-vote-receipt-total')).toHaveText(
+        `本轮合计投出 ${expectedAmount(VOTE_AMOUNT + HALF_VOTE_AMOUNT)} 票`,
+      );
+      await page.getByTestId('gov-vote-receipt-close').click();
+
+      // 页面：两个提案各自的「我已投」与剩余额度。
+      await expect(page.getByTestId(`gov-vote-proposal-mine-${p1.toString()}`)).toHaveText(
+        `我已投 ${expectedAmount(VOTE_AMOUNT)} 票`,
+      );
+      await expect(page.getByTestId(`gov-vote-proposal-mine-${p2.toString()}`)).toHaveText(
+        `我已投 ${expectedAmount(HALF_VOTE_AMOUNT)} 票`,
+      );
+      await expect(page.getByTestId('gov-vote-power-used')).toHaveText(
+        expectedAmount(VOTE_AMOUNT + HALF_VOTE_AMOUNT),
+      );
+      await expect(page.getByTestId('gov-vote-power-remaining')).toHaveText(
+        expectedAmount(maxVote - VOTE_AMOUNT - HALF_VOTE_AMOUNT),
+      );
+
+      // 链上：逐提案票数、本轮已投、本轮总票数三者与页面一致。
+      expect(await readVoteByProposal(round, p1)).toBe(VOTE_AMOUNT);
+      expect(await readVoteByProposal(round, p2)).toBe(HALF_VOTE_AMOUNT);
+      expect(await readVoteByMember(round)).toBe(VOTE_AMOUNT + HALF_VOTE_AMOUNT);
+      expect(await readTotalVoteAmount(round)).toBe(VOTE_AMOUNT + HALF_VOTE_AMOUNT);
+    } finally {
+      await revertChain(snapshot);
+    }
+  });
+
   test('用例 G6 · 治理核心：/vote/records 独立投票记录页（按轮分组）', async ({ page }) => {
     await openPage(page, '/vote/records');
     await expect(page.getByTestId('gov-vote-records-title')).toHaveText('我的投票记录', {
