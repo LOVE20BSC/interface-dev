@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
 import { configuredAddress } from '@/config/networks';
 import { usePhaseClock } from '@/entities/phase/model/use-phase-clock';
@@ -8,16 +9,18 @@ import { useVotePower } from '@/entities/gov-core/model/use-vote-power';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { GOV_POLL_MS } from '@/features/governance-stake/model/use-gov-context';
-import { useVoteWrite } from '@/features/governance-vote/model/use-vote-write';
-import { VotePanel } from '@/features/governance-vote/ui/vote-panel';
+import { RoundProposalList } from '@/features/governance-vote/ui/round-proposal-list';
+import { VotePowerCard } from '@/features/governance-vote/ui/vote-power-card';
 import { GovAccessGate } from '@/widgets/gov-access-gate/gov-access-gate';
+import { buttonStyles } from '@/shared/ui/button';
+import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 
 /**
- * 治理·投票（core `Vote`）。
+ * 治理·投票（core `Vote`）——**本轮提案列表**。
  *
- * 只覆盖 core：投票对象是**已被推举进本轮**的提案（`Submit.submitInfos(currentRound)`）。
- * 有目标合约回调的提案（`targetMode == 1`）不在这一页投——回调数据由目标合约定义，
- * 属于行动域；页面会把这些提案列出来但禁用输入并写明原因。
+ * owner 2026-11-22：列表只负责「点哪个提案」，投票动作在独立详情页 `/vote/:proposalId`
+ * （快捷 25% / 50% / 100% + 自定义）。有目标合约回调的提案（`targetMode == 1`）不在
+ * core 覆盖范围，列表里标原因、不给入口。
  */
 export function VotePage() {
   const { symbol } = useCommunityContext();
@@ -44,15 +47,6 @@ export function VotePage() {
     access.refetch();
   };
 
-  const write = useVoteWrite(
-    {
-      waitingWallet: copy.gov.vote.waitingWallet,
-      pending: copy.gov.vote.pending,
-      revert: copy.gov.vote.revert,
-    },
-    refetchAll,
-  );
-
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-bold text-foreground" data-testid="gov-vote-title">
@@ -77,26 +71,44 @@ export function VotePage() {
           <p className="text-sm text-muted" data-testid="gov-vote-loading">
             {copy.gov.vote.loading}
           </p>
-        ) : voteAddress === undefined ||
-          token.address === undefined ||
-          access.memberId === undefined ? (
+        ) : voteAddress === undefined || token.address === undefined ? (
           <p className="text-sm text-muted" data-testid="gov-vote-unavailable">
             {copy.gov.gates.unconfiguredBody}
           </p>
         ) : (
-          <VotePanel
-            voteAddress={voteAddress}
-            tokenAddress={token.address}
-            memberId={access.memberId}
-            symbol={symbol}
-            proposals={proposals.items}
-            power={power}
-            write={write}
-            roundLabel={
-              round === undefined ? copy.common.unknown : copy.gov.vote.roundHint(round.toString())
-            }
-            onRefetch={refetchAll}
-          />
+          <>
+            <VotePowerCard power={power} symbol={symbol} />
+            {proposals.items.length === 0 ? (
+              <Card data-testid="gov-vote-empty">
+                <CardTitle>{copy.gov.vote.emptyTitle}</CardTitle>
+                <CardDescription>{copy.gov.vote.emptyBody}</CardDescription>
+                <Link
+                  to={`/submit?symbol=${encodeURIComponent(symbol)}`}
+                  className="mt-4 inline-flex h-11 items-center justify-center rounded-2xl bg-brand px-4 text-sm font-medium text-on-brand"
+                >
+                  {copy.gov.vote.emptyAction}
+                </Link>
+              </Card>
+            ) : (
+              <RoundProposalList
+                proposals={proposals.items}
+                power={power}
+                symbol={symbol}
+                roundLabel={
+                  round === undefined
+                    ? copy.common.unknown
+                    : copy.gov.vote.roundHint(round.toString())
+                }
+              />
+            )}
+            <Link
+              to={`/vote/records?symbol=${encodeURIComponent(symbol)}`}
+              data-testid="gov-vote-records-link"
+              className={buttonStyles('secondary', 'md', 'w-full')}
+            >
+              {copy.gov.myVotes.recordsTitle}
+            </Link>
+          </>
         )}
       </GovAccessGate>
     </div>

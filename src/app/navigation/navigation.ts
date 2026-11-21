@@ -91,5 +91,9 @@ const PAGE_TITLES: Readonly<Record<string, string>> = Object.freeze({
 });
 
 export function pageTitleFor(pathname: string): string | null {
-  return PAGE_TITLES[pathname] ?? null;
+  const exact = PAGE_TITLES[pathname];
+  if (exact !== undefined) return exact;
+  // 动态路由（owner 2026-11-22）：提案投票详情 `/vote/:proposalId` 与列表同标题。
+  if (pathname.startsWith('/vote/')) return copy.pageTitles.vote;
+  return null;
 }

@@ -5,11 +5,14 @@ import { copy } from '@/shared/config/copy-pages';
 import { usePhaseClock } from '@/entities/phase/model/use-phase-clock';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
 import { useGovAccess } from '@/entities/gov-core/model/use-gov-access';
+import { useProposalHistory } from '@/entities/gov-core/model/use-proposal-history';
 import { useSubmitContext } from '@/entities/gov-core/model/use-submit-context';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { GOV_POLL_MS } from '@/features/governance-stake/model/use-gov-context';
+import { useSubmitExisting } from '@/features/governance-submit/model/use-submit-existing';
 import { useSubmitWrite } from '@/features/governance-submit/model/use-submit-write';
+import { SubmitHistoryPanel } from '@/features/governance-submit/ui/submit-history-panel';
 import { SubmitPanel } from '@/features/governance-submit/ui/submit-panel';
 import { GovAccessGate } from '@/widgets/gov-access-gate/gov-access-gate';
 
@@ -51,15 +54,27 @@ export function SubmitPage() {
   });
   const submittedTitle = submittedInfo.data?.[0]?.body.title;
 
-  // 成功后重读资格 / 限制 / 轮次，表单随即换成「本轮已经推举」。
+  // 推举历史提案（owner 2026-11-22）：与新建提案是同一份资格与「每轮一个」约束。
+  const history = useProposalHistory(token.address, { limit: 20, round });
+
+  // 成功后重读资格 / 限制 / 轮次 / 历史列表，表单随即换成「本轮已经推举」。
   const refetchAll = (): void => {
     context.refetch();
     clock.refetch();
     token.refetch();
     access.refetch();
+    history.refetch();
   };
 
   const write = useSubmitWrite(
+    {
+      waitingWallet: copy.gov.submit.waitingWallet,
+      revert: copy.gov.submit.revert,
+    },
+    refetchAll,
+  );
+
+  const historyWrite = useSubmitExisting(
     {
       waitingWallet: copy.gov.submit.waitingWallet,
       revert: copy.gov.submit.revert,
@@ -81,15 +96,26 @@ export function SubmitPage() {
             {copy.gov.gates.unconfiguredBody}
           </p>
         ) : (
-          <SubmitPanel
-            submitAddress={submitAddress}
-            tokenAddress={token.address}
-            memberId={access.memberId}
-            context={context}
-            submittedTitle={submittedTitle}
-            write={write}
-            onRefetch={refetchAll}
-          />
+          <>
+            <SubmitPanel
+              submitAddress={submitAddress}
+              tokenAddress={token.address}
+              memberId={access.memberId}
+              context={context}
+              submittedTitle={submittedTitle}
+              write={write}
+              onRefetch={refetchAll}
+            />
+            <SubmitHistoryPanel
+              submitAddress={submitAddress}
+              tokenAddress={token.address}
+              memberId={access.memberId}
+              canSubmit={context.canSubmit === true}
+              history={history}
+              write={historyWrite}
+              onRefetch={refetchAll}
+            />
+          </>
         )}
       </GovAccessGate>
     </div>
