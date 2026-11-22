@@ -35,12 +35,8 @@ export function VotePowerCard({
           </Link>
         </>
       ) : (
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <Stat
-            label={copy.gov.vote.powerMax}
-            value={power.maxVoteAmount}
-            testId={`${testId}-max`}
-          />
+        // owner 2026-11-22：本轮治理权 = 已投 + 还能投，第三个数字是多余的，只留两格。
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <Stat
             label={copy.gov.vote.powerUsed}
             value={power.usedVoteAmount}

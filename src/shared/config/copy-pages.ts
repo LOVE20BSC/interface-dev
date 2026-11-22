@@ -1822,7 +1822,6 @@ export const copy = {
       title: '投票',
       intro: '每轮能投的票数等于你的治理权。可以一次投给多个提案，也可以分几次给同一个提案加票。',
       powerTitle: '我的投票额度',
-      powerMax: '本轮治理权',
       powerUsed: '本轮已投',
       powerRemaining: '还能投',
       powerUnit: '票',
@@ -1864,8 +1863,7 @@ export const copy = {
       totalVotesOn: (votes: string) => `该提案本轮共 ${votes} 票`,
       detail: {
         backToList: '返回本轮提案',
-        quickTitle: '快捷投票',
-        quickHint: (remaining: string) => `可用票数 ${remaining} 票`,
+        quickTitle: '投票',
         quickPercent: (percent: number) => `投 ${percent}%`,
         amountHint: (remaining: string) => `最多可投 ${remaining} 票`,
         detailTitle: '提案内容',

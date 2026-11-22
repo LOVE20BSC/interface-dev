@@ -132,14 +132,25 @@ export function VoteDetailPanel({
       <VotePowerCard power={power} symbol={symbol} testId="gov-vote-detail-power" />
 
       <Card data-testid="gov-vote-detail-quick">
-        <div className="flex items-baseline justify-between gap-2">
-          <CardTitle>{copy.gov.vote.detail.quickTitle}</CardTitle>
-          <span className="text-xs text-muted" data-testid="gov-vote-detail-remaining">
-            {remaining === undefined
-              ? copy.common.unknown
-              : copy.gov.vote.detail.quickHint(formatTokenAmount(remaining, VOTE_DECIMALS))}
-          </span>
-        </div>
+        <CardTitle>{copy.gov.vote.detail.quickTitle}</CardTitle>
+        <label
+          htmlFor="gov-vote-detail-amount"
+          className="mt-3 block text-xs font-medium text-muted"
+        >
+          {copy.gov.vote.amountLabel}
+        </label>
+        <input
+          id="gov-vote-detail-amount"
+          data-testid="gov-vote-detail-amount"
+          inputMode="decimal"
+          value={raw}
+          onChange={(event) => {
+            setRaw(event.target.value);
+            setLocalError(null);
+          }}
+          placeholder={copy.gov.vote.amountPlaceholder}
+          className="mt-1 h-11 w-full rounded-2xl border border-line bg-surface px-3 text-sm text-foreground outline-none placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20"
+        />
         <div className="mt-3 grid grid-cols-3 gap-2">
           {VOTE_QUICK_PERCENTS.map((percent) => {
             const amount = votesForPercent(remaining, percent);
@@ -162,25 +173,7 @@ export function VoteDetailPanel({
             );
           })}
         </div>
-        <label
-          htmlFor="gov-vote-detail-amount"
-          className="mt-4 block text-xs font-medium text-muted"
-        >
-          {copy.gov.vote.amountLabel}
-        </label>
-        <input
-          id="gov-vote-detail-amount"
-          data-testid="gov-vote-detail-amount"
-          inputMode="decimal"
-          value={raw}
-          onChange={(event) => {
-            setRaw(event.target.value);
-            setLocalError(null);
-          }}
-          placeholder={copy.gov.vote.amountPlaceholder}
-          className="mt-1 h-11 w-full rounded-2xl border border-line bg-surface px-3 text-sm text-foreground outline-none placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20"
-        />
-        <p className="mt-1 text-[11px] leading-4 text-muted" data-testid="gov-vote-detail-hint">
+        <p className="mt-2 text-[11px] leading-4 text-muted" data-testid="gov-vote-detail-hint">
           {remaining === undefined
             ? copy.common.unknown
             : copy.gov.vote.detail.amountHint(formatTokenAmount(remaining, VOTE_DECIMALS))}

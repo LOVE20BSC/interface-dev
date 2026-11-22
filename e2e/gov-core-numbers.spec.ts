@@ -808,13 +808,15 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     const govVotes = await readGovVotes(phase);
     expect(maxVoteAmount, '本轮治理权应当来自 Stake.govVotes').toBe(govVotes);
     expect(maxVoteAmount, '种子仓位应当给 memberId 1 一笔可投票的治理权').toBeGreaterThan(0n);
-    await expect(page.getByTestId('gov-vote-power-max')).toHaveText(expectedAmount(maxVoteAmount), {
+    // owner 2026-11-22：额度卡只留「已投 / 还能投」两格（治理权 = 两者之和）；
+    // 卡片上的数字仍与链上 `maxVoteAmount` 对得上（还没投时 还能投 = 额度）。
+    await expect(page.getByTestId('gov-vote-power-used')).toHaveText(expectedAmount(0n), {
       timeout: 30_000,
     });
-    await expect(page.getByTestId('gov-vote-power-used')).toHaveText(expectedAmount(0n));
     await expect(page.getByTestId('gov-vote-power-remaining')).toHaveText(
       expectedAmount(maxVoteAmount),
     );
+    await expect(page.getByTestId('gov-vote-power-max')).toHaveCount(0);
     await expect(page.getByTestId('gov-vote-error')).toHaveCount(0);
 
     // ---- 2. /submit：资格 + 字节计数器 → 真实推举交易 → 回执 ----
@@ -952,7 +954,6 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     await expect(page.getByTestId('gov-vote-power-remaining')).toHaveText(
       expectedAmount(maxVoteAmount - VOTE_AMOUNT),
     );
-    await expect(page.getByTestId('gov-vote-power-max')).toHaveText(expectedAmount(maxVoteAmount));
   });
 
   test('用例 G2 · 治理核心：推举 / 投票两态的验收截图', async ({ page }) => {
@@ -1557,8 +1558,6 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
       await expect(page.getByTestId(`gov-vote-proposal-${p1.toString()}`)).toBeVisible({
         timeout: 30_000,
       });
-      await expect(page.getByTestId('gov-vote-power-max')).toHaveText(expectedAmount(maxVote));
-
       // 列表：两个提案各自的「我已投」与剩余额度（列表卡是链上读回来的）。
       await expect(page.getByTestId(`gov-vote-proposal-mine-${p1.toString()}`)).toHaveText(
         `我已投 ${expectedAmount(VOTE_AMOUNT)} 票`,
