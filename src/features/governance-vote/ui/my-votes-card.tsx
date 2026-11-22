@@ -23,11 +23,14 @@ export interface MyVotesCardProps {
 
 /**
  * 治理首页「我的投票」卡（owner 2026-11-21：仿旧库 `MyVotingPanel` + `/vote/records`，
- * 布局重新设计；同日复核后去掉「本轮可投」——它等于上面摘要卡里的「有效治理权」，
- * 同页重复展示，只留「已投 / 未投」）。
+ * 布局重新设计）。
+ *
+ * owner 2026-11-22 去重：只剩「本轮已投」一个数字——
+ * 「本轮可投」= 上面摘要卡的「有效治理权」（更早删掉），「未投」= 有效治理权 − 本轮已投，
+ * 卡片头的「治理第 N 轮」又和记录行重复，三处都删了（详见下面卡片内的注释）。
  *
  * 内容对应关系：
- * - 两格 ← 旧 `MyVotingPanel` 的「我的已投票数 / 我的未投票数」；
+ * - 一格「本轮已投」← 旧 `MyVotingPanel` 的「我的已投票数」；
  * - 主按钮「去投票」← 旧版同款入口（本轮投完变禁用，无治理权改引导句）；
  * - 记录区 ← 旧 `MyVotingPanel` 的右链接「我的投票记录 >>」+ `/vote/records` 的预览；
  *   卡片只给最近两轮，完整列表在独立页 `/vote/records`。
@@ -48,26 +51,20 @@ export function MyVotesCard({ tokenAddress, memberId, round, symbol }: MyVotesCa
 
   return (
     <Card data-testid="gov-my-votes-card">
-      <div className="flex items-baseline justify-between gap-2">
-        <CardTitle>{copy.gov.myVotes.title}</CardTitle>
-        <span className="text-xs text-muted" data-testid="gov-my-votes-round">
-          {round === undefined
-            ? copy.common.unknown
-            : copy.gov.myVotes.roundLabel(round.toString())}
-        </span>
-      </div>
+      <CardTitle>{copy.gov.myVotes.title}</CardTitle>
 
-      {/* 「本轮可投」不在这里重复：它等于上面摘要卡的「我的有效治理权」。 */}
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      {/*
+        owner 2026-11-22 去重：这里只剩「本轮已投」。
+        - 「本轮可投」早已删掉：它等于上面摘要卡的「我的有效治理权」；
+        - 「未投」同样删掉：它 = 有效治理权 − 本轮已投，两个数都在同一页上；
+        - 卡片头右侧的「治理第 N 轮」也删掉：记录行本身带轮次，同轮会在同一张卡上出现两次。
+        还有多少票可投由下面按钮承载（「去投票」/「本轮票已经投完」）。
+      */}
+      <div className="mt-3">
         <Stat
           label={copy.gov.myVotes.statVoted}
           value={formatTokenAmount(power.usedVoteAmount, VOTE_DECIMALS)}
           testId="gov-my-votes-used"
-        />
-        <Stat
-          label={copy.gov.myVotes.statRemaining}
-          value={formatTokenAmount(remaining, VOTE_DECIMALS)}
-          testId="gov-my-votes-remaining"
         />
       </div>
 

@@ -14,7 +14,10 @@ export interface MyVoteRoundsProps {
 
 /**
  * 「我的投票记录」按轮分组的呈现（旧库 `/vote/records` 的内容）：
- * 每轮一行「治理第 R 轮 · 共投出 X 票」，轮内每条 = `#编号 标题` + 「我的投票 X」+「占本轮 Y%」。
+ * 每轮一行「治理第 R 轮」，轮内每条 = `#编号 标题` + 「我的投票 X」+「占该提案票数 Y%」。
+ *
+ * 轮头不写「共投出 X 票」（owner 2026-11-22 去重）：那只是下面每条「我的投票」的加总，
+ * 单提案轮次里同一个数字会在同一张卡上连着出现两次。
  *
  * 治理首页的卡片（预览最近两轮）与独立页 `/vote/records`（可翻页）共用这一份渲染，
  * 避免两处各写一套而慢慢漂移。
@@ -28,10 +31,7 @@ export function MyVoteRounds({ rounds, testIdPrefix }: MyVoteRoundsProps) {
             className="text-xs text-muted"
             data-testid={`${testIdPrefix}-round-line-${item.round}`}
           >
-            {copy.gov.myVotes.roundHeader(
-              item.round.toString(),
-              formatTokenAmount(item.myTotalVotes, VOTE_DECIMALS),
-            )}
+            {copy.gov.myVotes.roundLabel(item.round.toString())}
           </p>
           <ul className="mt-1 space-y-1.5 rounded-2xl bg-elevated/60 px-3 py-2">
             {item.entries.map((entry) => {

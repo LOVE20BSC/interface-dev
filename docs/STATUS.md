@@ -4,7 +4,9 @@
 
 ## 1. 一句话定位
 
-LOVE20BSC 协议的纯静态、移动优先前端：无后端、无索引器、无第三方 API 调用，钱包只支持注入式。本 checkout（目录 `interface-dev-dsh`，`origin` = `LOVE20BSC/interface-dev`）是**三变体中的 dev**（链 31337 / 本地 anvil），当前处于 **M0 收尾**（身份漏斗 + 空投 + 通用兑换）：功能与验收、包体已闭环，发布尚未闭环；M1 未开始——但 **2026-11-17 按 owner 要求提前实装治理页的「质押」部分**（流动性质押 / 加速质押 / 我的质押与解锁），投票、推举与激励铸造仍属 M1、未开工。三变体定义见 [ADR-0002](adr/0002-three-environment-injection.md) §4。
+LOVE20BSC 协议的纯静态、移动优先前端：无后端、无索引器、无第三方 API 调用，钱包只支持注入式。本 checkout（目录 `interface-dev-dsh`，`origin` = `LOVE20BSC/interface-dev`）是**三变体中的 dev**（链 31337 / 本地 anvil）。
+
+**当前进度（2026-11-22）**：M0（身份漏斗 + 空投 + 通用兑换）已闭环、dev 站已发布；**治理域的 core 部分整体实装**——质押（流动性质押 / 加速质押 / 申请解锁，2026-11-17 提前做）、投票（`/vote` 列表 + `/vote/:id` 详情 + `/vote/records`）、提案与推举（`/submit` 历史列表 + `/submit/new` 新建 + 历史提案推举）、治理激励铸造（`/gov/rewards`）、提案激励结算（`/gov/proposal-rewards`），并做了一轮「同页重复数字/文案」收口（2026-11-22）。**仍未做**：行动域（回调提案 `targetMode=1` 的推举与投票、`/verify/*`、`/acting/*`、`/action/*` 仍是占位；owner 2026-11-22 决定「行动域先不做」）、test/prod 地址簿（协议尚未在 BSC 测试网/主网部署）。三变体定义见 [ADR-0002](adr/0002-three-environment-injection.md) §4。
 
 ## 2. 当前状态
 
@@ -73,22 +75,24 @@ M0 范围共 6 项（[m0-scope](product/m0-scope.md)「范围内」）。✅ 完
 | — | 2026-11-22 推举历史提案：本轮已推举时要区别呈现（owner 反馈） | ✅ | `/submit` 历史段新增两种只读态：① 本轮已推举过（同一身份每轮一个）→ 顶部说明「你本轮已经推举过提案 #N，历史提案要等下一轮才能推举。」+ 行内不再渲染按钮（该提案「本轮已推举」、其他「下一轮」）；② 本轮没有推举权 → 顶部给原因「治理权没到推举门槛，先质押流动性，下一轮再来」，按钮保持禁用。之前这两种情况只是按钮变灰、没有解释，容易被当成按钮坏了。e2e：G1 断言推举成功后的只读说明与行状态；G12 断言推举历史成功后出现同一条说明。ux-spec §3.15 同步。 |
 
 | — | 2026-11-22 `/submit` 拆页（列表默认 + 新建独立）+ 投票页推举入口 | ✅ | ① **`/submit` 默认是历史提案列表**：按提案编号**倒序**、**每页 10 条**（`proposalIds` + `proposalInfosByProposalIds`），行内「推举」走 `Submit.submit(proposalId)`，底部「上一页 / 第 N / M 页 / 下一页」+ `共 N 个提案`；列表**右上「推举新提案」**在可推举时出现。② 新增 **`/submit/new`** 推举新提案页（原表单 + 资格卡 + 回执，顶部「← 返回提案列表」）；页头标题「推举新提案」。③ 本轮已推举时：列表整段只读（顶部说明 + 行内状态 + 右上按钮收起），`/submit/new` 显示「本轮已经推举」卡。④ **投票页**：本轮已有提案时列表标题右侧也显示「推举提案」入口（进 `/submit`），空态保留原「去推举提案」。e2e：G1 走 `/submit/new` 创建 → 回 `/submit` 断言只读说明/行状态/无新建按钮；G2 增「历史列表」截图并改推举截图到 `/submit/new`；G12 列表页推举全链路。验证：check 952；gov-core-numbers 10/10（3.6m）；全量 e2e 见提交。 |
+| — | 2026-11-22 治理域「同页重复」收口 + 社区 tab 断链修复 + 台账回正（owner 选 C） | ✅ | owner 问「接下来做哪部分」并选定「治理域最后几处去重（0.5 轮）」、行动域「先不做」。**去重**：① `/gov` 我的投票卡删掉「未投」（= 摘要卡「有效治理权」−「本轮已投」，两个数都在同一页），删掉卡头「治理第 N 轮」（记录行本身带轮次，同轮会在同一张卡出现两次），「已投」改「本轮已投」；② 记录轮头删掉「共投出 X 票」（= 下面每条「我的投票」的加总，单提案轮次里同一数字会连着出现两次），`MyVoteRounds` 只留「治理第 R 轮」；③ 顺手少一半 RPC：`use-my-votes` 不再逐轮读 `totalVoteAmount`（占比分母 2026-11-21 已改成「该提案总票数」），删掉 `myTotalVotes` / `roundTotalVotes`；④ `/vote` 页头 intro 只讲额度规则（旧句「可以一次投给多个提案」在「一屏一个提案」之后已不成立，且与列表那句都在教怎么投），怎么投交给列表上方那句；⑤ 术语统一：列表卡与推举历史行的「提案人」改成「提案创建人」（与详情页共用同一个 copy 键）；⑥ 详情页「总治理权占比」徽标由「参考」改成「**不判激励阈值**」（它确实不参与过线判定，只写「参考」看不出为什么没有状态）。**修断链**：⑦ `/gov` 社区 tab 的「投票中的行动」还指向旧库 `/vote/actions`，投票改版后该路径会落进 `/vote/*` 详情页并显示「没有找到这个提案」→ 改指 `/vote`、文案改「本轮提案」；⑧ 占位表清掉已实装条目（`/vote*`、`/submit*`、`/gov/rewards`）与对应 copy 键，只留 `/verify/*`、`/acting/*`、`/action/*`（未知二级路径按前缀回落，不会串域）。**验证**：`pnpm check` **952 passed / 130 文件**；`gov-core-numbers` **10/10（3.5m）**；`gov-stake-numbers` **8/8（1.8m，社区 tab 入口随之覆盖）**；全量 e2e **173/173（14.1m，EXIT 0）**；包体 prod **159.5** / dev **160.9** kB gzip（均无 WARN）；截图 **44 张更新**（36 张 `gov-core-*` + 8 张 `gov-home-{mine,community}-*`），`gov-verify-placeholder-*` / `me-stake-*` / `stake-*` / `unstake-*` 的渲染噪声已按 §7.9 撤回。**台账回正**：§1 一句话定位（M1「未开始」→ 治理 core 已实装、行动域仍占位）、§7 下一步（按 owner「行动域先不做」重排 + 新增 §7.1 待拍板 3 条）、§4/§8 的 e2e 条数 **143 → 173**、真机三处体验标注为已修（`86326c7`）。文档 [m0-ux-spec](product/m0-ux-spec.md) §3.14 / §3.15 同步（我的投票卡、记录轮头、intro、提案创建人、不判激励阈值、社区 tab 入口）。 |
 
-**未完成清单（别误读为 done）**：三处真机体验、test/prod 地址簿填充（协议尚未在 BSC 测试网/主网部署，两个变体的五个应用页按「未配置」禁用入口）、M1 的**行动域**（回调提案的推举/投票、验证、链群行动；core 的投票/推举/治理激励/提案激励已于 2026-11-21 实装）。e2e 已隔离到独立 8555 链（§6.1）；包体 prod **159.3** / dev **160.7** kB gzip（2026-11-19 收尾实测；2026-11-17 治理页后为 159.6/161.0；2026-11-16 把钱包菜单/社区菜单/弹层/占位页/404/版本提示文案移到 `copy-pages` 懒加载；dev 预算 161 = 160 + 1 kB 部署数据豁免，§6.2；新增 `gov-page` 懒加载 chunk 不占首屏）；ABI manifest 与漂移门禁已补（§6.5）。
 
-截图共 **235** 张（2026-11-21 实测：`find docs/product/screenshots -name '*.png' | wc -l` = 235；= 207 + 28 张 `gov-core-*`（含 4 张我的投票卡、4 张投票记录页）− 4 张 `/vote` 占位图 + 4 张 `gov-verify-placeholder-*`（占位样例改到 `/verify`），其中顶层 `ls docs/product/screenshots/*.png` 226 张 + `live/` 1 张；本轮 **167 张已按默认深色重拍、总数不变**；按前缀：home 7 / airdrop 10 / mint 4 / my-nft 5 / swap 21 / transfer 29（含转让抽屉 5、恢复流程 8）/ about 4 / apps 1 / me 3 / approvals 13 / batch-transfer 20 / liquidity 20 / theme 12 / tx-recovery 1 / global-actions 24 / gov-home 8（`gov-home-{mine,community}-{light,dark}-{mobile,desktop}`）/ me-stake 4（`me-stake-{light,dark}-{mobile,desktop}`，2026-11-18 23:20 新增）/ stake-lp 4 / stake-token 4 / unstake 4 / gov-core 28（2026-11-21 新增：投票/推举/治理激励/提案激励 × 5 状态 × 四档 + 首页我的投票卡 4 张 + 投票记录页 4 张）/ gov-verify-placeholder 4（原 `/vote` 占位样例改 `/verify`；治理域共 28 张新图；旧的 `gov-{stake,mine,boost-locked}` 12 张已随多页面 IA 重写删除）/ wallet-menu 2 / wallet-no-wallet 1 / community-search 1 / live 1），见 [`product/screenshots/`](product/screenshots/)。本次核对用到的文件：`home-identity-error.png`、`home-no-identity.png`、`swap-form.png`、`mint-form.png`、`airdrop-eligible.png`、`gov-home-mine-light-mobile.png`、`me-stake-light-mobile.png`、`stake-lp-light-mobile.png`、`unstake-light-mobile.png`、[`live/interface-test-live-2026-11-11.png`](product/screenshots/live/interface-test-live-2026-11-11.png)。
+**未完成清单（别误读为 done）**：**行动域**（回调提案的推举/投票、`/verify/*` 验证打分、`/acting/*`·`/action/*` 行动页——owner 2026-11-22 决定「先不做」，见 §7 第 5 行）、test/prod 地址簿填充（协议尚未在 BSC 测试网/主网部署，两个变体的五个应用页按「未配置」禁用入口）、真机人工复核（代码侧三处体验缺陷 `86326c7` 已修）。e2e 已隔离到独立 8555 链（§6.1）；包体 prod **159.5** / dev **160.9** kB gzip（2026-11-22 全量实测；历史：2026-11-19 收尾 159.3 / 160.7；dev 预算 161 = 160 + 1 kB 部署数据豁免，§6.2）；ABI manifest 与漂移门禁已补（§6.5）。
+
+截图共 **247** 张（2026-11-22 实测：`find docs/product/screenshots -name '*.png' | wc -l` = 247；其中顶层 `ls docs/product/screenshots/*.png` 246 张 + `live/` 1 张；按前缀：home 7 / airdrop 10 / mint 5 / my-nft 6 / swap 21 / transfer 29（含转让抽屉 5、恢复流程 8）/ about 4 / apps 1 / me 3 / approvals 13 / batch-transfer 20 / liquidity 20 / theme 12 / tx-recovery 1 / global-actions 24 / **gov-home 8**（`gov-home-{mine,community}-{light,dark}-{mobile,desktop}`）/ me-stake 4 / stake-lp 4 / stake-token 4 / unstake 4 / **gov-core 38**（推举 4 + 历史列表 4 + 投票列表 4 + 投票详情 4 + 投票记录 4 + 首页我的投票卡 4 + 治理激励 9（可铸 4 / 已铸 4 / 加速激励 1）+ 提案激励 5（可结算 4 / 销毁 1））/ gov-verify-placeholder 4 / wallet-menu 2 / wallet-no-wallet 1 / community-search 1 / live 1）。治理域内 2026-11-22 更新 44 张（36 张 `gov-core-*` + 8 张 `gov-home-*`），其余页面截图未随本轮变动。本次核对用到的文件：`home-identity-error.png`、`home-no-identity.png`、`swap-form.png`、`mint-form.png`、`airdrop-eligible.png`、`gov-home-mine-light-mobile.png`、`me-stake-light-mobile.png`、`stake-lp-light-mobile.png`、`unstake-light-mobile.png`、[`live/interface-test-live-2026-11-11.png`](product/screenshots/live/interface-test-live-2026-11-11.png)。见 [`product/screenshots/`](product/screenshots/)。
 
 ## 3. 仓库与环境事实
 
-### 3.1 三个仓库与部署（2026-11-11 实测）
+### 3.1 三个仓库与部署（2026-11-22 实测）
 
 | 仓库 | 是否存在 | 变体 / 链 | Pages |
 | --- | --- | --- | --- |
-| `LOVE20BSC/interface-dev` | 存在（`git ls-remote` 正常；本仓 `origin`） | dev / 31337 | <https://love20bsc.github.io/interface-dev/> 200，build id `mwb9t10g-85b4d354` |
-| `LOVE20BSC/interface-test` | 存在（本仓另有 `test` remote） | test / 97 占位 | <https://love20bsc.github.io/interface-test/> 200，build id `mwb9werl-379de9b0` |
-| `LOVE20BSC/interface` | **不存在**（`git ls-remote` 128 `Repository not found`；根站 404） | prod / 56 | 尚未部署 |
+| `LOVE20BSC/interface-dev` | 存在（本仓 `origin`；`main` = 本仓 HEAD） | dev / 31337 | <https://love20bsc.github.io/interface-dev/> 200，build id **`mwrir89n-9a495bf3`**（对应 §2 本轮末提交） |
+| `LOVE20BSC/interface-test` | 存在（本仓另有 `test` remote） | test / 97 占位 | <https://love20bsc.github.io/interface-test/> 200，但 build id 仍是 **`mwk2g1ce-c669b644`**（2026-11-17 的构建），远端 `main` = `ace6042`，明显落后；原因见 §7 第 6 行（test 地址来源未解决） |
+| `LOVE20BSC/interface` | **不存在**（`git ls-remote` 仍 `Repository not found`） | prod / 56 | 尚未部署 |
 
-线上两站可访问但构建早于当前 HEAD（页面标题仍是旧品牌 `LOVE20`，现应为 `LOVE20协议`）。本地跟踪分支 `test/main` 停在 `8707b6a`，远端实际 `a217ddb`，一律以 `git ls-remote` 为准。
+`interface-dev` 的 Pages 由 push `main` 触发（`.github/workflows/deploy.yml`，run 记录见 Actions）；build id 是「构建批次 + 源码指纹」，线上页脚显示 8 位短 id、完整值进 `title`。test/prod 的地址簿仍全 0（合约仓只有 `anvil31337_dev` 一套网络参数），因此 test 站即使发布到最新 commit，协议相关页面的真实形态也只能显示「未配置」。
 
 ### 3.2 本地链与地址来源
 
@@ -121,7 +125,7 @@ M0 范围共 6 项（[m0-scope](product/m0-scope.md)「范围内」）。✅ 完
 | 构建 | `pnpm build` | typecheck → vite → 404/.nojekyll/build-id → 包体门禁；默认 **prod** 变体 |
 | dev 变体构建 | `VITE_ENV=dev pnpm build` | 测包体/本地地址簿时必须显式指定 |
 | 预览产物 | `pnpm preview` | <http://127.0.0.1:4173> |
-| E2E | `pnpm e2e` | Playwright，**143 条**；在独立 **8555** 自动化链上自举/复用（`scripts/e2e-chain.mjs`），`playwright.config.ts` 强制 `VITE_ENV=dev` 并跑 `build && preview`，把解析出的 RPC 作为 `VITE_ANVIL_RPC` 烘进构建 |
+| E2E | `pnpm e2e` | Playwright，**173 条**；在独立 **8555** 自动化链上自举/复用（`scripts/e2e-chain.mjs`），`playwright.config.ts` 强制 `VITE_ENV=dev` 并跑 `build && preview`，把解析出的 RPC 作为 `VITE_ANVIL_RPC` 烘进构建 |
 | 只看 e2e 链 | `pnpm e2e:ensure-chain` | 打印 8555 端点与「自举/复用」结果，不跑测试；`pnpm e2e:reset-chain` 重建 |
 | 格式化 | `pnpm format` / `pnpm format:check` | Prettier |
 | 起人工链（8545） | `make stop && make clean && make bootstrap` | 只从全新链/nonce 0 部署；旧链会被拒绝 |
@@ -154,7 +158,7 @@ CI 环境规则（`.github/workflows/deploy.yml`）：取 `github.repository` �
 | 无第三方 / 零密钥 | 钱包 injected-only；无 WalletConnect/AppKit/第三方 API/Service Worker；所有 `VITE_*` 公开，环境包不放任何密钥 | [README](../README.md) §Stack；[ADR-0002](adr/0002-three-environment-injection.md) §1 |
 | i18n 纪律 | 所有用户可见文案进 `shared/config/copy.ts`（首屏）/ `shared/config/copy-pages.ts`（懒加载页与弹层）；组件内禁止 CJK 字面量（架构测试强制）；暂不引入 i18n 库 | [README](../README.md)「i18n readiness」 |
 | 缓存与错误 | 唯一存储封装 `shared/lib/cache.ts`，键 `love20:v1:<chainId>:<contractAddress>:<wallet>:<businessKey>`；合约错误 selector → 中文人话 | [ADR-0003](adr/0003-identity-and-connect-button.md) §3；[README](../README.md) §Storage |
-| 底栏与占位页 | 5 个 tab 同权重，不做中央凸起；**行动**仍是占位页（「即将上线」），**治理**自 2026-11-17 起是真实页（流动性质押 + 加速质押；投票/推举属 M1），**我的**早已实装；占位页不出现半成品表单 | [README](../README.md)「Decisions…」；[m0-ux-spec](product/m0-ux-spec.md) §1.2/§3.14 |
+| 底栏与占位页 | 5 个 tab 同权重，不做中央凸起；**行动**仍是占位页（「即将上线」，行动域 owner 2026-11-22 决定先不做），**治理**是真实页（质押 2026-11-17 起；投票/推举/治理激励/提案激励 2026-11-21 起），**我的**早已实装；占位页不出现半成品表单 | [README](../README.md)「Decisions…」；[m0-ux-spec](product/m0-ux-spec.md) §1.2/§3.14 |
 | 应用目录 | 底栏「链群」改为「应用」（`/apps?symbol=`）：功能型页面统一由 `src/domain/apps-catalog.ts` 的数据目录管理（今日：创世空投 / 身份 NFT / 代币兑换 / 开源文档；`/about` 是文档、合约地址与只读链上数据页，无合约地址依赖），≥2 个分类自动分组，未来页面只加目录条目；`/group` 深链保留、不再上底栏 | [m0-ux-spec](product/m0-ux-spec.md) §1.2/§3.6/§3.8 |
 
 ## 6. 已知坑与注意事项
@@ -163,11 +167,11 @@ CI 环境规则（`.github/workflows/deploy.yml`）：取 `github.repository` �
    - `pnpm e2e` 由 `scripts/e2e-chain.mjs` 守护：默认链 `http://127.0.0.1:8555`，本机命中 `:8545` **立即失败**（`playwright.config.ts` 对直接 `playwright test` 同样拒绝）；未显式设置 `E2E_ANVIL_RPC` 时首次在 8555 上 `make -C ../anvil bootstrap PORT=8555`、之后复用。
    - `e2e/chain.ts` 仍按 spec 文件 `anvil_snapshot`/`anvil_revert`（文件内测试共享夹具，如 mint 收据给 my-nft 列表用；按测试回滚会抹掉下一个测试依赖的状态），`playwright.config.ts` 固定 `workers: 1`——快照作用于整条链，不能让两个文件同时改链。现在它只作用于自动化链，**链脏/被强杀用 `pnpm e2e:reset-chain` 重建，不要去动 8545**。
    - 复核（2026-11-11 21:53–21:58 +08:00）：`pnpm e2e` 连跑两遍均 **33/33**（各 1.3m，中间无 bootstrap；快照 id 0x0–0x3 → 0x4–0x7 连续）；杀掉 8555 后重跑自动 bootstrap 并再次 33/33；两遍前后 8545 的 `block-number` 969→969、`nonce 0x7099…` 69→69、`anvil_getAutomine` true→true、pid 13323 不变。操作见 [e2e/README.md](../e2e/README.md)。
-2. **首屏包体（修复后复核）**：门禁 `scripts/check-bundle.mjs`（level-9）实测 **prod 159.3 kB / dev 160.7 kB** gzip（2026-11-19 收尾复核；2026-11-16：把只在钱包菜单/社区菜单/弹层/占位页/404/版本提示里用的文案从 `copy.ts` 拆到懒加载 `copy-pages.ts` 后；此前 2026-11-12 为 prod 158.3 / dev 159.2，迁移前 159.2–159.3 / 160.0–160.1）；Vite 自身报数更高（统计口径不同）。dev 与 prod 的差异来自**部署数据压缩率**，不是 dev-only 代码：两者 raw 约 535 kB，部署 JSON 的 anvil 真实地址比零地址占位更难压缩，测试网横幅/dev 标识是两个变体共有的真实 UI。门禁因此给 dev 显式 **+1 kB 数据豁免**（dev 目标 161 kB，硬限 200 仍适用；prod 仍按 160 kB），不再输出无法行动的 WARN。后续 prod 不得超 160、dev 不得超 161。
-3. **三处真机（390×844）体验缺陷**：① 主按钮被固定底栏遮挡——[`swap-form.png`](product/screenshots/swap-form.png) 里「兑换」只剩上沿；② 小数位不统一——`mint-form.png` 显示 `99,998,199.99`（2 位）、`swap-form.png` `19.938012`（6 位）、`airdrop-eligible.png` `100,000,000`（0 位）；③ 6 字标题被截——`airdrop-eligible.png` 页头「铸造空投…」。
+2. **首屏包体（修复后复核）**：门禁 `scripts/check-bundle.mjs`（level-9）实测 **prod 159.5 kB / dev 160.9 kB** gzip（2026-11-22 收尾复核；2026-11-19 为 prod 159.3 / dev 160.7；2026-11-16：把只在钱包菜单/社区菜单/弹层/占位页/404/版本提示里用的文案从 `copy.ts` 拆到懒加载 `copy-pages.ts` 后；此前 2026-11-12 为 prod 158.3 / dev 159.2，迁移前 159.2–159.3 / 160.0–160.1）；Vite 自身报数更高（统计口径不同）。dev 与 prod 的差异来自**部署数据压缩率**，不是 dev-only 代码：两者 raw 约 535 kB，部署 JSON 的 anvil 真实地址比零地址占位更难压缩，测试网横幅/dev 标识是两个变体共有的真实 UI。门禁因此给 dev 显式 **+1 kB 数据豁免**（dev 目标 161 kB，硬限 200 仍适用；prod 仍按 160 kB），不再输出无法行动的 WARN。后续 prod 不得超 160、dev 不得超 161。
+3. **三处真机（390×844）体验缺陷（已于 2026-11-11 `86326c7` 修复，留作事故记录）**：① 主按钮被固定底栏遮挡 → 内容区改 `pb-[calc(var(--bottom-navigation-height)+16px)]`，主按钮完整可见；② 小数位不统一（`99,998,199.99` / `19.938012` / `100,000,000`）→ 2026-11-19 起按数量级自适应（[frontend-standards](engineering/frontend-standards.md) §4.5.1）；③ 6 字标题撑破页头 → 页头标题走 `truncate`。**仍未解决的一点**：窄屏（390×844）上社区 chip + 钱包药丸同时在位时，二级页标题会被省略成「投票…」（例：`/vote/records` 页头），属页头空间分配问题，记 backlog（§7.1 第 2 条）。
 4. **地址确定性已收敛（冲突已解决）**：clean bootstrap 从 deployer nonce 0 开始，地址确定；bootstrap 期间 automine，导出块高也确定（§6 有两次 sha256 相同的证明命令）。只有「已用过的链」会得到另一组地址，所以 `make bootstrap` 现在拒绝复用任何运行中的链，`export.py` 还会拒绝 nonce 首笔不为 0 的 broadcast。`m0-scope` 与 ADR-0004 已按「deterministic-from-clean」统一；操作上仍只消费 `pnpm sync:anvil` 生成物，绝不硬编码、绝不手设 nonce。
 5. **ABI 必须 generate-then-commit（已补齐）**：core `out/`、dex `build/` 都被各自仓库 gitignore（core `.gitignore:1`、dex `.gitignore:1`），本仓也忽略 `out/`。`pnpm sync:anvil` 生成 `src/config/abis/*.ts`（含 `airdrop-distributor.ts`）、`src/config/abis/manifest.json`（core/action/group-chat/libs/dex/anvil/periphery/tools 的 HEAD、导出块高/时间、每合约条目数）与快照；`pnpm abis:check` 在有 `../anvil/export` 时逐字节校验，缺失时明确跳过。不要把 `abi` 手改后再提交。
-6. **合约问题清单已过基线**：`docs/contract-issues/README.md` 审计基线 `core@43d5344`，而 core HEAD 已是 **`72a1604`**（CI-004 在该提交标为已修复）。13 条中 12 Open / 1 修复，需按新 HEAD 复核；[CI-001](contract-issues/001-no-member-round-index.md) 仍是 M1 Blocker。
+6. **合约问题清单已过基线**：`docs/contract-issues/README.md` 审计基线仍是 `core@43d5344`，而 core HEAD 已到 **`a3dbcc1`**（2026-11-21 的接口迁移：`targetData` → `creationData`、参数顺序调整）。13 条里只有 CI-004 标为已修复，其余需按新 HEAD 复核；[CI-001](contract-issues/001-no-member-round-index.md) 在新协议下**不再是 Blocker**（治理激励/我的投票改成倒序扫描即可用），但仍是「只能扫、不能直查」的体验根因（每次翻页多 N 笔 RPC）。
 7. **空投快照必须与链上根一致**：导出/内置快照的 `merkleRoot`=`0x046a5d53…c6c404`（10 个账户），页面用 `airdropInfo(创世代币).merkleRoot` 校验；本地匹配即使用，否则回退链上 HTTP(S) URI，仍不可用时按「空投资格暂时读不到」+「重试」处理，不显示数字。新部署在构造期写定创世 URI；旧部署的空 URI 仍由本地快照兼容（CI-017）。
 8. **test/prod 地址簿为空**：两份 JSON 各 24 个零地址，现在发布会得到「未配置」界面；地址只能来自合约仓 `script/network/`，不得把 anvil 地址抄过去。
 9. **Pages 缓存**：`index.html` 最多陈旧 600 s、旧哈希 chunk 会 404；只能靠 build id 比对 + `vite:preloadError` 兜底；不启用 PWA。
@@ -177,20 +181,29 @@ CI 环境规则（`.github/workflows/deploy.yml`）：取 `github.repository` �
 
 ## 7. 下一步（按顺序）
 
-| # | 事项 | 完成标志 |
+> 2026-11-22 按 owner 当轮决定重排：**行动域先不做**（下一行标 ⏸），先把治理域收口 + 交付面收尾。
+
+| # | 事项 | 状态 / 完成标志 |
 | --- | --- | --- |
-| 1 | ✅ 包体保持预算内 | prod gate ≤160 kB（2026-11-17 复核 159.2 kB）；dev ≤161 kB（复核 160.6 kB，含 `check-bundle.mjs` 显式 1 kB 部署数据豁免）；不引入 WalletConnect 字节 |
-| 2 | 修三处真机体验：底栏遮挡主按钮、小数位统一、6 字标题不截断 | 按 390×844 重出 `product/screenshots/` 对照图，主按钮完整可见、金额精度有统一规则（**小数位一项已由 2026-11-19 数字显示规范关闭**：小数位按数量级自适应，见 §2 二轮收口行 + [frontend-standards](engineering/frontend-standards.md) §4.5.1） |
-| 3 | ✅ E2E 独立链隔离 | 自动化链 8555（`pnpm e2e` 自举/复用，8545 硬拒绝）；按文件快照/回滚；连跑两遍均全绿且 8545 前后不变（§6.1） |
-| 4 | 写 M0 验收报告 | 按 [m0-ux-spec](product/m0-ux-spec.md) §6 的 14 步 + 四个阻塞点逐条附证据（截图/交易哈希/命令输出） |
-| 5 | 发布到 interface-test | 先解决 test 地址来源（合约仓当前只有 `anvil31337_dev` 参数，前端 test 簿仍全 0）→ 干净工作区 + CI 绿 → `pnpm release-to-interface-test`；线上 build id 对应发布 commit |
-| 6 | 之后才是 M1 的其余部分（推举/投票/激励铸造；质押已于 2026-11-17 提前实装） | CI-001 解除并有 view 级枚举方案；prod 仓 `LOVE20BSC/interface` 到时才创建 |
+| 1 | 包体保持预算内 | ✅ prod gate ≤160 kB（2026-11-22 复核 **159.5 kB**）；dev ≤161 kB（**160.9 kB**，含 `check-bundle.mjs` 显式 1 kB 部署数据豁免）；不引入 WalletConnect 字节 |
+| 2 | 三处真机体验（底栏遮挡主按钮 / 小数位统一 / 6 字标题截断） | ✅ 2026-11-11 `86326c7` 已修（内容区 `pb-[calc(var(--bottom-navigation-height)+16px)]`、小数位按数量级自适应见 [frontend-standards](engineering/frontend-standards.md) §4.5.1、页头标题走 `truncate` 不撑破布局）；仍待**真机人工复核**（手机 + 钱包） |
+| 3 | E2E 独立链隔离 | ✅ 自动化链 8555（`pnpm e2e` 自举/复用，8545 硬拒绝）；按文件快照/回滚；连跑两遍均全绿且 8545 前后不变（§6.1） |
+| 4 | M0 验收报告 | ✅ [m0-acceptance](product/m0-acceptance.md)（14 步 + 证据；§3 的 O1–O4 已修复复核） |
+| 5 | 行动域（M1 剩余主体：回调提案 + `/verify/*` + `/acting/*` + `/action/*`） | ⏸ **owner 2026-11-22 决定「先不做」**。开做前的就绪度：地址簿已有 `actionTarget` / `groupActionExecutor` / `groupServiceExecutor` / `lpExecutor`，`../anvil/export/abis/` 已有 4 份 ABI（未进前端 `ABI_MODULES`）；缺 `m0-ux-spec` 的行动域章节（§3.16）与回调载荷编码器 |
+| 6 | 发布到 interface-test | ⛔ 先解决 test 地址来源：合约仓 `core/script/network/` 目前只有 `anvil31337_dev`，前端 test 簿 24 槽全 0，发布过去协议页只会显示「未配置」；解除后再走 干净工作区 + CI 绿 → `pnpm release-to-interface-test` |
+| 7 | prod 仓 `LOVE20BSC/interface` | ⛔ 尚不存在（`git ls-remote` 128），等协议上主网前再创建 |
+
+## 7.1 待 owner 拍板（2026-11-22 收盘）
+
+1. **行动域何时开**：范围建议先 LP 行动（`LpExecutor`，无验证打分环节），再链群行动/服务。
+2. **二级页页头标题在窄屏被省略**：`/vote/records` 等二级页在 390×844 且社区 chip + 钱包药丸都在位时，页头标题会被 `truncate` 成「投票…」——属页头空间分配问题，修它要动 `app-header` 的响应式预算（本仓库首屏敏感），可以先记 backlog。
+3. **CI-001**（无「按身份查轮次」反向索引）仍是治理激励/我的投票只能倒序扫描的根因；core 侧若加 view 就能从「扫描」换成「直查」。
 
 ## 8. 如何接手（最短路径）
 
 1. **读什么**：先 [ADR-0001](adr/0001-stack-and-static-hosting.md)→[0004](adr/0004-anvil-local-chain.md)（0002 环境/发布、0004 起链最关键），再本文件，再 [m0-ux-spec](product/m0-ux-spec.md)；改文案前读 [GLOSSARY](../GLOSSARY.md)。
 2. **起链**：`make -C ../anvil bootstrap`；`cast chain-id --rpc-url http://127.0.0.1:8545` 应为 31337；收链 `make -C ../anvil stop`。同一时刻只允许一条链。
-3. **跑测试**：`pnpm install` → `pnpm typecheck && pnpm lint && pnpm test`；`pnpm e2e` 跑 143 条，首次需干净链，之后可按文件快照/回滚重复跑（见 [e2e/README.md](../e2e/README.md)）。
+3. **跑测试**：`pnpm install` → `pnpm typecheck && pnpm lint && pnpm test`；`pnpm e2e` 跑 173 条，首次需干净链，之后可按文件快照/回滚重复跑（见 [e2e/README.md](../e2e/README.md)）。
 4. **改 UI 的纪律**：文案只进 `shared/config/copy.ts`（首屏）或 `shared/config/copy-pages.ts`（懒加载页/弹层）；组件内禁止中文字面量；缓存只走 `shared/lib/cache.ts`；地址/chainId 只从环境包来；禁止硬编码费率；金额与倒计时必须标「约/预计」；不调 `tokenURI`、不读事件日志。
 5. **改 ABI/地址**：先 clean bootstrap，再 `pnpm sync:anvil` 生成并提交；不手改、不把 `out/`/`build/` 带进仓，不为了匹配旧地址簿调 nonce。漂移门禁 `pnpm abis:check`。
 6. **提交纪律**：显式 `git add <path>`（不要 `git add -A`）；已推送 commit 禁止 amend；不提交 `dist*/`、`.research/`、`.build-id`、`.env`。

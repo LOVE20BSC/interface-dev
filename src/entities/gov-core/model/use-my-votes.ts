@@ -34,8 +34,6 @@ export interface MyVoteEntry {
 
 export interface MyVoteRound {
   readonly round: bigint;
-  /** 这一轮我投出的票合计。 */
-  readonly myTotalVotes: bigint;
   readonly entries: readonly MyVoteEntry[];
 }
 
@@ -80,29 +78,23 @@ export function useMyVotes(tokenAddress: HexAddress | undefined, options: MyVote
     return list;
   }, [currentPhase, pageCount, pageSize]);
 
+  // 一轮一笔读：占比的分母是「该提案总票数」（owner 2026-11-21 更正），
+  // 所以不需要再逐轮读 `totalVoteAmount`（2026-11-22 去重时一并删掉，少一半 RPC）。
   const votes = useReadContracts({
     contracts: enabled
-      ? rounds.flatMap((round) => [
-          {
-            address: voteAddress,
-            abi: voteAbi,
-            functionName: 'votedProposalIdsByMemberId' as const,
-            args: [
-              tokenAddress,
-              round,
-              memberId as bigint,
-              0n,
-              VOTES_PER_ROUND_LIMIT,
-              false,
-            ] as const,
-          },
-          {
-            address: voteAddress,
-            abi: voteAbi,
-            functionName: 'totalVoteAmount' as const,
-            args: [tokenAddress, round] as const,
-          },
-        ])
+      ? rounds.map((round) => ({
+          address: voteAddress,
+          abi: voteAbi,
+          functionName: 'votedProposalIdsByMemberId' as const,
+          args: [
+            tokenAddress,
+            round,
+            memberId as bigint,
+            0n,
+            VOTES_PER_ROUND_LIMIT,
+            false,
+          ] as const,
+        }))
       : [],
     // 翻页时 key 变了：保留上一页数据，列表不整块闪成骨架。
     query: { enabled, placeholderData: keepPreviousData },
@@ -112,25 +104,14 @@ export function useMyVotes(tokenAddress: HexAddress | undefined, options: MyVote
   const perRound = useMemo(() => {
     const data = votes.data;
     if (data === undefined)
-      return [] as {
-        round: bigint;
-        ids: readonly bigint[];
-        amounts: readonly bigint[];
-        roundTotalVotes: bigint;
-      }[];
-    const result: {
-      round: bigint;
-      ids: readonly bigint[];
-      amounts: readonly bigint[];
-      roundTotalVotes: bigint;
-    }[] = [];
+      return [] as { round: bigint; ids: readonly bigint[]; amounts: readonly bigint[] }[];
+    const result: { round: bigint; ids: readonly bigint[]; amounts: readonly bigint[] }[] = [];
     rounds.forEach((round, index) => {
-      const page = data[index * 2]?.result;
-      const roundTotal = data[index * 2 + 1]?.result;
-      if (page === undefined || typeof roundTotal !== 'bigint') return;
+      const page = data[index]?.result;
+      if (page === undefined) return;
       const [ids, amounts] = page as readonly [readonly bigint[], readonly bigint[], bigint];
       if (ids.length === 0) return;
-      result.push({ round, ids, amounts, roundTotalVotes: roundTotal });
+      result.push({ round, ids, amounts });
     });
     return result;
   }, [rounds, votes.data]);
@@ -197,7 +178,6 @@ export function useMyVotes(tokenAddress: HexAddress | undefined, options: MyVote
     () =>
       perRound.map((item) => ({
         round: item.round,
-        myTotalVotes: item.amounts.reduce((sum, amount) => sum + amount, 0n),
         entries: item.ids.map((proposalId, index) => ({
           proposalId,
           // 标题还没读回来时不给占位串：卡片按「条目数已齐」渲染，标题缺就是空串，

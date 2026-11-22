@@ -1579,10 +1579,6 @@ export const copy = {
       unstake: '申请解锁',
       liquid: '流动性质押数据',
     },
-    publicCard: {
-      /** 验证中的行动在新协议里已不存在（owner 2026-11-18 23:52），只保留投票入口。 */
-      voteActions: '投票中的行动',
-    },
     /**
      * 旧库 LOVE20TKM /gov 首页：我的 / 社区 两个 tab。
      *
@@ -1728,24 +1724,15 @@ export const copy = {
       feeNote: '手续费结算是流动性凭证口径：结算后用于回购并销毁社区代币。',
       empty: '这个社区还没有流动性质押。',
     },
-    /** 旧库的投票 / 验证 / 推举 / 行动页面：本轮先建出来占位（ABI 未导出）。 */
+    /**
+     * 旧库的验证 / 行动页面：行动域（`/verify/*`、`/acting/*`、`/action/*`）还没接，
+     * 先占位并写清原因。
+     *
+     * 2026-11-22 清掉已经实装的条目（`/vote*`、`/submit*`、`/gov/rewards`）：
+     * 它们现在由真实页面接管，占位表里留着只会成为死配置（`/vote/actions` 那条
+     * 还会把用户带进「没有找到这个提案」）。
+     */
     placeholders: {
-      vote: {
-        title: '投票',
-        body: '用治理权给行动投票。投票需要 Vote 合约的 ABI 导出后接入，这里先占位。',
-      },
-      voteActions: {
-        title: '投票中的行动',
-        body: '查看本轮投票中的行动。接入投票后开放。',
-      },
-      voteSingle: {
-        title: '行动详情',
-        body: '单个行动的投票页。接入投票后开放。',
-      },
-      voteRecords: {
-        title: '投票历史',
-        body: '查看自己或他人的投票记录。接入投票后开放。',
-      },
       verify: {
         title: '验证',
         body: '验证链群行动的参与结果。接入验证后开放。',
@@ -1762,14 +1749,6 @@ export const copy = {
         title: '验证详情',
         body: '查看一轮验证的明细。接入验证后开放。',
       },
-      submitActions: {
-        title: '推举',
-        body: '查看还没被推举的行动。接入推举后开放。',
-      },
-      submitSingle: {
-        title: '行动详情',
-        body: '把一个行动推举进本轮投票。接入推举后开放。',
-      },
       acting: {
         title: '社区首页',
         body: '社区行动首页。接入行动后开放。',
@@ -1785,10 +1764,6 @@ export const copy = {
       actionInfo: {
         title: '行动详情',
         body: '行动详情。接入行动后开放。',
-      },
-      govRewards: {
-        title: '治理激励',
-        body: '逐轮铸造治理激励需要 Mint 合约的 ABI 导出；当前版本不显示激励金额。',
       },
       backToGov: '回治理首页',
       goStake: '去质押流动性',
@@ -1820,13 +1795,14 @@ export const copy = {
      */
     vote: {
       title: '投票',
-      intro: '每轮能投的票数等于你的治理权。可以一次投给多个提案，也可以分几次给同一个提案加票。',
+      // owner 2026-11-22：投票改成「一屏一个提案」后，「一次投给多个提案」已不成立；
+      // 同时这句只讲额度规则，怎么投交给列表下方那句（同页两处都在教怎么投 = 重复）。
+      intro: '每轮能投的票数等于你的治理权，同一个提案可以分几次继续加票。',
       powerTitle: '我的投票额度',
       powerUsed: '本轮已投',
       powerRemaining: '还能投',
       powerUnit: '票',
       powerNote: '治理权由流动性质押份额和承诺解锁期决定，每轮重新计算。',
-      noPowerTitle: '当前身份 NFT 还没有治理权',
       noPowerBody: '治理权来自流动性质押。先质押流动性，下一轮就能投票。',
       noPowerAction: '去质押流动性',
       roundTitle: '本轮提案',
@@ -1838,8 +1814,6 @@ export const copy = {
       loading: '读取本轮提案中…',
       readFailed: '本轮提案暂时读不到。',
       retry: '重试',
-      mineVotes: (votes: string) => `我已投 ${votes} 票`,
-      totalVotes: (votes: string) => `本轮共 ${votes} 票`,
       targetUnsupported: '这个提案由目标合约处理，要在对应的行动页投票。',
       amountLabel: '投多少票',
       amountPlaceholder: '0',
@@ -1848,8 +1822,6 @@ export const copy = {
       amountNone: '至少给一个提案分票。',
       /** 走查 2026-11-21（P2-3）：额度用完是中性状态，不该复用「超额」的错误口吻。 */
       quotaUsed: '本轮票已经投完，等下一轮再投。',
-      submit: '确认投票',
-      submitting: '提交中…',
       waitingWallet: '等待你在钱包确认',
       pending: '已提交，等待上链',
       revert: '交易上链了，但没有成功，票数没有变化。',
@@ -1859,16 +1831,18 @@ export const copy = {
       /** 2026-11-22 owner：点列表里的提案进入独立的投票详情页。 */
       listHint: '点任意提案进入投票；可以一次投 25%、50%、100% 的可用票数，也可以自己填。',
       openProposal: '去投票',
-      proposalAuthor: '提案人',
       myVotesOn: (votes: string) => `我已投 ${votes} 票`,
       totalVotesOn: (votes: string) => `该提案本轮共 ${votes} 票`,
       detail: {
         backToList: '返回本轮提案',
         quickPercent: (percent: number) => `投 ${percent}%`,
         amountHint: (remaining: string) => `最多可投 ${remaining} 票`,
-        detailTitle: '提案内容',
         proposalIdLabel: '提案编号',
         targetLabel: '提案目标地址',
+        /**
+         * 提案创建人。列表卡、详情页、`/submit` 历史行共用这一个键——同一概念只有一份文案
+         * （旧键 `vote.proposalAuthor` 写「提案人」，与详情页「提案创建人」不一致，2026-11-22 收敛）。
+         */
         authorLabel: '提案创建人',
         submitterLabel: '本轮推举人',
         roundVotesLabel: '当轮得票',
@@ -1879,14 +1853,14 @@ export const copy = {
         thresholdPassed: '已过激励阈值',
         thresholdFailed: '未过激励阈值',
         thresholdUnknown: '阈值读不到',
-        referenceBadge: '参考',
+        /** 这个占比不参与激励阈值判定：徽标要说明「不判」，而不是只写「参考」。 */
+        referenceBadge: '不判激励阈值',
         notFoundTitle: '没有找到这个提案',
         notFoundBody: '提案编号可能不对，回本轮提案列表看看。',
         readFailed: '这个提案暂时读不到。',
         retry: '重试',
         submit: '投票',
         resumeSubmit: '继续加票',
-        submitted: (votes: string) => `已为这个提案投 ${votes} 票`,
       },
     },
     /**
@@ -1897,8 +1871,7 @@ export const copy = {
     myVotes: {
       title: '我的投票',
       roundLabel: (round: string) => `治理第 ${round} 轮`,
-      statVoted: '已投',
-      statRemaining: '未投',
+      statVoted: '本轮已投',
       unit: '票',
       goVote: '去投票',
       allVoted: '本轮票已经投完',
@@ -1907,7 +1880,6 @@ export const copy = {
       previewLink: '查看全部投票记录',
       emptyRecord: '还没有投票记录',
       emptyRecordHint: '给本轮提案投票后，这里会按轮次列出你投过的提案。',
-      roundHeader: (round: string, votes: string) => `治理第 ${round} 轮 · 共投出 ${votes} 票`,
       entryLine: (id: string, title: string) => (title.length > 0 ? `#${id} ${title}` : `#${id}`),
       entryMine: (votes: string) => `我的投票 ${votes}`,
       entryShare: (percent: string) => `占该提案票数 ${percent}%`,

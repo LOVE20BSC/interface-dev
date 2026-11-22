@@ -6,33 +6,48 @@ import { Badge } from '@/shared/ui/badge';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 
 /**
- * 旧库 LOVE20TKM 的治理域页面（投票 / 验证 / 推举 / 行动）在本轮先作为占位存在：
- * 这些页面需要的 `Vote` / `Verify` / `Submit` / `Mint` ABI 尚未随 `sync:anvil`
- * 导出，页面不编造数据，只保留旧版的路由与入口，等 ABI 导出后逐页接入。
+ * 行动域（旧库 LOVE20TKM 的验证 / 行动页面）的占位页：`action` 合约的 ABI 与地址虽然在
+ * 地址簿里，但页面（本轮行动 / 行动详情 / 加入 / 验证打分）还没接，页面不编造数据，
+ * 只保留旧版路由与入口，并写清「为什么现在没有」。
+ *
+ * 治理域的四页（`/vote`、`/submit`、`/gov/rewards`、`/gov/proposal-rewards`）已于
+ * 2026-11-21 实装、投票记录页 `/vote/records` 于同日拆出，因此这张表里不再有它们的条目
+ * （2026-11-22 清理死配置：那条 `/vote/actions` 会把用户带进「没有找到这个提案」）。
  */
-const PLACEHOLDER_BY_PATH: Readonly<Record<string, keyof typeof copy.gov.placeholders>> = {
-  '/vote': 'vote',
-  '/vote/batch': 'vote',
-  '/vote/actions': 'voteActions',
-  '/vote/single': 'voteSingle',
-  '/vote/records': 'voteRecords',
+type PlaceholderEntry =
+  | 'verify'
+  | 'verifyActions'
+  | 'verifyAction'
+  | 'verifyDetail'
+  | 'acting'
+  | 'actingJoin'
+  | 'actionNew'
+  | 'actionInfo';
+
+const PLACEHOLDER_BY_PATH: Readonly<Record<string, PlaceholderEntry>> = {
   '/verify': 'verify',
   '/verify/actions': 'verifyActions',
   '/verify/action': 'verifyAction',
   '/verify/detail': 'verifyDetail',
-  '/submit/actions': 'submitActions',
-  '/submit/submit': 'submitSingle',
   '/acting': 'acting',
   '/acting/join': 'actingJoin',
   '/action/new': 'actionNew',
   '/action/info': 'actionInfo',
-  '/gov/rewards': 'govRewards',
+};
+
+/** 未登记的二级路径按前缀回落到该段的代表页，避免落到别的域。 */
+const DEFAULT_BY_PREFIX: Readonly<Record<string, PlaceholderEntry>> = {
+  verify: 'verify',
+  acting: 'acting',
+  action: 'actionInfo',
 };
 
 export function GovPlaceholderPage() {
   const location = useLocation();
-  const key = PLACEHOLDER_BY_PATH[location.pathname] ?? 'vote';
-  const entry = copy.gov.placeholders[key] as { readonly title: string; readonly body: string };
+  const prefix = location.pathname.split('/')[1] ?? '';
+  const key: PlaceholderEntry =
+    PLACEHOLDER_BY_PATH[location.pathname] ?? DEFAULT_BY_PREFIX[prefix] ?? 'verify';
+  const entry = copy.gov.placeholders[key];
 
   return (
     <Card data-testid="gov-placeholder">

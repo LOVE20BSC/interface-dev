@@ -1303,13 +1303,15 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     const card = page.getByTestId('gov-my-votes-card');
     await expect(card).toBeVisible({ timeout: 30_000 });
 
-    // 两格：已投 / 未投（「本轮可投」= 上面摘要卡的有效治理权，不在本卡重复，owner 2026-11-21）。
+    // 只剩「本轮已投」一格（owner 2026-11-22 去重）：
+    // 「本轮可投」= 上面摘要卡的有效治理权、「未投」= 有效治理权 − 本轮已投、
+    // 卡片头的轮次 = 记录行的轮次，三处都在同一页重复过，已全部删掉。
     await expect(page.getByTestId('gov-my-votes-max')).toHaveCount(0);
     await expect(page.getByTestId('gov-my-votes-used')).toHaveText(expectedAmount(usedNow), {
       timeout: 30_000,
     });
-    await expect(page.getByTestId('gov-my-votes-remaining')).toHaveText(expectedAmount(remaining));
-    await expect(page.getByTestId('gov-my-votes-round')).toHaveText(roundLabelOf(nowRound));
+    await expect(page.getByTestId('gov-my-votes-remaining')).toHaveCount(0);
+    await expect(page.getByTestId('gov-my-votes-round')).toHaveCount(0);
 
     // 卡片只预览最近两轮：给「查看全部投票记录」入口；完整记录在独立页断言。
     await expect(page.getByTestId('gov-my-votes-all-link')).toHaveText('查看全部投票记录 >>');
@@ -1715,7 +1717,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
 
     // 投票那一轮的记录：轮次行 + 编号标题 + 我的投票 + 占该提案票数。
     await expect(page.getByTestId(`gov-vote-records-round-line-${round.toString()}`)).toHaveText(
-      `治理第 ${round.toString()} 轮 · 共投出 ${expectedAmount(VOTE_AMOUNT)} 票`,
+      `治理第 ${round.toString()} 轮`,
     );
     await expect(
       page.getByTestId(`gov-vote-records-entry-${round.toString()}-${proposalId.toString()}`),

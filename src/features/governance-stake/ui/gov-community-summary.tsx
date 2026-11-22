@@ -11,7 +11,7 @@ const VOTE_DECIMALS = 18;
 export interface GovCommunitySummaryProps {
   readonly community: StakeCommunity;
   readonly tokenDecimals: number | undefined;
-  /** 当前社区 symbol 的查询串，带在「投票中的行动」入口上。 */
+  /** 当前社区 symbol 的查询串，带在「本轮提案」入口上。 */
   readonly q: string;
 }
 
@@ -55,12 +55,17 @@ export function GovCommunitySummary({ community, tokenDecimals, q }: GovCommunit
       </div>
 
       <div className="mt-4">
+        {/*
+          2026-11-22 修：这里原本链到旧库的 `/vote/actions`，投票改成一屏一个提案后
+          该路径会落进 `/vote/*` 详情页并显示「没有找到这个提案」。入口改指 `/vote`，
+          文案按新协议用「提案」而不是「行动」（`copy.gov.vote.roundTitle`）。
+        */}
         <Link
-          to={`/vote/actions${q}`}
+          to={`/vote${q}`}
           data-testid="gov-entry-vote"
           className={buttonStyles('secondary', 'sm', 'w-full')}
         >
-          {copy.gov.publicCard.voteActions}
+          {copy.gov.vote.roundTitle}
           <span aria-hidden="true"> &gt;&gt;</span>
         </Link>
       </div>

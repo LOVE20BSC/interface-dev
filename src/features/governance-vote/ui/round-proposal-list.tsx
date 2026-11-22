@@ -53,7 +53,7 @@ export function RoundProposalList({
                   <div className="min-w-0">
                     <CardTitle className="truncate">{proposal.title}</CardTitle>
                     <CardDescription>
-                      {copy.gov.vote.proposalAuthor} #{proposal.submitterId.toString()}
+                      {copy.gov.vote.detail.authorLabel} #{proposal.submitterId.toString()}
                     </CardDescription>
                   </div>
                   <span className="shrink-0 font-mono text-xs text-muted">#{id}</span>
