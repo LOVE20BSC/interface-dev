@@ -890,6 +890,21 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     // 详情页的标题与列表同源（动态路由不能回落成「页面不存在」）。
     await expect(page.getByTestId('gov-vote-detail-title')).toHaveText('投票');
     await expect(page.getByTestId('gov-vote-detail-round')).toHaveText(roundLabelOf(phase));
+    // owner 2026-11-22 布局：0 投多少票 → 1 编号+标题+内容 → 2 目标/创建人/推举人 →
+    // 3 当轮得票 + 两个占比（阈值状态）。
+    await expect(page.getByTestId('gov-vote-detail-id')).toHaveText(`#${proposalId.toString()}`);
+    await expect(page.getByTestId('gov-vote-detail-proposal-title')).toHaveText(TITLE);
+    await expect(page.getByTestId('gov-vote-detail-body')).toContainText('真实写链回归');
+    await expect(page.getByTestId('gov-vote-detail-target')).toContainText('0x');
+    // G1 的提案由 member1 创建并推举 → 创建人 / 本轮推举人都是 #1。
+    await expect(page.getByTestId('gov-vote-detail-author')).toHaveText(`#${MEMBER_ID}`);
+    await expect(page.getByTestId('gov-vote-detail-submitter')).toHaveText(`#${MEMBER_ID}`);
+    // 还没人投过：当轮得票 0、两个占比 0%、未过激励阈值。
+    await expect(page.getByTestId('gov-vote-detail-total')).toHaveText('0');
+    await expect(page.getByTestId('gov-vote-detail-round-share')).toHaveText('0%');
+    await expect(page.getByTestId('gov-vote-detail-gov-share')).toHaveText('0%');
+    await expect(page.getByTestId('gov-vote-detail-threshold-state')).toHaveText('未过激励阈值');
+    await expect(page.getByTestId('gov-vote-detail-threshold')).toContainText('激励阈值');
 
     // 快捷百分比作用在「还能投」上：25% = 额度/4（向下截断），100% = 全部额度。
     const remainingBefore = maxVoteAmount;
@@ -923,6 +938,11 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
       `我已投 ${expectedAmount(VOTE_AMOUNT)} 票`,
       { timeout: 30_000 },
     );
+    // 投完之后：当轮得票 = 100；当轮总投票占比 100%（只有这一个提案）；
+    // 100 票 >> 阈值（5% × 100 = 5 票）→ 已过激励阈值。
+    await expect(page.getByTestId('gov-vote-detail-total')).toHaveText(expectedAmount(VOTE_AMOUNT));
+    await expect(page.getByTestId('gov-vote-detail-round-share')).toHaveText('100%');
+    await expect(page.getByTestId('gov-vote-detail-threshold-state')).toHaveText('已过激励阈值');
     await page.getByTestId('gov-vote-detail-back').click();
     await expect(page.getByTestId('gov-vote-list')).toBeVisible({ timeout: 30_000 });
 
@@ -1580,7 +1600,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
         { timeout: 30_000 },
       );
       await expect(page.getByTestId('gov-vote-detail-total')).toHaveText(
-        `该提案本轮共 ${expectedAmount(HALF_VOTE_AMOUNT)} 票`,
+        expectedAmount(HALF_VOTE_AMOUNT),
       );
 
       // 链上：逐提案票数、本轮已投、本轮总票数三者与页面一致。
