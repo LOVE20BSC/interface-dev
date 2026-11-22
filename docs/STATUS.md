@@ -88,7 +88,7 @@ M0 范围共 6 项（[m0-scope](product/m0-scope.md)「范围内」）。✅ 完
 
 | 仓库 | 是否存在 | 变体 / 链 | Pages |
 | --- | --- | --- | --- |
-| `LOVE20BSC/interface-dev` | 存在（本仓 `origin`；`main` = 本仓 HEAD） | dev / 31337 | <https://love20bsc.github.io/interface-dev/> 200，build id **`mwrir89n-9a495bf3`**（对应 §2 本轮末提交） |
+| `LOVE20BSC/interface-dev` | 存在（本仓 `origin`；`main` = 本仓 HEAD） | dev / 31337 | <https://love20bsc.github.io/interface-dev/> 200，build id **`mwrpdufi-cfb2dbf8`**（对应 §2 本轮末提交 `75095e2`） |
 | `LOVE20BSC/interface-test` | 存在（本仓另有 `test` remote） | test / 97 占位 | <https://love20bsc.github.io/interface-test/> 200，但 build id 仍是 **`mwk2g1ce-c669b644`**（2026-11-17 的构建），远端 `main` = `ace6042`，明显落后；原因见 §7 第 6 行（test 地址来源未解决） |
 | `LOVE20BSC/interface` | **不存在**（`git ls-remote` 仍 `Repository not found`） | prod / 56 | 尚未部署 |
 
