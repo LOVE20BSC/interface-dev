@@ -125,60 +125,80 @@ export function VoteDetailPanel({
     );
   }
 
+  const noPower = power.status === 'ready' && power.maxVoteAmount === 0n;
+  const exhausted = !noPower && remaining === 0n;
+
   return (
     <div className="space-y-4">
       <ProposalCard detail={detail} roundLabel={roundLabel} />
 
-      <VotePowerCard power={power} symbol={symbol} testId="gov-vote-detail-power" />
+      {/* owner 2026-11-22：详情页不再重复「我的投票额度」卡——提案卡已有「我已投」，
+          输入区已有「最多可投」，再放一张额度卡会让同一个数字出现两次。
+          只有「没有治理权 / 本轮投完」需要解释时才借用同一张卡。 */}
+      {noPower ? (
+        <VotePowerCard power={power} symbol={symbol} testId="gov-vote-detail-power" />
+      ) : null}
+      {exhausted ? (
+        <Card data-testid="gov-vote-detail-exhausted">
+          <CardDescription>{copy.gov.vote.quotaUsed}</CardDescription>
+          <Link
+            to={`/stake/liquidity?symbol=${encodeURIComponent(symbol)}`}
+            className="mt-3 inline-flex h-11 items-center justify-center rounded-2xl bg-brand px-4 text-sm font-medium text-on-brand"
+          >
+            {copy.gov.vote.noPowerAction}
+          </Link>
+        </Card>
+      ) : null}
 
-      <Card data-testid="gov-vote-detail-quick">
-        <CardTitle>{copy.gov.vote.detail.quickTitle}</CardTitle>
-        <label
-          htmlFor="gov-vote-detail-amount"
-          className="mt-3 block text-xs font-medium text-muted"
-        >
-          {copy.gov.vote.amountLabel}
-        </label>
-        <input
-          id="gov-vote-detail-amount"
-          data-testid="gov-vote-detail-amount"
-          inputMode="decimal"
-          value={raw}
-          onChange={(event) => {
-            setRaw(event.target.value);
-            setLocalError(null);
-          }}
-          placeholder={copy.gov.vote.amountPlaceholder}
-          className="mt-1 h-11 w-full rounded-2xl border border-line bg-surface px-3 text-sm text-foreground outline-none placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20"
-        />
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {VOTE_QUICK_PERCENTS.map((percent) => {
-            const amount = votesForPercent(remaining, percent);
-            return (
-              <Button
-                key={percent}
-                type="button"
-                variant="secondary"
-                size="md"
-                data-testid={`gov-vote-detail-percent-${percent}`}
-                disabled={amount === undefined || busy}
-                onClick={() => {
-                  if (amount === undefined) return;
-                  setRaw(votesToInputText(amount));
-                  setLocalError(null);
-                }}
-              >
-                {copy.gov.vote.detail.quickPercent(percent)}
-              </Button>
-            );
-          })}
-        </div>
-        <p className="mt-2 text-[11px] leading-4 text-muted" data-testid="gov-vote-detail-hint">
-          {remaining === undefined
-            ? copy.common.unknown
-            : copy.gov.vote.detail.amountHint(formatTokenAmount(remaining, VOTE_DECIMALS))}
-        </p>
-      </Card>
+      {noPower || exhausted ? null : (
+        <Card data-testid="gov-vote-detail-quick">
+          <label
+            htmlFor="gov-vote-detail-amount"
+            className="mt-3 block text-xs font-medium text-muted"
+          >
+            {copy.gov.vote.amountLabel}
+          </label>
+          <input
+            id="gov-vote-detail-amount"
+            data-testid="gov-vote-detail-amount"
+            inputMode="decimal"
+            value={raw}
+            onChange={(event) => {
+              setRaw(event.target.value);
+              setLocalError(null);
+            }}
+            placeholder={copy.gov.vote.amountPlaceholder}
+            className="mt-1 h-11 w-full rounded-2xl border border-line bg-surface px-3 text-sm text-foreground outline-none placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20"
+          />
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {VOTE_QUICK_PERCENTS.map((percent) => {
+              const amount = votesForPercent(remaining, percent);
+              return (
+                <Button
+                  key={percent}
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  data-testid={`gov-vote-detail-percent-${percent}`}
+                  disabled={amount === undefined || busy}
+                  onClick={() => {
+                    if (amount === undefined) return;
+                    setRaw(votesToInputText(amount));
+                    setLocalError(null);
+                  }}
+                >
+                  {copy.gov.vote.detail.quickPercent(percent)}
+                </Button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[11px] leading-4 text-muted" data-testid="gov-vote-detail-hint">
+            {remaining === undefined
+              ? copy.common.unknown
+              : copy.gov.vote.detail.amountHint(formatTokenAmount(remaining, VOTE_DECIMALS))}
+          </p>
+        </Card>
+      )}
 
       {localError !== null ? (
         <p

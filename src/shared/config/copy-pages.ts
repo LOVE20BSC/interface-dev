@@ -1863,7 +1863,6 @@ export const copy = {
       totalVotesOn: (votes: string) => `该提案本轮共 ${votes} 票`,
       detail: {
         backToList: '返回本轮提案',
-        quickTitle: '投票',
         quickPercent: (percent: number) => `投 ${percent}%`,
         amountHint: (remaining: string) => `最多可投 ${remaining} 票`,
         detailTitle: '提案内容',
