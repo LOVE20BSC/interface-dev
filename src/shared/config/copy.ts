@@ -140,6 +140,7 @@ export const copy = {
     vote: '投票',
     voteRecords: '投票记录',
     submit: '提案',
+    submitNew: '推举新提案',
     rewards: '治理激励',
     proposalRewards: '提案激励',
   },

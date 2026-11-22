@@ -1834,6 +1834,7 @@ export const copy = {
       emptyTitle: '本轮还没有提案被推举',
       emptyBody: '有人把提案推举进这一轮后，这里会出现可以投票的提案。',
       emptyAction: '去推举提案',
+      proposeAction: '推举提案',
       loading: '读取本轮提案中…',
       readFailed: '本轮提案暂时读不到。',
       retry: '重试',
@@ -1947,10 +1948,26 @@ export const copy = {
       historyTotal: (total: string) => `共 ${total} 个提案`,
       historyAction: '推举',
       historySubmittedBadge: '本轮已推举',
+      /** 本轮已经推举过（同一身份每轮一个）时，历史段顶部换成这条说明、不再给按钮。 */
+      historyBlockedSubmitted: (id: string) =>
+        `你本轮已经推举过提案 #${id}，历史提案要等下一轮才能推举。`,
+      /** 本轮还没有推举权（治理权没到门槛）时，历史段顶部给原因。 */
+      historyBlockedNoPower: '本轮还不能推举：治理权没到推举门槛。先质押流动性，下一轮再来。',
+      historyNextRoundBadge: '下一轮',
       historyMineBadge: '我推举的',
       historyReceiptTitle: '推举结果',
       historyReceiptLine: (id: string, round: string) => `提案 #${id} 已推举进治理第 ${round} 轮`,
       historyRejected: '这一轮已经推举过提案了，下一轮再来。',
+      /** 2026-11-22 owner：/submit 默认是历史提案列表，创建表单挪到 /submit/new。 */
+      listTitle: '历史提案',
+      listIntro: '按提案编号倒序；一个身份每轮只能推举一个提案。',
+      newAction: '推举新提案',
+      newTitle: '推举新提案',
+      backToList: '返回提案列表',
+      pagePrev: '上一页',
+      pageNext: '下一页',
+      pageLabel: (page: string, total: string) => `第 ${page} / ${total} 页`,
+      emptyAction: '推举新提案',
       submittedTitle: '本轮已经推举',
       submittedBody: (id: string, title: string) =>
         `你在本轮推举了提案 #${id}「${title}」，同一轮不能推举第二个。`,

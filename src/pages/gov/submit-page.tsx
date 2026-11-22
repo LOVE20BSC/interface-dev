@@ -1,6 +1,5 @@
-import { useReadContract } from 'wagmi';
-import { submitAbi } from '@/config/abis';
-import { configuredAddress, type HexAddress } from '@/config/networks';
+import { useState } from 'react';
+import { configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { usePhaseClock } from '@/entities/phase/model/use-phase-clock';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
@@ -11,19 +10,18 @@ import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { GOV_POLL_MS } from '@/features/governance-stake/model/use-gov-context';
 import { useSubmitExisting } from '@/features/governance-submit/model/use-submit-existing';
-import { useSubmitWrite } from '@/features/governance-submit/model/use-submit-write';
 import { SubmitHistoryPanel } from '@/features/governance-submit/ui/submit-history-panel';
-import { SubmitPanel } from '@/features/governance-submit/ui/submit-panel';
 import { GovAccessGate } from '@/widgets/gov-access-gate/gov-access-gate';
 
+/** 历史提案每页条数（owner 2026-11-22：每页 10 条）。 */
+const PAGE_SIZE = 10;
+
 /**
- * 治理·提案（推举，core `Submit`）。
+ * 治理·提案（`/submit`）——**历史提案列表**（owner 2026-11-22）。
  *
- * 语义按合约走（`Submit.sol:76-99,263-341`）：
- * - 推举权 = 本轮治理权 ≥ `ceil(totalGovVotes * SUBMIT_MIN_RATIO / PRECISION)`，
- *   且社区本轮有人质押；`useSubmitContext` 已经把这些算好；
- * - 一个身份每轮**只能推举 1 个**（`MemberAlreadySubmitted`），已推举时页面只显示
- *   链上记下的提案编号与标题，不再渲染表单。
+ * 这一页默认就是列表：按提案编号倒序、每页 10 条，右上「推举新提案」进创建页
+ * （`/submit/new`）。行内「推举」走 `Submit.submit(proposalId)`；本轮已经推举过
+ * （同一身份每轮只能推举一个）时整段只读并给说明。
  */
 export function SubmitPage() {
   const { symbol } = useCommunityContext();
@@ -35,46 +33,27 @@ export function SubmitPage() {
   const submitAddress = configuredAddress('submit');
   const context = useSubmitContext(token.address, round, access.memberId);
 
-  /**
-   * 本轮已推举提案的标题：链上没有「按 id 单读标题」的专用 view，只能拿
-   * `proposalInfosByProposalIds` 读这一条。读不到就把 undefined 交给面板，
-   * 面板用「—」兜底（绝不编一个标题）。
-   */
-  const submittedId = context.submittedProposalThisRound;
-  const submittedReadArgs: readonly [HexAddress, readonly bigint[]] | undefined =
-    token.address !== undefined && submittedId !== undefined && submittedId !== 0n
-      ? [token.address, [submittedId]]
-      : undefined;
-  const submittedInfo = useReadContract({
-    address: submitAddress,
-    abi: submitAbi,
-    functionName: 'proposalInfosByProposalIds',
-    args: submittedReadArgs,
-    query: { enabled: submittedReadArgs !== undefined },
+  const [page, setPage] = useState(1);
+  const history = useProposalHistory(token.address, {
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+    round,
   });
-  const submittedTitle = submittedInfo.data?.[0]?.body.title;
 
-  // 推举历史提案（owner 2026-11-22）：与新建提案是同一份资格与「每轮一个」约束。
-  const history = useProposalHistory(token.address, { limit: 20, round });
+  const totalPages =
+    history.total === undefined
+      ? undefined
+      : Math.max(1, Math.ceil(Number(history.total) / PAGE_SIZE));
 
-  // 成功后重读资格 / 限制 / 轮次 / 历史列表，表单随即换成「本轮已经推举」。
   const refetchAll = (): void => {
+    history.refetch();
     context.refetch();
     clock.refetch();
     token.refetch();
     access.refetch();
-    history.refetch();
   };
 
-  const write = useSubmitWrite(
-    {
-      waitingWallet: copy.gov.submit.waitingWallet,
-      revert: copy.gov.submit.revert,
-    },
-    refetchAll,
-  );
-
-  const historyWrite = useSubmitExisting(
+  const write = useSubmitExisting(
     {
       waitingWallet: copy.gov.submit.waitingWallet,
       revert: copy.gov.submit.revert,
@@ -96,26 +75,20 @@ export function SubmitPage() {
             {copy.gov.gates.unconfiguredBody}
           </p>
         ) : (
-          <>
-            <SubmitPanel
-              submitAddress={submitAddress}
-              tokenAddress={token.address}
-              memberId={access.memberId}
-              context={context}
-              submittedTitle={submittedTitle}
-              write={write}
-              onRefetch={refetchAll}
-            />
-            <SubmitHistoryPanel
-              submitAddress={submitAddress}
-              tokenAddress={token.address}
-              memberId={access.memberId}
-              canSubmit={context.canSubmit === true}
-              history={history}
-              write={historyWrite}
-              onRefetch={refetchAll}
-            />
-          </>
+          <SubmitHistoryPanel
+            submitAddress={submitAddress}
+            symbol={symbol}
+            tokenAddress={token.address}
+            memberId={access.memberId}
+            canSubmit={context.canSubmit === true}
+            submittedThisRoundId={context.submittedProposalThisRound}
+            page={page}
+            totalPages={totalPages}
+            history={history}
+            write={write}
+            onRefetch={refetchAll}
+            onPageChange={setPage}
+          />
         )}
       </GovAccessGate>
     </div>

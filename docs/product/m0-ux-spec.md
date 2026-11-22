@@ -788,7 +788,7 @@
 
 **`/vote` 投票**（core `Vote`；owner 2026-11-22 改为「列表 + 独立详情页」两屏）：
 - 数据：`Phase.currentPhase` = 本轮；`Submit.submitInfos(本轮)` + `Submit.proposalInfosByProposalIds` = 本轮被推举的提案；`Vote.maxVoteAmount` / `voteAmountByMemberId` = 我的本轮额度与已投；`voteAmountByProposalId` + `voteAmountByMemberIdByProposalId` = 每个提案的总票数与我已投。
-- **`/vote` 只做列表**：`我的投票额度`（本轮已投 / 还能投，两格；owner 2026-11-22：本轮治理权 = 两者之和，不再单独显示）→ 本轮提案卡列表（`#编号 标题`、提案人、`该提案本轮共 X 票`、`我已投 X 票`、按钮「去投票」）。列表里**没有输入框**，点任意可投提案进入详情页；页面底部一个「我的投票记录」入口。
+- **`/vote` 只做列表**：`我的投票额度`（本轮已投 / 还能投，两格；owner 2026-11-22：本轮治理权 = 两者之和，不再单独显示）→ 本轮提案卡列表（列表标题右侧有「推举提案」入口，进 `/submit`；owner 2026-11-22：本轮已经有提案被推举出来时也要能直接去推举自己的）（`#编号 标题`、提案人、`该提案本轮共 X 票`、`我已投 X 票`、按钮「去投票」）。列表里**没有输入框**，点任意可投提案进入详情页；页面底部一个「我的投票记录」入口。
 - **`/vote/:proposalId` 投票详情页**（owner 2026-11-22：每个提案单独一屏，也为后续接行动类投票留位置）。**区块顺序按 owner 2026-11-22 第三轮改定**：
   - **0. 投多少票**（第一块）：输入框（标签「投多少票」）→ 百分比行「投 25% / 50% / 100%」（作用在**还能投**上，向下截断、不产生 0 票）→ 一行「最多可投 X 票」→ 主按钮「投票」/「继续加票」；本地校验（空 / 非法 / 超额）写在按钮上方。没有治理权 / 本轮票已投完时这一块换成对应的解释卡（附「去质押流动性」出口）。
   - **1. 提案编号 + 提案标题 + 提案内容**：`#编号` 与标题同行，正文在下（保留换行）。
@@ -806,17 +806,14 @@
 - 分页：一页 10 轮 +「加载更多轮次」（翻页保留上一页内容，不整块闪骨架）；没有记录 → 空态「还没有投票记录」+ 一句说明 +「去投票」；读失败 →「投票记录暂时读不到。」+「重试」。
 - 数据同首页卡片：`Vote.votedProposalIdsByMemberId` 从 `currentPhase` 倒序扫描（[CI-001](../contract-issues/001-no-member-round-index.md) 无反向索引），标题补 `Submit.proposalInfosByProposalIds`。
 
-**`/submit` 提案（推举）**（core `Submit`）：
-- 数据：`Submit.canSubmit`（= `govVotes ≥ ceil(社区总治理权 × SUBMIT_MIN_RATIO)`）、`SUBMIT_MIN_RATIO` / `MAX_TITLE_LENGTH` / `MAX_DETAILS_LENGTH` / `MAX_CREATION_DATA_BYTES` 常量、`Stake.totalGovVotes` 与 `govVotes`（用于解释差多少）、`proposalIdBySubmitterId(本轮)`（本轮我是否已推举）。
-- 版面：资格卡（能/不能推举 + 门槛 + 我的治理权）→ 表单（标题、详情、提案目标地址；字段下方按 **UTF-8 字节**计数的上限提示）→ 主按钮「推举提案」。
-- 规则：**一个身份每轮只能推举一个**（合约 `MemberAlreadySubmitted`），所以本轮已推举时表单换成「本轮已经推举」卡并显示提案编号与标题；正文上限按字节（一个中文字 3 字节，`domain/gov-core#utf8ByteLength`）。
+**`/submit` 提案列表 + `/submit/new` 推举新提案**（core `Submit`；owner 2026-11-22 拆成两页）：
+- **`/submit` 默认就是历史提案列表**：按**提案编号倒序**、**每页 10 条**（`Submit.proposalIds(token, offset, 10, reverse=true)` + `proposalInfosByProposalIds` 取正文）；行 `#编号 标题` + `提案人 #id`，右侧「推举」；底部「上一页 / 第 N / M 页 / 下一页」与 `共 N 个提案`。
+- **右上「推举新提案」**：只在「本轮还能推举」时出现，点进 `/submit/new`。
+- **`/submit/new` 推举新提案**：资格卡（能/不能推举 + 门槛 + 我的治理权）→ 表单（标题、详情、提案目标地址；字段下方按 **UTF-8 字节**计数的上限提示）→ 主按钮「推举提案」；顶部「← 返回提案列表」。
+- 规则：**一个身份每轮只能推举一个**（合约 `MemberAlreadySubmitted`）；本轮已推举时：`/submit/new` 表单换成「本轮已经推举」卡并显示提案编号与标题，`/submit` 列表整段只读——顶部说明「你本轮已经推举过提案 #N，历史提案要等下一轮才能推举。」，行内不再给按钮（已推举的那行「本轮已推举」、其他「下一轮」），右上按钮收起。没有推举权时顶部给原因「治理权没到推举门槛，先质押流动性，下一轮再来」，按钮保持禁用。
+- 列表里某一行已被其它身份推进本轮时，该行标「本轮已推举」并禁用（同一提案一轮只能被推举一次）。
+- 写链：行内「推举」= `Submit.submit(token, memberId, proposalId, '0x')`，回执来自 `ProposalSubmitted`（只显示「提案 #N 已推举进治理第 R 轮」，不编造编号）；成功后刷新资格、轮次与列表。
 - 边界：本版本处理 `targetMode = 0` 的提案，`creationData` 和首次推举的 `submitData` 均传 `0x`。页面提示「本版本只推举不回调的提案」。
-
-**`/submit` 的「推举历史提案」段**（owner 2026-11-22）：
-- 位置：`/submit` 页表单下方，标题「推举历史提案」，一行说明「以前有人创建过的提案都在这里…一个身份每轮仍然只能推举一个提案」。
-- 数据：`Submit.proposalIds(token, offset, 20, reverse=true)` 倒序取编号 + `proposalInfosByProposalIds` 取正文；当前轮 `Submit.isSubmitted(本轮, 提案)` 标「本轮已推举」；分页「加载更多」+ `共 N 个提案`。
-- 行：`#编号 标题` + `提案人 #id`；右侧按钮「推举」。本轮已推举 / 无推举权 / 写操作在途时按钮禁用，行上写「本轮已推举」。
-- 写链：`Submit.submit(token, memberId, proposalId, '0x')`，回执来自 `ProposalSubmitted`，只显示「提案 #N 已推举进治理第 R 轮」，不编造新编号；成功后刷新资格、轮次与历史列表（该行变「本轮已推举」、上方表单变「本轮已经推举」）。
 
 **`/gov/rewards` 治理激励**（core `Mint`）：
 - 数据：`Mint.govRewardByMemberId(轮次)` 三件套（我的投票激励 / 我的加速激励 / 是否已铸）+ `Mint.govReward(轮次)`（该轮预留池）+ `Vote.voteAmountByMemberId(轮次)`（该轮我投没投票）。**只有已结束的轮次（`currentPhase > 轮次`）能铸**，所以从 `currentPhase - 1` 往回倒序扫描，一页 20 轮，触底再往前。

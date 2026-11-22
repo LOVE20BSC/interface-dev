@@ -31,7 +31,16 @@ export function RoundProposalList({
           {roundLabel}
         </span>
       </div>
-      <p className="px-1 text-xs leading-5 text-muted">{copy.gov.vote.listHint}</p>
+      <div className="flex items-center justify-between gap-2 px-1">
+        <p className="min-w-0 text-xs leading-5 text-muted">{copy.gov.vote.listHint}</p>
+        <Link
+          to={`/submit?symbol=${encodeURIComponent(symbol)}`}
+          data-testid="gov-vote-propose"
+          className="inline-flex h-9 shrink-0 items-center justify-center rounded-2xl border border-line bg-surface px-3 text-xs font-medium text-foreground hover:bg-elevated"
+        >
+          {copy.gov.vote.proposeAction}
+        </Link>
+      </div>
       <ul className="space-y-3" data-testid="gov-vote-list">
         {proposals.map((proposal) => {
           const id = proposal.proposalId.toString();

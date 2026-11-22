@@ -820,8 +820,9 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     await expect(page.getByTestId('gov-vote-error')).toHaveCount(0);
 
     // ---- 2. /submit：资格 + 字节计数器 → 真实推举交易 → 回执 ----
-    await openPage(page, '/submit');
-    await expect(page.getByTestId('gov-submit-page-title')).toHaveText('提案');
+    // owner 2026-11-22：/submit 是历史列表，创建表单在 /submit/new。
+    await openPage(page, '/submit/new');
+    await expect(page.getByTestId('gov-submit-page-title')).toHaveText('推举新提案');
     await expect(page.getByTestId('gov-submit-eligibility')).toContainText('推举资格');
 
     const totalGovVotes = await readTotalGovVotes(phase);
@@ -868,6 +869,18 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
       `你在本轮推举了提案 #${proposalId.toString()}「${TITLE}」，同一轮不能推举第二个。`,
     );
     await expect(page.getByTestId('gov-submit-form')).toHaveCount(0);
+
+    // 回到历史列表页：本轮已经推举过 → 顶部给原因、行内只读、右上不再给「推举新提案」。
+    await page.goto(`/submit${QUERY}`);
+    await connect(page);
+    await expect(page.getByTestId('gov-submit-history')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('gov-submit-history-blocked')).toHaveText(
+      `你本轮已经推举过提案 #${proposalId.toString()}，历史提案要等下一轮才能推举。`,
+    );
+    await expect(page.getByTestId(`gov-submit-history-action-${proposalId.toString()}`)).toHaveText(
+      '本轮已推举',
+    );
+    await expect(page.getByTestId('gov-submit-history-new')).toHaveCount(0);
     // 链上：本轮提案列表里就是这一个（推举顺序）。
     const roundIds = await readRoundProposalIds(phase);
     expect(roundIds, '本轮推举列表应当只有这一个提案').toEqual([proposalId]);
@@ -984,7 +997,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
       await captureState(
         page,
         'gov-core-submit-submitted',
-        '/submit',
+        '/submit/new',
         async (target) => {
           await expect(target.getByTestId('gov-submit-submitted')).toBeVisible({
             timeout: 30_000,
@@ -994,6 +1007,20 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
           );
         },
         'gov-submit-submitted',
+      );
+
+      await captureState(
+        page,
+        'gov-core-submit-history',
+        '/submit',
+        async (target) => {
+          await expect(target.getByTestId('gov-submit-history')).toBeVisible({
+            timeout: 30_000,
+          });
+          await expect(target.getByTestId('gov-submit-history-new')).toBeVisible();
+          await expect(target.getByTestId('gov-submit-history-page')).toHaveText(/第 1 \/ \d+ 页/);
+        },
+        'gov-submit-history',
       );
 
       await captureState(
@@ -1658,13 +1685,16 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
       await page.getByTestId('gov-submit-history-receipt-close').click();
       await expect(page.getByTestId('gov-submit-history-receipt')).toHaveCount(0);
 
-      // 链上：这个提案确实进了本轮；页面把该行标成「本轮已推举」。
+      // 链上：这个提案确实进了本轮；页面把该行标成「本轮已推举」，
+      // 并且历史段顶部说明「本轮已经推举过，等下一轮」（owner 2026-11-22）。
       expect(await readIsSubmitted(round, proposal)).toBe(true);
+      await expect(page.getByTestId('gov-submit-history-blocked')).toHaveText(
+        `你本轮已经推举过提案 #${proposal.toString()}，历史提案要等下一轮才能推举。`,
+      );
       await expect(page.getByTestId(`gov-submit-history-action-${proposal.toString()}`)).toHaveText(
         '本轮已推举',
         { timeout: 20_000 },
       );
-      await expect(page.getByTestId('gov-submit-submitted')).toBeVisible({ timeout: 30_000 });
     } finally {
       await revertChain(snapshot);
     }

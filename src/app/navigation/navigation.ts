@@ -82,6 +82,7 @@ const PAGE_TITLES: Readonly<Record<string, string>> = Object.freeze({
   '/vote': copy.pageTitles.vote,
   '/vote/records': copy.pageTitles.voteRecords,
   '/submit': copy.pageTitles.submit,
+  '/submit/new': copy.pageTitles.submitNew,
   '/gov/rewards': copy.pageTitles.rewards,
   '/gov/proposal-rewards': copy.pageTitles.proposalRewards,
   '/act': copy.placeholders.act.title,

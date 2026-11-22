@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { Button } from '@/shared/ui/button';
@@ -9,44 +9,85 @@ import { TxWatchCard } from '@/shared/ui/tx-watch-card';
 import type { ProposalHistory } from '@/entities/gov-core/model/use-proposal-history';
 import type { SubmitExistingWrite } from '../model/use-submit-existing';
 
-const PAGE_SIZE = 5;
-
 export interface SubmitHistoryPanelProps {
   readonly submitAddress: HexAddress;
+  readonly symbol: string;
   readonly tokenAddress: HexAddress;
   readonly memberId: bigint;
   /** 本轮还能不能推举（门槛 + 每轮一个）；false 时按钮禁用并给原因。 */
   readonly canSubmit: boolean;
+  /** 本轮这个身份已经推举的提案编号（0/undefined = 还没推举）。 */
+  readonly submittedThisRoundId: bigint | undefined;
+  /** 当前页（页码从 1 开始由页面换算成 offset）。 */
+  readonly page: number;
+  readonly totalPages: number | undefined;
   readonly history: ProposalHistory;
   readonly write: SubmitExistingWrite;
   readonly onRefetch: () => void;
+  readonly onPageChange: (page: number) => void;
 }
 
 /**
- * 「推举历史提案」段（owner 2026-11-22）。
+ * `/submit` 的历史提案列表（owner 2026-11-22：这一页默认就是列表，创建表单在 `/submit/new`）。
  *
- * 数据来自 `Submit.proposalIds` + `proposalInfosByProposalIds`（倒序、分页），
- * 每行一个「推举」按钮；本轮已经被推举的提案标「本轮已推举」并禁用（同一个提案不能在一轮里
- * 被推举两次）。写链走 `useSubmitExisting`，回执是 `ProposalSubmitted` 的轮次 + 编号。
+ * - 行：`#编号 标题` + `提案人 #id`，右侧「推举」；
+ * - 分页：每页 10 条（`Submit.proposalIds` 倒序 + `proposalInfosByProposalIds`），
+ *   底部「上一页 / 第 N / M 页 / 下一页」；
+ * - 右上「推举新提案」进创建页；本轮已经推举过（同一身份每轮一个）时整段只读：
+ *   顶部给说明、行内状态文字、右上按钮收起。
  */
 export function SubmitHistoryPanel({
   submitAddress,
+  symbol,
   tokenAddress,
   memberId,
   canSubmit,
+  submittedThisRoundId,
+  page,
+  totalPages,
   history,
   write,
   onRefetch,
+  onPageChange,
 }: SubmitHistoryPanelProps) {
-  const [limit, setLimit] = useState(PAGE_SIZE);
-  const [localError, setLocalError] = useState<string | null>(null);
   const busy = write.stage !== 'idle' || write.receipt !== null;
-  const more = history.total !== undefined && BigInt(history.items.length) < history.total;
+  const alreadySubmitted = submittedThisRoundId !== undefined && submittedThisRoundId !== 0n;
+  const canGoPrev = page > 1;
+  const canGoNext = totalPages !== undefined && page < totalPages;
 
   return (
     <Card data-testid="gov-submit-history">
-      <CardTitle>{copy.gov.submit.historyTitle}</CardTitle>
-      <CardDescription className="mt-1">{copy.gov.submit.historyIntro}</CardDescription>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <CardTitle>{copy.gov.submit.listTitle}</CardTitle>
+          <CardDescription className="mt-1">{copy.gov.submit.listIntro}</CardDescription>
+        </div>
+        {alreadySubmitted ? null : (
+          <Link
+            to={`/submit/new?symbol=${encodeURIComponent(symbol)}`}
+            data-testid="gov-submit-history-new"
+            className="inline-flex h-9 shrink-0 items-center justify-center rounded-2xl border border-line bg-surface px-3 text-xs font-medium text-foreground hover:bg-elevated"
+          >
+            {copy.gov.submit.newAction}
+          </Link>
+        )}
+      </div>
+
+      {alreadySubmitted ? (
+        <p
+          className="mt-3 rounded-2xl border border-line bg-elevated px-3 py-2 text-xs leading-5 text-muted"
+          data-testid="gov-submit-history-blocked"
+        >
+          {copy.gov.submit.historyBlockedSubmitted(submittedThisRoundId.toString())}
+        </p>
+      ) : canSubmit ? null : (
+        <p
+          className="mt-3 rounded-2xl border border-line bg-elevated px-3 py-2 text-xs leading-5 text-muted"
+          data-testid="gov-submit-history-blocked"
+        >
+          {copy.gov.submit.historyBlockedNoPower}
+        </p>
+      )}
 
       {history.status === 'loading' ? (
         <div className="mt-3 space-y-2" data-testid="gov-submit-history-loading">
@@ -69,7 +110,7 @@ export function SubmitHistoryPanel({
       ) : (
         <>
           <ul className="mt-3 space-y-2" data-testid="gov-submit-history-list">
-            {history.items.slice(0, limit).map((proposal) => {
+            {history.items.map((proposal) => {
               const id = proposal.proposalId.toString();
               const blocked = !canSubmit || proposal.submittedThisRound || busy;
               return (
@@ -89,43 +130,69 @@ export function SubmitHistoryPanel({
                         : ''}
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    className="shrink-0"
-                    data-testid={`gov-submit-history-action-${id}`}
-                    disabled={blocked}
-                    onClick={() => {
-                      setLocalError(null);
-                      write.submit({
-                        submitAddress,
-                        tokenAddress,
-                        memberId,
-                        proposalId: proposal.proposalId,
-                      });
-                    }}
-                  >
-                    {proposal.submittedThisRound
-                      ? copy.gov.submit.historySubmittedBadge
-                      : copy.gov.submit.historyAction}
-                  </Button>
+                  {alreadySubmitted ? (
+                    <span
+                      data-testid={`gov-submit-history-action-${id}`}
+                      className="shrink-0 text-[11px] leading-4 text-muted"
+                    >
+                      {proposal.submittedThisRound
+                        ? copy.gov.submit.historySubmittedBadge
+                        : copy.gov.submit.historyNextRoundBadge}
+                    </span>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="shrink-0"
+                      data-testid={`gov-submit-history-action-${id}`}
+                      disabled={blocked}
+                      onClick={() => {
+                        write.submit({
+                          submitAddress,
+                          tokenAddress,
+                          memberId,
+                          proposalId: proposal.proposalId,
+                        });
+                      }}
+                    >
+                      {proposal.submittedThisRound
+                        ? copy.gov.submit.historySubmittedBadge
+                        : copy.gov.submit.historyAction}
+                    </Button>
+                  )}
                 </li>
               );
             })}
           </ul>
-          {more ? (
+
+          <div className="mt-3 flex items-center justify-between gap-2">
             <Button
               type="button"
               variant="secondary"
-              size="md"
-              className="mt-3 w-full"
-              data-testid="gov-submit-history-more"
-              onClick={() => setLimit((current) => current + PAGE_SIZE)}
+              size="sm"
+              data-testid="gov-submit-history-prev"
+              disabled={!canGoPrev || history.status !== 'ready'}
+              onClick={() => onPageChange(page - 1)}
             >
-              {copy.gov.submit.historyLoadMore}
+              {copy.gov.submit.pagePrev}
             </Button>
-          ) : null}
+            <span className="text-[11px] text-muted" data-testid="gov-submit-history-page">
+              {totalPages === undefined
+                ? copy.common.unknown
+                : copy.gov.submit.pageLabel(page.toString(), totalPages.toString())}
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              data-testid="gov-submit-history-next"
+              disabled={!canGoNext || history.status !== 'ready'}
+              onClick={() => onPageChange(page + 1)}
+            >
+              {copy.gov.submit.pageNext}
+            </Button>
+          </div>
           {history.total !== undefined ? (
             <p className="mt-2 text-[11px] text-muted" data-testid="gov-submit-history-total">
               {copy.gov.submit.historyTotal(history.total.toString())}
@@ -134,13 +201,13 @@ export function SubmitHistoryPanel({
         </>
       )}
 
-      {(localError ?? write.error !== null) ? (
+      {write.error !== null ? (
         <p
           role="alert"
           className="mt-2 text-sm text-danger-strong"
           data-testid="gov-submit-history-error-text"
         >
-          {localError ?? write.error}
+          {write.error}
         </p>
       ) : null}
 
