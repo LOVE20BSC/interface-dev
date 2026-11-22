@@ -1017,7 +1017,9 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
           await expect(target.getByTestId('gov-submit-history')).toBeVisible({
             timeout: 30_000,
           });
-          await expect(target.getByTestId('gov-submit-history-new')).toBeVisible();
+          // 这一态是「本轮已推举」：右上「推举新提案」应当收起，顶部给说明。
+          await expect(target.getByTestId('gov-submit-history-blocked')).toBeVisible();
+          await expect(target.getByTestId('gov-submit-history-new')).toHaveCount(0);
           await expect(target.getByTestId('gov-submit-history-page')).toHaveText(/第 1 \/ \d+ 页/);
         },
         'gov-submit-history',
@@ -1668,6 +1670,8 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
 
       await openPage(page, '/submit');
       await expect(page.getByTestId('gov-submit-history')).toBeVisible({ timeout: 30_000 });
+      // 本轮还没推举 → 右上「推举新提案」在，列表给「推举」按钮。
+      await expect(page.getByTestId('gov-submit-history-new')).toBeVisible();
       const row = page.getByTestId(`gov-submit-history-row-${proposal.toString()}`);
       await expect(row).toBeVisible({ timeout: 30_000 });
       await expect(row).toContainText('历史提案 C');

@@ -123,11 +123,9 @@ export function SubmitHistoryPanel({
                     <p className="truncate text-sm font-semibold text-foreground">
                       <span className="font-mono text-xs text-muted">#{id}</span> {proposal.title}
                     </p>
+                    {/* 「本轮已推举」只由右侧状态列表达，行内不再重复一遍（owner 2026-11-22 去重口径）。 */}
                     <p className="mt-0.5 text-[11px] leading-4 text-muted">
                       {copy.gov.vote.proposalAuthor} #{proposal.submitterId.toString()}
-                      {proposal.submittedThisRound
-                        ? ` · ${copy.gov.submit.historySubmittedBadge}`
-                        : ''}
                     </p>
                   </div>
                   {alreadySubmitted ? (
