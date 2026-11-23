@@ -5,6 +5,8 @@
 - 状态：Open
 - 关联文件：`action/src/LpExecutor.sol`、`action/src/GroupServiceExecutor.sol`、`action/src/GroupActionExecutor.sol`、`core/src/Mint.sol`
 
+GroupService 已实现来源社区验证阶段期末的治理权快照，首次正式部署时生效。以下记录描述报障时的实现与影响。 [链群服务治理上限](https://github.com/LOVE20BSC/matt-gov/blob/main/docs/specs/action/06-service-executor.md#治理上限)
+
 ## 现象
 
 行动合约与核心合约的“我能铸多少”视图，在**未铸造**状态下不是读一个已经定死的数，而是用**当前时刻**的治理质押状态和**当前时刻**的激励池余量重新算一遍：
