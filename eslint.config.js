@@ -61,6 +61,7 @@ export default tseslint.config(
       'test-results',
       '.research',
       '.agents',
+      '.dsh-master',
       'docs',
       'src/config/errors.generated.ts',
       'src/config/build-id.generated.ts',
