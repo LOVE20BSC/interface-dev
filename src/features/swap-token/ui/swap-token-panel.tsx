@@ -14,7 +14,7 @@ import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
 import { ActionStack } from '@/shared/ui/action-stack';
-import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import {
   applySlippage,
   DEFAULT_SLIPPAGE_PERCENT,
@@ -445,17 +445,9 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     }
   };
 
-  const handleRetry = () => {
-    if (submitError !== null) {
-      setSubmitError(null);
-      void quote.refetch();
-      return;
-    }
-    if (tx.error?.action === 'approve') {
-      if (approveAmount !== undefined) tx.approve(approveAmount);
-      return;
-    }
-    void handlePrimary();
+  const handleQuoteRetry = () => {
+    setSubmitError(null);
+    void quote.refetch();
   };
 
   // 授权步骤 lives in the action group below the information card, side by side
@@ -769,13 +761,6 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
 
   const errorMessage = submitError ?? tx.error?.message ?? null;
   const showQuoteError = quote.isError;
-  const recoveryAction =
-    tx.error?.kind === 'nonce'
-      ? { run: tx.resubmit, label: copy.txWatch.actions.resubmit }
-      : tx.error?.kind === 'staleBlock'
-        ? { run: () => window.location.reload(), label: copy.txWatch.actions.reload }
-        : null;
-
   const maxAmount = () => {
     if (availableBalance === undefined) return;
     setAmountInput(formatUnits(availableBalance, fromDecimals ?? 0));
@@ -1021,19 +1006,15 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
           {tx.error?.action === 'swap' ? (
             <p className="mt-1 text-xs leading-5 text-muted">{copy.swap.errors.failedNote}</p>
           ) : null}
-          {recoveryAction !== null ||
-          submitError !== null ||
-          (tx.error?.action === 'approve' ? canApprove : tx.error !== null && canSwap) ? (
+          {submitError !== null ? (
             <Button
               variant="secondary"
               size="sm"
               className="mt-2"
-              onClick={recoveryAction !== null ? recoveryAction.run : handleRetry}
+              onClick={handleQuoteRetry}
               leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
             >
-              {recoveryAction !== null
-                ? recoveryAction.label
-                : (tx.error?.retryLabel ?? copy.swap.states.retry)}
+              {copy.swap.states.retry}
             </Button>
           ) : null}
         </div>
@@ -1088,7 +1069,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
           ) : null}
         </ActionStack>
 
-        {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
+        {tx.watch.hash !== null ? <TxStuckHint watch={tx.watch} /> : null}
 
         <p className="text-[11px] leading-5 text-muted">{copy.swap.ladder.note}</p>
       </section>

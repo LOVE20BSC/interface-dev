@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useAccount, useBytecode } from 'wagmi';
-import { AlertTriangle, Check, RefreshCw } from '@/shared/ui/icons';
+import { AlertTriangle, Check } from '@/shared/ui/icons';
 import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
@@ -21,7 +21,7 @@ import { IdentityRecipientCard } from '@/shared/ui/identity-recipient-card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { ActionStack } from '@/shared/ui/action-stack';
 import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shared/ui/token-picker';
-import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import { useAssetProtection } from '@/shared/lib/use-asset-protection';
 import { decideRecipientProtection, knownContractLabel } from '@/shared/lib/recipient-protection';
 import {
@@ -202,8 +202,8 @@ export function TransferTokenPanel({
       ? parsed.value - spendable
       : undefined;
 
-  // D1/D2: an in-flight (even stuck) or restored transfer owns the CTA — the
-  // only way forward is the recovery card's 「重新提交」/「重新查询」.
+  // D1/D2: an in-flight (even stuck) or restored transfer owns the CTA; the
+  // stuck hint explains where to look, and the watcher updates automatically.
   const hasPending = tx.pendingHash !== null;
   const pendingStuck = hasPending && tx.watch.isStuck;
   const busy = tx.stage !== 'idle' || tx.receipt !== null || tx.isHydrating || hasPending;
@@ -334,13 +334,6 @@ export function TransferTokenPanel({
       : null;
 
   const txError = tx.error;
-  const recoveryAction =
-    txError?.kind === 'nonce'
-      ? { run: tx.resubmit, label: copy.txWatch.actions.resubmit }
-      : txError?.kind === 'staleBlock'
-        ? { run: () => window.location.reload(), label: copy.txWatch.actions.reload }
-        : null;
-
   if (!isConnected) {
     return (
       <StateCard
@@ -752,17 +745,6 @@ export function TransferTokenPanel({
           className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
         >
           <p>{txError.message}</p>
-          {recoveryAction !== null ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-2"
-              onClick={recoveryAction.run}
-              leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
-            >
-              {recoveryAction.label}
-            </Button>
-          ) : null}
         </div>
       ) : null}
 
@@ -803,13 +785,7 @@ export function TransferTokenPanel({
           </p>
         ) : null}
 
-        {tx.watch.hash !== null ? (
-          <TxWatchCard
-            watch={tx.watch}
-            onResubmit={tx.resubmit}
-            resubmitDisabled={tx.isResubmitting}
-          />
-        ) : null}
+        {tx.watch.hash !== null ? <TxStuckHint watch={tx.watch} /> : null}
       </section>
     </div>
   );

@@ -42,7 +42,6 @@ export interface GovRewardWrite {
   /** 正在签 / 在途的轮次；列表据此把对应行标成「铸造中…」。 */
   readonly submittingRounds: readonly bigint[];
   readonly submit: (input: GovRewardWriteInput) => void;
-  readonly resubmit: () => void;
   readonly closeReceipt: () => void;
 }
 
@@ -52,7 +51,6 @@ export function useGovRewardWrite(onConfirmed: () => void): GovRewardWrite {
     {
       wallet: copy.gov.rewards.waitingWallet,
       reverted: copy.gov.rewards.revert,
-      ownerChanged: copy.gov.tx.ownerChanged,
     },
     toUserMessage,
     onConfirmed,
@@ -99,7 +97,6 @@ export function useGovRewardWrite(onConfirmed: () => void): GovRewardWrite {
     receipt,
     submittingRounds,
     submit,
-    resubmit: write.resubmit,
     closeReceipt: () => {
       // 不在这里清 `submittingRounds`：回执是 `watch.receipt` 的派生值，等 watch
       // 自己把哈希清掉（下一帧）后回执自然消失，避免中间一帧出现空轮次文案。

@@ -22,7 +22,7 @@ function messageChain(value: unknown, depth = 0): string {
  */
 export function describeTransferError(cause: unknown, context: TransferErrorContext): string {
   if (isUserRejection(cause)) return copy.transfer.errors.rejected;
-  if (isTxSendNonceError(cause)) return copy.txWatch.bodies.nonceGap;
+  if (isTxSendNonceError(cause)) return copy.txWatch.nonceGap;
   if (isTxStaleBlockError(cause)) return copy.txWatch.staleBlock;
 
   const message = messageChain(cause);

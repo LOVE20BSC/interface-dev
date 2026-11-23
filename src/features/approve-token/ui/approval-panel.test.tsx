@@ -74,7 +74,6 @@ const { catalogState, balanceState, allowancesState, txState } = vi.hoisted(() =
         refresh: () => {},
       },
       submit: async () => true,
-      resubmit: () => {},
       clearRecord: () => {},
       clearError: () => {},
     },
@@ -145,7 +144,6 @@ beforeEach(() => {
     error: null,
     watch: { hash: null, status: 'idle', isStuck: false, remainingSeconds: 0, refresh: () => {} },
     submit: async () => true,
-    resubmit: () => {},
     clearRecord: () => {},
     clearError: () => {},
   };

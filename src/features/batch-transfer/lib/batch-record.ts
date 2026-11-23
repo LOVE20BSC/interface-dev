@@ -14,12 +14,12 @@ export type BatchPendingKind = 'approve' | 'batch';
  * The record also carries `{chainId, account}` *inside* itself: a record read
  * through the wrong scope (or written by an older build) is rejected instead of
  * being signed by whichever wallet is connected now (R3), and `nonce` lets a
- * 「重新提交」 after a refresh replace the original transaction instead of sending a
+ * A refresh restores the in-flight hash instead of sending a second transaction.
  * second batch (R2).
  */
 export interface StoredBatch {
   /** The hash the wallet returned, or `null` while the attempt has not landed yet. */
-  readonly hash: HexHash | null;
+  readonly hash: HexHash;
   readonly chainId: number;
   readonly account: HexAddress;
   readonly kind: BatchPendingKind;
@@ -174,8 +174,8 @@ export function readStoredBatch(scope: CacheScope): StoredBatch | null {
   // `hash` is optional (an attempt that never reached the wallet has none), but a
   // present-yet-invalid hash must reject the record instead of being read as
   // 「还没有 hash」 and re-signed.
-  const hash = raw.hash === undefined || raw.hash === null ? null : hashOf(raw.hash);
-  if (raw.hash !== undefined && raw.hash !== null && hash === null) return null;
+  const hash = hashOf(raw.hash);
+  if (hash === null) return null;
   return {
     hash,
     chainId,
@@ -206,7 +206,7 @@ function serializeRequest(request: BatchRequest): Record<string, unknown> {
 /** Persist before the wallet opens (attempt without a hash) and again with the hash. */
 export function writeStoredBatch(scope: CacheScope, stored: StoredBatch): void {
   cache.set(scope, BATCH_TASK_CACHE_KEY, {
-    ...(stored.hash !== null ? { hash: stored.hash } : {}),
+    hash: stored.hash,
     chainId: stored.chainId,
     account: stored.account,
     kind: stored.kind,

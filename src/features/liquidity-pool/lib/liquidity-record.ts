@@ -13,7 +13,7 @@ export type HexHash = `0x${string}`;
 
 /**
  * One 加池/撤出 attempt persisted so 离页或刷新 does not lose it (R4) and so a
- * 「重新提交」 after a refresh replaces the same transaction instead of sending a
+ * A refresh restores the in-flight hash instead of sending a second transaction.
  * second liquidity operation (R2/R7).
  *
  * 流动性页没有「属于某一页」的合约：scope 用 contract-less 的 ZERO_ADDRESS，
@@ -22,7 +22,7 @@ export type HexHash = `0x${string}`;
  * 的 `to` 参数指向旧账户时，代签等于花新账户的资产给旧账户发凭证。
  */
 export interface StoredLiquidity {
-  readonly hash: HexHash | null;
+  readonly hash: HexHash;
   readonly chainId: number;
   readonly account: HexAddress;
   readonly call: LiquidityCall;
@@ -201,8 +201,8 @@ export function readStoredLiquidity(scope: CacheScope): StoredLiquidity | null {
   if (chainId === undefined || account === null) return null;
   if (call === null || note === null) return null;
   if (typeof recordedAt !== 'number' || !Number.isFinite(recordedAt)) return null;
-  const hash = raw.hash === undefined || raw.hash === null ? null : hashOf(raw.hash);
-  if (raw.hash !== undefined && raw.hash !== null && hash === null) return null;
+  const hash = hashOf(raw.hash);
+  if (hash === null) return null;
   return {
     hash,
     chainId,
@@ -217,7 +217,7 @@ export function readStoredLiquidity(scope: CacheScope): StoredLiquidity | null {
 /** Persist before the wallet opens (no hash yet) and again once the hash lands. */
 export function writeStoredLiquidity(scope: CacheScope, stored: StoredLiquidity): void {
   cache.set(scope, LIQUIDITY_TASK_CACHE_KEY, {
-    ...(stored.hash !== null ? { hash: stored.hash } : {}),
+    hash: stored.hash,
     chainId: stored.chainId,
     account: stored.account,
     call: {

@@ -13,7 +13,7 @@ import { Card, CardTitle } from '@/shared/ui/card';
 import { ArrowLeft, ArrowRight } from '@/shared/ui/icons';
 import { Sheet } from '@/shared/ui/sheet';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import {
   GOV_VOTE_DECIMALS,
   proposalRewardRowAmount,
@@ -256,7 +256,7 @@ export function ProposalRewardPanel({
         </p>
       ) : null}
 
-      <TxWatchCard watch={write.watch} onResubmit={write.resubmit} />
+      <TxStuckHint watch={write.watch} />
 
       <Sheet
         open={write.receipt !== null}

@@ -27,7 +27,7 @@ const AIRDROP_ERRORS: Readonly<Record<string, string>> = Object.freeze({
 export function describeAirdropClaimError(error: unknown): string {
   if (isUserRejection(error)) return copy.airdrop.errors.rejected;
   // A stale wallet nonce must never fall through to the generic retry copy.
-  if (isTxSendNonceError(error)) return copy.txWatch.bodies.nonceGap;
+  if (isTxSendNonceError(error)) return copy.txWatch.nonceGap;
   if (isTxStaleBlockError(error)) return copy.txWatch.staleBlock;
 
   const data = extractRevertData(error);

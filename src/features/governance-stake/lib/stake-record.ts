@@ -8,7 +8,7 @@ export type HexHash = `0x${string}`;
 
 /**
  * 一条质押写操作的持久化记录（R4：离页/刷新不丢在途交易，R2/R7：刷新后的
- * 「重新提交」替换同一笔而不是再发一笔）。
+ * 刷新后只恢复有 hash 的在途记录，不再重发。
  *
  * scope 用 contract-less 的 ZERO_ADDRESS（与流动性页同一约定）；记录内部另存
  * `{chainId, account}`，恢复或签名前必须与当前钱包/网络比对（R3，绝不代签）。
@@ -17,7 +17,7 @@ export type HexHash = `0x${string}`;
  * 被旧版本或手改过的记录不能塞进任意合约接口。
  */
 export interface StoredStakeCall {
-  readonly hash: HexHash | null;
+  readonly hash: HexHash;
   readonly chainId: number;
   readonly account: HexAddress;
   readonly call: StakeCall;
@@ -40,7 +40,7 @@ const MAX_ARGS_DEPTH = 4;
 /**
  * 记录只存「地址 + 函数名 + 参数」，重建时按函数名挑 ABI。用**函数名白名单**而不是
  * 扫整份 ABI：否则一条被手改过的记录可以把 `transfer` 伪装成待重提的质押请求，
- * 用户点「重新提交」就会签一笔转出。这里只列出页面真正会签的 6 个函数
+ * 页面会签的 6 个函数。
  * （质押合约 5 个写方法 + 每笔授权前的 `approve`）。
  */
 const STAKE_CALLS: Readonly<Record<string, Abi>> = Object.freeze({
@@ -166,14 +166,14 @@ export function readStoredStakeCall(scope: CacheScope): StoredStakeCall | null {
   if (chainId === undefined || account === null || call === null || action === undefined)
     return null;
   if (typeof recordedAt !== 'number' || !Number.isFinite(recordedAt)) return null;
-  const hash = raw.hash === undefined || raw.hash === null ? null : hashOf(raw.hash);
-  if (raw.hash !== undefined && raw.hash !== null && hash === null) return null;
+  const hash = hashOf(raw.hash);
+  if (hash === null) return null;
   return { hash, chainId, account, call, action, nonce: nonceOf(raw.nonce), recordedAt };
 }
 
 export function writeStoredStakeCall(scope: CacheScope, stored: StoredStakeCall): void {
   cache.set(scope, STAKE_TASK_CACHE_KEY, {
-    ...(stored.hash !== null ? { hash: stored.hash } : {}),
+    hash: stored.hash,
     chainId: stored.chainId,
     account: stored.account,
     call: {

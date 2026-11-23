@@ -15,7 +15,7 @@ describe('describeAirdropClaimError', () => {
         name: 'TransactionExecutionError',
         cause: { message },
       });
-      expect(described).toBe(copy.txWatch.bodies.nonceGap);
+      expect(described).toBe(copy.txWatch.nonceGap);
       expect(described).not.toBe(copy.airdrop.errors.generic);
     }
   });

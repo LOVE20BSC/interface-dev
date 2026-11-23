@@ -1307,7 +1307,7 @@ const restoreAnchorFocus = (event: Event) => {
 | 页面渲染字符串/布局/主题/截图有变 | 补 spec 断言 + 重出四档截图 | `e2e/transfer-numbers.spec.ts:8-13,440-446` |
 | 新增 e2e spec 文件 | 文件顶部 `isolateChain()`、`test.describe.configure({ mode: 'serial' })` | `e2e/mint-identity.spec.ts:66-69`；`e2e/chain.ts:153-182` |
 | 改了 e2e harness / 链脚本 / 挖矿模式相关代码 | **全量连跑两遍都应全绿**（同链、无二次 bootstrap） | `e2e/README.md:18-20` |
-| 改了交易恢复/慢钱包/重放这类时序逻辑 | 必须跑对应 spec（`--repeat-each` 验证不再泄漏） | `e2e/README.md:38`（`--grep "swap" --repeat-each=3`） |
+| 改了交易恢复/慢钱包/重放这类时序逻辑 | 必须跑对应 spec；卡住态断言「纯提示卡、无 button/link、mine 后自动回执」，不写重发行为 | `e2e/README.md:38`；`e2e/gov-stake-recovery.spec.ts` |
 | 只改 `docs/`、台账、ADR、截图、spec 文本 | 不跑 e2e；pre-commit 也会自动跳过 | `.githooks/pre-commit:19-26` |
 
 **e2e 不在 CI 门禁里**：CI 的 `check` job 只有 Typecheck → Lint → Unit tests → Build（`.github/workflows/deploy.yml:149-159`），没有 e2e 步骤；e2e 通过的是本地门禁 + worklog 记录（`ledger/worklog/202611/16-1438-c467-…md:110-112` 记了 `pnpm test 761 passed（111 files）` 与 `pnpm e2e --grep "流动性" 17 passed`）。因此「等 CI 绿」不能代替跑 e2e。
@@ -1684,6 +1684,14 @@ git config --get core.hooksPath           # 应输出 .githooks
 - **证据**：2026-11-17 全仓格式化验证跑完后，`git diff --stat HEAD~1 HEAD -- docs/product/screenshots` = 65 files changed, **0 insertions**, 全是 `Bin 65897 -> 65816 bytes` 这类字节差。
 
 ---
+
+
+### 10.12 交易卡住态不要提供站内重发
+
+- **现象**：恢复卡上曾有站内重发/手动刷新；同 nonce 替换在真实节点会被 `replacement transaction underpriced` 拒绝，且 R2 复核/原 nonce 替换在 8 个 flow 里各有一套。
+- **根因**：重发不是「再点一次」那么简单；它需要复核回执/交易/nonce、gas bump 与 R7 锁，失败分支多且难穷举。
+- **正确写法**：owner 2026-11-23 决定移除重发。卡住态只显示标题 + 正文「请在钱包或区块浏览器里查看」，无按钮/链接；交易落定由 watcher 自动更新。只保留有 hash 的在途记录；失败/取消不保存请求。不要重新引入站内重发、失败重试或同 nonce 替换。
+- **证据**：[ADR-0006](../adr/0006-no-transaction-resend.md)；`e2e/gov-stake-recovery.spec.ts`、`e2e/transfer-recovery.spec.ts`、`e2e/swap-slow-wallet.spec.ts`、`e2e/tx-recovery.spec.ts`；`src/shared/ui/tx-stuck-hint.tsx`。
 
 ## 11. 未决项、已知缺口与变更记录
 

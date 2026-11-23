@@ -6,7 +6,7 @@ import { formatTokenAmount } from '@/shared/lib/format';
 import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Sheet } from '@/shared/ui/sheet';
-import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import type { GovRewardRow, GovRewards } from '@/entities/gov-core/model/use-gov-rewards';
 import type { GovRewardReceipt } from '../lib/gov-reward-receipt';
 import type { GovRewardWrite } from '../model/use-gov-reward-write';
@@ -201,7 +201,7 @@ export function RewardPanel({
         )}
       </div>
 
-      <TxWatchCard watch={write.watch} onResubmit={write.resubmit} />
+      <TxStuckHint watch={write.watch} />
 
       <Sheet
         open={write.receipt !== null}

@@ -30,8 +30,8 @@ const ERC20_INSUFFICIENT_BALANCE = '0xe450d38c';
 export function describeMintError(error: unknown, context: MintErrorContext = {}): string {
   if (isUserRejection(error)) return copy.mintIdentity.errors.rejected;
   // A stale wallet nonce is not 「请稍后重试」: give the actionable wallet copy
-  // and let the page offer 「重新提交」 with an explicit on-chain nonce.
-  if (isTxSendNonceError(error)) return copy.txWatch.bodies.nonceGap;
+  // and let the page explain the wallet state; T004 removes the re-send.
+  if (isTxSendNonceError(error)) return copy.txWatch.nonceGap;
   if (isTxStaleBlockError(error)) return copy.txWatch.staleBlock;
 
   const data = extractRevertData(error);

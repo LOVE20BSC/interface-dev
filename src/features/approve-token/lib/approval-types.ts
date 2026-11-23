@@ -3,7 +3,7 @@ import type { HexAddress } from '@/config/networks';
 /** Which of the two writes a row's button starts. */
 export type ApprovalMode = 'unlimited' | 'revoke';
 
-/** One pending 授权/撤销 request, fully self-contained for a resubmit. */
+/** One pending 授权/撤销 request, self-contained for the receipt. */
 export interface ApprovalRequest {
   readonly tokenAddress: HexAddress;
   readonly tokenSymbol: string;

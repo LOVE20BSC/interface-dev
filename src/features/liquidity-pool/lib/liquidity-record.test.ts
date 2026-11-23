@@ -74,12 +74,9 @@ describe('liquidity-record 在途任务（R2/R3/R4）', () => {
     expect(stored?.call.value).toBeUndefined();
   });
 
-  it('keeps an attempt that never got a hash (R1 after a refresh)', () => {
-    writeStoredLiquidity(SCOPE, { ...STORED, hash: null, nonce: undefined });
-    const stored = readStoredLiquidity(SCOPE);
-    expect(stored?.hash).toBeNull();
-    expect(stored?.nonce).toBeUndefined();
-    expect(stored?.call.functionName).toBe('addLiquidityETH');
+  it('rejects a legacy hash-less record (no retry state after T004)', () => {
+    cache.set(SCOPE, LIQUIDITY_TASK_CACHE_KEY, { ...STORED, hash: null, nonce: undefined });
+    expect(readStoredLiquidity(SCOPE)).toBeNull();
   });
 
   it('scopes the task by chain + wallet so A 的请求在 B 下读不到（R3/R4）', () => {

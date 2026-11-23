@@ -3,12 +3,7 @@ import { useAccount, useChainId, useWriteContract } from 'wagmi';
 import { love20TokenAbi, uniswapV2Router02Abi, weth9Abi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import {
-  useNextNonce,
-  usePendingNonce,
-  useTxWatch,
-  type TxWatch,
-} from '@/shared/model/use-tx-watch';
+import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
 import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 import { describeSwapError, swapRetryLabel } from '@/features/swap-token/lib/swap-errors';
 import { parseSwapReceipt } from '@/features/swap-token/lib/swap-events';
@@ -63,19 +58,13 @@ export interface SwapTransactionState {
   readonly pendingKind: SwapTxAction | null;
   readonly error: SwapTxError | null;
   readonly isHydrating: boolean;
-  /** Bounded wait for the submitted hash; `isStuck` frees the CTA + shows recovery. */
+  /** Bounded wait for the submitted hash; the recovery card explains a stuck one. */
   readonly watch: TxWatch;
-  /** Re-sends the pending step with an explicitly correct nonce (recovery card). */
-  readonly resubmit: () => void;
   readonly approve: (amount: bigint) => void;
   readonly execute: (execution: SwapExecution) => Promise<void>;
   readonly clearReceipt: () => void;
   readonly clearError: () => void;
 }
-
-type ResendTarget =
-  | { readonly kind: 'approve'; readonly amount: bigint; readonly tokenAddress: HexAddress }
-  | { readonly kind: 'swap'; readonly execution: SwapExecution };
 
 type PendingTx =
   | {
@@ -86,7 +75,7 @@ type PendingTx =
     }
   | { readonly kind: 'swap'; readonly hash: HexHash; readonly record: SwapRecord };
 
-/** The router call a swap record represents, replayable for 「重新提交」. */
+/** The router call a swap record represents. */
 interface SwapRequest {
   readonly kind: SwapRecord['kind'];
   readonly fromKey: string;
@@ -105,21 +94,6 @@ function pairReadsFromRecord(record: SwapRecord): SwapPairRead[] {
   });
 }
 
-function requestFromRecord(record: SwapRecord): SwapRequest | null {
-  if (record.amountIn === undefined || record.minOut === undefined) return null;
-  const path = record.path.filter((entry): entry is HexAddress =>
-    /^0x[0-9a-fA-F]{40}$/.test(entry),
-  );
-  return {
-    kind: record.kind,
-    fromKey: record.fromKey,
-    toKey: record.toKey,
-    amountIn: record.amountIn,
-    minOut: record.minOut,
-    path,
-  };
-}
-
 /**
  * ERC20 input: exact-amount approve first, then the swap. The mint ladder's
  * grammar is reused: wallet → 确认中 → mined. The hash (and all receipt context)
@@ -134,7 +108,6 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
   const { address: account } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
-  const readNextNonce = useNextNonce(account);
   const readPendingNonce = usePendingNonce(account);
 
   const [pending, setPending] = useState<PendingTx | null>(null);
@@ -145,7 +118,6 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
   const [error, setError] = useState<SwapTxError | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
   const submittingRef = useRef(false);
-  const lastAttemptRef = useRef<ResendTarget | null>(null);
 
   const fromKey = from !== undefined ? swapTokenKey(from) : '';
   // An approval belongs to one token; switching the input must not reuse it.
@@ -270,7 +242,7 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
 
   const deadlineSeconds = (): bigint => BigInt(Math.floor(Date.now() / 1000) + 1200);
 
-  /** One place for the three write shapes (wrap/unwrap/router), so resubmit reuses it. */
+  /** One place for the three write shapes (wrap/unwrap/router). */
   const writeSwapRequest = async (request: SwapRequest, nonce?: number): Promise<HexHash> => {
     const nonceOption = nonce !== undefined ? { nonce } : {};
     if (request.kind === 'wrap') {
@@ -325,17 +297,14 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
   };
 
   /**
-   * Owner 2026-11-14: every send (including the very first one after a refresh)
-   * pins the nonce read from the chain the page is watching, exactly like the
-   * recovery card's 「重新提交」 does. Letting the wallet pick the nonce is what put
-   * the first transaction behind a stale wallet nonce: the hash existed, the
-   * transaction sat in the wallet's queue with a gap, and only a resubmission
-   * carrying the on-chain nonce could mine it.
+   * Owner 2026-11-14: every send pins the nonce read from the chain the page is
+   * watching. Letting the wallet pick the nonce is what put the first transaction
+   * behind a stale wallet nonce: the hash existed, the transaction sat in the
+   * wallet's queue with a gap, and nothing on the page could move it.
    *
    * R5 (owner 2026-11-16): the pin is the **pool-aware** count (`pending`), so a
    * new swap queues behind a transaction the wallet already broadcast instead of
-   * re-using its nonce. An explicit nonce only ever replaces a known transaction
-   * (its own nonce), never a new operation.
+   * re-using its nonce.
    *
    * A failed read falls back to undefined: the wallet assigns the nonce and the
    * bounded watcher still turns any gap into the recovery card.
@@ -348,18 +317,14 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     }
   };
 
-  const submitApprove = async (
-    amount: bigint,
-    tokenAddress: HexAddress,
-    nonce?: number,
-  ): Promise<void> => {
+  const submitApprove = async (amount: bigint, tokenAddress: HexAddress): Promise<void> => {
     if (submittingRef.current || router === undefined) return;
     setError(null);
     setIsApproved(false);
     setWalletAction('approve');
     submittingRef.current = true;
     try {
-      const sendNonce = nonce ?? (await pinnedNonce());
+      const sendNonce = await pinnedNonce();
       const hash = await writeContractAsync({
         address: tokenAddress,
         abi: love20TokenAbi,
@@ -394,11 +359,10 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     ) {
       return;
     }
-    lastAttemptRef.current = { kind: 'approve', amount, tokenAddress: from.address };
     void submitApprove(amount, from.address);
   };
 
-  const submitExecution = async (execution: SwapExecution, nonce?: number): Promise<void> => {
+  const submitExecution = async (execution: SwapExecution): Promise<void> => {
     if (submittingRef.current) return;
     if (
       router === undefined ||
@@ -423,7 +387,7 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
       path: route.kind === 'swap' ? [...route.pathAddresses] : [],
     };
     try {
-      const sendNonce = nonce ?? (await pinnedNonce());
+      const sendNonce = await pinnedNonce();
       const hash = await writeSwapRequest(request, sendNonce);
       const record: SwapRecord = {
         hash,
@@ -467,74 +431,7 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
 
   const execute = async (execution: SwapExecution): Promise<void> => {
     if (submittingRef.current || pending !== null || activeReceipt !== null) return;
-    lastAttemptRef.current = { kind: 'swap', execution };
     await submitExecution(execution);
-  };
-
-  /**
-   * Recovery action for a stuck hash or a rejected send: rebuild the same call
-   * from the persisted record (or the last attempt) and re-send it with the
-   * on-chain nonce, so a nonce gap heals itself.
-   * record and re-send it with the on-chain nonce, so a nonce gap heals itself.
-   */
-  const resubmit = (): void => {
-    void (async () => {
-      const nonce = await readNextNonce();
-      if (nonce === undefined) {
-        const action: SwapTxAction = pending?.kind ?? lastAttemptRef.current?.kind ?? 'swap';
-        setError({ action, message: copy.txWatch.nonceUnavailable, retryLabel: undefined });
-        return;
-      }
-      if (pending !== null) {
-        const target = pending;
-        if (target.kind === 'approve') {
-          await submitApprove(target.amount, target.tokenAddress, nonce);
-          return;
-        }
-        const request = requestFromRecord(target.record);
-        if (request === null) {
-          setError({ action: 'swap', message: copy.swap.errors.failedNote, retryLabel: undefined });
-          return;
-        }
-        setError(null);
-        setWalletAction('swap');
-        submittingRef.current = true;
-        try {
-          const hash = await writeSwapRequest(request, nonce);
-          const record: SwapRecord = {
-            ...target.record,
-            hash,
-            confirmed: false,
-            recordedAt: Date.now(),
-          };
-          if (scope !== null) writeSwapRecord(scope, record);
-          setPending({ kind: 'swap', hash, record });
-        } catch (cause) {
-          const message = describeSwapError(cause, {
-            nativeSymbol,
-            fromSymbol: target.record.fromSymbol,
-          });
-          const recovery = txSendRecoveryKind(cause);
-          setError({
-            action: 'swap',
-            message,
-            retryLabel: swapRetryLabel(message),
-            ...(recovery !== undefined ? { kind: recovery } : {}),
-          });
-        } finally {
-          setWalletAction(null);
-          submittingRef.current = false;
-        }
-        return;
-      }
-      const last = lastAttemptRef.current;
-      if (last === null) return;
-      if (last.kind === 'approve') {
-        await submitApprove(last.amount, last.tokenAddress, nonce);
-        return;
-      }
-      await submitExecution(last.execution, nonce);
-    })();
   };
 
   const clearReceipt = (): void => {
@@ -546,20 +443,12 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     if (scope !== null) clearSwapRecord(scope);
   };
 
-  // A stuck hash frees the CTA and the pair controls; the recovery card owns
-  // the manual 「重新查询」/「重新提交」 actions until a new hash is submitted.
+  // Stage stays 'pending' for as long as a hash is in flight: a stuck transaction
+  // is reported by the watcher card, it does not re-enable the CTA.
   const approveStage: SwapTxStage =
-    walletAction === 'approve'
-      ? 'wallet'
-      : pending?.kind === 'approve' && !watch.isStuck
-        ? 'pending'
-        : 'idle';
+    walletAction === 'approve' ? 'wallet' : pending?.kind === 'approve' ? 'pending' : 'idle';
   const swapStage: SwapTxStage =
-    walletAction === 'swap'
-      ? 'wallet'
-      : pending?.kind === 'swap' && !watch.isStuck
-        ? 'pending'
-        : 'idle';
+    walletAction === 'swap' ? 'wallet' : pending?.kind === 'swap' ? 'pending' : 'idle';
 
   return {
     approveStage,
@@ -572,7 +461,6 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     error,
     isHydrating,
     watch,
-    resubmit,
     approve,
     execute,
     clearReceipt,

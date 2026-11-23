@@ -166,13 +166,7 @@ export function GovTxFeedback({ ctx }: { readonly ctx: GovContextValue }) {
           />
         ) : null}
       </Sheet>
-      <StakeTxFeedback
-        error={tx.error}
-        watch={tx.watch}
-        stage={tx.stage}
-        onResubmit={tx.resubmit}
-        resubmitDisabled={tx.isResubmitting}
-      />
+      <StakeTxFeedback error={tx.error} watch={tx.watch} stage={tx.stage} />
     </div>
   );
 }

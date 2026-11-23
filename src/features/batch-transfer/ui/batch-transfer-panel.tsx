@@ -18,7 +18,7 @@ import { Skeleton } from '@/shared/ui/skeleton';
 import { ActionStack } from '@/shared/ui/action-stack';
 import { approvalKind } from '@/shared/lib/approval-kind';
 import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shared/ui/token-picker';
-import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import { parseBatchText } from '@/features/batch-transfer/lib/batch-parse';
 import {
   BATCH_GAS_DEFAULT_NATIVE,
@@ -431,12 +431,6 @@ export function BatchTransferPanel({
   const showBalanceRetry = balanceState === 'error';
 
   const txError = tx.error;
-  const recoveryAction =
-    txError?.kind === 'nonce'
-      ? { run: tx.resubmit, label: copy.txWatch.actions.resubmit }
-      : txError?.kind === 'staleBlock'
-        ? { run: () => window.location.reload(), label: copy.txWatch.actions.reload }
-        : null;
 
   const ctaLabel = (() => {
     if (tx.stage === 'wallet') return copy.batchTransfer.submitting;
@@ -866,13 +860,7 @@ export function BatchTransferPanel({
             </Button>
           </ActionStack>
 
-          {tx.watch.hash !== null ? (
-            <TxWatchCard
-              watch={tx.watch}
-              onResubmit={tx.resubmit}
-              resubmitDisabled={tx.isResubmitting}
-            />
-          ) : null}
+          {tx.watch.hash !== null ? <TxStuckHint watch={tx.watch} /> : null}
 
           {txError !== null ? (
             <div
@@ -881,17 +869,6 @@ export function BatchTransferPanel({
               className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
             >
               <p>{txError.message}</p>
-              {recoveryAction !== null ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="mt-2"
-                  onClick={recoveryAction.run}
-                  leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
-                >
-                  {recoveryAction.label}
-                </Button>
-              ) : null}
             </div>
           ) : null}
         </section>

@@ -9,7 +9,7 @@ import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { ActionStack } from '@/shared/ui/action-stack';
-import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import { airdropUnavailableCopy } from '@/features/claim-airdrop/lib/airdrop-unavailable-copy';
 import { claimedAmountView } from '@/features/claim-airdrop/lib/claimed-amount-view';
 import { selectAirdropReceiptView } from '@/features/claim-airdrop/lib/airdrop-receipt-dismissal';
@@ -360,13 +360,6 @@ export function ClaimAirdropPanel({
         ? copy.airdrop.pending.chain
         : copy.airdrop.eligible.cta;
   const isBusy = tx.stage !== 'idle';
-  const recoveryAction =
-    tx.errorKind === 'nonce'
-      ? { run: tx.resubmit, label: copy.txWatch.actions.resubmit }
-      : tx.errorKind === 'staleBlock'
-        ? { run: () => window.location.reload(), label: copy.txWatch.actions.reload }
-        : null;
-
   return (
     <div className="space-y-4">
       <StatusCard>
@@ -396,7 +389,7 @@ export function ClaimAirdropPanel({
           </Button>
         </ActionStack>
 
-        {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
+        {tx.watch.hash !== null ? <TxStuckHint watch={tx.watch} /> : null}
 
         {tx.error !== null ? (
           <div
@@ -404,15 +397,6 @@ export function ClaimAirdropPanel({
             className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
           >
             <p>{tx.error}</p>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-2"
-              onClick={recoveryAction !== null ? recoveryAction.run : tx.claim}
-              leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
-            >
-              {recoveryAction !== null ? recoveryAction.label : copy.airdrop.states.retry}
-            </Button>
           </div>
         ) : null}
       </div>

@@ -55,7 +55,6 @@ const h = vi.hoisted(() => {
         isSettled: false,
         refresh: () => {},
       },
-      resubmit: () => {},
       claim: () => {},
       clearError: () => {},
     },

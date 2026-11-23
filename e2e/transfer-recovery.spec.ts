@@ -18,7 +18,7 @@ import { connect, installWallet } from './wallet-stub';
  *
  * D1 是本次修复的核心：提交 → 立即刷新 → 在途卡恢复、主按钮不可再发 → 链上只
  * 一笔（刷新前 QA 实测收款方双倍到账）。另外三条：
- * - D2：恢复卡出现后主按钮必须禁用并说明原因，只能从卡里「重新提交」继续；
+ * - D2：恢复卡出现后主按钮必须禁用并说明原因；卡住态是纯提示，不能重发；
  * - D4：刷新后恢复成功条（金额 + 可复制哈希），但不再弹回执；
  * - D7：`memberName` 慢 RPC 下，身份确认块在名字到达前不出现、不能勾选/提交。
  *
@@ -247,59 +247,44 @@ test('D4 完成后刷新：成功条与哈希恢复，不再重复弹回执', as
   await shot(page, 'transfer-d4-strip-after-reload.png');
 });
 
-test('D2 恢复卡：主按钮禁用并说明，只能从卡里「重新提交」继续（不再静默）', async ({ page }) => {
-  // 第一次 eth_sendTransaction 返回一个链上不存在的合法哈希，10s（e2e 构建为 4s）后
-  // 进入 dropped 恢复卡；之后的真实发送放行。
-  let sendRequests = 0;
-  await page.route(RPC_URL, async (route) => {
-    const raw = route.request().postData() ?? '';
-    if (raw.includes('"eth_sendTransaction"') && sendRequests === 0) {
-      sendRequests += 1;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          result: `0x${'ab'.repeat(31)}01`,
-        }),
-      });
-      return;
-    }
-    await route.continue();
-  });
-
-  await openTransfer(page, SENDER);
+test('D2 卡住态：纯提示卡无按钮，mine 后自动出回执', async ({ page }) => {
+  // 真实状态：交易已广播、hash 已知、链上不打包（suspendMining）。
+  // 真实慢链：卡住态只能等，不能重发；mine 后 watcher 自动更新回执。
+  await suspendMining();
+  await installWallet(page, SENDER);
+  await page.goto(`/transfer${QUERY}`);
+  await connect(page);
   await selectToken(page, SYMBOL);
   await fillTransfer(page, '0.1', RECIPIENT);
-  await page.getByTestId('transfer-submit').click();
-  await expect(page.getByTestId('tx-watch-pending')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId('tx-watch-recovery')).toBeVisible({ timeout: 40_000 });
-  await shot(page, 'transfer-d2-recovery-card.png');
 
-  const sendsBefore = (await stubState(page)).sends.length;
-  expect(sendsBefore).toBe(1);
-  // D2 修复：主按钮不再是「可点但静默」——它被禁用，并指向恢复卡。
-  await expect(page.getByTestId('transfer-submit')).toBeDisabled();
-  await expect(page.getByTestId('transfer-submit-note')).toContainText(
-    '上面这笔还没有结果，请先用上面的「重新提交」或「重新查询」处理。',
-  );
-  await page.getByTestId('transfer-submit').click({ force: true });
-  await page.waitForTimeout(1_500);
-  expect((await stubState(page)).sends.length).toBe(sendsBefore);
-
-  // 真正能继续的是恢复卡里的「重新提交」：它带链上 nonce 重发并成功出回执。
   const balanceBefore = await tokenBalance(RECIPIENT);
-  await page.getByTestId('tx-watch-recovery').getByRole('button', { name: '重新提交' }).click();
-  await expect
-    .poll(() => stubState(page).then((state) => state.sends.length), {
-      timeout: 30_000,
-    })
-    .toBe(sendsBefore + 1);
+  const nonceBefore = await latestNonce(SENDER);
+  await page.getByTestId('transfer-submit').click();
+
+  await expect(page.getByTestId('tx-watch-pending')).toBeVisible({ timeout: 20_000 });
+  const recovery = page.getByTestId('tx-watch-recovery');
+  await expect(recovery).toBeVisible({ timeout: 40_000 });
+  await expect(recovery).toContainText('这笔交易还没有确认');
+  await expect(recovery).toContainText('请在钱包或区块浏览器里查看');
+  // 纯提示卡：无按钮、无链接；主按钮禁用，不能开第二笔。
+  await expect(recovery.getByRole('button')).toHaveCount(0);
+  await expect(recovery.getByRole('link')).toHaveCount(0);
+  await expect(page.getByTestId('transfer-submit')).toBeDisabled();
+  await shot(page, 'transfer-d2-recovery-card.png');
+  const send = (await stubState(page)).sends[0];
+  expect(send).toBeDefined();
+  if (send === undefined) return;
+  expect((await stubState(page)).sends.length).toBe(1);
+  expect(await latestNonce(SENDER)).toBe(nonceBefore);
+
+  await mine();
   await expect(page.getByTestId('transfer-receipt-amount')).toHaveText(`0.1 ${SYMBOL}`, {
     timeout: 30_000,
   });
+  await expect(page.getByTestId('tx-watch-recovery')).toHaveCount(0);
   await expect.poll(() => tokenBalance(RECIPIENT)).toBe(balanceBefore + 100_000_000_000_000_000n);
+  const receipt = await publicClient.getTransactionReceipt({ hash: send.hash as `0x${string}` });
+  expect(receipt.status).toBe('success');
 });
 
 test('D1 提交后立即刷新：在途卡恢复、不能再发，链上只有一笔', async ({ page }) => {

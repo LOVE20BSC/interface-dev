@@ -47,7 +47,6 @@ export interface ProposalRewardWrite {
   /** 正在（或最近一次）提交销毁的提案，用来只把那一行显示成「销毁中…」。 */
   readonly activeProposalId: bigint | null;
   readonly submit: (input: ProposalRewardBurnInput) => void;
-  readonly resubmit: () => void;
   readonly closeReceipt: () => void;
 }
 
@@ -56,7 +55,6 @@ export function useProposalRewardWrite(onConfirmed: () => void): ProposalRewardW
     {
       wallet: copy.gov.proposalRewards.waitingWallet,
       reverted: copy.gov.proposalRewards.revert,
-      ownerChanged: copy.gov.tx.ownerChanged,
     },
     toUserMessage,
     onConfirmed,
@@ -108,7 +106,6 @@ export function useProposalRewardWrite(onConfirmed: () => void): ProposalRewardW
     receipt,
     activeProposalId,
     submit,
-    resubmit: write.resubmit,
     closeReceipt: () => {
       setReceipt(null);
       setActiveProposalId(null);

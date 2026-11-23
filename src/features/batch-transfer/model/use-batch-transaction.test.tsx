@@ -2,7 +2,6 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cache } from '@/shared/lib/cache';
 import { copy } from '@/shared/config/copy-pages';
-import type { ResubmitSnapshot } from '@/shared/lib/tx-resubmit';
 import { useBatchTransaction } from '@/features/batch-transfer/model/use-batch-transaction';
 import {
   createBatchScope,
@@ -14,7 +13,7 @@ import type { BatchRequest } from '@/features/batch-transfer/lib/batch-types';
 
 /**
  * 批量转账恢复加固（R1/R2/R3/R4/R5）—— owner 2026-11-16 的 5 个 P1 里，批量转账
- * 独占两条：发送失败后「重新提交」重发上一笔（attempt 只在拿到 hash 后才更新），以及
+ * 覆盖发送/刷新/owner；发送失败不再保留请求（T004）。
  * 首次失败时按钮无响应（根本没有 attempt）。另外两条是离页丢失（无持久化）与跨账户。
  */
 
@@ -62,7 +61,6 @@ const {
   writeMock,
   simulateMock,
   pendingNonceMock,
-  snapshotMock,
   refreshSpy,
   watchState,
   approvedSpy,
@@ -71,7 +69,6 @@ const {
   writeMock: vi.fn(),
   simulateMock: vi.fn(),
   pendingNonceMock: vi.fn(),
-  snapshotMock: vi.fn(),
   refreshSpy: vi.fn(),
   approvedSpy: vi.fn(),
   confirmedSpy: vi.fn(),
@@ -100,15 +97,7 @@ vi.mock('wagmi', () => ({
 vi.mock('@/shared/model/use-tx-watch', () => ({
   useTxWatch: () => watchState.value,
   usePendingNonce: () => pendingNonceMock,
-  readResubmitSnapshot: () => snapshotMock(),
 }));
-
-const UNKNOWN_SNAPSHOT: ResubmitSnapshot = {
-  receiptStatus: null,
-  txNonce: null,
-  latestNonce: undefined,
-  pendingNonce: undefined,
-};
 
 function renderBatch() {
   return renderHook(() =>
@@ -137,158 +126,10 @@ beforeEach(() => {
   simulateMock.mockResolvedValue({});
   pendingNonceMock.mockReset();
   pendingNonceMock.mockResolvedValue(undefined);
-  snapshotMock.mockReset();
-  snapshotMock.mockResolvedValue(UNKNOWN_SNAPSHOT);
   refreshSpy.mockReset();
   approvedSpy.mockReset();
   confirmedSpy.mockReset();
   resetWatch();
-});
-
-describe('useBatchTransaction 不重放上一笔（R1）', () => {
-  it('re-sends the request that just failed, not the previous successful batch', async () => {
-    const { result, rerender } = renderBatch();
-
-    // 上一笔 100 成功成交。
-    writeMock.mockResolvedValue(HASH_2);
-    await act(async () => {
-      await result.current.submit(FIRST);
-    });
-    watchState.value = {
-      ...watchState.value,
-      status: 'confirmed',
-      hash: HASH_2,
-      receipt: { status: 'success', logs: [] },
-      isSettled: true,
-    };
-    rerender();
-    expect(confirmedSpy).toHaveBeenCalledWith(HASH_2, FIRST);
-    await act(async () => {});
-    expect(result.current.pendingKind).toBeNull();
-
-    // 下一笔 200 发送失败。
-    writeMock.mockClear();
-    writeMock.mockRejectedValue(new Error('user rejected'));
-    await act(async () => {
-      await result.current.submit(SECOND);
-    });
-    expect(result.current.error).not.toBeNull();
-
-    // 重试：必须是 200 这一笔的参数。
-    writeMock.mockClear();
-    writeMock.mockResolvedValue(HASH_2);
-    await act(async () => {
-      result.current.resubmit();
-    });
-    const call = writeMock.mock.calls[0]?.[0] as { args: readonly unknown[] } | undefined;
-    expect(call).toBeDefined();
-    expect(call?.args[2]).toEqual([2000000000000000000n, 0n]);
-  });
-
-  it('keeps a retryable attempt when the very first send fails (button not dead)', async () => {
-    const { result } = renderBatch();
-    writeMock.mockRejectedValue(new Error('user rejected'));
-
-    await act(async () => {
-      await result.current.submit(FIRST);
-    });
-    expect(result.current.error).not.toBeNull();
-
-    writeMock.mockClear();
-    writeMock.mockResolvedValue(HASH_2);
-    await act(async () => {
-      result.current.resubmit();
-    });
-    expect(writeMock).toHaveBeenCalledTimes(1);
-    expect(result.current.pendingKind).toBe('batch');
-  });
-});
-
-describe('useBatchTransaction 重试复核（R2）', () => {
-  it('does not send when the original batch already confirmed during the re-check', async () => {
-    const { result } = renderBatch();
-    writeMock.mockResolvedValue(HASH_2);
-    await act(async () => {
-      await result.current.submit(FIRST);
-    });
-    snapshotMock.mockResolvedValue({
-      receiptStatus: 'success',
-      txNonce: 9,
-      latestNonce: 9,
-      pendingNonce: 9,
-    });
-    writeMock.mockClear();
-
-    await act(async () => {
-      result.current.resubmit();
-    });
-
-    expect(writeMock).not.toHaveBeenCalled();
-    expect(confirmedSpy).toHaveBeenCalledWith(HASH_2, FIRST);
-  });
-
-  it('replaces a still-queued batch at its original nonce', async () => {
-    const { result } = renderBatch();
-    writeMock.mockResolvedValue(HASH_2);
-    await act(async () => {
-      await result.current.submit(FIRST);
-    });
-    snapshotMock.mockResolvedValue({
-      receiptStatus: null,
-      txNonce: 9,
-      latestNonce: 8,
-      pendingNonce: 12,
-    });
-    writeMock.mockClear();
-
-    await act(async () => {
-      result.current.resubmit();
-    });
-    expect(writeMock).toHaveBeenCalledWith(expect.objectContaining({ nonce: 9 }));
-  });
-
-  it('stops when another transaction took the nonce (replaced)', async () => {
-    const { result } = renderBatch();
-    pendingNonceMock.mockResolvedValue(9);
-    writeMock.mockResolvedValue(HASH_2);
-    await act(async () => {
-      await result.current.submit(FIRST);
-    });
-    snapshotMock.mockResolvedValue({
-      receiptStatus: null,
-      txNonce: null,
-      latestNonce: 10,
-      pendingNonce: 10,
-    });
-    writeMock.mockClear();
-
-    await act(async () => {
-      result.current.resubmit();
-    });
-    expect(writeMock).not.toHaveBeenCalled();
-    expect(refreshSpy).toHaveBeenCalled();
-  });
-
-  it('never signs blind when the re-check cannot read the chain', async () => {
-    const { result } = renderBatch();
-    writeMock.mockResolvedValue(HASH_2);
-    await act(async () => {
-      await result.current.submit(FIRST);
-    });
-    snapshotMock.mockResolvedValue({
-      receiptStatus: undefined,
-      txNonce: undefined,
-      latestNonce: undefined,
-      pendingNonce: undefined,
-    });
-    writeMock.mockClear();
-
-    await act(async () => {
-      result.current.resubmit();
-    });
-    expect(writeMock).not.toHaveBeenCalled();
-    expect(result.current.error?.message).toBe(copy.txWatch.nonceUnavailable);
-  });
 });
 
 describe('useBatchTransaction 首笔 nonce（R5）', () => {
@@ -320,19 +161,6 @@ describe('useBatchTransaction 离页/刷新恢复（R4）', () => {
     });
     expect(writeMock).not.toHaveBeenCalled();
     expect(readStoredBatch(SCOPE)?.hash).toBe(HASH);
-  });
-
-  it('restores an attempt that never got a hash as a retryable state', async () => {
-    writeStoredBatch(SCOPE, { ...STORED, hash: null });
-    const { result } = renderBatch();
-    expect(result.current.pendingKind).toBeNull();
-
-    writeMock.mockResolvedValue(HASH_2);
-    await act(async () => {
-      result.current.resubmit();
-    });
-    expect(writeMock).toHaveBeenCalledTimes(1);
-    expect(result.current.pendingKind).toBe('batch');
   });
 
   it('clears the persisted task once the batch settles', async () => {

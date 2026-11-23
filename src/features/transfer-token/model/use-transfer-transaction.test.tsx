@@ -2,7 +2,6 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cache } from '@/shared/lib/cache';
 import { copy } from '@/shared/config/copy-pages';
-import type { ResubmitSnapshot } from '@/shared/lib/tx-resubmit';
 import { useTransferTransaction } from '@/features/transfer-token/model/use-transfer-transaction';
 import {
   createTransferScope,
@@ -41,12 +40,6 @@ const REQUEST = {
   recipientLabel: undefined,
 } as const;
 
-const NEXT_REQUEST = {
-  ...REQUEST,
-  amount: 2000000000000000000n,
-  recipient: OTHER,
-} as const;
-
 interface WatchLike {
   status: string;
   hash: string | null;
@@ -59,28 +52,25 @@ interface WatchLike {
   refresh: () => void;
 }
 
-const { sendMock, writeMock, pendingNonceMock, snapshotMock, refreshSpy, watchState } = vi.hoisted(
-  () => ({
-    sendMock: vi.fn(),
-    writeMock: vi.fn(),
-    pendingNonceMock: vi.fn(),
-    snapshotMock: vi.fn(),
-    refreshSpy: vi.fn(),
-    watchState: {
-      value: {
-        status: 'idle',
-        hash: null,
-        receipt: null,
-        submittedNonce: undefined,
-        remainingMs: 0,
-        remainingSeconds: 0,
-        isStuck: false,
-        isSettled: false,
-        refresh: () => {},
-      } as WatchLike,
-    },
-  }),
-);
+const { sendMock, writeMock, pendingNonceMock, refreshSpy, watchState } = vi.hoisted(() => ({
+  sendMock: vi.fn(),
+  writeMock: vi.fn(),
+  pendingNonceMock: vi.fn(),
+  refreshSpy: vi.fn(),
+  watchState: {
+    value: {
+      status: 'idle',
+      hash: null,
+      receipt: null,
+      submittedNonce: undefined,
+      remainingMs: 0,
+      remainingSeconds: 0,
+      isStuck: false,
+      isSettled: false,
+      refresh: () => {},
+    } as WatchLike,
+  },
+}));
 
 vi.mock('wagmi', () => ({
   useAccount: () => ({ address: SELF }),
@@ -92,18 +82,9 @@ vi.mock('wagmi', () => ({
 
 vi.mock('@/shared/model/use-tx-watch', () => ({
   useTxWatch: () => watchState.value,
-  // A new operation pins the pool-aware nonce (R5); 重新提交 re-checks the chain
-  // through `readResubmitSnapshot` instead of reading a bare nonce (R2).
+  // A new operation pins the pool-aware nonce (R5).
   usePendingNonce: () => pendingNonceMock,
-  readResubmitSnapshot: () => snapshotMock(),
 }));
-
-const UNKNOWN_SNAPSHOT: ResubmitSnapshot = {
-  receiptStatus: null,
-  txNonce: null,
-  latestNonce: undefined,
-  pendingNonce: undefined,
-};
 
 function resetWatch(): void {
   watchState.value = {
@@ -135,8 +116,6 @@ beforeEach(() => {
   writeMock.mockReset();
   pendingNonceMock.mockReset();
   pendingNonceMock.mockResolvedValue(undefined);
-  snapshotMock.mockReset();
-  snapshotMock.mockResolvedValue(UNKNOWN_SNAPSHOT);
   refreshSpy.mockReset();
   resetWatch();
 });
@@ -264,180 +243,6 @@ describe('useTransferTransaction 提交与持久化', () => {
     expect(result.current.receipt).toBeNull();
     expect(result.current.error?.message).toBe('交易上链了，但没有成功。你的资产没有变化。');
     expect(readStoredTransfer(SCOPE)).toBeNull();
-  });
-});
-
-describe('useTransferTransaction 重试（R1）', () => {
-  it('re-sends the request that just failed, never the previous successful one', async () => {
-    const { result, rerender } = renderHook(() => useTransferTransaction(() => {}));
-
-    // 第一笔成功 → 成交 → 关掉回执（pending/receipt 都清掉，attempt 也必须前进）。
-    writeMock.mockResolvedValue(HASH_2);
-    await act(async () => {
-      await result.current.submit(REQUEST);
-    });
-    watchState.value = minedSuccess(HASH_2);
-    rerender();
-    expect(result.current.receipt?.hash).toBe(HASH_2);
-    act(() => result.current.clearReceipt());
-
-    // 第二笔：钱包拒绝，没有 hash。
-    writeMock.mockRejectedValue(new Error('user rejected'));
-    await act(async () => {
-      await result.current.submit(NEXT_REQUEST);
-    });
-    expect(result.current.error).not.toBeNull();
-    writeMock.mockClear();
-
-    // 「重试」必须重发第二笔（200 / OTHER），不能重发第一笔（100 / RECIPIENT）。
-    await act(async () => {
-      result.current.resubmit();
-    });
-    expect(writeMock).toHaveBeenCalledTimes(1);
-    expect(writeMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        functionName: 'transfer',
-        args: [OTHER, 2000000000000000000n],
-      }),
-    );
-  });
-
-  it('keeps a retryable attempt when the very first send fails (no dead button)', async () => {
-    writeMock.mockRejectedValue(new Error('user rejected'));
-    const { result } = renderHook(() => useTransferTransaction(() => {}));
-
-    await act(async () => {
-      await result.current.submit(REQUEST);
-    });
-    writeMock.mockClear();
-    writeMock.mockResolvedValue(HASH_2);
-
-    await act(async () => {
-      result.current.resubmit();
-    });
-    expect(writeMock).toHaveBeenCalledTimes(1);
-    expect(result.current.pendingHash).toBe(HASH_2);
-  });
-});
-
-describe('useTransferTransaction 重试绑定原哈希与原 nonce（R2）', () => {
-  it('replaces a still-queued transfer at its ORIGINAL nonce, not the pool’s next one', async () => {
-    writeMock.mockResolvedValue(HASH_2);
-    const { result } = renderHook(() => useTransferTransaction(() => {}));
-
-    await act(async () => {
-      await result.current.submit(REQUEST);
-    });
-    // 原交易还在池里 nonce 7；池里前面还排着别的交易（pending 9）。
-    snapshotMock.mockResolvedValue({
-      receiptStatus: null,
-      txNonce: 7,
-      latestNonce: 6,
-      pendingNonce: 9,
-    });
-    writeMock.mockClear();
-
-    await act(async () => {
-      result.current.resubmit();
-    });
-
-    expect(writeMock).toHaveBeenCalledTimes(1);
-    expect(writeMock).toHaveBeenLastCalledWith(expect.objectContaining({ nonce: 7 }));
-  });
-
-  it('does not send when the original transfer confirmed while the re-check ran (only 1 send)', async () => {
-    writeMock.mockResolvedValue(HASH_2);
-    const { result } = renderHook(() => useTransferTransaction(() => {}));
-
-    await act(async () => {
-      await result.current.submit(REQUEST);
-    });
-    expect(writeMock).toHaveBeenCalledTimes(1);
-
-    // 复核读到回执：原交易已成交，重试绝不能发第二笔。
-    snapshotMock.mockResolvedValue({
-      receiptStatus: 'success',
-      txNonce: 7,
-      latestNonce: 7,
-      pendingNonce: 7,
-    });
-    writeMock.mockClear();
-    await act(async () => {
-      result.current.resubmit();
-    });
-
-    expect(writeMock).not.toHaveBeenCalled();
-    expect(refreshSpy).toHaveBeenCalled();
-  });
-
-  it('does not send when another transaction took the nonce (replaced)', async () => {
-    // R5 pins the original nonce at submit time, which is what lets the re-check
-    // recognise 「这笔 nonce 已经被别人吃掉」 instead of re-sending blind.
-    pendingNonceMock.mockResolvedValue(7);
-    writeMock.mockResolvedValue(HASH_2);
-    const { result } = renderHook(() => useTransferTransaction(() => {}));
-
-    await act(async () => {
-      await result.current.submit(REQUEST);
-    });
-    snapshotMock.mockResolvedValue({
-      receiptStatus: null,
-      txNonce: null,
-      latestNonce: 9,
-      pendingNonce: 9,
-    });
-    writeMock.mockClear();
-
-    await act(async () => {
-      result.current.resubmit();
-    });
-    expect(writeMock).not.toHaveBeenCalled();
-  });
-
-  it('never signs blind when the re-check reads fail', async () => {
-    writeMock.mockResolvedValue(HASH_2);
-    const { result } = renderHook(() => useTransferTransaction(() => {}));
-
-    await act(async () => {
-      await result.current.submit(REQUEST);
-    });
-    snapshotMock.mockResolvedValue({
-      receiptStatus: undefined,
-      txNonce: undefined,
-      latestNonce: undefined,
-      pendingNonce: undefined,
-    });
-    writeMock.mockClear();
-
-    await act(async () => {
-      result.current.resubmit();
-    });
-    expect(writeMock).not.toHaveBeenCalled();
-    expect(result.current.error?.message).toBe(copy.txWatch.nonceUnavailable);
-  });
-
-  it('re-sends a dropped transfer at the pool nonce (heal)', async () => {
-    pendingNonceMock.mockResolvedValue(8);
-    writeMock.mockResolvedValue(HASH_2);
-    const { result } = renderHook(() => useTransferTransaction(() => {}));
-
-    await act(async () => {
-      await result.current.submit(REQUEST);
-    });
-    snapshotMock.mockResolvedValue({
-      receiptStatus: null,
-      txNonce: null,
-      latestNonce: 8,
-      pendingNonce: 8,
-    });
-    writeMock.mockClear();
-    writeMock.mockResolvedValue(HASH_2);
-
-    await act(async () => {
-      result.current.resubmit();
-    });
-    expect(writeMock).toHaveBeenCalledTimes(1);
-    expect(writeMock).toHaveBeenLastCalledWith(expect.objectContaining({ nonce: 8 }));
   });
 });
 

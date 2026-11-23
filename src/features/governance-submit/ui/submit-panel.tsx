@@ -6,7 +6,7 @@ import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Sheet } from '@/shared/ui/sheet';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import type { SubmitContext } from '@/entities/gov-core/model/use-submit-context';
 import {
   EMPTY_SUBMIT_DRAFT,
@@ -236,7 +236,7 @@ export function SubmitPanel({
         </>
       )}
 
-      <TxWatchCard watch={write.watch} onResubmit={write.resubmit} />
+      <TxStuckHint watch={write.watch} />
 
       <Sheet
         open={write.receipt !== null}

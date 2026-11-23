@@ -98,14 +98,14 @@ export function describeBatchError(cause: unknown, context: BatchErrorContext): 
 
   const recovery = txSendRecoveryKind(cause);
   if (recovery === 'nonce') {
-    return { message: copy.txWatch.bodies.nonceGap, kind: 'nonce' };
+    return { message: copy.txWatch.nonceGap, kind: 'nonce' };
   }
   if (recovery === 'staleBlock') {
     return { message: copy.txWatch.staleBlock, kind: 'staleBlock' };
   }
   // Defensive: the shared helpers and the family recovery must agree.
   if (isTxSendNonceError(cause)) {
-    return { message: copy.txWatch.bodies.nonceGap, kind: 'nonce' };
+    return { message: copy.txWatch.nonceGap, kind: 'nonce' };
   }
   if (isTxStaleBlockError(cause)) {
     return { message: copy.txWatch.staleBlock, kind: 'staleBlock' };

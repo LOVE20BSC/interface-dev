@@ -82,7 +82,6 @@ const { catalogState, balanceState, txState, codesState, balancesState } = vi.ho
       },
       approve: async () => {},
       submit: async () => {},
-      resubmit: () => {},
       clearError: () => {},
     },
   },
@@ -170,7 +169,6 @@ beforeEach(() => {
     watch: { hash: null, status: 'idle', isStuck: false, remainingSeconds: 0, refresh: () => {} },
     approve: async () => {},
     submit: async () => {},
-    resubmit: () => {},
     clearError: () => {},
   };
 });

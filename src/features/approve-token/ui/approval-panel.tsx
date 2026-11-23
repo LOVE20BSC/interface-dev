@@ -13,7 +13,7 @@ import { shouldShowPrecision } from '@/shared/lib/token-precision';
 import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shared/ui/token-picker';
-import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import { useTransferBalance } from '@/features/transfer-token/model/use-transfer-balance';
 import { useTransferCatalog } from '@/features/transfer-token/model/use-transfer-catalog';
 import { transferTokenKey, type TransferToken } from '@/features/transfer-token/lib/transfer-types';
@@ -789,7 +789,7 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
         </Card>
       )}
 
-      {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
+      {tx.watch.hash !== null ? <TxStuckHint watch={tx.watch} /> : null}
 
       {tx.error !== null ? (
         <div
@@ -798,17 +798,6 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
           className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
         >
           <p>{tx.error.message}</p>
-          {tx.error.kind === 'nonce' ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-2"
-              onClick={tx.resubmit}
-              leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
-            >
-              {copy.txWatch.actions.resubmit}
-            </Button>
-          ) : null}
         </div>
       ) : null}
 

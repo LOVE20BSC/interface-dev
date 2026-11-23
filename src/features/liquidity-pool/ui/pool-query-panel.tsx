@@ -210,7 +210,7 @@ export function PoolQueryPanel({
   const submitLabel = queryLoading
     ? copy.liquidity.query.submitting
     : submitted !== undefined && trimmed.toLowerCase() === submitted.toLowerCase()
-      ? copy.liquidity.query.resubmit
+      ? copy.liquidity.query.refresh
       : copy.liquidity.query.submit;
 
   const runQuery = () => {

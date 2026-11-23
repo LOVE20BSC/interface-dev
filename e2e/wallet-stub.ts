@@ -50,7 +50,7 @@ export function identityCacheKey(account: string): string {
 
 /**
  * A slow / out-of-sync wallet (owner 2026-11-14: the first 兑换 after a refresh
- * sat in the wallet as 「卡在钱包里」 until 「重新提交」).
+ * sat in the wallet as 「卡在钱包里」).
  *
  * A real wallet answers the user's confirmation after 3–8 s and picks the nonce
  * from its own (possibly stale) tracker; the injected stub normally answers in
@@ -69,7 +69,7 @@ export interface WalletStubOptions {
   /**
    * Ignore a dapp-pinned nonce on the FIRST send only — reproduces the pre-fix
    * delegation exactly (the wallet owned the nonce). Later sends honour the
-   * pinned nonce, exactly like MetaMask does when 「重新提交」 carries one.
+   * pinned nonce, exactly like MetaMask does when a re-send carries one.
    */
   readonly ignorePinnedNonce?: boolean | undefined;
 }

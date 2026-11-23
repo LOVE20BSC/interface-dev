@@ -5,12 +5,7 @@ import { airdropDistributorAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 import type { AirdropSnapshotEntry } from '@/domain/airdrop-snapshot';
 import { copy } from '@/shared/config/copy-pages';
-import {
-  useNextNonce,
-  usePendingNonce,
-  useTxWatch,
-  type TxWatch,
-} from '@/shared/model/use-tx-watch';
+import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
 import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 import { describeAirdropClaimError } from '@/features/claim-airdrop/lib/airdrop-errors';
 import {
@@ -35,8 +30,6 @@ export interface AirdropClaimTransactionState {
   readonly isHydrating: boolean;
   /** Bounded wait for the submitted hash; `isStuck` frees the CTA + shows recovery. */
   readonly watch: TxWatch;
-  /** Re-sends the claim with an explicitly correct nonce (recovery card). */
-  readonly resubmit: () => void;
   readonly claim: () => void;
   readonly clearError: () => void;
 }
@@ -83,7 +76,6 @@ export function useAirdropClaimTransaction(
   const { address: account } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
-  const readNextNonce = useNextNonce(account);
   const readPendingNonce = usePendingNonce(account);
 
   const [pending, setPending] = useState<PendingClaim | null>(null);
@@ -215,8 +207,7 @@ export function useAirdropClaimTransaction(
   ]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  /** One place for the claim write, so 「重新提交」 reuses the exact same call. */
-  const submitClaim = async (nonce?: number): Promise<void> => {
+  const submitClaim = async (): Promise<void> => {
     if (submittingRef.current) return;
     if (airdropAddress === undefined || tokenAddress === undefined || account === undefined) return;
     if (entry === null) return;
@@ -226,7 +217,7 @@ export function useAirdropClaimTransaction(
     submittingRef.current = true;
     try {
       // R5: a new claim queues behind whatever the wallet already broadcast.
-      const sendNonce = nonce ?? (await readPendingNonce());
+      const sendNonce = await readPendingNonce();
       const hash = await writeContractAsync({
         address: airdropAddress,
         abi: airdropDistributorAbi,
@@ -251,30 +242,14 @@ export function useAirdropClaimTransaction(
 
   const claim = (): void => {
     if (submittingRef.current || receipt !== null) return;
-    if (pending !== null && !watch.isStuck) return;
+    if (pending !== null) return;
     void submitClaim();
-  };
-
-  /**
-   * Recovery action for a stuck hash: re-send the same claim with the on-chain
-   * nonce, so a wallet that cached a stale nonce heals the gap itself.
-   */
-  const resubmit = (): void => {
-    void (async () => {
-      const nonce = await readNextNonce();
-      if (nonce === undefined) {
-        setError(copy.txWatch.nonceUnavailable);
-        setErrorKind(null);
-        return;
-      }
-      await submitClaim(nonce);
-    })();
   };
 
   // A stuck hash frees the CTA; the recovery card owns the manual actions.
   const stage: AirdropClaimTxStage = walletAction
     ? 'wallet'
-    : pending !== null && !watch.isStuck
+    : pending !== null
       ? 'pending'
       : 'idle';
 
@@ -286,7 +261,6 @@ export function useAirdropClaimTransaction(
     errorKind,
     isHydrating,
     watch,
-    resubmit,
     claim,
     clearError: () => {
       setError(null);

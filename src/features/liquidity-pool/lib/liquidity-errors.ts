@@ -20,7 +20,7 @@ export interface LiquidityErrorContext {
  */
 export function describeLiquidityError(cause: unknown, context: LiquidityErrorContext): string {
   if (isUserRejection(cause)) return copy.liquidity.errors.rejected;
-  if (isTxSendNonceError(cause)) return copy.txWatch.bodies.nonceGap;
+  if (isTxSendNonceError(cause)) return copy.txWatch.nonceGap;
   if (isTxStaleBlockError(cause)) return copy.txWatch.staleBlock;
 
   const message = messageChain(cause);

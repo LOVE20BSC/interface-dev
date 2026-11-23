@@ -16,7 +16,7 @@ const STAKE = '0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e' as const;
 const TOKEN = '0x8aCd85898458400f7Db866d53FCFF6f0D49741FF' as const;
 
 /**
- * 持久化记录是「刷新后重新提交同一笔」的唯一依据：读回来必须能重建**完全相同**的
+ * 持久化记录是「刷新后恢复有 hash 的在途交易」的唯一依据：读回来必须能重建**完全相同**的
  * 调用（含 bigint 金额），并且手改过的记录必须被拒绝，不能变成可签名的请求。
  */
 describe('stake-record', () => {
@@ -86,25 +86,17 @@ describe('stake-record', () => {
     cache.remove(scope, STAKE_TASK_CACHE_KEY);
   });
 
-  it('treats a hash-less attempt as a retryable request (no hash yet)', () => {
+  it('rejects a legacy hash-less record (no retry state after T004)', () => {
     const scope = createStakeScope(CHAIN_ID, WALLET);
-    writeStoredStakeCall(scope, {
+    cache.set(scope, STAKE_TASK_CACHE_KEY, {
       hash: null,
       chainId: CHAIN_ID,
       account: WALLET,
-      call: {
-        address: STAKE,
-        abi: stakeAbi,
-        functionName: 'unstake',
-        args: [TOKEN, 5n],
-      },
+      call: { address: STAKE, functionName: 'unstake', args: [TOKEN, { __bigint: '5' }] },
       action: 'unstake',
-      nonce: undefined,
       recordedAt: 1_700_000_000_000,
     });
-    const stored = readStoredStakeCall(scope);
-    expect(stored?.hash).toBeNull();
-    expect(stored?.nonce).toBeUndefined();
+    expect(readStoredStakeCall(scope)).toBeNull();
     clearStoredStakeCall(scope);
   });
 });

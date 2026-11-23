@@ -1,7 +1,6 @@
 import { parseEventLogs, type TransactionReceipt } from 'viem';
 import { submitAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
-import { copy } from '@/shared/config/copy-pages';
 import { toUserMessage } from '@/shared/lib/errors';
 import { useContractWrite, type ContractCall } from '@/shared/model/use-contract-write';
 import type { ProposalBodyInput } from '../lib/submit-form';
@@ -48,7 +47,6 @@ export interface SubmitWrite {
   readonly watch: ReturnType<typeof useContractWrite>['watch'];
   readonly receipt: SubmitReceipt | null;
   readonly submit: (input: SubmitInput) => void;
-  readonly resubmit: () => void;
   /** 关掉回执面板：清哈希与错误，允许下一笔。 */
   readonly closeReceipt: () => void;
 }
@@ -66,7 +64,6 @@ export function useSubmitWrite(
     {
       wallet: messages.waitingWallet,
       reverted: messages.revert,
-      ownerChanged: copy.gov.tx.ownerChanged,
     },
     toUserMessage,
     onConfirmed,
@@ -96,7 +93,6 @@ export function useSubmitWrite(
     watch: write.watch,
     receipt,
     submit,
-    resubmit: write.resubmit,
     closeReceipt: () => write.reset(),
   };
 }

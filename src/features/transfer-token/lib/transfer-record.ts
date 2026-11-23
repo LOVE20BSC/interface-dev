@@ -22,7 +22,7 @@ export type HexHash = `0x${string}`;
  * `chainId` / `account` / `nonce` are stored *inside* the record as well (R2/R3):
  * the scope already namespaces the entry, but a record that is read through the
  * wrong scope (or was written by an older build) must still be rejected instead
- * of signed by whichever wallet happens to be connected now — and a 「重新提交」
+ * of signed by whichever wallet happens to be connected now — and a restored
  * after a refresh must know the original nonce so it replaces that transaction
  * rather than sending a second one.
  */

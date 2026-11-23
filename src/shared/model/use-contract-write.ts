@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Abi } from 'viem';
 import { useAccount, useChainId, useWriteContract } from 'wagmi';
 import type { HexAddress } from '@/config/networks';
-import { isSameTxOwner, type TxOwner } from '@/shared/lib/tx-owner';
+import type { TxOwner } from '@/shared/lib/tx-owner';
 import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
 
 /**
@@ -17,11 +17,9 @@ import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx
  *
  * 语义与质押域一致（owner 2026-11-16 R1–R7 的可见行为）：
  * - 发交易前先读 `pending` nonce 并显式传入，避免钱包缓存旧 nonce 让交易卡死；
- * - 「重新提交」先确认钱包/网络没换（换了就中性提示、绝不代签），有哈希就用**同一笔的
- *   nonce** 替换，没有哈希就是普通重试。
  *
  * 已知缺口（如实记录，别当成已实现）：在途请求**没有**落缓存，刷新页面不会自动恢复并
- * 后台继续 watch；恢复靠 `useTxWatch` 的「慢/掉队/被替换/nonce 缺口」卡与「重新提交」。
+ * 后台继续 watch；卡住时只显示纯提示，不再重发。
  */
 
 export interface ContractCall {
@@ -38,8 +36,6 @@ export interface ContractWriteMessages {
   readonly wallet: string;
   /** 交易上链但合约拒绝时的提示。 */
   readonly reverted: string;
-  /** 重新提交时发现钱包/网络已切换。 */
-  readonly ownerChanged: string;
 }
 
 export interface ContractWrite {
@@ -48,16 +44,9 @@ export interface ContractWrite {
   readonly hash: `0x${string}` | null;
   readonly watch: TxWatch;
   readonly run: (call: ContractCall) => Promise<void>;
-  readonly resubmit: () => void;
   readonly clearError: () => void;
   /** 回执被页面消费（关掉面板）后调用：清哈希、清错误，允许下一笔。 */
   readonly reset: () => void;
-}
-
-interface Attempt extends TxOwner {
-  readonly call: ContractCall;
-  readonly hash: `0x${string}` | undefined;
-  readonly nonce: number | undefined;
 }
 
 export function useContractWrite(
@@ -77,7 +66,6 @@ export function useContractWrite(
     readonly owner: TxOwner;
   } | null>(null);
   const submittingRef = useRef(false);
-  const lastAttemptRef = useRef<Attempt | null>(null);
 
   const watch = useTxWatch({ hash: pending?.hash ?? null, wallet: account });
   const settledReceipt = watch.receipt;
@@ -99,8 +87,6 @@ export function useContractWrite(
 
   const run = async (call: ContractCall): Promise<void> => {
     if (account === undefined || submittingRef.current) return;
-    const attempt: Attempt = { chainId, account, call, hash: undefined, nonce: undefined };
-    lastAttemptRef.current = attempt;
     setExplicitError(null);
     setWalletOpen(true);
     submittingRef.current = true;
@@ -113,7 +99,6 @@ export function useContractWrite(
         args: call.args,
         ...(nonce !== undefined ? { nonce } : {}),
       });
-      lastAttemptRef.current = { ...attempt, hash, nonce: nonce ?? undefined };
       setPending({ hash, owner: { chainId, account } });
     } catch (cause) {
       setExplicitError(translate(cause));
@@ -123,48 +108,12 @@ export function useContractWrite(
     }
   };
 
-  const resubmit = (): void => {
-    void (async () => {
-      if (submittingRef.current) return;
-      const attempt = lastAttemptRef.current;
-      if (attempt === null) return;
-      if (account === undefined || !isSameTxOwner(attempt, { chainId, account })) {
-        lastAttemptRef.current = null;
-        setPending(null);
-        setExplicitError(messages.ownerChanged);
-        return;
-      }
-      setExplicitError(null);
-      setWalletOpen(true);
-      submittingRef.current = true;
-      try {
-        // 已知哈希时用它自己的 nonce 替换；还没有哈希就是同一笔请求的普通重试。
-        const nonce = attempt.nonce ?? (await readPendingNonce());
-        const hash = await writeContractAsync({
-          address: attempt.call.address,
-          abi: attempt.call.abi,
-          functionName: attempt.call.functionName,
-          args: attempt.call.args,
-          ...(nonce !== undefined ? { nonce } : {}),
-        });
-        lastAttemptRef.current = { ...attempt, hash, nonce: nonce ?? undefined };
-        setPending({ hash, owner: { chainId, account } });
-      } catch (cause) {
-        setExplicitError(translate(cause));
-      } finally {
-        setWalletOpen(false);
-        submittingRef.current = false;
-      }
-    })();
-  };
-
   const clearError = (): void => setExplicitError(null);
   const reset = (): void => {
     setExplicitError(null);
     setPending(null);
     setWalletOpen(false);
-    lastAttemptRef.current = null;
   };
 
-  return { stage, error, hash: pending?.hash ?? null, watch, run, resubmit, clearError, reset };
+  return { stage, error, hash: pending?.hash ?? null, watch, run, clearError, reset };
 }

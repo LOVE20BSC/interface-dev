@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { voteAbi } from '@/config/abis';
-import { copy } from '@/shared/config/copy-pages';
 import { toUserMessage } from '@/shared/lib/errors';
 import { useContractWrite, type ContractCall } from '@/shared/model/use-contract-write';
 import { parseVoteReceipt, type VoteReceiptLine } from '../lib/vote-receipt';
@@ -23,7 +22,6 @@ export interface VoteWrite {
   readonly watch: ReturnType<typeof useContractWrite>['watch'];
   readonly receipt: readonly VoteReceiptLine[] | null;
   readonly submit: (input: VoteInput) => void;
-  readonly resubmit: () => void;
   readonly closeReceipt: () => void;
 }
 
@@ -38,7 +36,6 @@ export function useVoteWrite(messages: VoteWriteMessages, onConfirmed: () => voi
     {
       wallet: messages.waitingWallet,
       reverted: messages.revert,
-      ownerChanged: copy.gov.tx.ownerChanged,
     },
     toUserMessage,
     onConfirmed,
@@ -66,7 +63,6 @@ export function useVoteWrite(messages: VoteWriteMessages, onConfirmed: () => voi
     watch: write.watch,
     receipt,
     submit,
-    resubmit: write.resubmit,
     closeReceipt: () => write.reset(),
   };
 }

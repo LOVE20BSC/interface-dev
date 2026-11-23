@@ -15,7 +15,7 @@ import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { Sheet } from '@/shared/ui/sheet';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import type { ProposalDetail } from '@/entities/gov-core/model/use-proposal-detail';
 import type { VotePower } from '@/entities/gov-core/model/use-vote-power';
 import { parseVoteAmount } from '../lib/vote-form';
@@ -225,7 +225,7 @@ export function VoteDetailPanel({
         </Card>
       )}
 
-      <TxWatchCard watch={write.watch} onResubmit={write.resubmit} />
+      <TxStuckHint watch={write.watch} />
 
       {/* 1~3. 提案信息：编号 + 标题 + 内容 / 目标地址 + 创建人 + 本轮推举人 / 得票 + 两个占比 */}
       <ProposalInfoCard detail={detail} roundLabel={roundLabel} />

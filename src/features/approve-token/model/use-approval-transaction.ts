@@ -11,12 +11,7 @@ import type {
   ApprovalRequest,
   ApprovalTxError,
 } from '@/features/approve-token/lib/approval-types';
-import {
-  useNextNonce,
-  usePendingNonce,
-  useTxWatch,
-  type TxWatch,
-} from '@/shared/model/use-tx-watch';
+import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
 import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 
 export type ApprovalStage = 'idle' | 'wallet' | 'pending';
@@ -30,7 +25,6 @@ export interface ApprovalTransactionState {
   readonly watch: TxWatch;
   /** Resolves true when the wallet returned a hash (the sheet may close). */
   readonly submit: (request: ApprovalRequest) => Promise<boolean>;
-  readonly resubmit: () => void;
   readonly clearRecord: () => void;
   readonly clearError: () => void;
 }
@@ -49,7 +43,6 @@ interface PendingApproval {
 export function useApprovalTransaction(onConfirmed: () => void): ApprovalTransactionState {
   const { address: account } = useAccount();
   const { writeContractAsync } = useWriteContract();
-  const readNextNonce = useNextNonce(account);
   const readPendingNonce = usePendingNonce(account);
 
   const [pending, setPending] = useState<PendingApproval | null>(null);
@@ -57,7 +50,6 @@ export function useApprovalTransaction(onConfirmed: () => void): ApprovalTransac
   const [isWalletAction, setIsWalletAction] = useState(false);
   const [error, setError] = useState<ApprovalTxError | null>(null);
   const submittingRef = useRef(false);
-  const lastAttemptRef = useRef<ApprovalRequest | null>(null);
 
   const onConfirmedRef = useRef(onConfirmed);
   useEffect(() => {
@@ -107,7 +99,7 @@ export function useApprovalTransaction(onConfirmed: () => void): ApprovalTransac
     });
   };
 
-  const submitInternal = async (request: ApprovalRequest, nonce?: number): Promise<boolean> => {
+  const submitInternal = async (request: ApprovalRequest): Promise<boolean> => {
     if (submittingRef.current) return false;
     if (account === undefined) return false;
     setError(null);
@@ -115,7 +107,7 @@ export function useApprovalTransaction(onConfirmed: () => void): ApprovalTransac
     submittingRef.current = true;
     try {
       // R5: a new approval queues behind whatever the wallet already broadcast.
-      const sendNonce = nonce ?? (await readPendingNonce());
+      const sendNonce = await readPendingNonce();
       const hash = await send(request, sendNonce);
       setPending({ hash, request });
       return true;
@@ -136,28 +128,10 @@ export function useApprovalTransaction(onConfirmed: () => void): ApprovalTransac
 
   const submit = async (request: ApprovalRequest): Promise<boolean> => {
     if (submittingRef.current || pending !== null) return false;
-    lastAttemptRef.current = request;
     return submitInternal(request);
   };
 
-  const resubmit = (): void => {
-    void (async () => {
-      const request = pending?.request ?? lastAttemptRef.current;
-      if (request === null || request === undefined) return;
-      const nonce = await readNextNonce();
-      if (nonce === undefined) {
-        setError({ message: copy.txWatch.nonceUnavailable });
-        return;
-      }
-      await submitInternal(request, nonce);
-    })();
-  };
-
-  const stage: ApprovalStage = isWalletAction
-    ? 'wallet'
-    : pending !== null && !watch.isStuck
-      ? 'pending'
-      : 'idle';
+  const stage: ApprovalStage = isWalletAction ? 'wallet' : pending !== null ? 'pending' : 'idle';
 
   return {
     stage,
@@ -165,7 +139,6 @@ export function useApprovalTransaction(onConfirmed: () => void): ApprovalTransac
     error,
     watch,
     submit,
-    resubmit,
     clearRecord: () => {
       setRecord(null);
       setPending(null);

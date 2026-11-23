@@ -478,36 +478,23 @@ export const copy = {
   },
   /**
    * 交易确认的有界等待 (UX spec §4.2 / §4.4). Shared by all three write flows so a
-   * pending transaction can never become a dead end: inside the deadline the
-   * page offers 「重新查询」, after it the role="alert" card explains what happened
-   * and offers 「重新提交」 plus the wallet-activity cure for a nonce gap.
+   * pending transaction can never become a dead end: inside the deadline it shows
+   * the hash; after it a pure hint explains where to look and auto-updates.
    * No gas/approve/allowance/nonce/revert words and never raw hex or RPC errors.
    */
   txWatch: {
     pending: {
       submitted: '交易已经提交，等待上链。',
-      remaining: (seconds: string) => `再等约 ${seconds} 秒仍没有结果的话，可以重新提交一笔。`,
-      refresh: '重新查询',
+      remaining: (seconds: string) => `再等约 ${seconds} 秒。`,
     },
-    titles: {
-      slow: '这笔交易还没有被确认',
-      dropped: '这笔交易还没有被确认',
-      replaced: '这笔交易已经被替换或取消',
-      nonceGap: '这笔交易还卡在钱包里',
+    /** Pure stuck hint (T004): no actions; auto-updates when the transaction settles. */
+    stuck: {
+      title: '这笔交易还没有确认',
+      body: '请在钱包或区块浏览器里查看。确认或失败后，这里会自动更新。',
     },
-    bodies: {
-      slow: '一直没有上链，网络可能比较拥堵。',
-      dropped: '没有找到这笔交易，它可能已经丢失。',
-      replaced: '同一个交易位置已经由另一笔交易完成，这一笔不会再上链。以钱包里的最新记录为准。',
-      nonceGap:
-        '这笔交易卡在钱包里，暂时不会完成。如果一直没有反应，请在钱包里清除活动记录，或先处理未完成的交易。',
-    },
-    actions: {
-      refresh: '重新查询',
-      resubmit: '重新提交',
-      reload: '刷新',
-      explorer: '在区块浏览器查看',
-    },
+    /** Send-error sentence for nonce mismatch; never rendered as the stuck card. */
+    nonceGap:
+      '这笔交易卡在钱包里，暂时不会完成。如果一直没有反应，请在钱包里清除活动记录，或先处理未完成的交易。',
     staleBlock: '钱包和当前网络对不上，刷新页面或重新连接钱包后再试。',
     nonceUnavailable: '暂时读不到网络状态，请稍后再试。',
     /** R3: an unfinished task belongs to another wallet/chain; it is never signed here. */
@@ -698,7 +685,7 @@ export const copy = {
     stripAmount: (amount: string) => `已转出 ${amount}`,
     /** The CTA explanation while a submitted transfer is still in flight (D1/D2). */
     pendingNote: '这笔转账还在确认中，确认后可以再转下一笔。',
-    pendingStuckNote: '上面这笔还没有结果，请先用上面的「重新提交」或「重新查询」处理。',
+    pendingStuckNote: '上面这笔还没有结果，请稍后在钱包或区块浏览器里查看。',
     /** The CTA explanation while the balance could not be read (D3). */
     balanceUnreadableNote: '余额暂时读不到，稍后重试。',
     balanceRetry: '重新读取余额',
@@ -1339,7 +1326,7 @@ export const copy = {
       addressPlaceholder: '请输入要查询的地址 (0x...)',
       addressInvalid: '这不是一个有效的地址，需要 0x 开头的 40 位地址。',
       submit: '查询',
-      resubmit: '重新查询',
+      refresh: '重新查询',
       submitting: '查询中…',
       reset: '重置',
       disconnectedHint: '⚠️ 未连接钱包，请手动输入要查询的地址',

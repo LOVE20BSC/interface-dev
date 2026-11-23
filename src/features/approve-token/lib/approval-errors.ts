@@ -22,7 +22,7 @@ function messageChain(value: unknown, depth = 0): string {
  */
 export function describeApprovalError(cause: unknown, context: ApprovalErrorContext): string {
   if (isUserRejection(cause)) return copy.approvals.errors.rejected;
-  if (isTxSendNonceError(cause)) return copy.txWatch.bodies.nonceGap;
+  if (isTxSendNonceError(cause)) return copy.txWatch.nonceGap;
   if (isTxStaleBlockError(cause)) return copy.txWatch.staleBlock;
 
   const message = messageChain(cause);

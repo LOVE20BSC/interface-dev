@@ -15,7 +15,7 @@ import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { ActionStack } from '@/shared/ui/action-stack';
-import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
 import { useAirdropEligibility } from '@/entities/airdrop/model/use-airdrop-eligibility';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
@@ -94,9 +94,7 @@ export function MintIdentityPanel({
   const community = useCommunityContext();
   const [name, setName] = useState('');
   const [preflightError, setPreflightError] = useState<string | null>(null);
-  // A stale wallet chain view can also break the eth_call preflight; the card
-  // then needs the same 「刷新」 action as a send-time stale-block failure.
-  const [preflightStaleBlock, setPreflightStaleBlock] = useState(false);
+  const [, setPreflightStaleBlock] = useState(false);
   const identity = useMemberIdentity();
   /**
    * 点「铸造身份 NFT」那一刻钱包里有没有身份：用于决定回执里要不要给
@@ -368,21 +366,6 @@ export function MintIdentityPanel({
         : copy.mintIdentity.ladder.mint;
 
   const errorMessage = preflightError ?? tx.error?.message ?? null;
-  const recoveryKind =
-    tx.error?.kind ?? (preflightStaleBlock ? ('staleBlock' as const) : undefined);
-  const recoveryAction =
-    recoveryKind === 'nonce'
-      ? { run: tx.resubmit, label: copy.txWatch.actions.resubmit }
-      : recoveryKind === 'staleBlock'
-        ? { run: () => window.location.reload(), label: copy.txWatch.actions.reload }
-        : null;
-  const retryFailedWrite = () => {
-    if (tx.error?.action === 'approve' && approveAmount !== undefined) {
-      tx.approve(approveAmount);
-      return;
-    }
-    void handleMint();
-  };
 
   return (
     <div className="space-y-4">
@@ -546,7 +529,7 @@ export function MintIdentityPanel({
           </>
         )}
 
-        {tx.watch.hash !== null ? <TxWatchCard watch={tx.watch} onResubmit={tx.resubmit} /> : null}
+        {tx.watch.hash !== null ? <TxStuckHint watch={tx.watch} /> : null}
 
         {errorMessage !== null ? (
           <div
@@ -554,19 +537,6 @@ export function MintIdentityPanel({
             className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
           >
             <p>{errorMessage}</p>
-            {recoveryAction !== null ||
-            (tx.error !== null &&
-              (tx.error.action === 'approve' ? isNameReady : canAttemptMint)) ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                className="mt-2"
-                onClick={recoveryAction !== null ? recoveryAction.run : retryFailedWrite}
-                leadingIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
-              >
-                {recoveryAction !== null ? recoveryAction.label : copy.mintIdentity.states.retry}
-              </Button>
-            ) : null}
           </div>
         ) : null}
       </section>

@@ -8,7 +8,7 @@ import { formatTokenAmount } from '@/shared/lib/format';
 import type { TxWatch } from '@/shared/model/use-tx-watch';
 import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
-import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import type { StakeStage } from '@/features/governance-stake/model/use-stake-transaction';
 
 /**
@@ -172,18 +172,10 @@ export interface StakeTxFeedbackProps {
   readonly error: string | null;
   readonly watch: TxWatch;
   readonly stage: StakeStage;
-  readonly onResubmit: () => void;
-  readonly resubmitDisabled: boolean;
 }
 
 /** 错误 / 钱包等待 / 在途 / 恢复卡：所有写操作共用的反馈区。 */
-export function StakeTxFeedback({
-  error,
-  watch,
-  stage,
-  onResubmit,
-  resubmitDisabled,
-}: StakeTxFeedbackProps) {
+export function StakeTxFeedback({ error, watch, stage }: StakeTxFeedbackProps) {
   return (
     <div className="space-y-3">
       {error !== null ? (
@@ -200,7 +192,7 @@ export function StakeTxFeedback({
           {copy.gov.tx.wallet}
         </p>
       ) : null}
-      <TxWatchCard watch={watch} onResubmit={onResubmit} resubmitDisabled={resubmitDisabled} />
+      <TxStuckHint watch={watch} />
     </div>
   );
 }

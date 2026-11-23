@@ -166,7 +166,7 @@ async function connect(page: Page): Promise<void> {
 
 test(
   HAS_SHORT_DEADLINE
-    ? '幽灵授权哈希在截止后给出恢复卡，主按钮重新可点'
+    ? '幽灵授权哈希在截止后给出纯提示卡，主按钮保持禁用'
     : 'tx-recovery: short deadline build required',
   async ({ page }) => {
     if (!HAS_SHORT_DEADLINE) {
@@ -205,25 +205,15 @@ test(
     // recovery alert explains it and the primary action is clickable again.
     const recovery = page.getByTestId('tx-watch-recovery');
     await expect(recovery).toBeVisible({ timeout: 30_000 });
-    await expect(recovery).toContainText('这笔交易还没有被确认');
-    await expect(recovery.getByRole('button', { name: '重新查询' })).toBeVisible();
-    await expect(recovery.getByRole('button', { name: '重新提交' })).toBeVisible();
-    await expect(approve).toBeEnabled({ timeout: 10_000 });
-    // No explorer link on anvil (the environment package has none).
-    await expect(recovery.getByRole('link', { name: '在区块浏览器查看' })).toHaveCount(0);
+    await expect(recovery).toContainText('这笔交易还没有确认');
+    await expect(recovery).toContainText('请在钱包或区块浏览器里查看');
+    // T004: pure hint only — no action button, no link.
+    await expect(recovery.getByRole('button')).toHaveCount(0);
+    await expect(recovery.getByRole('link')).toHaveCount(0);
+    // A ghost hash never settles; one write at a time means the CTA stays disabled.
+    await expect(approve).toBeDisabled();
 
-    // Screenshot the whole recovery card (its actions must not hide behind the
-    // fixed primary-action dock on a 390×844 phone).
     await recovery.evaluate((element) => element.scrollIntoView({ block: 'center' }));
     await shot(page, 'tx-recovery-card.png');
-
-    // 「重新提交」 sends a new (ghost) hash with an explicit on-chain nonce; the
-    // watcher restarts from pending instead of staying stuck on the old hash.
-    // (Only the mint hash is persisted across reloads by design; an approval is
-    // recovered from allowance(), so there is intentionally nothing to resume
-    // for the approve step documented here.)
-    await recovery.getByRole('button', { name: '重新提交' }).click();
-    await expect(page.getByTestId('tx-watch-pending')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('tx-watch-recovery')).toHaveCount(0);
   },
 );

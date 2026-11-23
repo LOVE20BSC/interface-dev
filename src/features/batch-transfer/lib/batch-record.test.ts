@@ -75,12 +75,9 @@ describe('batch-record 在途批量转账（R1/R3/R4）', () => {
     expect(stored?.nonce).toBeUndefined();
   });
 
-  it('keeps an attempt that never got a hash (R1 retry state)', () => {
-    writeStoredBatch(SCOPE, { ...PENDING, hash: null, nonce: undefined });
-    const stored = readStoredBatch(SCOPE);
-    expect(stored?.hash).toBeNull();
-    expect(stored?.kind).toBe('batch');
-    expect(stored?.request.rows).toHaveLength(2);
+  it('rejects a legacy hash-less record (no retry state after T004)', () => {
+    cache.set(SCOPE, BATCH_TASK_CACHE_KEY, { ...PENDING, hash: null, nonce: undefined });
+    expect(readStoredBatch(SCOPE)).toBeNull();
   });
 
   it('scopes the task by chain + wallet, never leaking across wallets (R3/R4)', () => {

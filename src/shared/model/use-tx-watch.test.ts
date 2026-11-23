@@ -11,13 +11,7 @@ import type { PublicClient } from 'viem';
 const wagmiMock = vi.hoisted(() => ({ client: undefined as unknown }));
 vi.mock('wagmi', () => ({ usePublicClient: () => wagmiMock.client }));
 
-import {
-  readResubmitSnapshot,
-  useNextNonce,
-  usePendingNonce,
-  useTxWatch,
-  type TxReadClient,
-} from './use-tx-watch';
+import { usePendingNonce, useTxWatch } from './use-tx-watch';
 
 const WALLET = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
 const HASH = `0x${'ab'.repeat(32)}` as const;
@@ -241,13 +235,6 @@ describe('useTxWatch', () => {
     await flush(10_000);
     expect(fake.calls.tx.mock.calls.length).toBe(callsBeforeUnmount);
   });
-
-  it('exposes the nonce the watched hash was observed with (R2 replacement target)', async () => {
-    const fake = makeClient({ tx: () => Promise.resolve({ nonce: 3, from: WALLET }) });
-    const { result } = renderWatch(fake);
-    await flush();
-    expect(result.current.submittedNonce).toBe(3);
-  });
 });
 
 describe('useTxWatch · replaced 判定（P2）', () => {
@@ -312,67 +299,5 @@ describe('nonce 读取函数（R5）', () => {
     // latest=3 but pending=4: a new operation must take 4, never 3.
     expect(nonce).toBe(4);
     expect(fake.calls.nonce).toHaveBeenCalledWith({ address: WALLET, blockTag: 'pending' });
-  });
-
-  it('keeps the legacy heal reader on `latest` so the swap recovery behaviour is unchanged', async () => {
-    const fake = makeClient({
-      nonce: (args) => Promise.resolve(args?.blockTag === 'pending' ? 4 : 3),
-    });
-    wagmiMock.client = fake.client;
-    const { result } = renderHook(() => useNextNonce(WALLET));
-    await flush();
-    const nonce = await act(async () => result.current());
-    expect(nonce).toBe(3);
-    expect(fake.calls.nonce).toHaveBeenCalledWith({ address: WALLET, blockTag: 'latest' });
-  });
-});
-
-describe('readResubmitSnapshot（R2 重试前复核）', () => {
-  const clientOf = (overrides: {
-    receipt?: () => Promise<unknown>;
-    tx?: () => Promise<unknown>;
-    nonce?: (args?: { blockTag?: string }) => Promise<number>;
-  }): TxReadClient => makeClient(overrides).client as unknown as TxReadClient;
-
-  it('keeps a failed read distinguishable from "not mined"', async () => {
-    const failed = await readResubmitSnapshot(
-      clientOf({
-        receipt: () => Promise.reject(new Error('rpc down')),
-        tx: () => Promise.reject(new Error('rpc down')),
-      }),
-      WALLET,
-      HASH,
-    );
-    expect(failed.receiptStatus).toBeUndefined();
-    expect(failed.txNonce).toBeUndefined();
-
-    const missing = await readResubmitSnapshot(clientOf({}), WALLET, HASH);
-    expect(missing.receiptStatus).toBeNull();
-    expect(missing.txNonce).toBeNull();
-
-    const mined = await readResubmitSnapshot(
-      clientOf({
-        receipt: () => Promise.resolve({ status: 'reverted' }),
-        tx: () => Promise.resolve({ nonce: 5 }),
-        nonce: () => Promise.resolve(6),
-      }),
-      WALLET,
-      HASH,
-    );
-    expect(mined).toEqual({
-      receiptStatus: 'reverted',
-      txNonce: 5,
-      latestNonce: 6,
-      pendingNonce: 6,
-    });
-  });
-
-  it('returns unreadable unknowns when there is no client or wallet', async () => {
-    expect(await readResubmitSnapshot(undefined, WALLET, HASH)).toEqual({
-      receiptStatus: undefined,
-      txNonce: undefined,
-      latestNonce: undefined,
-      pendingNonce: undefined,
-    });
   });
 });

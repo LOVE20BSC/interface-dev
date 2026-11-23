@@ -22,7 +22,7 @@ export interface SwapErrorContext {
 export function describeSwapError(cause: unknown, context: SwapErrorContext): string {
   if (isUserRejection(cause)) return copy.swap.errors.rejected;
   // A stale wallet nonce must never fall through to the generic retry copy.
-  if (isTxSendNonceError(cause)) return copy.txWatch.bodies.nonceGap;
+  if (isTxSendNonceError(cause)) return copy.txWatch.nonceGap;
   if (isTxStaleBlockError(cause)) return copy.txWatch.staleBlock;
 
   const message = messageChain(cause);

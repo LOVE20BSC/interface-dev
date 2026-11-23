@@ -115,7 +115,6 @@ const { pairState, catalogState, txState, quoteState, balanceState, routeState }
           remainingSeconds: 0,
           refresh: () => {},
         },
-        resubmit: () => {},
         approve: () => {},
         execute: async () => {},
         clearReceipt: () => {},

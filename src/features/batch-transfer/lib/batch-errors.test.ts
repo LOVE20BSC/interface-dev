@@ -79,7 +79,7 @@ describe('describeBatchError', () => {
     const result = describeBatchError(new Error('nonce too low'), CONTEXT);
 
     expect(result.kind).toBe('nonce');
-    expect(result.message).toBe(copy.txWatch.bodies.nonceGap);
+    expect(result.message).toBe(copy.txWatch.nonceGap);
   });
 
   it('never leaks an unknown library error to the user', () => {

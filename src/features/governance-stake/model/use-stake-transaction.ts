@@ -1,17 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAccount, useChainId, usePublicClient, useWriteContract } from 'wagmi';
+import { useAccount, useChainId, useWriteContract } from 'wagmi';
 import type { Abi } from 'viem';
 import { NETWORK, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { toUserMessage } from '@/shared/lib/errors';
 import { isSameTxOwner, type TxOwner } from '@/shared/lib/tx-owner';
-import { decideResubmit } from '@/shared/lib/tx-resubmit';
-import {
-  readResubmitSnapshot,
-  usePendingNonce,
-  useTxWatch,
-  type TxWatch,
-} from '@/shared/model/use-tx-watch';
+import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
 import {
   clearStoredStakeCall,
   createStakeScope,
@@ -26,16 +20,15 @@ import {
 
 /**
  * 治理·质押的写链状态机：可选的「授权」+ 主交易两步，两步都走共享的有界等待
- * （`useTxWatch`），钱包里卡住的交易不会变成死路，页面给出恢复卡与「重新提交」。
+ * （`useTxWatch`），钱包里卡住的交易不会变成死路，页面给出恢复卡。
  *
  * 页面把准备好的调用（地址 + ABI + 参数）交给 `run`，hook 只负责签名、等待、
  * 失败翻译与回执；数量与治理权都在页面/领域层算好，这里不重算。
  *
- * 恢复语义沿用仓库既有约定（owner 2026-11-16 R1–R7）：
- * - 打开钱包之前先落 attempt（含 `{chainId, account}`），取消/失败也能重发这一笔；
- * - `重新提交` 先读回执/交易/nonce 再决定：已成交就不发，仍排队就用**原 nonce** 替换；
+ * 恢复语义（owner 2026-11-23 移除交易重发）：
+ * - 只有拿到哈希之后才落记录；签名失败只报错，不保留请求、不重试；
  * - 钱包/网络切换后清记录 + 中性提示，绝不代签；
- * - 在途任务持久化在缓存里，刷新/切页后恢复并继续 watch。
+ * - 在途任务持久化在缓存里，刷新/切页后恢复并继续 watch 同一个哈希。
  */
 
 export type StakeStage = 'idle' | 'wallet' | 'pending';
@@ -66,10 +59,8 @@ export interface StakeTransactionState {
   readonly error: string | null;
   readonly watch: TxWatch;
   readonly approveWatch: TxWatch;
-  readonly isResubmitting: boolean;
   readonly approve: (request: StakeApproveRequest) => Promise<void>;
   readonly run: (call: StakeCall, action: StakeReceiptAction) => Promise<void>;
-  readonly resubmit: () => void;
   readonly clearReceipt: () => void;
   readonly clearError: () => void;
 }
@@ -95,17 +86,9 @@ interface PendingMain {
   readonly nonce: number | undefined;
 }
 
-interface MainAttempt extends TxOwner {
-  readonly call: StakeCall;
-  readonly action: StakeReceiptAction;
-  readonly hash: `0x${string}` | undefined;
-  readonly nonce: number | undefined;
-}
-
 export function useStakeTransaction(onConfirmed: () => void): StakeTransactionState {
   const { address: account } = useAccount();
   const chainId = useChainId();
-  const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const readPendingNonce = usePendingNonce(account);
 
@@ -117,10 +100,8 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
   const [approveTokenAddress, setApproveTokenAddress] = useState<HexAddress | undefined>();
   const [receipt, setReceipt] = useState<StakeReceipt | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isResubmitting, setIsResubmitting] = useState(false);
   const [isHydrating, setIsHydrating] = useState(true);
   const submittingRef = useRef(false);
-  const lastAttemptRef = useRef<MainAttempt | null>(null);
 
   const onConfirmedRef = useRef(onConfirmed);
   useEffect(() => {
@@ -141,9 +122,7 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
     setError(null);
     setApproveWalletAction(false);
     setMainWalletAction(false);
-    setIsResubmitting(false);
     submittingRef.current = false;
-    lastAttemptRef.current = null;
     setIsHydrating(true);
     if (scope === null || account === undefined) {
       setIsHydrating(false);
@@ -177,13 +156,8 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
         nonce: stored.nonce,
       });
     } else {
-      lastAttemptRef.current = {
-        ...owner,
-        call: stored.call,
-        action,
-        hash: undefined,
-        nonce: stored.nonce,
-      };
+      // 旧版本在发送前落下的无哈希记录：没有在途交易可恢复，直接丢掉。
+      clearStoredStakeCall(scope);
     }
     setIsHydrating(false);
   }, [account, chainId, scope]);
@@ -224,14 +198,12 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
     if (pendingMain === null || mainReceipt === null) return;
     if (mainReceipt.status === 'reverted') {
       if (scope !== null) clearStoredStakeCall(scope);
-      lastAttemptRef.current = null;
       setPendingMain(null);
       setError(copy.gov.tx.revert);
       onConfirmedRef.current();
       return;
     }
     if (scope !== null) clearStoredStakeCall(scope);
-    lastAttemptRef.current = null;
     setReceipt({
       action: pendingMain.action,
       hash: pendingMain.hash,
@@ -254,32 +226,26 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
       ...(nonce !== undefined ? { nonce } : {}),
     });
 
-  const persistAttempt = (attempt: MainAttempt): void => {
-    lastAttemptRef.current = attempt;
+  const sendMain = async (
+    owner: TxOwner,
+    call: StakeCall,
+    action: StakeReceiptAction,
+    nonce: number | undefined,
+  ): Promise<void> => {
+    const hash = await signCall(call, nonce);
+    // 只有拿到哈希之后才落记录：签名失败不保留任何可重发的请求。
     if (scope !== null) {
       writeStoredStakeCall(scope, {
-        hash: attempt.hash ?? null,
-        chainId: attempt.chainId,
-        account: attempt.account,
-        call: attempt.call,
-        action: attempt.action,
-        nonce: attempt.nonce,
+        hash,
+        chainId: owner.chainId,
+        account: owner.account,
+        call,
+        action,
+        nonce,
         recordedAt: Date.now(),
       });
     }
-  };
-
-  const signAttempt = async (attempt: MainAttempt, nonce: number | undefined): Promise<void> => {
-    const hash = await signCall(attempt.call, nonce);
-    const settledNonce = nonce ?? attempt.nonce;
-    persistAttempt({ ...attempt, hash, nonce: settledNonce });
-    setPendingMain({
-      hash,
-      owner: { chainId: attempt.chainId, account: attempt.account },
-      call: attempt.call,
-      action: attempt.action,
-      nonce: settledNonce,
-    });
+    setPendingMain({ hash, owner, call, action, nonce });
   };
 
   const approve = async (request: StakeApproveRequest): Promise<void> => {
@@ -310,22 +276,13 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
   const run = async (call: StakeCall, action: StakeReceiptAction): Promise<void> => {
     if (account === undefined || submittingRef.current || isHydrating) return;
     if (pendingMain !== null || receipt !== null) return;
-    const attempt: MainAttempt = {
-      chainId,
-      account,
-      call,
-      action,
-      hash: undefined,
-      nonce: undefined,
-    };
-    // 钱包打开之前就落下 attempt：取消/失败也能重发这一笔。
-    persistAttempt(attempt);
+    const owner: TxOwner = { chainId, account };
     setError(null);
     setMainWalletAction(true);
     submittingRef.current = true;
     try {
       const nonce = await readPendingNonce();
-      await signAttempt(attempt, nonce);
+      await sendMain(owner, call, action, nonce);
     } catch (cause) {
       setError(toUserMessage(cause));
     } finally {
@@ -334,114 +291,14 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
     }
   };
 
-  const currentAttempt = (): MainAttempt | null => {
-    if (pendingMain !== null) {
-      return {
-        ...pendingMain.owner,
-        call: pendingMain.call,
-        action: pendingMain.action,
-        hash: pendingMain.hash,
-        nonce: pendingMain.nonce,
-      };
-    }
-    return lastAttemptRef.current;
-  };
-
-  const resubmit = (): void => {
-    void (async () => {
-      if (submittingRef.current) return;
-      const attempt = currentAttempt();
-      if (attempt === null) return;
-      // 绝不代签别的钱包/别的链上的请求。
-      if (account === undefined || !isSameTxOwner(attempt, { chainId, account })) {
-        lastAttemptRef.current = null;
-        setPendingMain(null);
-        if (scope !== null) clearStoredStakeCall(scope);
-        setError(copy.gov.tx.ownerChanged);
-        return;
-      }
-      // 还没有哈希：钱包拒签/取消，这就是同一笔请求的普通重试。
-      if (attempt.hash === undefined) {
-        setError(null);
-        setMainWalletAction(true);
-        setIsResubmitting(true);
-        submittingRef.current = true;
-        try {
-          const nonce = await readPendingNonce();
-          await signAttempt(attempt, nonce);
-        } catch (cause) {
-          setError(toUserMessage(cause));
-        } finally {
-          setMainWalletAction(false);
-          setIsResubmitting(false);
-          submittingRef.current = false;
-        }
-        return;
-      }
-
-      const hash = attempt.hash;
-      setError(null);
-      setIsResubmitting(true);
-      setMainWalletAction(true);
-      submittingRef.current = true;
-      try {
-        // 读 nonce 期间原交易可能已经确认，所以先复核再决定发不发。
-        const snapshot = await readResubmitSnapshot(publicClient, account, hash);
-        const decision = decideResubmit(snapshot, attempt.nonce ?? watch.submittedNonce);
-        if (decision.action === 'settled') {
-          if (scope !== null) clearStoredStakeCall(scope);
-          lastAttemptRef.current = null;
-          if (decision.status === 'reverted') {
-            setPendingMain(null);
-            setError(copy.gov.tx.revert);
-            onConfirmedRef.current();
-            return;
-          }
-          setReceipt({
-            action: attempt.action,
-            hash,
-            detail: {
-              govVotesAdded: undefined,
-              liquiditySharesAdded: undefined,
-              boostAmount: undefined,
-              boostShares: undefined,
-              promisedWaitingPhases: undefined,
-              tokenAmount: undefined,
-              parentTokenAmount: undefined,
-            },
-            recordedAt: Date.now(),
-          });
-          setPendingMain(null);
-          onConfirmedRef.current();
-          return;
-        }
-        if (decision.action === 'replaced') {
-          watch.refresh();
-          return;
-        }
-        if (decision.action === 'unavailable') {
-          setError(copy.gov.tx.nonceUnavailable);
-          return;
-        }
-        await signAttempt({ ...attempt, nonce: decision.nonce }, decision.nonce);
-      } catch (cause) {
-        setError(toUserMessage(cause));
-      } finally {
-        setMainWalletAction(false);
-        setIsResubmitting(false);
-        submittingRef.current = false;
-      }
-    })();
-  };
-
   const mainStage: StakeStage = mainWalletAction
     ? 'wallet'
-    : pendingMain !== null && !watch.isStuck
+    : pendingMain !== null
       ? 'pending'
       : 'idle';
   const approveStage: StakeStage = approveWalletAction
     ? 'wallet'
-    : pendingApprove !== null && !approveWatch.isStuck
+    : pendingApprove !== null
       ? 'pending'
       : 'idle';
 
@@ -456,8 +313,6 @@ export function useStakeTransaction(onConfirmed: () => void): StakeTransactionSt
     approveWatch,
     approve,
     run,
-    isResubmitting,
-    resubmit,
     clearReceipt: () => {
       setReceipt(null);
       setPendingMain(null);

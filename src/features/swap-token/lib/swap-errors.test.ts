@@ -17,7 +17,7 @@ describe('describeSwapError', () => {
         { name: 'TransactionExecutionError', cause: { message } },
         CONTEXT,
       );
-      expect(described).toBe(copy.txWatch.bodies.nonceGap);
+      expect(described).toBe(copy.txWatch.nonceGap);
       expect(described).not.toBe(copy.errors.generic);
     }
   });

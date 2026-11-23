@@ -59,7 +59,6 @@ const { quoteState, txState } = vi.hoisted(() => ({
       },
       approve: async () => {},
       run: async () => {},
-      resubmit: () => {},
       clearReceipt: () => {},
       clearError: () => {},
     },

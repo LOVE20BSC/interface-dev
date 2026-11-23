@@ -1,7 +1,6 @@
 import { parseEventLogs, type TransactionReceipt } from 'viem';
 import { submitAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
-import { copy } from '@/shared/config/copy-pages';
 import { toUserMessage } from '@/shared/lib/errors';
 import { useContractWrite, type ContractCall } from '@/shared/model/use-contract-write';
 
@@ -41,7 +40,6 @@ export interface SubmitExistingWrite {
   readonly watch: ReturnType<typeof useContractWrite>['watch'];
   readonly receipt: SubmitExistingReceipt | null;
   readonly submit: (input: SubmitExistingInput) => void;
-  readonly resubmit: () => void;
   readonly closeReceipt: () => void;
 }
 
@@ -53,7 +51,6 @@ export function useSubmitExisting(
     {
       wallet: messages.waitingWallet,
       reverted: messages.revert,
-      ownerChanged: copy.gov.tx.ownerChanged,
     },
     toUserMessage,
     onConfirmed,
@@ -79,7 +76,6 @@ export function useSubmitExisting(
     watch: write.watch,
     receipt,
     submit,
-    resubmit: write.resubmit,
     closeReceipt: () => write.reset(),
   };
 }

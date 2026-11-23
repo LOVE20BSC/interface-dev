@@ -27,7 +27,7 @@
  *
  * | observed shape                                   | kind           | user copy + action                     |
  * | ------------------------------------------------ | -------------- | -------------------------------------- |
- * | nonce too low / too high / used, underpriced,     | nonceMismatch  | nonceGap sentence + 「重新提交」       |
+ * | nonce too low / too high / used, underpriced,     | nonceMismatch  | nonce-gap hint sentence             |
  * | already known / known transaction                 | ...            | (explicit on-chain nonce heals it)     |
  * | BlockOutOfRangeError, block height/requested was, | staleBlock     | 「钱包还停留在旧链的区块上…」 + 「刷新」 |
  * | header not found, unknown block                   |                |                                        |
@@ -141,7 +141,7 @@ export function classifyTxSendError(error: unknown): TxSendErrorKind | null {
 
 /**
  * True for every nonce-shaped send failure. They share one actionable message
- * (「钱包里的交易记录和链上没有对上…」) and the 「重新提交」 action, so callers
+ * (「钱包里的交易记录和链上没有对上…」) as a hint, so callers
  * do not need to distinguish the sub-kinds for UI purposes.
  */
 export function isTxSendNonceError(error: unknown): boolean {

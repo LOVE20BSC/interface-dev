@@ -14,7 +14,7 @@ import { Skeleton } from '@/shared/ui/skeleton';
 import { ActionStack } from '@/shared/ui/action-stack';
 import { approvalKind } from '@/shared/lib/approval-kind';
 import { decideApproveAmount } from '@/shared/lib/approve-amount';
-import { TxWatchCard } from '@/shared/ui/tx-watch-card';
+import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
 import {
   applySlippageDown,
@@ -361,11 +361,6 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
           className="rounded-2xl border border-danger/20 bg-danger-soft/50 p-3 text-sm leading-6 text-danger-strong"
         >
           <p>{errorMessage}</p>
-          {tx.error?.kind === 'nonce' ? (
-            <Button variant="secondary" size="sm" className="mt-2" onClick={tx.resubmit}>
-              {copy.txWatch.actions.resubmit}
-            </Button>
-          ) : null}
         </div>
       ) : null}
 
@@ -411,7 +406,7 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
                 : copy.approve.approvedNote}
           </p>
         ) : null}
-        {tx.approveWatch.hash !== null ? <TxWatchCard watch={tx.approveWatch} /> : null}
+        {tx.approveWatch.hash !== null ? <TxStuckHint watch={tx.approveWatch} /> : null}
         <Button
           variant="primary"
           size="lg"
@@ -425,13 +420,7 @@ export function MyLiquidityPanel(props: MyLiquidityPanelProps) {
         >
           {tx.stage === 'pending' ? copy.liquidity.mine.withdrawing : copy.liquidity.mine.withdraw}
         </Button>
-        {tx.watch.hash !== null ? (
-          <TxWatchCard
-            watch={tx.watch}
-            onResubmit={tx.resubmit}
-            resubmitDisabled={tx.isResubmitting}
-          />
-        ) : null}
+        {tx.watch.hash !== null ? <TxStuckHint watch={tx.watch} /> : null}
       </ActionStack>
 
       <LiquidityReceiptSheet record={tx.receipt} onDismiss={tx.clearReceipt} />

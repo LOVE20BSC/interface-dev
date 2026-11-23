@@ -22,7 +22,6 @@ interface TxMockState {
     refresh: () => void;
   };
   isHydrating: boolean;
-  resubmit: () => void;
   submit: (request: unknown) => Promise<void>;
   clearReceipt: () => void;
   clearError: () => void;
@@ -65,7 +64,6 @@ const { identityState, catalogState, submitMock, txState, balanceState } = vi.ho
           refresh: () => {},
         },
         isHydrating: false,
-        resubmit: () => {},
         submit: submitMock,
         clearReceipt: () => {},
         clearError: () => {},
@@ -180,7 +178,6 @@ beforeEach(() => {
     error: null,
     watch: { hash: null, status: 'idle', isStuck: false, remainingSeconds: 0, refresh: () => {} },
     isHydrating: false,
-    resubmit: () => {},
     submit: submitMock,
     clearReceipt: () => {},
     clearError: () => {},
@@ -437,7 +434,7 @@ describe('TransferTokenPanel 在途/恢复态（D1/D2）', () => {
 
     expect(submitButton()).toBeDisabled();
     expect(screen.getByTestId('transfer-submit-note')).toHaveTextContent(
-      '上面这笔还没有结果，请先用上面的「重新提交」或「重新查询」处理。',
+      '上面这笔还没有结果，请稍后在钱包或区块浏览器里查看。',
     );
     expect(screen.getByTestId('tx-watch-recovery')).toBeVisible();
   });

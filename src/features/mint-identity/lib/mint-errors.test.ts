@@ -37,11 +37,11 @@ describe('describeMintError', () => {
         name: 'TransactionExecutionError',
         cause: { message },
       });
-      expect(described).toBe(copy.txWatch.bodies.nonceGap);
+      expect(described).toBe(copy.txWatch.nonceGap);
       expect(described).not.toBe(copy.errors.generic);
     }
     const viemShape = Object.assign(new Error('nonce too low'), { name: 'NonceTooLowError' });
-    expect(describeMintError(viemShape)).toBe(copy.txWatch.bodies.nonceGap);
+    expect(describeMintError(viemShape)).toBe(copy.txWatch.nonceGap);
   });
 
   it('maps a stale wallet block view to the reload copy, never to generic', () => {

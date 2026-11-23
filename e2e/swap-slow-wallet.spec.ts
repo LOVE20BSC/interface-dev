@@ -16,7 +16,7 @@ import { CHAIN_HEX, connect, installWallet, type WalletStubSend } from './wallet
  * 兑换 · 慢钱包回归（owner 2026-11-14）
  *
  * 真实浏览器里，每次刷新后的第一笔兑换都会先显示「这笔交易还卡在钱包里」，点
- * 「重新提交」才上链 —— e2e 里复现不出来，因为注入钱包的 `eth_sendTransaction`
+ * 慢钱包卡住态只提示，不重发；mine 后自动更新回执。
  * 直连 anvil、延迟极低，而且 app 首笔发送把 nonce 完全交给钱包。
  *
  * 这里用三个慢钱包条件把它固化：
@@ -139,74 +139,48 @@ async function receiptHash(page: Page): Promise<`0x${string}`> {
   return hash as `0x${string}`;
 }
 
-test('慢钱包 + 钱包 nonce 领先链上（修复前首笔的真实状态）：卡在钱包里，重新提交带链上 nonce 才上链', async ({
-  page,
-}) => {
+test('慢钱包卡住：纯提示卡无按钮，mine 后自动出回执', async ({ page }) => {
   await suspendMining();
-  // ignorePinnedNonce: 首笔仍然由钱包决定 nonce（修复前行为），把钱包侧那笔 stale
-  // nonce 原样提交；「重新提交」的显式 nonce 会被尊重（与 MetaMask 一致）。
-  await installWallet(page, ACCOUNT, CHAIN_HEX, {
-    sendDelayMs: 3_000,
-    staleNonceOffset: 1,
-    ignorePinnedNonce: true,
-  });
+  await installWallet(page, ACCOUNT, CHAIN_HEX, { sendDelayMs: 3_000 });
 
   await openWrapForm(page);
   await fillWrapAmount(page, '0.01');
 
   const nonceBefore = await latestNonce();
-  const startedAt = Date.now();
+  const balanceBefore = await wethBalance();
   await page.getByTestId('swap-submit').click();
 
-  // The recovery card can only appear once the 10 s grace window proves the gap
-  // is real; the stale-nonce transaction sits in the pool for the whole time.
   const recovery = page.getByTestId('tx-watch-recovery');
   await expect(recovery).toBeVisible({ timeout: 40_000 });
-  await expect(recovery).toContainText('这笔交易还卡在钱包里');
-  const gapElapsedMs = Date.now() - startedAt;
+  await expect(recovery).toContainText('这笔交易还没有确认');
+  await expect(recovery).toContainText('请在钱包或区块浏览器里查看');
+  await expect(recovery.getByRole('button')).toHaveCount(0);
+  await expect(recovery.getByRole('link')).toHaveCount(0);
+  await expect(page.getByTestId('swap-submit')).toBeDisabled();
+  expect(await writesSent(page)).toBe(1);
 
-  const first = (await stubState(page)).sends[0];
-  expect(first).toBeDefined();
-  if (first === undefined) return;
-  // 修复后 app 首笔也 pin 了链上 nonce（这是修复），但钱包的 stale nonce 覆盖了它。
-  expect(first.pinnedNonce).toBe(nonceBefore);
-  expect(first.usedNonce).toBe(nonceBefore + 1);
-
-  // Chain-side evidence: accepted into the pool at nonce N+1, not mined.
-  const queued = await publicClient.getTransaction({ hash: first.hash as `0x${string}` });
-  expect(queued.nonce).toBe(nonceBefore + 1);
-  const minedBeforeResubmit = await publicClient
-    .getTransactionReceipt({ hash: first.hash as `0x${string}` })
-    .catch(() => null);
-  expect(minedBeforeResubmit).toBeNull();
-  await shot(page, 'swap-slow-wallet-nonce-gap.png');
-
-  // 「重新提交」 pins the on-chain nonce, which is what makes it mine.
-  const balanceBefore = await wethBalance();
-  await recovery.getByRole('button', { name: '重新提交' }).click();
-  await expect.poll(() => writesSent(page), { timeout: 30_000 }).toBe(2);
-  const second = (await stubState(page)).sends[1];
-  expect(second?.pinnedNonce).toBe(nonceBefore);
-  expect(second?.usedNonce).toBeNull();
+  const send = (await stubState(page)).sends[0];
+  expect(send).toBeDefined();
+  if (send === undefined) return;
+  expect(send.pinnedNonce).toBe(nonceBefore);
+  const queued = await publicClient.getTransaction({ hash: send.hash as `0x${string}` });
+  expect(queued.nonce).toBe(nonceBefore);
 
   await mine();
   await expect(page.getByRole('heading', { name: '兑换完成' })).toBeVisible({ timeout: 30_000 });
-  const resubmitted = await receiptHash(page);
-  expect(resubmitted).toBe(second?.hash);
-  const receipt = await publicClient.getTransactionReceipt({ hash: resubmitted });
+  await expect(page.getByTestId('tx-watch-recovery')).toHaveCount(0);
+  const hash = await receiptHash(page);
+  expect(hash).toBe(send.hash);
+  const receipt = await publicClient.getTransactionReceipt({ hash });
   expect(receipt.status).toBe('success');
   await expect.poll(wethBalance, { timeout: 15_000 }).toBeGreaterThan(balanceBefore);
 
   console.log(
-    `swap slow wallet (stale nonce): firstSend nonce=${String(first.pinnedNonce)}→wallet ${String(
-      first.usedNonce,
-    )} queued; recovery card after ${gapElapsedMs}ms; resubmit=${second?.hash} pinned=${String(
-      second?.pinnedNonce,
-    )} receipt=${resubmitted} block=${receipt.blockNumber}`,
+    `swap stuck hint: nonce=${nonceBefore} hash=${hash} receipt block=${receipt.blockNumber} pure hint`,
   );
 });
 
-test('慢钱包首笔一次成功：3 s 钱包延迟 + receipt 先返回 null，不出现「卡在钱包里」、不需要重新提交', async ({
+test('慢钱包首笔一次成功：3 s 钱包延迟 + receipt 先返回 null，不出现「卡在钱包里」', async ({
   page,
 }) => {
   await suspendMining();
@@ -247,7 +221,7 @@ test('慢钱包首笔一次成功：3 s 钱包延迟 + receipt 先返回 null，
   await page.waitForTimeout(5_000);
   const recovery = page.getByTestId('tx-watch-recovery');
   if ((await recovery.count()) > 0) {
-    await expect(recovery).toContainText('这笔交易还没有被确认');
+    await expect(recovery).toContainText('这笔交易还没有确认');
     await expect(recovery).not.toContainText('这笔交易还卡在钱包里');
     await expect(recovery).not.toContainText('这笔交易已经被替换或取消');
   }
@@ -268,7 +242,7 @@ test('慢钱包首笔一次成功：3 s 钱包延迟 + receipt 先返回 null，
 
   console.log(
     `swap slow wallet (fixed): send pinned=${String(send.pinnedNonce)} walletDelay=3000ms ` +
-      `tx=${hash} block=${receipt.blockNumber} no recovery card, no resubmit`,
+      `tx=${hash} block=${receipt.blockNumber} no recovery card`,
   );
 });
 
