@@ -1,36 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAccount, useChainId, useSendTransaction, useWriteContract } from 'wagmi';
-import { love20TokenAbi } from '@/config/abis';
-import { NETWORK, type HexAddress } from '@/config/networks';
-import { copy } from '@/shared/config/copy-pages';
-import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
-import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
-import { isSameTxOwner, type TxOwner } from '@/shared/lib/tx-owner';
-import { describeTransferError } from '@/features/transfer-token/lib/transfer-errors';
-import {
-  clearStoredTransfer,
-  createTransferScope,
-  readStoredTransfer,
-  storedTransferToRecord,
-  writeStoredTransfer,
-} from '@/features/transfer-token/lib/transfer-record';
+import { useMemo, useState } from 'react';
+import { useAccount, useChainId } from 'wagmi';
+import { useWriteAttempt } from '@/shared/model/use-write-attempt';
+import type { TxWatch } from '@/shared/model/use-tx-watch';
+import { createTransferScope } from '@/features/transfer-token/lib/transfer-record';
 import type { TransferRecord } from '@/features/transfer-token/lib/transfer-receipt';
-import type { TransferToken } from '@/features/transfer-token/lib/transfer-types';
+import {
+  useTransferAttemptAdapter,
+  type TransferRequest,
+  type TransferTxError,
+} from '@/features/transfer-token/model/transfer-attempt-adapter';
+
+export type { TransferRequest, TransferTxError };
 
 export type TransferStage = 'idle' | 'wallet' | 'pending';
-
-export interface TransferRequest {
-  readonly token: TransferToken;
-  readonly amount: bigint;
-  readonly recipient: HexAddress;
-  readonly recipientLabel: string | undefined;
-}
-
-export interface TransferTxError {
-  readonly message: string;
-  /** Send-time recovery family: nonce mismatch / stale wallet block view. */
-  readonly kind?: 'nonce' | 'staleBlock';
-}
 
 export interface TransferTransactionState {
   readonly stage: TransferStage;
@@ -48,19 +30,12 @@ export interface TransferTransactionState {
   readonly clearError: () => void;
 }
 
-interface PendingTransfer {
-  readonly hash: `0x${string}`;
-  readonly owner: TxOwner;
-  readonly request: TransferRequest;
-  readonly nonce: number | undefined;
-}
-
 /**
  * One transfer, two write shapes: the native coin uses a plain value transfer,
  * every ERC20 uses `transfer(to, amount)` directly — there is no approval step
- * (and the page never mentions one). Waiting is the shared bounded watcher, so a
- * dropped / nonce-gapped transaction becomes a pure hint instead of an endless
- * 确认中; it never re-sends.
+ * (and the page never mentions one). The write itself, its persistence policy and
+ * the bounded wait live in the shared write-attempt core; this hook only projects
+ * the core state onto the page's frozen props.
  *
  * D1 (owner 2026-11-14): the submitted hash + its request are persisted before
  * waiting. A refresh in the pending window restores the pending card and keeps
@@ -75,230 +50,53 @@ interface PendingTransfer {
 export function useTransferTransaction(onConfirmed: () => void): TransferTransactionState {
   const { address: account } = useAccount();
   const chainId = useChainId();
-  const { sendTransactionAsync } = useSendTransaction();
-  const { writeContractAsync } = useWriteContract();
-  const readPendingNonce = usePendingNonce(account);
 
-  const [pending, setPending] = useState<PendingTransfer | null>(null);
-  const [receipt, setReceipt] = useState<TransferRecord | null>(null);
   const [restoredRecord, setRestoredRecord] = useState<TransferRecord | null>(null);
-  const [isWalletAction, setIsWalletAction] = useState(false);
-  const [error, setError] = useState<TransferTxError | null>(null);
-  const [isHydrating, setIsHydrating] = useState(true);
-  const submittingRef = useRef(false);
-
-  const onConfirmedRef = useRef(onConfirmed);
-  useEffect(() => {
-    onConfirmedRef.current = onConfirmed;
-  });
+  const [hydrationError, setHydrationError] = useState<TransferTxError | null>(null);
 
   const scope = useMemo(
     () => (account !== undefined ? createTransferScope(chainId, account) : null),
     [account, chainId],
   );
 
-  // A refresh must resume the transfer instead of showing an empty, submittable form.
-  // `account` / `chainId` are the owner check inputs (R3); `scope` already changes
-  // with them, but naming both keeps the effect honest about what it reads.
-  /* eslint-disable react-hooks/set-state-in-effect -- hydration from the namespaced cache */
-  useEffect(() => {
-    setPending(null);
-    setReceipt(null);
-    setRestoredRecord(null);
-    setError(null);
-    setIsWalletAction(false);
-    submittingRef.current = false;
-    setIsHydrating(true);
-    if (scope === null) {
-      setIsHydrating(false);
-      return;
-    }
-    const stored = readStoredTransfer(scope);
-    if (stored !== null && account !== undefined) {
-      // R3: a task that belongs to another wallet/chain is never restored as
-      // submittable page state (the record itself carries the owner).
-      const storedOwner: TxOwner = { chainId: stored.chainId, account: stored.account };
-      if (!isSameTxOwner(storedOwner, { chainId, account })) {
-        clearStoredTransfer(scope);
-        setError({ message: copy.txWatch.ownerChanged });
-        setIsHydrating(false);
-        return;
-      }
-      if (stored.confirmed) {
-        // Only the strip is replayed; the receipt sheet stays a one-time state.
-        setRestoredRecord(storedTransferToRecord(stored));
-      } else {
-        setPending({
-          hash: stored.hash,
-          owner: storedOwner,
-          request: {
-            token: stored.token,
-            amount: stored.amount,
-            recipient: stored.recipient,
-            recipientLabel: stored.recipientLabel,
-          },
-          nonce: stored.nonce,
-        });
-      }
-    }
-    setIsHydrating(false);
-  }, [account, chainId, scope]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const watch = useTxWatch({
-    hash: pending?.hash ?? null,
-    wallet: account,
-    walletAction: isWalletAction,
-    enabled: pending !== null,
+  const adapter = useTransferAttemptAdapter({
+    scope,
+    chainId,
+    account,
+    onRestoredRecord: setRestoredRecord,
+    onHydrationError: setHydrationError,
+    onConfirmed,
   });
-  const onChainReceipt = watch.receipt;
-
-  /* eslint-disable react-hooks/set-state-in-effect -- a mined receipt is an external chain fact */
-  useEffect(() => {
-    if (pending === null || onChainReceipt === null) return;
-
-    if (onChainReceipt.status === 'reverted') {
-      // A settled failure must not be restored as an in-flight transfer.
-      if (scope !== null) clearStoredTransfer(scope);
-      setPending(null);
-      setError({ message: copy.transfer.errors.reverted });
-      onConfirmedRef.current();
-      return;
-    }
-
-    const request = pending.request;
-    const record: TransferRecord = {
-      hash: pending.hash,
-      tokenSymbol: request.token.symbol,
-      tokenDecimals: request.token.decimals,
-      native: request.token.kind === 'native',
-      amount: request.amount,
-      recipient: request.recipient,
-      recipientLabel: request.recipientLabel,
-      recordedAt: Date.now(),
-    };
-    // Flip the persisted task to confirmed: a later refresh shows the success
-    // strip (hash + amount), never the receipt sheet again.
-    if (scope !== null) {
-      writeStoredTransfer(scope, {
-        hash: pending.hash,
-        chainId: pending.owner.chainId,
-        account: pending.owner.account,
-        token: request.token,
-        amount: request.amount,
-        recipient: request.recipient,
-        recipientLabel: request.recipientLabel,
-        nonce: pending.nonce,
-        confirmed: true,
-        recordedAt: record.recordedAt,
-      });
-    }
-    setRestoredRecord(null);
-    setReceipt(record);
-    setPending(null);
-    setError(null);
-    onConfirmedRef.current();
-  }, [onChainReceipt, pending, scope]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const send = async (request: TransferRequest, nonce?: number): Promise<`0x${string}`> => {
-    const nonceOption = nonce !== undefined ? { nonce } : {};
-    if (request.token.kind === 'native') {
-      return sendTransactionAsync({
-        to: request.recipient,
-        value: request.amount,
-        ...nonceOption,
-      });
-    }
-    if (request.token.address === undefined) throw new Error('token address unavailable');
-    return writeContractAsync({
-      address: request.token.address,
-      abi: love20TokenAbi,
-      functionName: 'transfer',
-      args: [request.recipient, request.amount],
-      ...nonceOption,
-    });
-  };
-
-  const signAttempt = async (
-    request: TransferRequest,
-    nonce: number | undefined,
-  ): Promise<void> => {
-    const hash = await send(request, nonce);
-    const settledNonce = nonce;
-    // Persist before waiting (D1): the hash is the only thing that cannot be
-    // rebuilt after a refresh.
-    if (scope !== null) {
-      writeStoredTransfer(scope, {
-        hash,
-        chainId,
-        account: account as HexAddress,
-        token: request.token,
-        amount: request.amount,
-        recipient: request.recipient,
-        recipientLabel: request.recipientLabel,
-        nonce: settledNonce,
-        confirmed: false,
-        recordedAt: Date.now(),
-      });
-    }
-    setPending({
-      hash,
-      owner: { chainId, account: account as HexAddress },
-      request,
-      nonce: settledNonce,
-    });
-  };
-
-  const submitInternal = async (request: TransferRequest): Promise<void> => {
-    if (submittingRef.current) return;
-    if (account === undefined || request.amount <= 0n) return;
-    setError(null);
-    setIsWalletAction(true);
-    submittingRef.current = true;
-    try {
-      // R5: a new operation queues behind whatever the wallet already broadcast.
-      const sendNonce = await readPendingNonce();
-      await signAttempt(request, sendNonce);
-    } catch (cause) {
-      const message = describeTransferError(cause, {
-        nativeSymbol: NETWORK.nativeCurrency.symbol,
-        tokenSymbol: request.token.symbol,
-      });
-      const recovery = txSendRecoveryKind(cause);
-      setError({ message, ...(recovery !== undefined ? { kind: recovery } : {}) });
-    } finally {
-      setIsWalletAction(false);
-      submittingRef.current = false;
-    }
-  };
+  const attempt = useWriteAttempt(adapter);
 
   const submit = async (request: TransferRequest): Promise<void> => {
     // D1: an in-flight or restored transfer blocks a second submission. The
     // panel disables the CTA for the same condition; this guard keeps the hook
     // honest when a stale click slips through.
-    if (isHydrating || submittingRef.current || pending !== null || receipt !== null) return;
-    await submitInternal(request);
+    if (account === undefined || request.amount <= 0n) return;
+    if (attempt.isHydrating || attempt.stage !== 'idle' || attempt.receipt !== null) return;
+    setHydrationError(null);
+    // The page never awaits `submit` (the CTA follows `stage`), and the core's
+    // promise settles from an effect that needs the signed/rejected render.
+    void attempt.run(request);
   };
 
-  const stage: TransferStage = isWalletAction ? 'wallet' : pending !== null ? 'pending' : 'idle';
-
   return {
-    stage,
-    receipt,
+    stage: attempt.stage,
+    receipt: attempt.receipt,
     restoredRecord,
-    pendingHash: pending?.hash ?? null,
-    error,
-    watch,
-    isHydrating,
+    pendingHash: attempt.pendingHash,
+    error: attempt.error ?? hydrationError,
+    watch: attempt.watch,
+    isHydrating: attempt.isHydrating,
     submit,
     clearReceipt: () => {
-      setReceipt(null);
-      setPending(null);
-      setError(null);
+      setHydrationError(null);
+      attempt.clearReceipt();
     },
     clearError: () => {
-      setError(null);
+      setHydrationError(null);
+      attempt.clearError();
     },
   };
 }

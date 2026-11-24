@@ -1,12 +1,14 @@
-import { useMemo } from 'react';
-import { voteAbi } from '@/config/abis';
-import { toUserMessage } from '@/shared/lib/errors';
-import { useContractWrite, type ContractCall } from '@/shared/model/use-contract-write';
-import { parseVoteReceipt, type VoteReceiptLine } from '../lib/vote-receipt';
+import type { TxWatch } from '@/shared/model/use-tx-watch';
+import { useWriteAttempt } from '@/shared/model/use-write-attempt';
+import type { VoteReceiptLine } from '../lib/vote-receipt';
+import { useVoteWriteAdapter } from './vote-write-adapter';
 
 /**
  * 治理域没有代币授权，所以只有「签名 → 上链 → 回执」一段；要显示什么数字由回执里的
  * `VoteCast` 事件决定（`lib/vote-receipt`），不拿页面输入冒充链上结果。
+ *
+ * 写链生命周期由 `useWriteAttempt` 纯核持有；这里只做投影（`submit` void、
+ * `closeReceipt` → `clearReceipt`、`error` 取 message、回执数组由 adapter 解析）。
  */
 export interface VoteInput {
   readonly voteAddress: `0x${string}`;
@@ -19,7 +21,7 @@ export interface VoteInput {
 export interface VoteWrite {
   readonly stage: 'idle' | 'wallet' | 'pending';
   readonly error: string | null;
-  readonly watch: ReturnType<typeof useContractWrite>['watch'];
+  readonly watch: TxWatch;
   readonly receipt: readonly VoteReceiptLine[] | null;
   readonly submit: (input: VoteInput) => void;
   readonly closeReceipt: () => void;
@@ -32,37 +34,22 @@ export interface VoteWriteMessages {
 }
 
 export function useVoteWrite(messages: VoteWriteMessages, onConfirmed: () => void): VoteWrite {
-  const write = useContractWrite(
-    {
-      wallet: messages.waitingWallet,
-      reverted: messages.revert,
-    },
-    toUserMessage,
+  const adapter = useVoteWriteAdapter({
+    reverted: messages.revert,
     onConfirmed,
-  );
-  // 回执是派生值：`watch.receipt` 一旦结算就不会再变，不需要再用 state/effect 同步。
-  const receiptData = write.watch.receipt;
-  const receipt = useMemo(
-    () => (receiptData?.status === 'success' ? parseVoteReceipt(receiptData) : null),
-    [receiptData],
-  );
+  });
+  const write = useWriteAttempt(adapter);
 
   const submit = (input: VoteInput): void => {
-    const call: ContractCall = {
-      address: input.voteAddress,
-      abi: voteAbi,
-      functionName: 'vote',
-      args: [input.tokenAddress, input.memberId, input.proposalIds, input.voteAmounts, []],
-    };
-    void write.run(call);
+    void write.run(input);
   };
 
   return {
     stage: write.stage,
-    error: write.error,
+    error: write.error?.message ?? null,
     watch: write.watch,
-    receipt,
+    receipt: write.receipt,
     submit,
-    closeReceipt: () => write.reset(),
+    closeReceipt: write.clearReceipt,
   };
 }

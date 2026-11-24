@@ -1,8 +1,9 @@
 import { parseEventLogs, type TransactionReceipt } from 'viem';
 import { submitAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
-import { toUserMessage } from '@/shared/lib/errors';
-import { useContractWrite, type ContractCall } from '@/shared/model/use-contract-write';
+import type { TxWatch } from '@/shared/model/use-tx-watch';
+import { useWriteAttempt } from '@/shared/model/use-write-attempt';
+import { useSubmitExistingAdapter } from './submit-existing-adapter';
 
 /**
  * 「推举历史提案」的写链状态机（owner 2026-11-22）。
@@ -10,6 +11,9 @@ import { useContractWrite, type ContractCall } from '@/shared/model/use-contract
  * 与新建提案分开：合约调用是 `Submit.submit(token, memberId, proposalId, submitData)`，
  * 没有 `ProposalCreated`（提案不是新建的），回执事实来自 `ProposalSubmitted` 事件
  * （轮次 + 提案编号 + 推举人）。
+ *
+ * 写链生命周期由 `useWriteAttempt` 纯核持有；这里只做投影（`submit` void、
+ * `closeReceipt` → `clearReceipt`、`error` 取 message）。
  */
 
 export interface SubmitExistingInput {
@@ -37,7 +41,7 @@ export function parseSubmitExistingReceipt(receipt: TransactionReceipt): SubmitE
 export interface SubmitExistingWrite {
   readonly stage: 'idle' | 'wallet' | 'pending';
   readonly error: string | null;
-  readonly watch: ReturnType<typeof useContractWrite>['watch'];
+  readonly watch: TxWatch;
   readonly receipt: SubmitExistingReceipt | null;
   readonly submit: (input: SubmitExistingInput) => void;
   readonly closeReceipt: () => void;
@@ -47,35 +51,23 @@ export function useSubmitExisting(
   messages: { readonly waitingWallet: string; readonly revert: string },
   onConfirmed: () => void,
 ): SubmitExistingWrite {
-  const write = useContractWrite(
-    {
-      wallet: messages.waitingWallet,
-      reverted: messages.revert,
-    },
-    toUserMessage,
+  const adapter = useSubmitExistingAdapter({
+    reverted: messages.revert,
     onConfirmed,
-  );
-
-  const settled = write.watch.receipt;
-  const receipt: SubmitExistingReceipt | null =
-    settled !== null && settled.status === 'success' ? parseSubmitExistingReceipt(settled) : null;
+    parse: parseSubmitExistingReceipt,
+  });
+  const write = useWriteAttempt(adapter);
 
   const submit = (input: SubmitExistingInput): void => {
-    const call: ContractCall = {
-      address: input.submitAddress,
-      abi: submitAbi,
-      functionName: 'submit',
-      args: [input.tokenAddress, input.memberId, input.proposalId, '0x'],
-    };
-    void write.run(call);
+    void write.run(input);
   };
 
   return {
     stage: write.stage,
-    error: write.error,
+    error: write.error?.message ?? null,
     watch: write.watch,
-    receipt,
+    receipt: write.receipt,
     submit,
-    closeReceipt: () => write.reset(),
+    closeReceipt: write.clearReceipt,
   };
 }

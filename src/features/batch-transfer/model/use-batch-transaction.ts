@@ -1,24 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAccount, useChainId, usePublicClient, useWriteContract } from 'wagmi';
-import { batchTransferAbi, love20TokenAbi } from '@/config/abis';
-import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
-import { copy } from '@/shared/config/copy-pages';
-import { decideApproveAmount } from '@/shared/lib/approve-amount';
-import { readUnlimitedApprovalPreference } from '@/shared/lib/approval-preference';
-import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
-import { isSameTxOwner, type TxOwner } from '@/shared/lib/tx-owner';
+import { useEffect, useMemo, useRef } from 'react';
+import { useAccount, useChainId } from 'wagmi';
+import { useWriteAttempt } from '@/shared/model/use-write-attempt';
+import type { TxWatch } from '@/shared/model/use-tx-watch';
+import type { BatchErrorMessage } from '@/features/batch-transfer/lib/batch-errors';
 import {
-  describeBatchError,
-  type BatchErrorMessage,
-} from '@/features/batch-transfer/lib/batch-errors';
-import {
-  clearStoredBatch,
   createBatchScope,
-  readStoredBatch,
-  writeStoredBatch,
   type BatchPendingKind,
 } from '@/features/batch-transfer/lib/batch-record';
 import type { BatchRequest } from '@/features/batch-transfer/lib/batch-types';
+import {
+  batchApproveKey,
+  useBatchAttemptAdapter,
+} from '@/features/batch-transfer/model/batch-attempt-adapter';
 
 export type BatchStage = 'idle' | 'wallet' | 'pending';
 export type { BatchPendingKind };
@@ -40,14 +33,6 @@ export interface UseBatchTransactionOptions {
   readonly onBatchConfirmed: (hash: `0x${string}`, request: BatchRequest) => void;
 }
 
-interface PendingBatch {
-  readonly hash: `0x${string}`;
-  readonly owner: TxOwner;
-  readonly kind: BatchPendingKind;
-  readonly request: BatchRequest;
-  readonly nonce: number | undefined;
-}
-
 /**
  * The 批量转账 write path: one optional `approve` for the exact batch total, then
  * one atomic `batchTransferNative` / `batchTransferERC20`.
@@ -58,235 +43,95 @@ interface PendingBatch {
  * (gas budget too low, recipient contract rejects the asset, insufficient
  * balance) without burning gas — and it keeps 「你的资产没有变化」 literally true.
  *
- * Waiting is the shared bounded watcher; a stuck hash exposes the recovery card,
- * exactly like 代币转账. Owner 2026-11-23 removed the re-send: the record is only
+ * The write itself, its `afterHash` persistence and the bounded wait live in the
+ * shared write-attempt core; this hook only projects the core state onto the
+ * page's frozen props. Owner 2026-11-23 removed the re-send: the record is only
  * written once the wallet returned a hash, so a refresh restores the in-flight
  * card (and blocks a second batch) while a rejected send is just an error.
  */
 export function useBatchTransaction(options: UseBatchTransactionOptions): BatchTransactionState {
   const { address: account } = useAccount();
   const chainId = useChainId();
-  const batchTransfer = configuredAddress('batchTransfer');
-  const publicClient = usePublicClient();
-  const { writeContractAsync } = useWriteContract();
-  const readPendingNonce = usePendingNonce(account);
-
-  const [pending, setPending] = useState<PendingBatch | null>(null);
-  const [isWalletAction, setIsWalletAction] = useState(false);
-  const [error, setError] = useState<BatchErrorMessage | null>(null);
-  const [isHydrating, setIsHydrating] = useState(true);
-  const submittingRef = useRef(false);
-
-  const onApprovedRef = useRef(options.onApproved);
-  const onBatchConfirmedRef = useRef(options.onBatchConfirmed);
-  useEffect(() => {
-    onApprovedRef.current = options.onApproved;
-    onBatchConfirmedRef.current = options.onBatchConfirmed;
-  });
 
   const scope = useMemo(
     () => (account !== undefined ? createBatchScope(chainId, account) : null),
     [account, chainId],
   );
 
-  // R4: a refresh (or leaving the page and coming back) resumes the in-flight batch
-  // instead of showing an empty, submittable form.
-  /* eslint-disable react-hooks/set-state-in-effect -- hydration from the namespaced cache */
-  useEffect(() => {
-    setPending(null);
-    setError(null);
-    setIsWalletAction(false);
-    submittingRef.current = false;
-    setIsHydrating(true);
-    if (scope === null || account === undefined) {
-      setIsHydrating(false);
-      return;
-    }
-    const stored = readStoredBatch(scope);
-    if (stored !== null) {
-      const owner: TxOwner = { chainId: stored.chainId, account: stored.account };
-      // R3: a task belonging to another wallet/chain is cleared, never signed.
-      if (!isSameTxOwner(owner, { chainId, account })) {
-        clearStoredBatch(scope);
-        setError({ message: copy.txWatch.ownerChanged });
-        setIsHydrating(false);
-        return;
-      }
-      if (stored.hash !== null) {
-        setPending({
-          hash: stored.hash,
-          owner,
-          kind: stored.kind,
-          request: stored.request,
-          nonce: stored.nonce,
-        });
-      } else {
-        // 旧版本在发送前落下的无哈希记录：没有在途交易可恢复，直接丢掉。
-        clearStoredBatch(scope);
-      }
-    }
-    setIsHydrating(false);
-  }, [account, chainId, scope]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const watch = useTxWatch({
-    hash: pending?.hash ?? null,
-    wallet: account,
-    walletAction: isWalletAction,
-    enabled: pending !== null,
-  });
-  const mined = watch.receipt;
-
-  /* eslint-disable react-hooks/set-state-in-effect -- a mined receipt is an external chain fact */
-  useEffect(() => {
-    if (pending === null || mined === null) return;
-
-    if (mined.status === 'reverted') {
-      if (scope !== null) clearStoredBatch(scope);
-      setPending(null);
-      setError({
-        message:
-          pending.kind === 'approve'
-            ? copy.batchTransfer.errors.approveReverted
-            : copy.batchTransfer.errors.reverted,
-      });
-      return;
-    }
-
-    if (scope !== null) clearStoredBatch(scope);
-    setPending(null);
-    if (pending.kind === 'approve') {
-      onApprovedRef.current();
-    } else {
-      onBatchConfirmedRef.current(pending.hash, pending.request);
-    }
-  }, [mined, pending, scope]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const errorContext = (request: BatchRequest) => ({
-    nativeSymbol: NETWORK.nativeCurrency.symbol,
-    tokenSymbol: request.tokenSymbol,
-    recipientHasCode: request.recipientHasCode,
-  });
-
-  const sendApprove = async (request: BatchRequest, nonce?: number): Promise<`0x${string}`> => {
-    if (request.tokenAddress === undefined || batchTransfer === undefined) {
-      throw new Error('batch transfer configuration unavailable');
-    }
-    // 默认使用长期授权 (owner 2026-11-16): the amount is read at send time, so the
-    // current preference always wins. Off → the exact batch total (unchanged);
-    // on → maxUint256, same value the approvals page writes.
-    return writeContractAsync({
-      address: request.tokenAddress,
-      abi: love20TokenAbi,
-      functionName: 'approve',
-      args: [batchTransfer, decideApproveAmount(readUnlimitedApprovalPreference(), request.total)],
-      ...(nonce !== undefined ? { nonce } : {}),
+  // `approve` / `submit` keep their pre-migration `Promise<void>` shape: the
+  // promise settles when the hash is persisted (main) or the approval hash is
+  // returned. The core's own promise resolves from a wallet→pending render, which
+  // a fast/mocked wallet can fold into a single commit while a caller awaits.
+  const waiter = useRef<{ step: 'main' | 'approve'; resolve: () => void } | null>(null);
+  const settleSend = (step: 'main' | 'approve'): void => {
+    const current = waiter.current;
+    if (current === null || current.step !== step) return;
+    waiter.current = null;
+    current.resolve();
+  };
+  const waitForSend = (step: 'main' | 'approve'): Promise<void> =>
+    new Promise<void>((resolve) => {
+      waiter.current = { step, resolve };
     });
-  };
 
-  const sendBatch = async (request: BatchRequest, nonce?: number): Promise<`0x${string}`> => {
-    if (batchTransfer === undefined) throw new Error('batch transfer configuration unavailable');
-    const recipients = request.rows.map((row) => row.address);
-    const amounts = request.rows.map((row) => row.amount);
-    const nonceOption = nonce !== undefined ? { nonce } : {};
+  const adapter = useBatchAttemptAdapter({
+    scope,
+    onApproved: options.onApproved,
+    onBatchConfirmed: options.onBatchConfirmed,
+    // An approval has no persisted record; its hash is the settle point. The main
+    // step settles once `writeRecord` has run (hash persisted) or the send failed.
+    onHash: (step) => {
+      if (step === 'approve') settleSend('approve');
+    },
+    onSendFailed: (step) => settleSend(step === 'approve' ? 'approve' : 'main'),
+    onRecordWritten: () => settleSend('main'),
+  });
+  const attempt = useWriteAttempt(adapter);
 
-    if (request.mode === 'native') {
-      // Simulation first: a doomed batch must not reach the wallet.
-      if (publicClient !== undefined && account !== undefined) {
-        await publicClient.simulateContract({
-          account,
-          address: batchTransfer,
-          abi: batchTransferAbi,
-          functionName: 'batchTransferNative',
-          args: [recipients, amounts, BigInt(request.gasLimit)],
-          value: request.total,
-        });
-      }
-      return writeContractAsync({
-        address: batchTransfer,
-        abi: batchTransferAbi,
-        functionName: 'batchTransferNative',
-        args: [recipients, amounts, BigInt(request.gasLimit)],
-        value: request.total,
-        ...nonceOption,
-      });
-    }
-
-    if (request.tokenAddress === undefined) throw new Error('token address unavailable');
-    const tokenAddress: HexAddress = request.tokenAddress;
-    if (publicClient !== undefined && account !== undefined) {
-      await publicClient.simulateContract({
-        account,
-        address: batchTransfer,
-        abi: batchTransferAbi,
-        functionName: 'batchTransferERC20',
-        args: [tokenAddress, recipients, amounts, BigInt(request.gasLimit)],
-      });
-    }
-    return writeContractAsync({
-      address: batchTransfer,
-      abi: batchTransferAbi,
-      functionName: 'batchTransferERC20',
-      args: [tokenAddress, recipients, amounts, BigInt(request.gasLimit)],
-      ...nonceOption,
-    });
-  };
-
-  const submitInternal = async (request: BatchRequest, kind: BatchPendingKind): Promise<void> => {
-    if (submittingRef.current) return;
-    if (account === undefined || request.rows.length === 0) return;
-    const owner: TxOwner = { chainId, account };
-    setError(null);
-    setIsWalletAction(true);
-    submittingRef.current = true;
-    try {
-      // R5: a new operation queues behind whatever the wallet already broadcast.
-      const sendNonce = await readPendingNonce();
-      const hash =
-        kind === 'approve'
-          ? await sendApprove(request, sendNonce)
-          : await sendBatch(request, sendNonce);
-      // 只有拿到哈希之后才落记录：签名失败不保留任何可重发的请求。
-      if (scope !== null) {
-        writeStoredBatch(scope, {
-          hash,
-          chainId: owner.chainId,
-          account: owner.account,
-          kind,
-          request,
-          nonce: sendNonce,
-          recordedAt: Date.now(),
-        });
-      }
-      setPending({ hash, owner, kind, request, nonce: sendNonce });
-    } catch (cause) {
-      setError(describeBatchError(cause, errorContext(request)));
-    } finally {
-      setIsWalletAction(false);
-      submittingRef.current = false;
-    }
-  };
+  // 批量转账 has no receipt sheet: the core's settled main slot must be released
+  // again so the next batch can start (the panel keeps its own receipt state).
+  useEffect(() => {
+    if (attempt.receipt !== null) attempt.clearReceipt();
+  }, [attempt]);
 
   const approve = async (request: BatchRequest): Promise<void> => {
-    if (submittingRef.current || pending !== null) return;
-    await submitInternal(request, 'approve');
+    if (account === undefined || request.rows.length === 0) return;
+    if (attempt.isHydrating || attempt.stage !== 'idle' || attempt.approveStage !== 'idle') return;
+    const sent = waitForSend('approve');
+    void attempt.approve(batchApproveKey(request), request).then((ok) => {
+      if (!ok) settleSend('approve');
+    });
+    await sent;
   };
 
   const submit = async (request: BatchRequest): Promise<void> => {
-    if (submittingRef.current || pending !== null || isHydrating) return;
-    await submitInternal(request, 'batch');
+    if (account === undefined || request.rows.length === 0) return;
+    if (attempt.isHydrating || attempt.stage !== 'idle' || attempt.approveStage !== 'idle') return;
+    if (attempt.receipt !== null) return;
+    const sent = waitForSend('main');
+    void attempt.run(request).then((ok) => {
+      if (!ok) settleSend('main');
+    });
+    await sent;
   };
 
-  const stage: BatchStage = isWalletAction ? 'wallet' : pending !== null ? 'pending' : 'idle';
+  // One stage for the panel: whichever slot is busy. An approval restored from an
+  // older record keeps saying 授权确认中 and watches the approval hash.
+  const stage: BatchStage = attempt.stage !== 'idle' ? attempt.stage : attempt.approveStage;
+  const pendingKind: BatchPendingKind | null =
+    attempt.stage === 'pending' ? 'batch' : attempt.approveStage === 'pending' ? 'approve' : null;
+  const watch =
+    attempt.stage === 'idle' && attempt.approveStage !== 'idle'
+      ? attempt.approveWatch
+      : attempt.watch;
 
   return {
     stage,
-    pendingKind: pending?.kind ?? null,
-    error,
+    pendingKind,
+    error: attempt.error,
     watch,
     approve,
     submit,
-    clearError: () => setError(null),
+    clearError: () => attempt.clearError(),
   };
 }

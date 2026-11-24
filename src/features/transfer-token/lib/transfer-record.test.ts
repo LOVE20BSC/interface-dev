@@ -40,6 +40,20 @@ describe('transfer-record 在途交易持久化（D1/D4）', () => {
     expect(readStoredTransfer(SCOPE)).toEqual(PENDING);
   });
 
+  it('nests the feature payload under `payload` in the generic envelope', () => {
+    writeStoredTransfer(SCOPE, PENDING);
+    const raw = cache.get<Record<string, unknown>>(SCOPE, TRANSFER_TASK_CACHE_KEY);
+    expect(raw).not.toBeNull();
+    expect(raw?.hash).toBe(HASH);
+    expect(raw?.chainId).toBe(31337);
+    expect(raw?.account).toBe(WALLET);
+    expect(raw?.token).toBeUndefined();
+    const payload = raw?.payload as Record<string, unknown>;
+    expect(payload.amount).toBe('1500000000000000000');
+    expect(payload.recipient).toBe(RECIPIENT);
+    expect(raw?.payload).not.toHaveProperty('hash');
+  });
+
   it('round-trips the confirmed flag so a refresh can restore the strip', () => {
     writeStoredTransfer(SCOPE, { ...PENDING, confirmed: true });
     const stored = readStoredTransfer(SCOPE);
@@ -53,6 +67,7 @@ describe('transfer-record 在途交易持久化（D1/D4）', () => {
     expect(stored?.chainId).toBe(31337);
     expect(stored?.account).toBe(WALLET);
     expect(stored?.nonce).toBe(7);
+    expect(stored?.recordedAt).toBe(1_700_000_000_000);
   });
 
   it('scopes the task by chain + wallet, never leaking across wallets', () => {
@@ -89,33 +104,48 @@ describe('transfer-record 在途交易持久化（D1/D4）', () => {
       hash: HASH,
       chainId: 31337,
       account: WALLET,
-      token: { kind: 'community', symbol: 'TestLOVE20', decimals: 18 },
-      amount: '1',
-      recipient: RECIPIENT,
-      confirmed: false,
       recordedAt: 1,
+      payload: {
+        token: { kind: 'community', symbol: 'TestLOVE20', decimals: 18 },
+        amount: '1',
+        recipient: RECIPIENT,
+        confirmed: false,
+      },
     });
     expect(readStoredTransfer(SCOPE)).toBeNull();
   });
 
   it('rejects malformed hashes, amounts and recipients (no unsubmittable restore)', () => {
-    const base = JSON.parse(
-      JSON.stringify({
-        ...PENDING,
-        amount: PENDING.amount.toString(),
-      }),
-    ) as Record<string, unknown>;
+    writeStoredTransfer(SCOPE, PENDING);
+    const raw = cache.get<Record<string, unknown>>(SCOPE, TRANSFER_TASK_CACHE_KEY);
+    expect(raw).not.toBeNull();
+    if (raw === null) return;
+    const payload = raw.payload as Record<string, unknown>;
     for (const broken of [
-      { ...base, hash: '0x1234' },
-      { ...base, amount: '-1' },
-      { ...base, amount: '1.5' },
-      { ...base, recipient: '0xnot-an-address' },
-      { ...base, token: { kind: 'community', address: TOKEN, symbol: '', decimals: 18 } },
-      { ...base, token: { kind: 'community', address: TOKEN, symbol: 'X', decimals: 99 } },
+      { ...raw, hash: '0x1234' },
+      { ...raw, hash: undefined },
+      { ...raw, payload: undefined },
+      { ...raw, payload: { ...payload, amount: '-1' } },
+      { ...raw, payload: { ...payload, amount: '1.5' } },
+      { ...raw, payload: { ...payload, recipient: '0xnot-an-address' } },
+      {
+        ...raw,
+        payload: {
+          ...payload,
+          token: { kind: 'community', address: TOKEN, symbol: '', decimals: 18 },
+        },
+      },
+      {
+        ...raw,
+        payload: {
+          ...payload,
+          token: { kind: 'community', address: TOKEN, symbol: 'X', decimals: 99 },
+        },
+      },
       // R3: a record without an owner can never be restored (old format).
-      { ...base, chainId: undefined },
-      { ...base, account: undefined },
-      { ...base, account: '0xnot-an-address' },
+      { ...raw, chainId: undefined },
+      { ...raw, account: undefined },
+      { ...raw, account: '0xnot-an-address' },
     ]) {
       clearStoredTransfer(SCOPE);
       cache.set(SCOPE, TRANSFER_TASK_CACHE_KEY, broken);

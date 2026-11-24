@@ -1,24 +1,31 @@
 import { ZERO_ADDRESS, type HexAddress } from '@/config/networks';
-import { cache, type CacheScope } from '@/shared/lib/cache';
+import type { CacheScope } from '@/shared/lib/cache';
+import {
+  addressOf,
+  clearWriteRecord,
+  isRecord,
+  readWriteRecord,
+  writeWriteRecord,
+  type WriteHash,
+  type WriteRecordAdapter,
+} from '@/shared/lib/write-record';
 import type { BatchMode, BatchRequest, BatchRequestRow } from './batch-types';
 
-export type HexHash = `0x${string}`;
+export type HexHash = WriteHash;
 export type BatchPendingKind = 'approve' | 'batch';
 
 /**
- * One 批量转账 attempt persisted before the wallet sheet opens (R1) and kept
- * while the hash waits (R4).
+ * One 批量转账 attempt persisted once the wallet returns a hash (R1/R4).
  *
  * 批量转账 has no per-user contract of its own, so the cache scope is the
  * contract-less ZERO_ADDRESS one — `{chainId, wallet}` is the whole namespace.
- * The record also carries `{chainId, account}` *inside* itself: a record read
- * through the wrong scope (or written by an older build) is rejected instead of
- * being signed by whichever wallet is connected now (R3), and `nonce` lets a
- * A refresh restores the in-flight hash instead of sending a second transaction.
- * second batch (R2).
+ * The generic envelope also carries `{chainId, account}` inside the record: a
+ * record read through the wrong scope (or written by an older build) is rejected
+ * instead of being signed by whichever wallet is connected now (R3), and `nonce`
+ * lets a refresh restore the in-flight hash instead of sending a second
+ * transaction (R2).
  */
 export interface StoredBatch {
-  /** The hash the wallet returned, or `null` while the attempt has not landed yet. */
   readonly hash: HexHash;
   readonly chainId: number;
   readonly account: HexAddress;
@@ -31,34 +38,12 @@ export interface StoredBatch {
 /** Semantic key; the scope already namespaces chain/wallet. */
 export const BATCH_TASK_CACHE_KEY = 'batchTransferTask';
 
-const HASH_RE = /^0x[0-9a-fA-F]{64}$/;
-const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const DECIMAL_RE = /^\d+$/;
 /** Same ceiling the parser accepts; a bigger list is not a real batch. */
 const MAX_ROWS = 500;
 
 export function createBatchScope(chainId: number, wallet: string): CacheScope {
   return { chainId, contractAddress: ZERO_ADDRESS, wallet };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function hashOf(value: unknown): HexHash | null {
-  return typeof value === 'string' && HASH_RE.test(value) ? (value as HexHash) : null;
-}
-
-function addressOf(value: unknown): HexAddress | null {
-  return typeof value === 'string' && ADDRESS_RE.test(value) ? (value as HexAddress) : null;
-}
-
-function chainIdOf(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined;
-}
-
-function nonceOf(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 }
 
 function symbolOf(value: unknown): string | undefined {
@@ -153,40 +138,6 @@ function requestOf(value: unknown): BatchRequest | null {
   };
 }
 
-/**
- * Validating read: a malformed entry is treated as absent, so a bad record can
- * never rebuild a submittable batch. The owner inside the record is returned
- * as-is; the hook compares it with the connected wallet before restoring or
- * signing anything (R3) so the mismatch surfaces as neutral copy.
- */
-export function readStoredBatch(scope: CacheScope): StoredBatch | null {
-  const raw: unknown = cache.get<unknown>(scope, BATCH_TASK_CACHE_KEY);
-  if (!isRecord(raw)) return null;
-  const chainId = chainIdOf(raw.chainId);
-  const account = addressOf(raw.account);
-  const kind: BatchPendingKind | undefined =
-    raw.kind === 'approve' ? 'approve' : raw.kind === 'batch' ? 'batch' : undefined;
-  const request = requestOf(raw.request);
-  const recordedAt = raw.recordedAt;
-  if (chainId === undefined || account === null) return null;
-  if (kind === undefined || request === null) return null;
-  if (typeof recordedAt !== 'number' || !Number.isFinite(recordedAt)) return null;
-  // `hash` is optional (an attempt that never reached the wallet has none), but a
-  // present-yet-invalid hash must reject the record instead of being read as
-  // 「还没有 hash」 and re-signed.
-  const hash = hashOf(raw.hash);
-  if (hash === null) return null;
-  return {
-    hash,
-    chainId,
-    account,
-    kind,
-    request,
-    nonce: nonceOf(raw.nonce),
-    recordedAt,
-  };
-}
-
 function serializeRequest(request: BatchRequest): Record<string, unknown> {
   return {
     mode: request.mode,
@@ -203,19 +154,56 @@ function serializeRequest(request: BatchRequest): Record<string, unknown> {
   };
 }
 
-/** Persist before the wallet opens (attempt without a hash) and again with the hash. */
+interface BatchPayload {
+  readonly kind: BatchPendingKind;
+  readonly request: BatchRequest;
+}
+
+const adapter: WriteRecordAdapter<BatchPayload> = {
+  key: BATCH_TASK_CACHE_KEY,
+  encodePayload: (payload) => ({ kind: payload.kind, request: serializeRequest(payload.request) }),
+  decodePayload: (raw) => {
+    if (!isRecord(raw)) return null;
+    const kind: BatchPendingKind | undefined =
+      raw.kind === 'approve' ? 'approve' : raw.kind === 'batch' ? 'batch' : undefined;
+    const request = requestOf(raw.request);
+    if (kind === undefined || request === null) return null;
+    return { kind, request };
+  },
+};
+
+/**
+ * Validating read: a malformed entry is treated as absent, so a bad record can
+ * never rebuild a submittable batch. The owner inside the record is returned
+ * as-is; the hook compares it with the connected wallet before restoring or
+ * signing anything (R3) so the mismatch surfaces as neutral copy.
+ */
+export function readStoredBatch(scope: CacheScope): StoredBatch | null {
+  const record = readWriteRecord(adapter, scope);
+  if (record === null) return null;
+  return {
+    hash: record.hash,
+    chainId: record.chainId,
+    account: record.account,
+    kind: record.payload.kind,
+    request: record.payload.request,
+    nonce: record.nonce,
+    recordedAt: record.recordedAt,
+  };
+}
+
+/** Persist once the wallet returns the hash so a refresh can resume the batch. */
 export function writeStoredBatch(scope: CacheScope, stored: StoredBatch): void {
-  cache.set(scope, BATCH_TASK_CACHE_KEY, {
+  writeWriteRecord(adapter, scope, {
     hash: stored.hash,
     chainId: stored.chainId,
     account: stored.account,
-    kind: stored.kind,
-    request: serializeRequest(stored.request),
-    ...(stored.nonce !== undefined ? { nonce: stored.nonce } : {}),
+    nonce: stored.nonce,
     recordedAt: stored.recordedAt,
+    payload: { kind: stored.kind, request: stored.request },
   });
 }
 
 export function clearStoredBatch(scope: CacheScope): void {
-  cache.remove(scope, BATCH_TASK_CACHE_KEY);
+  clearWriteRecord(adapter, scope);
 }

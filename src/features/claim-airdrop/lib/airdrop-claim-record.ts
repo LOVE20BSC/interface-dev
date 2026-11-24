@@ -1,6 +1,15 @@
-import { cache, type CacheScope } from '@/shared/lib/cache';
+import type { CacheScope } from '@/shared/lib/cache';
+import {
+  clearWriteRecord,
+  isRecord,
+  labelOf,
+  readWriteRecord,
+  writeWriteRecord,
+  type WriteHash,
+  type WriteRecordAdapter,
+} from '@/shared/lib/write-record';
 
-export type HexHash = `0x${string}`;
+export type HexHash = WriteHash;
 
 /**
  * One claim receipt, as rendered by the page.
@@ -26,27 +35,7 @@ export interface AirdropClaimReceipt {
 /** Semantic cache key; the scope already namespaces chain/contract/wallet. */
 export const AIRDROP_CLAIM_CACHE_KEY = 'airdropClaim';
 
-const HASH_RE = /^0x[0-9a-fA-F]{64}$/;
 const DECIMAL_RE = /^\d+$/;
-
-interface StoredAirdropClaim {
-  readonly hash?: unknown;
-  readonly amount?: unknown;
-  readonly share?: unknown;
-  readonly totalShare?: unknown;
-  readonly remainingShare?: unknown;
-  readonly tokenSymbol?: unknown;
-  readonly tokenDecimals?: unknown;
-  readonly recordedAt?: unknown;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function hashOf(value: unknown): HexHash | null {
-  return typeof value === 'string' && HASH_RE.test(value) ? (value as HexHash) : null;
-}
 
 function decimalOf(value: unknown): bigint | undefined {
   if (typeof value !== 'string' || !DECIMAL_RE.test(value)) return undefined;
@@ -57,18 +46,10 @@ function decimalOf(value: unknown): bigint | undefined {
   }
 }
 
-function symbolOf(value: unknown): string | undefined {
-  return typeof value === 'string' && value.length > 0 && value.length <= 64 ? value : undefined;
-}
-
 function decimalsOf(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 36
     ? value
     : undefined;
-}
-
-function timestampOf(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 export function createAirdropClaimScope(
@@ -79,50 +60,105 @@ export function createAirdropClaimScope(
   return { chainId, contractAddress, wallet };
 }
 
+/** Everything but the envelope's hash and recordedAt. */
+interface AirdropClaimPayload {
+  readonly amount: bigint | undefined;
+  readonly share: bigint | undefined;
+  readonly totalShare: bigint | undefined;
+  readonly remainingShare: bigint | undefined;
+  readonly tokenSymbol: string | undefined;
+  readonly tokenDecimals: number | undefined;
+}
+
+const EMPTY_PAYLOAD: AirdropClaimPayload = {
+  amount: undefined,
+  share: undefined,
+  totalShare: undefined,
+  remainingShare: undefined,
+  tokenSymbol: undefined,
+  tokenDecimals: undefined,
+};
+
+function decimalString(value: bigint | undefined): string | undefined {
+  return value === undefined ? undefined : value.toString();
+}
+
+const adapter: WriteRecordAdapter<AirdropClaimPayload> = {
+  key: AIRDROP_CLAIM_CACHE_KEY,
+  encodePayload: (payload) => ({
+    amount: decimalString(payload.amount),
+    share: decimalString(payload.share),
+    totalShare: decimalString(payload.totalShare),
+    remainingShare: decimalString(payload.remainingShare),
+    tokenSymbol: payload.tokenSymbol,
+    tokenDecimals: payload.tokenDecimals,
+  }),
+  decodePayload: (raw) => {
+    if (!isRecord(raw)) return null;
+    return {
+      amount: decimalOf(raw.amount),
+      share: decimalOf(raw.share),
+      totalShare: decimalOf(raw.totalShare),
+      remainingShare: decimalOf(raw.remainingShare),
+      tokenSymbol: labelOf(raw.tokenSymbol, 64),
+      tokenDecimals: decimalsOf(raw.tokenDecimals),
+    };
+  },
+};
+
+function writeReceipt(
+  scope: CacheScope,
+  hash: HexHash,
+  payload: AirdropClaimPayload,
+  recordedAt: number | undefined,
+): void {
+  writeWriteRecord(adapter, scope, {
+    hash,
+    chainId: scope.chainId,
+    account: scope.wallet as `0x${string}`,
+    nonce: undefined,
+    recordedAt: recordedAt ?? Date.now(),
+    payload,
+  });
+}
+
 /**
- * Reads the local claim record. A malformed hash invalidates the record (the
- * page falls back to the on-chain isClaimed read); a missing amount keeps the
- * hash so a pending transaction can be recovered.
+ * Reads the local claim record. A missing/invalid hash or envelope invalidates the
+ * record (the page falls back to the on-chain isClaimed read); a missing amount
+ * keeps the hash so a pending transaction can be recovered.
  */
 export function readAirdropClaimRecord(scope: CacheScope): AirdropClaimReceipt | null {
-  const raw: unknown = cache.get<unknown>(scope, AIRDROP_CLAIM_CACHE_KEY);
-  if (!isRecord(raw)) return null;
-  const record = raw as StoredAirdropClaim;
-  const hash = hashOf(record.hash);
-  if (hash === null) return null;
+  const record = readWriteRecord(adapter, scope);
+  if (record === null) return null;
   return {
-    hash,
-    amount: decimalOf(record.amount),
-    share: decimalOf(record.share),
-    totalShare: decimalOf(record.totalShare),
-    remainingShare: decimalOf(record.remainingShare),
-    tokenSymbol: symbolOf(record.tokenSymbol),
-    tokenDecimals: decimalsOf(record.tokenDecimals),
-    recordedAt: timestampOf(record.recordedAt),
+    hash: record.hash,
+    ...record.payload,
+    recordedAt: record.recordedAt,
   };
 }
 
 /** Persists the hash as soon as the wallet returns it, before it is mined. */
 export function writeAirdropClaimPending(scope: CacheScope, hash: HexHash): void {
-  cache.set(scope, AIRDROP_CLAIM_CACHE_KEY, { hash });
+  writeReceipt(scope, hash, EMPTY_PAYLOAD, undefined);
 }
 
 /** Persists the confirmed receipt so a refresh keeps showing 已铸造 + the amount. */
 export function writeAirdropClaimReceipt(scope: CacheScope, receipt: AirdropClaimReceipt): void {
-  cache.set(scope, AIRDROP_CLAIM_CACHE_KEY, {
-    hash: receipt.hash,
-    ...(receipt.amount !== undefined ? { amount: receipt.amount.toString() } : {}),
-    ...(receipt.share !== undefined ? { share: receipt.share.toString() } : {}),
-    ...(receipt.totalShare !== undefined ? { totalShare: receipt.totalShare.toString() } : {}),
-    ...(receipt.remainingShare !== undefined
-      ? { remainingShare: receipt.remainingShare.toString() }
-      : {}),
-    ...(receipt.tokenSymbol !== undefined ? { tokenSymbol: receipt.tokenSymbol } : {}),
-    ...(receipt.tokenDecimals !== undefined ? { tokenDecimals: receipt.tokenDecimals } : {}),
-    ...(receipt.recordedAt !== undefined ? { recordedAt: receipt.recordedAt } : {}),
-  });
+  writeReceipt(
+    scope,
+    receipt.hash,
+    {
+      amount: receipt.amount,
+      share: receipt.share,
+      totalShare: receipt.totalShare,
+      remainingShare: receipt.remainingShare,
+      tokenSymbol: receipt.tokenSymbol,
+      tokenDecimals: receipt.tokenDecimals,
+    },
+    receipt.recordedAt,
+  );
 }
 
 export function clearAirdropClaimRecord(scope: CacheScope): void {
-  cache.remove(scope, AIRDROP_CLAIM_CACHE_KEY);
+  clearWriteRecord(adapter, scope);
 }

@@ -15,6 +15,9 @@ import {
  *
  * 记录里只存「调用形状」（地址 + 函数名 + 参数），ABI 由函数名在已知 ABIs 里重新
  * 查出来，所以一条被篡改的记录也没有机会让页面签一个任意接口的调用。
+ *
+ * T005：通用信封 `{hash,chainId,account,nonce?,recordedAt,payload}`，调用形状在
+ * `payload.call` 之下。
  */
 
 const WALLET = '0x90F79bf6EB2c4f870365E785982E1f101E93b906';
@@ -51,12 +54,28 @@ describe('liquidity-record 在途任务（R2/R3/R4）', () => {
     const stored = readStoredLiquidity(SCOPE);
     expect(stored).not.toBeNull();
     expect(stored?.hash).toBe(HASH);
+    expect(stored?.chainId).toBe(31337);
+    expect(stored?.account).toBe(WALLET);
     expect(stored?.call.functionName).toBe('addLiquidityETH');
     expect(stored?.call.address).toBe(ROUTER);
     expect(stored?.call.args).toEqual([TOKEN, 1000000n, 900n, 800n, WALLET, 1_700_000_600n]);
     expect(stored?.call.value).toBe(500000000000000000n);
     expect(stored?.nonce).toBe(12);
     expect(stored?.note).toEqual({ title: '加流动性完成', detail: '已加入 0.5 ETH' });
+  });
+
+  it('nests the feature payload under `payload` in the generic envelope', () => {
+    writeStoredLiquidity(SCOPE, STORED);
+    const raw = cache.get<Record<string, unknown>>(SCOPE, LIQUIDITY_TASK_CACHE_KEY);
+    expect(raw).not.toBeNull();
+    expect(raw?.hash).toBe(HASH);
+    expect(raw?.call).toBeUndefined();
+    expect(raw?.note).toBeUndefined();
+    const payload = raw?.payload as Record<string, unknown>;
+    const call = payload.call as Record<string, unknown>;
+    expect(call.functionName).toBe('addLiquidityETH');
+    expect(call.value).toEqual({ __bigint: '500000000000000000' });
+    expect(payload.note).toEqual({ title: '加流动性完成', detail: '已加入 0.5 ETH' });
   });
 
   it('round-trips a struct-argument call (hub addLiquidityWithNative)', () => {
@@ -75,7 +94,16 @@ describe('liquidity-record 在途任务（R2/R3/R4）', () => {
   });
 
   it('rejects a legacy hash-less record (no retry state after T004)', () => {
-    cache.set(SCOPE, LIQUIDITY_TASK_CACHE_KEY, { ...STORED, hash: null, nonce: undefined });
+    cache.set(SCOPE, LIQUIDITY_TASK_CACHE_KEY, {
+      hash: null,
+      chainId: 31337,
+      account: WALLET,
+      recordedAt: 1_700_000_000_000,
+      payload: {
+        call: { address: ROUTER, functionName: 'addLiquidityETH', args: [] },
+        note: { title: '加流动性完成' },
+      },
+    });
     expect(readStoredLiquidity(SCOPE)).toBeNull();
   });
 
@@ -91,17 +119,20 @@ describe('liquidity-record 在途任务（R2/R3/R4）', () => {
     const raw = cache.get<Record<string, unknown>>(SCOPE, LIQUIDITY_TASK_CACHE_KEY);
     expect(raw).not.toBeNull();
     if (raw === null) return;
-    const call = raw.call as Record<string, unknown>;
+    const payload = raw.payload as Record<string, unknown>;
+    const call = payload.call as Record<string, unknown>;
     for (const broken of [
       { ...raw, chainId: undefined },
       { ...raw, account: undefined },
       { ...raw, account: '0xnot-an-address' },
       { ...raw, hash: '0x1234' },
-      { ...raw, call: { ...call, functionName: 'drainEverything' } },
-      { ...raw, call: { ...call, address: '0xnot-an-address' } },
-      { ...raw, call: { ...call, args: [{ __bigint: '-1' }] } },
-      { ...raw, call: { ...call, args: 'not-an-array' } },
-      { ...raw, note: { title: '' } },
+      { ...raw, hash: undefined },
+      { ...raw, payload: undefined },
+      { ...raw, payload: { ...payload, call: { ...call, functionName: 'drainEverything' } } },
+      { ...raw, payload: { ...payload, call: { ...call, address: '0xnot-an-address' } } },
+      { ...raw, payload: { ...payload, call: { ...call, args: [{ __bigint: '-1' }] } } },
+      { ...raw, payload: { ...payload, call: { ...call, args: 'not-an-array' } } },
+      { ...raw, payload: { ...payload, note: { title: '' } } },
     ]) {
       cache.set(SCOPE, LIQUIDITY_TASK_CACHE_KEY, broken);
       expect(readStoredLiquidity(SCOPE)).toBeNull();

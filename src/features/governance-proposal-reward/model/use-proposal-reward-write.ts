@@ -1,16 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import type { TransactionReceipt } from 'viem';
-import { mintAbi } from '@/config/abis';
+import { useState } from 'react';
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import { toUserMessage } from '@/shared/lib/errors';
-import {
-  useContractWrite,
-  type ContractCall,
-  type ContractWriteStage,
-} from '@/shared/model/use-contract-write';
+import type { WriteStage } from '@/shared/lib/write-attempt';
 import type { TxWatch } from '@/shared/model/use-tx-watch';
-import { parseProposalRewardBurned } from '../lib/proposal-reward-receipt';
+import { useWriteAttempt } from '@/shared/model/use-write-attempt';
+import { useProposalRewardWriteAdapter } from './proposal-reward-write-adapter';
 
 /**
  * 提案激励销毁的写链状态机：一笔 `Mint.burnProposalReward(token, round, proposalId)`。
@@ -25,6 +19,8 @@ import { parseProposalRewardBurned } from '../lib/proposal-reward-receipt';
  *
  * 达标提案的激励只能由提案目标合约铸造（`mintProposalReward` 的 `onlyProposalTarget`），
  * core 覆盖范围内这一页**不给铸造按钮**，只有这一笔写操作。
+ *
+ * 写链生命周期由 `useWriteAttempt` 纯核持有；这里只投影 `activeProposalId` 与面需要的字段。
  */
 export interface ProposalRewardBurnInput {
   readonly mintAddress: HexAddress;
@@ -40,7 +36,7 @@ export interface ProposalRewardReceipt {
 }
 
 export interface ProposalRewardWrite {
-  readonly stage: ContractWriteStage;
+  readonly stage: WriteStage;
   readonly error: string | null;
   readonly watch: TxWatch;
   readonly receipt: ProposalRewardReceipt | null;
@@ -51,67 +47,28 @@ export interface ProposalRewardWrite {
 }
 
 export function useProposalRewardWrite(onConfirmed: () => void): ProposalRewardWrite {
-  const write = useContractWrite(
-    {
-      wallet: copy.gov.proposalRewards.waitingWallet,
-      reverted: copy.gov.proposalRewards.revert,
-    },
-    toUserMessage,
-    onConfirmed,
-  );
-  const [receipt, setReceipt] = useState<ProposalRewardReceipt | null>(null);
   const [activeProposalId, setActiveProposalId] = useState<bigint | null>(null);
-  /** 回执对象只消费一次：同一条回执不能重复弹面板。 */
-  const consumedRef = useRef<TransactionReceipt | null>(null);
-  /** 最近一次提交的入参；回执里的 token / round 用它过滤事件，避免用户切轮后错配。 */
-  const lastInputRef = useRef<ProposalRewardBurnInput | null>(null);
-
-  const receiptData = write.watch.receipt;
-  useEffect(() => {
-    if (receiptData === null) return;
-    if (consumedRef.current === receiptData) return;
-    consumedRef.current = receiptData;
-    if (receiptData.status !== 'success') return;
-    const input = lastInputRef.current;
-    if (input === null) return;
-    const burned = parseProposalRewardBurned(
-      receiptData,
-      input.tokenAddress,
-      input.round,
-      input.proposalId,
-    );
-    setReceipt(
-      burned === null
-        ? { proposalId: input.proposalId, amount: null }
-        : { proposalId: burned.proposalId, amount: burned.amount },
-    );
-  }, [receiptData]);
+  const adapter = useProposalRewardWriteAdapter({
+    reverted: copy.gov.proposalRewards.revert,
+    onConfirmed,
+  });
+  const write = useWriteAttempt(adapter);
 
   const submit = (input: ProposalRewardBurnInput): void => {
-    const call: ContractCall = {
-      address: input.mintAddress,
-      abi: mintAbi,
-      functionName: 'burnProposalReward',
-      args: [input.tokenAddress, input.round, input.proposalId],
-    };
-    lastInputRef.current = input;
     setActiveProposalId(input.proposalId);
-    void write.run(call);
+    void write.run(input);
   };
 
   return {
     stage: write.stage,
-    error: write.error,
+    error: write.error?.message ?? null,
     watch: write.watch,
-    receipt,
+    receipt: write.receipt,
     activeProposalId,
     submit,
     closeReceipt: () => {
-      setReceipt(null);
       setActiveProposalId(null);
-      consumedRef.current = null;
-      lastInputRef.current = null;
-      write.reset();
+      write.clearReceipt();
     },
   };
 }

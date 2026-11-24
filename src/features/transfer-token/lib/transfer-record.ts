@@ -1,9 +1,19 @@
 import { ZERO_ADDRESS, type HexAddress } from '@/config/networks';
-import { cache, type CacheScope } from '@/shared/lib/cache';
+import type { CacheScope } from '@/shared/lib/cache';
+import {
+  addressOf,
+  clearWriteRecord,
+  isRecord,
+  labelOf,
+  readWriteRecord,
+  writeWriteRecord,
+  type WriteHash,
+  type WriteRecordAdapter,
+} from '@/shared/lib/write-record';
 import type { TransferRecord } from './transfer-receipt';
 import type { TransferToken, TransferTokenKind } from './transfer-types';
 
-export type HexHash = `0x${string}`;
+export type HexHash = WriteHash;
 
 /**
  * One transfer, persisted the moment the wallet returns a hash.
@@ -19,8 +29,8 @@ export type HexHash = `0x${string}`;
  *   the receipt sheet never pops up again (owner 2026-11-14, same rule as
  *   mint/swap).
  *
- * `chainId` / `account` / `nonce` are stored *inside* the record as well (R2/R3):
- * the scope already namespaces the entry, but a record that is read through the
+ * `chainId` / `account` / `nonce` live in the generic envelope (R2/R3): the
+ * scope already namespaces the entry, but a record that is read through the
  * wrong scope (or was written by an older build) must still be rejected instead
  * of signed by whichever wallet happens to be connected now — and a restored
  * after a refresh must know the original nonce so it replaces that transaction
@@ -44,8 +54,6 @@ export interface StoredTransfer {
 /** Semantic key; the scope already namespaces chain/wallet. */
 export const TRANSFER_TASK_CACHE_KEY = 'transferTask';
 
-const HASH_RE = /^0x[0-9a-fA-F]{64}$/;
-const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const DECIMAL_RE = /^\d+$/;
 const KINDS: readonly TransferTokenKind[] = ['native', 'community', 'wrapped', 'lp', 'custom'];
 
@@ -65,26 +73,6 @@ export function storedTransferToRecord(stored: StoredTransfer): TransferRecord {
     recipientLabel: stored.recipientLabel,
     recordedAt: stored.recordedAt,
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function hashOf(value: unknown): HexHash | null {
-  return typeof value === 'string' && HASH_RE.test(value) ? (value as HexHash) : null;
-}
-
-function addressOf(value: unknown): HexAddress | null {
-  return typeof value === 'string' && ADDRESS_RE.test(value) ? (value as HexAddress) : null;
-}
-
-function chainIdOf(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined;
-}
-
-function nonceOf(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 }
 
 function decimalOf(value: unknown): bigint | undefined {
@@ -122,48 +110,69 @@ function tokenOf(value: unknown): TransferToken | null {
   return { kind, address, symbol, decimals };
 }
 
-function labelOf(value: unknown): string | undefined {
-  return typeof value === 'string' && value.length > 0 && value.length <= 128 ? value : undefined;
+interface TransferPayload {
+  readonly token: TransferToken;
+  readonly amount: bigint;
+  readonly recipient: HexAddress;
+  readonly recipientLabel: string | undefined;
+  readonly confirmed: boolean;
 }
 
-function timestampOf(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
-}
+const adapter: WriteRecordAdapter<TransferPayload> = {
+  key: TRANSFER_TASK_CACHE_KEY,
+  encodePayload: (payload) => ({
+    token: {
+      kind: payload.token.kind,
+      ...(payload.token.address !== undefined ? { address: payload.token.address } : {}),
+      symbol: payload.token.symbol,
+      decimals: payload.token.decimals,
+    },
+    amount: payload.amount.toString(),
+    recipient: payload.recipient,
+    ...(payload.recipientLabel !== undefined ? { recipientLabel: payload.recipientLabel } : {}),
+    confirmed: payload.confirmed,
+  }),
+  decodePayload: (raw) => {
+    if (!isRecord(raw)) return null;
+    const token = tokenOf(raw.token);
+    const amount = decimalOf(raw.amount);
+    const recipient = addressOf(raw.recipient);
+    if (token === null || amount === undefined || recipient === null) return null;
+    return {
+      token,
+      amount,
+      recipient,
+      recipientLabel: labelOf(raw.recipientLabel, 128),
+      confirmed: raw.confirmed === true,
+    };
+  },
+};
 
 /**
  * Validating read: a malformed / outdated entry is treated as absent (the cache
  * removes only truly unparseable JSON), so a bad record can never rebuild a fake
  * pending state that would block the page.
  *
- * The record carries its own `{chainId, account}` and is returned as-is here; the
- * hook compares it with the connected wallet before restoring/signing anything
- * (R3) so the mismatch can surface as neutral copy instead of a silent no-op.
- * The cache scope already namespaces the entry, so the wrong wallet cannot even
- * read another wallet's record.
+ * The record carries its own `{chainId, account}` in the envelope and is returned
+ * as-is here; the hook compares it with the connected wallet before
+ * restoring/signing anything (R3) so the mismatch can surface as neutral copy
+ * instead of a silent no-op. The cache scope already namespaces the entry, so the
+ * wrong wallet cannot even read another wallet's record.
  */
 export function readStoredTransfer(scope: CacheScope): StoredTransfer | null {
-  const raw: unknown = cache.get<unknown>(scope, TRANSFER_TASK_CACHE_KEY);
-  if (!isRecord(raw)) return null;
-  const hash = hashOf(raw.hash);
-  const token = tokenOf(raw.token);
-  const amount = decimalOf(raw.amount);
-  const recipient = addressOf(raw.recipient);
-  const recordedAt = timestampOf(raw.recordedAt);
-  const storedChainId = chainIdOf(raw.chainId);
-  const storedAccount = addressOf(raw.account);
-  if (hash === null || token === null || amount === undefined || recipient === null) return null;
-  if (storedChainId === undefined || storedAccount === null) return null;
+  const record = readWriteRecord(adapter, scope);
+  if (record === null) return null;
   return {
-    hash,
-    chainId: storedChainId,
-    account: storedAccount,
-    token,
-    amount,
-    recipient,
-    recipientLabel: labelOf(raw.recipientLabel),
-    nonce: nonceOf(raw.nonce),
-    confirmed: raw.confirmed === true,
-    recordedAt: recordedAt ?? Date.now(),
+    hash: record.hash,
+    chainId: record.chainId,
+    account: record.account,
+    token: record.payload.token,
+    amount: record.payload.amount,
+    recipient: record.payload.recipient,
+    recipientLabel: record.payload.recipientLabel,
+    nonce: record.nonce,
+    confirmed: record.payload.confirmed,
+    recordedAt: record.recordedAt,
   };
 }
 
@@ -173,25 +182,22 @@ export function readStoredTransfer(scope: CacheScope): StoredTransfer | null {
  * reconstructs the same page state.
  */
 export function writeStoredTransfer(scope: CacheScope, stored: StoredTransfer): void {
-  cache.set(scope, TRANSFER_TASK_CACHE_KEY, {
+  writeWriteRecord(adapter, scope, {
     hash: stored.hash,
     chainId: stored.chainId,
     account: stored.account,
-    token: {
-      kind: stored.token.kind,
-      ...(stored.token.address !== undefined ? { address: stored.token.address } : {}),
-      symbol: stored.token.symbol,
-      decimals: stored.token.decimals,
-    },
-    amount: stored.amount.toString(),
-    recipient: stored.recipient,
-    ...(stored.recipientLabel !== undefined ? { recipientLabel: stored.recipientLabel } : {}),
-    ...(stored.nonce !== undefined ? { nonce: stored.nonce } : {}),
-    confirmed: stored.confirmed,
+    nonce: stored.nonce,
     recordedAt: stored.recordedAt,
+    payload: {
+      token: stored.token,
+      amount: stored.amount,
+      recipient: stored.recipient,
+      recipientLabel: stored.recipientLabel,
+      confirmed: stored.confirmed,
+    },
   });
 }
 
 export function clearStoredTransfer(scope: CacheScope): void {
-  cache.remove(scope, TRANSFER_TASK_CACHE_KEY);
+  clearWriteRecord(adapter, scope);
 }

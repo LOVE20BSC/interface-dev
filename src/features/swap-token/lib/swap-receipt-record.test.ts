@@ -71,6 +71,7 @@ describe('swap receipt record', () => {
       belowMinOut: false,
       pairToken0: [TOKEN],
       pairToken1: [WETH],
+      recordedAt: 1_700_000_000_000,
     });
   });
 
@@ -82,9 +83,49 @@ describe('swap receipt record', () => {
     expect(stored?.hash).toBe(HASH);
   });
 
+  it('nests the feature payload under `payload` in the generic envelope', () => {
+    writeSwapRecord(scope, record());
+    const raw = cache.get<Record<string, unknown>>(scope, 'swapReceipt');
+    expect(raw).not.toBeNull();
+    expect(raw?.hash).toBe(HASH);
+    expect(raw?.chainId).toBe(31337);
+    expect(raw?.account).toBe(scope.wallet);
+    expect(raw?.kind).toBeUndefined();
+    const payload = raw?.payload as Record<string, unknown>;
+    expect(payload.kind).toBe('swap');
+    expect(payload.actualOut).toBe('20000000000000000000');
+    expect(raw?.payload).not.toHaveProperty('hash');
+  });
+
   it('self-heals a record with a malformed hash', () => {
-    cache.set(scope, 'swapReceipt', { hash: '0x1234', kind: 'swap' });
+    cache.set(scope, 'swapReceipt', {
+      hash: '0x1234',
+      chainId: 31337,
+      account: scope.wallet,
+      recordedAt: 1,
+      payload: { kind: 'swap' },
+    });
     expect(readSwapRecord(scope)).toBeNull();
+  });
+
+  it('rejects a record without a hash or without a decodable payload', () => {
+    const base = {
+      chainId: 31337,
+      account: scope.wallet,
+      recordedAt: 1,
+      payload: { kind: 'swap' },
+    };
+    for (const broken of [
+      { ...base },
+      { ...base, hash: null },
+      { ...base, hash: HASH, payload: undefined },
+      { ...base, hash: HASH, payload: { kind: 'nope' } },
+      { ...base, hash: HASH, chainId: undefined },
+      { ...base, hash: HASH, account: undefined },
+    ]) {
+      cache.set(scope, 'swapReceipt', broken);
+      expect(readSwapRecord(scope)).toBeNull();
+    }
   });
 
   it('matches only the same pair', () => {

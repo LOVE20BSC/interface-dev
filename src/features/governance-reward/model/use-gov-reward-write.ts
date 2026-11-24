@@ -1,16 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useAccount } from 'wagmi';
-import { mintAbi } from '@/config/abis';
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import { toUserMessage } from '@/shared/lib/errors';
-import {
-  useContractWrite,
-  type ContractCall,
-  type ContractWriteStage,
-} from '@/shared/model/use-contract-write';
+import type { WriteStage } from '@/shared/lib/write-attempt';
 import type { TxWatch } from '@/shared/model/use-tx-watch';
-import { parseGovRewardReceipt, type GovRewardReceipt } from '../lib/gov-reward-receipt';
+import { useWriteAttempt } from '@/shared/model/use-write-attempt';
+import type { GovRewardReceipt } from '../lib/gov-reward-receipt';
+import { useGovRewardWriteAdapter } from './gov-reward-write-adapter';
 
 /**
  * 治理激励的写链状态机：一笔 `Mint.mintGovReward`（单轮）或 `Mint.mintGovRewards`（批量）。
@@ -24,6 +20,9 @@ import { parseGovRewardReceipt, type GovRewardReceipt } from '../lib/gov-reward-
  *   （`Mint.sol:287` 的 `onlyMemberOwner`），界面上没有「收款人」这个概念；
  * - 批量只传调用方给的轮次数组（页面只放「确认可铸」的轮次）：中间任何一轮失败
  *   整笔回滚，所以这里不再二次筛选、也不补轮次。
+ *
+ * 写链生命周期由 `useWriteAttempt` 纯核持有；`submittingRounds` 与 `receipt` 的投影
+ * 仍按提交入参派生（adapter 在 `send` 时记下轮次，回执文案与迁移前一致）。
  */
 export interface GovRewardWriteInput {
   readonly mintAddress: HexAddress;
@@ -34,10 +33,10 @@ export interface GovRewardWriteInput {
 }
 
 export interface GovRewardWrite {
-  readonly stage: ContractWriteStage;
+  readonly stage: WriteStage;
   readonly error: string | null;
   readonly watch: TxWatch;
-  /** 回执（由 `watch.receipt` 现算，关闭回执等于 `reset()`）。 */
+  /** 回执（由纯核持有，关闭回执等于 `clearReceipt()`）。 */
   readonly receipt: GovRewardReceipt | null;
   /** 正在签 / 在途的轮次；列表据此把对应行标成「铸造中…」。 */
   readonly submittingRounds: readonly bigint[];
@@ -47,60 +46,29 @@ export interface GovRewardWrite {
 
 export function useGovRewardWrite(onConfirmed: () => void): GovRewardWrite {
   const { address: account } = useAccount();
-  const write = useContractWrite(
-    {
-      wallet: copy.gov.rewards.waitingWallet,
-      reverted: copy.gov.rewards.revert,
-    },
-    toUserMessage,
-    onConfirmed,
-  );
   const [submittingRounds, setSubmittingRounds] = useState<readonly bigint[]>([]);
-
-  const receiptData = write.watch.receipt;
-  // 回执是 watch 的派生值：不回填 state，关闭回执就是 `write.reset()`（哈希清空后
-  // watch 的 receipt 自然变 null）。这样也不会在 effect 里 setState。
-  const receipt = useMemo(
-    () =>
-      receiptData !== null && receiptData.status === 'success'
-        ? parseGovRewardReceipt(receiptData, submittingRounds)
-        : null,
-    [receiptData, submittingRounds],
-  );
+  const adapter = useGovRewardWriteAdapter({
+    reverted: copy.gov.rewards.revert,
+    onConfirmed,
+  });
+  const write = useWriteAttempt(adapter);
 
   const submit = (input: GovRewardWriteInput): void => {
     if (account === undefined) return;
     const [first] = input.rounds;
     if (first === undefined) return;
     setSubmittingRounds(input.rounds);
-    const call: ContractCall =
-      input.rounds.length === 1
-        ? {
-            address: input.mintAddress,
-            abi: mintAbi,
-            functionName: 'mintGovReward',
-            args: [input.tokenAddress, first, input.memberId, account],
-          }
-        : {
-            address: input.mintAddress,
-            abi: mintAbi,
-            functionName: 'mintGovRewards',
-            args: [input.tokenAddress, input.rounds, input.memberId, account],
-          };
-    void write.run(call);
+    // 收款人在提交时定死（而不是签名时再读钱包），与迁移前的调用参数一致。
+    void write.run({ ...input, recipient: account });
   };
 
   return {
     stage: write.stage,
-    error: write.error,
+    error: write.error?.message ?? null,
     watch: write.watch,
-    receipt,
+    receipt: write.receipt,
     submittingRounds,
     submit,
-    closeReceipt: () => {
-      // 不在这里清 `submittingRounds`：回执是 `watch.receipt` 的派生值，等 watch
-      // 自己把哈希清掉（下一帧）后回执自然消失，避免中间一帧出现空轮次文案。
-      write.reset();
-    },
+    closeReceipt: write.clearReceipt,
   };
 }

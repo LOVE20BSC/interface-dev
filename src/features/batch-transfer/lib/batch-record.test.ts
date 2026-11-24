@@ -61,6 +61,19 @@ describe('batch-record 在途批量转账（R1/R3/R4）', () => {
     expect(readStoredBatch(SCOPE)).toEqual(PENDING);
   });
 
+  it('nests the feature payload under `payload` in the generic envelope', () => {
+    writeStoredBatch(SCOPE, PENDING);
+    const raw = cache.get<Record<string, unknown>>(SCOPE, BATCH_TASK_CACHE_KEY);
+    expect(raw).not.toBeNull();
+    expect(raw?.hash).toBe(HASH);
+    expect(raw?.chainId).toBe(31337);
+    expect(raw?.account).toBe(WALLET);
+    expect(raw?.kind).toBeUndefined();
+    const payload = raw?.payload as Record<string, unknown>;
+    expect(payload.kind).toBe('batch');
+    expect((payload.request as Record<string, unknown>).total).toBe('3000000000000000000');
+  });
+
   it('round-trips the native shape without a token address', () => {
     writeStoredBatch(SCOPE, {
       ...PENDING,
@@ -76,7 +89,13 @@ describe('batch-record 在途批量转账（R1/R3/R4）', () => {
   });
 
   it('rejects a legacy hash-less record (no retry state after T004)', () => {
-    cache.set(SCOPE, BATCH_TASK_CACHE_KEY, { ...PENDING, hash: null, nonce: undefined });
+    cache.set(SCOPE, BATCH_TASK_CACHE_KEY, {
+      hash: null,
+      chainId: 31337,
+      account: WALLET,
+      recordedAt: PENDING.recordedAt,
+      payload: { kind: PENDING.kind, request: PENDING.request },
+    });
     expect(readStoredBatch(SCOPE)).toBeNull();
   });
 
@@ -93,30 +112,40 @@ describe('batch-record 在途批量转账（R1/R3/R4）', () => {
     const raw = cache.get<Record<string, unknown>>(SCOPE, BATCH_TASK_CACHE_KEY);
     expect(raw).not.toBeNull();
     if (raw === null) return;
+    const payload = raw.payload as Record<string, unknown>;
+    const request = payload.request as Record<string, unknown>;
     for (const broken of [
       { ...raw, chainId: undefined },
       { ...raw, account: undefined },
       { ...raw, account: '0xnot-an-address' },
-      { ...raw, kind: 'swap' },
       { ...raw, hash: '0x1234' },
-      { ...raw, request: { ...(raw.request as Record<string, unknown>), rows: [] } },
-      { ...raw, request: { ...(raw.request as Record<string, unknown>), total: '-1' } },
+      { ...raw, hash: undefined },
+      { ...raw, payload: undefined },
+      { ...raw, payload: { ...payload, kind: 'swap' } },
+      { ...raw, payload: { ...payload, request: { ...request, rows: [] } } },
+      { ...raw, payload: { ...payload, request: { ...request, total: '-1' } } },
       {
         ...raw,
-        request: {
-          ...(raw.request as Record<string, unknown>),
-          rows: [{ address: '0xnot-an-address', amount: '1' }],
+        payload: {
+          ...payload,
+          request: {
+            ...request,
+            rows: [{ address: '0xnot-an-address', amount: '1' }],
+          },
         },
       },
       {
         ...raw,
-        request: {
-          ...(raw.request as Record<string, unknown>),
-          mode: 'token',
-          tokenAddress: undefined,
+        payload: {
+          ...payload,
+          request: {
+            ...request,
+            mode: 'token',
+            tokenAddress: undefined,
+          },
         },
       },
-      { ...raw, request: { ...(raw.request as Record<string, unknown>), mode: 'approve' } },
+      { ...raw, payload: { ...payload, request: { ...request, mode: 'approve' } } },
     ]) {
       cache.set(SCOPE, BATCH_TASK_CACHE_KEY, broken);
       expect(readStoredBatch(SCOPE)).toBeNull();

@@ -1,21 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { parseEventLogs } from 'viem';
-import { useAccount, useChainId, useWriteContract } from 'wagmi';
-import { airdropDistributorAbi } from '@/config/abis';
+import { useMemo, useState } from 'react';
+import { useAccount, useChainId } from 'wagmi';
 import type { HexAddress } from '@/config/networks';
 import type { AirdropSnapshotEntry } from '@/domain/airdrop-snapshot';
 import { copy } from '@/shared/config/copy-pages';
-import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
-import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
-import { describeAirdropClaimError } from '@/features/claim-airdrop/lib/airdrop-errors';
+import { useWriteAttempt } from '@/shared/model/use-write-attempt';
+import type { TxWatch } from '@/shared/model/use-tx-watch';
 import {
-  clearAirdropClaimRecord,
   createAirdropClaimScope,
-  readAirdropClaimRecord,
-  writeAirdropClaimPending,
   type AirdropClaimReceipt,
   type HexHash,
 } from '@/features/claim-airdrop/lib/airdrop-claim-record';
+import {
+  useAirdropClaimAttemptAdapter,
+  type AirdropClaimIntent,
+} from '@/features/claim-airdrop/model/airdrop-attempt-adapter';
 
 export type AirdropClaimTxStage = 'idle' | 'wallet' | 'pending';
 
@@ -45,21 +43,16 @@ export interface AirdropClaimTransactionOptions {
   readonly onConfirmed?: () => void;
 }
 
-interface PendingClaim {
-  readonly hash: HexHash;
-}
-
 /**
  * Single-step claim transaction (no ERC20 approval: the airdrop contract pays
  * the token itself). Pending grammar is 铸造中… (wallet) → 确认中… (submitted).
+ * The write itself, its persistence policy and the bounded wait live in the shared
+ * write-attempt core; this hook only projects the core state onto the page's
+ * frozen props.
  *
  * The hash is persisted before waiting, so a refresh resumes the receipt. The
  * confirmed record stores AirdropClaimed.amount — the estimate is never used as
  * the final number. Local storage is wallet/chain/contract scoped by cache.ts.
- *
- * The receipt wait is the shared bounded watcher (`useTxWatch`): a dropped,
- * replaced or nonce-gapped claim becomes an actionable recovery card instead of
- * an endless 确认中.
  */
 export function useAirdropClaimTransaction(
   options: AirdropClaimTransactionOptions,
@@ -75,21 +68,7 @@ export function useAirdropClaimTransaction(
   } = options;
   const { address: account } = useAccount();
   const chainId = useChainId();
-  const { writeContractAsync } = useWriteContract();
-  const readPendingNonce = usePendingNonce(account);
-
-  const [pending, setPending] = useState<PendingClaim | null>(null);
-  const [receipt, setReceipt] = useState<AirdropClaimReceipt | null>(null);
-  const [walletAction, setWalletAction] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [errorKind, setErrorKind] = useState<'nonce' | 'staleBlock' | null>(null);
-  const [isHydrating, setIsHydrating] = useState(true);
-  const submittingRef = useRef(false);
-
-  const onConfirmedRef = useRef<(() => void) | undefined>(onConfirmed);
-  useEffect(() => {
-    onConfirmedRef.current = onConfirmed;
-  });
+  const [missingReceiptLog, setMissingReceiptLog] = useState(false);
 
   const scope = useMemo(
     () =>
@@ -99,172 +78,60 @@ export function useAirdropClaimTransaction(
     [account, airdropAddress, chainId],
   );
 
-  // A refresh must resume the pending hash or show the confirmed receipt,
-  // instead of offering a second mint.
-  /* eslint-disable react-hooks/set-state-in-effect -- hydration from the namespaced cache */
-  useEffect(() => {
-    setPending(null);
-    setReceipt(null);
-    setError(null);
-    setErrorKind(null);
-    setWalletAction(false);
-    setIsHydrating(true);
-    submittingRef.current = false;
-    if (scope === null) {
-      setIsHydrating(false);
-      return;
-    }
-    const stored = readAirdropClaimRecord(scope);
-    // Only an unconfirmed hash is resumed. A confirmed receipt is shown once in
-    // the session that mined it; revisiting the page must not replay it (owner
-    // 2026-11-14) — the page falls back to its S6 已铸造 state from the chain.
-    if (stored !== null) {
-      if (stored.amount !== undefined) clearAirdropClaimRecord(scope);
-      else setPending({ hash: stored.hash });
-    }
-    setIsHydrating(false);
-  }, [scope]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const watch = useTxWatch({
-    hash: pending?.hash ?? null,
-    wallet: account,
-    walletAction,
-    enabled: pending !== null,
-  });
-  const onChainReceipt = watch.receipt;
-
-  /* eslint-disable react-hooks/set-state-in-effect -- a mined receipt is an external chain fact */
-  useEffect(() => {
-    if (pending === null || onChainReceipt === null) return;
-
-    if (onChainReceipt.status === 'reverted') {
-      if (scope !== null) clearAirdropClaimRecord(scope);
-      setPending(null);
-      setError(copy.airdrop.errors.reverted);
-      onConfirmedRef.current?.();
-      return;
-    }
-
-    // A malformed log must show a neutral result, never crash or show the estimate.
-    const events = (() => {
-      try {
-        return parseEventLogs({
-          abi: airdropDistributorAbi,
-          logs: onChainReceipt.logs,
-          eventName: 'AirdropClaimed',
-        });
-      } catch {
-        return [];
-      }
-    })();
-    const event = events.find((candidate) => {
-      const args = candidate.args;
-      const eventClaimer = args.claimer;
-      const eventToken = args.tokenAddress;
-      return (
-        account !== undefined &&
-        tokenAddress !== undefined &&
-        typeof eventClaimer === 'string' &&
-        typeof eventToken === 'string' &&
-        eventClaimer.toLowerCase() === account.toLowerCase() &&
-        eventToken.toLowerCase() === tokenAddress.toLowerCase()
-      );
-    });
-
-    if (event === undefined) {
-      if (scope !== null) clearAirdropClaimRecord(scope);
-      setPending(null);
-      setError(copy.airdrop.receipt.missingBody);
-      onConfirmedRef.current?.();
-      return;
-    }
-
-    const nextReceipt: AirdropClaimReceipt = {
-      hash: onChainReceipt.transactionHash,
-      amount: event.args.amount,
-      share: event.args.share,
-      totalShare,
-      remainingShare: event.args.remainingShare,
-      tokenSymbol,
-      tokenDecimals,
-      recordedAt: Date.now(),
-    };
-    if (scope !== null) clearAirdropClaimRecord(scope);
-    setReceipt(nextReceipt);
-    setPending(null);
-    setError(null);
-    onConfirmedRef.current?.();
-  }, [
-    account,
-    onChainReceipt,
-    pending,
+  const adapter = useAirdropClaimAttemptAdapter({
     scope,
+    chainId,
+    account,
+    airdropAddress,
     tokenAddress,
-    tokenDecimals,
     tokenSymbol,
+    tokenDecimals,
     totalShare,
-  ]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const submitClaim = async (): Promise<void> => {
-    if (submittingRef.current) return;
-    if (airdropAddress === undefined || tokenAddress === undefined || account === undefined) return;
-    if (entry === null) return;
-    setError(null);
-    setErrorKind(null);
-    setWalletAction(true);
-    submittingRef.current = true;
-    try {
-      // R5: a new claim queues behind whatever the wallet already broadcast.
-      const sendNonce = await readPendingNonce();
-      const hash = await writeContractAsync({
-        address: airdropAddress,
-        abi: airdropDistributorAbi,
-        functionName: 'claim',
-        args: [tokenAddress, entry.share, entry.proof],
-        ...(sendNonce !== undefined ? { nonce: sendNonce } : {}),
-      });
-      // Persist before waiting: a refresh while pending must recover this hash.
-      if (scope !== null) writeAirdropClaimPending(scope, hash);
-      setPending({ hash });
-    } catch (cause) {
-      setError(describeAirdropClaimError(cause));
-      setErrorKind(txSendRecoveryKind(cause) ?? null);
-      // Another device may have claimed first (AlreadyClaimed), or the pool
-      // may have changed: resync so the page does not keep offering the CTA.
-      onConfirmedRef.current?.();
-    } finally {
-      setWalletAction(false);
-      submittingRef.current = false;
-    }
-  };
+    entry,
+    onMissingReceiptLog: () => setMissingReceiptLog(true),
+    onConfirmed: () => onConfirmed?.(),
+  });
+  const attempt = useWriteAttempt(adapter);
 
   const claim = (): void => {
-    if (submittingRef.current || receipt !== null) return;
-    if (pending !== null) return;
-    void submitClaim();
+    if (attempt.isHydrating || attempt.stage !== 'idle' || attempt.receipt !== null) return;
+    if (airdropAddress === undefined || tokenAddress === undefined || account === undefined) return;
+    if (entry === null) return;
+    const intent: AirdropClaimIntent = {
+      tokenAddress,
+      share: entry.share,
+      proof: entry.proof,
+    };
+    setMissingReceiptLog(false);
+    void attempt.run(intent).then((started) => {
+      // A failed send may mean another device already claimed first
+      // (AlreadyClaimed) or that the pool changed: resync so the page does not
+      // keep offering the CTA.
+      if (!started) onConfirmed?.();
+    });
   };
 
-  // A stuck hash frees the CTA; the recovery card owns the manual actions.
-  const stage: AirdropClaimTxStage = walletAction
-    ? 'wallet'
-    : pending !== null
-      ? 'pending'
-      : 'idle';
+  // A claimed receipt whose AirdropClaimed log could not be read is not a revert:
+  // the transaction was submitted, only the amount is still unknown.
+  const error =
+    attempt.error === null
+      ? null
+      : missingReceiptLog
+        ? copy.airdrop.receipt.missingBody
+        : attempt.error.message;
 
   return {
-    stage,
-    receipt,
-    pendingHash: pending?.hash ?? null,
+    stage: attempt.stage,
+    receipt: attempt.receipt,
+    pendingHash: attempt.pendingHash,
     error,
-    errorKind,
-    isHydrating,
-    watch,
+    errorKind: attempt.error?.kind ?? null,
+    isHydrating: attempt.isHydrating,
+    watch: attempt.watch,
     claim,
     clearError: () => {
-      setError(null);
-      setErrorKind(null);
+      setMissingReceiptLog(false);
+      attempt.clearError();
     },
   };
 }

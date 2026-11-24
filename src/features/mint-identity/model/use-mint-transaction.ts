@@ -1,44 +1,27 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAccount, useChainId, useWriteContract } from 'wagmi';
-import { parseEventLogs } from 'viem';
-import { love20TokenAbi, memberNftAbi } from '@/config/abis';
+import { useEffect, useMemo, useState } from 'react';
+import { useAccount, useChainId } from 'wagmi';
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import { cache } from '@/shared/lib/cache';
-import { describeMintError } from '@/features/mint-identity/lib/mint-errors';
-import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
-import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
+import type { CacheScope } from '@/shared/lib/cache';
+import { useWriteAttempt } from '@/shared/model/use-write-attempt';
+import type { TxWatch } from '@/shared/model/use-tx-watch';
+import {
+  useMintAttemptAdapter,
+  type HexHash,
+  type MintedIdentity,
+} from '@/features/mint-identity/model/mint-attempt-adapter';
 
-type HexHash = `0x${string}`;
-type PendingKind = 'approve' | 'mint';
-
-interface PendingTx {
-  readonly kind: PendingKind;
-  readonly hash: HexHash;
-  /** For an approval, the amount just approved (drives the optimistic allowance). */
-  readonly amount?: bigint;
-}
-
-export interface MintedIdentity {
-  readonly memberId: bigint;
-  /** On-chain memberName (MemberMinted.name); the chain stores the raw input verbatim. */
-  readonly name: string;
-  /** MemberMinted.cost — exactly what the contract pulled and burned. */
-  readonly cost: bigint;
-  readonly hash: HexHash;
-}
+export type { MintedIdentity };
 
 export type MintTxStage = 'idle' | 'wallet' | 'pending';
+
+type PendingKind = 'approve' | 'mint';
 
 export interface MintTransactionError {
   readonly action: PendingKind;
   readonly message: string;
   /** Send-time recovery family: nonce mismatch / stale wallet block view. */
   readonly kind?: 'nonce' | 'staleBlock';
-}
-
-function recoveryKindFor(cause: unknown): 'nonce' | 'staleBlock' | undefined {
-  return txSendRecoveryKind(cause);
 }
 
 export interface MintTransactionState {
@@ -67,21 +50,12 @@ export interface UseMintTransactionOptions {
   readonly onConfirmed?: () => void;
 }
 
-const MINT_TASK_KEY = 'mintTask';
-
-interface StoredMintTask {
-  readonly hash?: unknown;
-}
-
-const HASH_RE = /^0x[0-9a-fA-F]{64}$/;
-
-function readStoredPending(raw: StoredMintTask | null): HexHash | null {
-  if (raw === null || typeof raw.hash !== 'string' || !HASH_RE.test(raw.hash)) return null;
-  return raw.hash as HexHash;
-}
-
 /**
  * Approve → mint ladder and receipt recovery.
+ *
+ * The write itself, its `afterHash` persistence (only the mint hash), the
+ * approve→mint ladder and the bounded wait live in the shared write-attempt core;
+ * this hook only projects the core state onto the page's frozen props.
  *
  * Only the mint hash is persisted: it is the one transaction whose result is a
  * user-visible page state. An approval is recovered from `allowance()` instead
@@ -92,22 +66,12 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
   const { memberNftAddress, paymentTokenAddress, paymentTokenSymbol, onConfirmed } = options;
   const { address: account } = useAccount();
   const chainId = useChainId();
-  const { writeContractAsync } = useWriteContract();
-  const readPendingNonce = usePendingNonce(account);
+  const [missingReceiptLog, setMissingReceiptLog] = useState(false);
+  // Revision of the approval that counts for ✓ 已授权; dismissing the receipt
+  // invalidates it (the original `clearReceipt` reset).
+  const [approvalFloor, setApprovalFloor] = useState(0);
 
-  const [walletAction, setWalletAction] = useState<PendingKind | null>(null);
-  const [pending, setPending] = useState<PendingTx | null>(null);
-  const [receipt, setReceipt] = useState<MintedIdentity | null>(null);
-  const [isApproved, setIsApproved] = useState(false);
-  const [approvedAmount, setApprovedAmount] = useState<bigint | null>(null);
-  const [error, setError] = useState<MintTransactionError | null>(null);
-
-  const onConfirmedRef = useRef<(() => void) | undefined>(onConfirmed);
-  useEffect(() => {
-    onConfirmedRef.current = onConfirmed;
-  });
-
-  const scope = useMemo(
+  const scope: CacheScope | null = useMemo(
     () =>
       account !== undefined && memberNftAddress !== undefined
         ? { chainId, contractAddress: memberNftAddress, wallet: account }
@@ -115,181 +79,93 @@ export function useMintTransaction(options: UseMintTransactionOptions): MintTran
     [account, chainId, memberNftAddress],
   );
 
-  // A refresh must resume the mint receipt instead of showing an empty form.
-  /* eslint-disable react-hooks/set-state-in-effect -- hydration from the namespaced cache */
-  useEffect(() => {
-    setPending(null);
-    setReceipt(null);
-    setError(null);
-    setIsApproved(false);
-    setApprovedAmount(null);
-    setWalletAction(null);
-    if (scope === null) return;
-    const stored = cache.get<StoredMintTask>(scope, MINT_TASK_KEY);
-    const storedHash = readStoredPending(stored);
-    if (storedHash !== null) setPending({ kind: 'mint', hash: storedHash });
-  }, [scope]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  // A bounded wait for the submitted hash. It replaces a bare receipt poll so a
-  // nonce-gapped/dropped/underpriced transaction cannot trap the page in 确认中.
-  const watch = useTxWatch({
-    hash: pending?.hash ?? null,
-    wallet: account,
-    walletAction: walletAction !== null,
-    enabled: pending !== null,
+  const adapter = useMintAttemptAdapter({
+    scope,
+    chainId,
+    account,
+    memberNftAddress,
+    paymentTokenAddress,
+    paymentTokenSymbol,
+    onMissingReceiptLog: () => setMissingReceiptLog(true),
+    onConfirmed: () => onConfirmed?.(),
   });
-  const onChainReceipt = watch.receipt;
+  const attempt = useWriteAttempt(adapter);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- a mined receipt is an external chain fact */
+  // A ✓ 已授权 belongs to the session wallet/chain, exactly like the original
+  // hydration reset; a wallet switch must not carry it over.
+  /* eslint-disable react-hooks/set-state-in-effect -- a wallet/chain switch invalidates the session approval */
   useEffect(() => {
-    if (pending === null || onChainReceipt === null) return;
-
-    if (onChainReceipt.status === 'reverted') {
-      if (pending.kind === 'mint' && scope !== null) cache.remove(scope, MINT_TASK_KEY);
-      setError({ action: pending.kind, message: copy.mintIdentity.errors.reverted });
-      setPending(null);
-      return;
-    }
-
-    if (pending.kind === 'approve') {
-      setIsApproved(true);
-      setApprovedAmount(pending.amount ?? null);
-      setPending(null);
-      onConfirmedRef.current?.();
-      return;
-    }
-
-    // A malformed log must show the neutral "读不到身份编号" card, never crash.
-    const events = (() => {
-      try {
-        return parseEventLogs({
-          abi: memberNftAbi,
-          logs: onChainReceipt.logs,
-          eventName: 'MemberMinted',
-        });
-      } catch {
-        return [];
-      }
-    })();
-    const event = events[0];
-    if (event === undefined) {
-      if (scope !== null) cache.remove(scope, MINT_TASK_KEY);
-      setError({
-        action: 'mint',
-        message: copy.mintIdentity.receipt.missingMessage,
-      });
-      setPending(null);
-      return;
-    }
-
-    setReceipt({
-      memberId: event.args.memberId,
-      name: event.args.name,
-      cost: event.args.cost,
-      hash: onChainReceipt.transactionHash,
-    });
-    // The receipt is a one-time page state (owner 2026-11-14): drop the
-    // persisted hash so revisiting /mint never replays the success sheet.
-    if (scope !== null) cache.remove(scope, MINT_TASK_KEY);
-    setPending(null);
-    onConfirmedRef.current?.();
-  }, [onChainReceipt, pending, scope]);
+    setApprovalFloor(attempt.approveRevision);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only on wallet/chain change
+  }, [account, chainId]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  const approvalIntent = attempt.lastApproval?.intent;
+  const isApproved =
+    attempt.lastApproval !== null &&
+    attempt.approveRevision > approvalFloor &&
+    attempt.approveStage === 'idle';
+  const approvedAmount =
+    isApproved && approvalIntent !== undefined && approvalIntent.action === 'approve'
+      ? approvalIntent.amount
+      : null;
 
   const approve = (amount: bigint): void => {
     if (memberNftAddress === undefined || paymentTokenAddress === undefined || amount <= 0n) {
       return;
     }
-    setError(null);
-    setIsApproved(false);
-    setWalletAction('approve');
-    void (async () => {
-      try {
-        // R5: a new approval queues behind whatever the wallet already broadcast.
-        const sendNonce = await readPendingNonce();
-        const hash = await writeContractAsync({
-          address: paymentTokenAddress,
-          abi: love20TokenAbi,
-          functionName: 'approve',
-          args: [memberNftAddress, amount],
-          ...(sendNonce !== undefined ? { nonce: sendNonce } : {}),
-        });
-        setPending({ kind: 'approve', hash, amount });
-      } catch (cause) {
-        const recovery = recoveryKindFor(cause);
-        setError({
-          action: 'approve',
-          message: describeMintError(cause, { paymentSymbol: paymentTokenSymbol }),
-          ...(recovery !== undefined ? { kind: recovery } : {}),
-        });
-      } finally {
-        setWalletAction(null);
-      }
-    })();
+    if (attempt.isHydrating || attempt.stage !== 'idle' || attempt.approveStage !== 'idle') return;
+    if (attempt.receipt !== null) return;
+    setMissingReceiptLog(false);
+    void attempt.approve(paymentTokenAddress.toLowerCase(), { action: 'approve', amount });
   };
 
   const mint = (name: string): void => {
     if (memberNftAddress === undefined || name.length === 0) return;
-    setError(null);
-    setWalletAction('mint');
-    void (async () => {
-      try {
-        // R5: a new mint queues behind whatever the wallet already broadcast.
-        const sendNonce = await readPendingNonce();
-        const hash = await writeContractAsync({
-          address: memberNftAddress,
-          abi: memberNftAbi,
-          functionName: 'mint',
-          args: [name],
-          ...(sendNonce !== undefined ? { nonce: sendNonce } : {}),
-        });
-        // 只有拿到哈希之后才落记录：签名失败不保留任何可重发的请求。
-        if (scope !== null) cache.set(scope, MINT_TASK_KEY, { hash });
-        setPending({ kind: 'mint', hash });
-      } catch (cause) {
-        const recovery = recoveryKindFor(cause);
-        setError({
-          action: 'mint',
-          message: describeMintError(cause, { paymentSymbol: paymentTokenSymbol }),
-          ...(recovery !== undefined ? { kind: recovery } : {}),
-        });
-      } finally {
-        setWalletAction(null);
-      }
-    })();
+    if (attempt.isHydrating || attempt.stage !== 'idle' || attempt.approveStage !== 'idle') return;
+    if (attempt.receipt !== null) return;
+    setMissingReceiptLog(false);
+    void attempt.run({ action: 'mint', name });
   };
 
+  // A reverted mint and a mined mint without its log are different cards.
+  const error: MintTransactionError | null =
+    attempt.error === null
+      ? null
+      : missingReceiptLog
+        ? { action: 'mint', message: copy.mintIdentity.receipt.missingMessage }
+        : {
+            action: adapter.lastAction(),
+            message: attempt.error.message,
+            ...(attempt.error.kind !== undefined ? { kind: attempt.error.kind } : {}),
+          };
+
   const clearReceipt = (): void => {
-    setReceipt(null);
-    setError(null);
-    setPending(null);
-    setIsApproved(false);
-    setApprovedAmount(null);
-    if (scope !== null) cache.remove(scope, MINT_TASK_KEY);
+    setMissingReceiptLog(false);
+    setApprovalFloor(attempt.approveRevision);
+    attempt.clearReceipt();
   };
 
   // Stage stays 'pending' for as long as a hash is in flight: a stuck transaction
   // is reported by the watcher card, it does not re-enable the CTA.
-  const approveStage: MintTxStage =
-    walletAction === 'approve' ? 'wallet' : pending?.kind === 'approve' ? 'pending' : 'idle';
-  const mintStage: MintTxStage =
-    walletAction === 'mint' ? 'wallet' : pending?.kind === 'mint' ? 'pending' : 'idle';
-
   return {
-    approveStage,
-    mintStage,
+    approveStage: attempt.approveStage,
+    mintStage: attempt.stage,
     isApproved,
-    receipt,
+    receipt: attempt.receipt,
     error,
-    approvedAmount: isApproved ? approvedAmount : null,
-    pendingHash: pending?.hash ?? null,
-    watch,
+    approvedAmount,
+    pendingHash: attempt.pendingHash ?? attempt.approveHash,
+    watch:
+      attempt.stage === 'idle' && attempt.approveStage !== 'idle'
+        ? attempt.approveWatch
+        : attempt.watch,
     approve,
     mint,
     clearReceipt,
     clearError: () => {
-      setError(null);
+      setMissingReceiptLog(false);
+      attempt.clearError();
     },
   };
 }

@@ -1,18 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
-import { useAccount, useWriteContract } from 'wagmi';
-import { love20TokenAbi } from '@/config/abis';
-import { NETWORK } from '@/config/networks';
+import { useState } from 'react';
+import { useAccount } from 'wagmi';
 import { copy } from '@/shared/config/copy-pages';
-import { describeApprovalError } from '@/features/approve-token/lib/approval-errors';
-import { UNLIMITED_APPROVAL_VALUE } from '@/features/approve-token/lib/approval-amount';
+import { useWriteAttempt } from '@/shared/model/use-write-attempt';
+import type { TxWatch } from '@/shared/model/use-tx-watch';
 import type {
   ApprovalMode,
   ApprovalRecord,
   ApprovalRequest,
   ApprovalTxError,
 } from '@/features/approve-token/lib/approval-types';
-import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
-import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
+import { useApprovalAttemptAdapter } from '@/features/approve-token/model/approval-attempt-adapter';
 
 export type ApprovalStage = 'idle' | 'wallet' | 'pending';
 
@@ -29,123 +26,44 @@ export interface ApprovalTransactionState {
   readonly clearError: () => void;
 }
 
-interface PendingApproval {
-  readonly hash: `0x${string}`;
-  readonly request: ApprovalRequest;
-}
-
 /**
- * One 授权/撤销 write. Long-term writes `maxUint256`, revoke writes `0`; both
- * go through the shared bounded watcher so a dropped/nonce-gapped transaction
- * becomes a recovery card instead of an endless 确认中. A mined receipt calls
- * back into the page to refetch allowances, then surfaces a dismissible strip.
+ * One 授权/撤销 write. Long-term writes `maxUint256`, revoke writes `0`; the write
+ * itself and the bounded wait live in the shared write-attempt core. A mined
+ * receipt calls back into the page to refetch allowances, then surfaces a
+ * dismissible strip. Nothing is persisted: an approval is never resumed after a
+ * reload.
  */
 export function useApprovalTransaction(onConfirmed: () => void): ApprovalTransactionState {
   const { address: account } = useAccount();
-  const { writeContractAsync } = useWriteContract();
-  const readPendingNonce = usePendingNonce(account);
+  const [retainedRecord, setRetainedRecord] = useState<ApprovalRecord | null>(null);
 
-  const [pending, setPending] = useState<PendingApproval | null>(null);
-  const [record, setRecord] = useState<ApprovalRecord | null>(null);
-  const [isWalletAction, setIsWalletAction] = useState(false);
-  const [error, setError] = useState<ApprovalTxError | null>(null);
-  const submittingRef = useRef(false);
+  const adapter = useApprovalAttemptAdapter({ onConfirmed });
+  const attempt = useWriteAttempt(adapter);
 
-  const onConfirmedRef = useRef(onConfirmed);
-  useEffect(() => {
-    onConfirmedRef.current = onConfirmed;
-  });
-
-  const watch = useTxWatch({
-    hash: pending?.hash ?? null,
-    wallet: account,
-    walletAction: isWalletAction,
-    enabled: pending !== null,
-  });
-  const onChainReceipt = watch.receipt;
-
-  /* eslint-disable react-hooks/set-state-in-effect -- a mined receipt is an external chain fact */
-  useEffect(() => {
-    if (pending === null || onChainReceipt === null) return;
-
-    if (onChainReceipt.status === 'reverted') {
-      setPending(null);
-      setError({ message: copy.approvals.errors.reverted });
-      onConfirmedRef.current();
-      return;
+  const submit = (request: ApprovalRequest): Promise<boolean> => {
+    if (account === undefined) return Promise.resolve(false);
+    const settled = attempt.receipt;
+    if (settled !== null) {
+      // A second 授权/撤销 starts a fresh attempt; the settled strip stays visible
+      // until the new receipt replaces it or the user dismisses it.
+      setRetainedRecord(settled);
+      attempt.clearReceipt();
     }
-
-    const request = pending.request;
-    setRecord({
-      hash: pending.hash,
-      spenderLabel: request.spenderLabel,
-      tokenSymbol: request.tokenSymbol,
-      mode: request.mode,
-    });
-    setPending(null);
-    setError(null);
-    onConfirmedRef.current();
-  }, [onChainReceipt, pending]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const send = async (request: ApprovalRequest, nonce?: number): Promise<`0x${string}`> => {
-    const nonceOption = nonce !== undefined ? { nonce } : {};
-    return writeContractAsync({
-      address: request.tokenAddress,
-      abi: love20TokenAbi,
-      functionName: 'approve',
-      args: [request.spender, request.mode === 'unlimited' ? UNLIMITED_APPROVAL_VALUE : 0n],
-      ...nonceOption,
-    });
+    return attempt.run(request);
   };
-
-  const submitInternal = async (request: ApprovalRequest): Promise<boolean> => {
-    if (submittingRef.current) return false;
-    if (account === undefined) return false;
-    setError(null);
-    setIsWalletAction(true);
-    submittingRef.current = true;
-    try {
-      // R5: a new approval queues behind whatever the wallet already broadcast.
-      const sendNonce = await readPendingNonce();
-      const hash = await send(request, sendNonce);
-      setPending({ hash, request });
-      return true;
-    } catch (cause) {
-      const message = describeApprovalError(cause, {
-        nativeSymbol: NETWORK.nativeCurrency.symbol,
-        tokenSymbol: request.tokenSymbol,
-        mode: request.mode,
-      });
-      const recovery = txSendRecoveryKind(cause);
-      setError({ message, ...(recovery !== undefined ? { kind: recovery } : {}) });
-      return false;
-    } finally {
-      setIsWalletAction(false);
-      submittingRef.current = false;
-    }
-  };
-
-  const submit = async (request: ApprovalRequest): Promise<boolean> => {
-    if (submittingRef.current || pending !== null) return false;
-    return submitInternal(request);
-  };
-
-  const stage: ApprovalStage = isWalletAction ? 'wallet' : pending !== null ? 'pending' : 'idle';
 
   return {
-    stage,
-    record,
-    error,
-    watch,
+    stage: attempt.stage,
+    record: attempt.receipt ?? retainedRecord,
+    error: attempt.error,
+    watch: attempt.watch,
     submit,
     clearRecord: () => {
-      setRecord(null);
-      setPending(null);
-      setError(null);
+      setRetainedRecord(null);
+      attempt.clearReceipt();
     },
     clearError: () => {
-      setError(null);
+      attempt.clearError();
     },
   };
 }

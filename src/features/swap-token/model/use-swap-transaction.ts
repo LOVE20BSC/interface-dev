@@ -1,28 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAccount, useChainId, useWriteContract } from 'wagmi';
-import { love20TokenAbi, uniswapV2Router02Abi, weth9Abi } from '@/config/abis';
+import { useAccount, useChainId } from 'wagmi';
 import type { HexAddress } from '@/config/networks';
-import { copy } from '@/shared/config/copy-pages';
-import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
-import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
-import { describeSwapError, swapRetryLabel } from '@/features/swap-token/lib/swap-errors';
-import { parseSwapReceipt } from '@/features/swap-token/lib/swap-events';
+import { useWriteAttempt } from '@/shared/model/use-write-attempt';
+import type { TxWatch } from '@/shared/model/use-tx-watch';
+import { swapRetryLabel } from '@/features/swap-token/lib/swap-errors';
 import {
-  clearSwapRecord,
   createSwapScope,
-  readSwapRecord,
   swapRecordMatchesPair,
-  writeSwapRecord,
-  type HexHash,
   type SwapRecord,
 } from '@/features/swap-token/lib/swap-receipt-record';
 import type { SwapRoute, SwapToken } from '@/features/swap-token/lib/swap-types';
 import { swapTokenKey } from '@/features/swap-token/lib/swap-types';
-import type { SwapPairRead } from '@/features/swap-token/lib/swap-route';
+import {
+  swapMainIntent,
+  useSwapAttemptAdapter,
+  type SwapTxAction,
+} from '@/features/swap-token/model/swap-attempt-adapter';
 
 export type SwapTxStage = 'idle' | 'wallet' | 'pending';
 
-export type SwapTxAction = 'approve' | 'swap';
+export type { SwapTxAction };
 
 export interface SwapTxError {
   readonly action: SwapTxAction;
@@ -54,7 +51,7 @@ export interface SwapTransactionState {
   readonly isApproved: boolean;
   readonly approvedAmount: bigint | null;
   readonly receipt: SwapRecord | null;
-  readonly pendingHash: HexHash | null;
+  readonly pendingHash: `0x${string}` | null;
   readonly pendingKind: SwapTxAction | null;
   readonly error: SwapTxError | null;
   readonly isHydrating: boolean;
@@ -66,72 +63,35 @@ export interface SwapTransactionState {
   readonly clearError: () => void;
 }
 
-type PendingTx =
-  | {
-      readonly kind: 'approve';
-      readonly hash: HexHash;
-      readonly amount: bigint;
-      readonly tokenAddress: HexAddress;
-    }
-  | { readonly kind: 'swap'; readonly hash: HexHash; readonly record: SwapRecord };
-
-/** The router call a swap record represents. */
-interface SwapRequest {
-  readonly kind: SwapRecord['kind'];
-  readonly fromKey: string;
-  readonly toKey: string;
-  readonly amountIn: bigint;
-  readonly minOut: bigint;
-  readonly path: readonly HexAddress[];
-}
-
-function pairReadsFromRecord(record: SwapRecord): SwapPairRead[] {
-  return record.pairAddresses.flatMap((address, index) => {
-    const token0 = record.pairToken0[index];
-    const token1 = record.pairToken1[index];
-    if (token0 === undefined || token1 === undefined) return [];
-    return [{ address, token0, token1, reserve0: 0n, reserve1: 0n } as SwapPairRead];
-  });
-}
-
 /**
  * ERC20 input: exact-amount approve first, then the swap. The mint ladder's
  * grammar is reused: wallet → 确认中 → mined. The hash (and all receipt context)
  * is persisted before waiting so a refresh resumes the pending transaction.
  *
- * The receipt wait is the shared bounded watcher (`useTxWatch`), not a bare
- * receipt poll: a dropped/replaced/nonce-gapped transaction becomes an
- * actionable recovery card instead of an endless 确认中.
+ * The write itself, its `afterHash` persistence, the approve→swap ladder and the
+ * bounded wait live in the shared write-attempt core; this hook only projects the
+ * core state onto the page's frozen props. The receipt wait is still the shared
+ * `useTxWatch`: a dropped/replaced/nonce-gapped transaction becomes an actionable
+ * recovery card instead of an endless 确认中.
  */
 export function useSwapTransaction(options: SwapTransactionInput): SwapTransactionState {
   const { router, wrappedAddress, from, to, route, nativeSymbol, onConfirmed } = options;
   const { address: account } = useAccount();
   const chainId = useChainId();
-  const { writeContractAsync } = useWriteContract();
-  const readPendingNonce = usePendingNonce(account);
-
-  const [pending, setPending] = useState<PendingTx | null>(null);
-  const [receipt, setReceipt] = useState<SwapRecord | null>(null);
-  const [walletAction, setWalletAction] = useState<SwapTxAction | null>(null);
-  const [isApproved, setIsApproved] = useState(false);
-  const [approvedAmount, setApprovedAmount] = useState<bigint | null>(null);
-  const [error, setError] = useState<SwapTxError | null>(null);
-  const [isHydrating, setIsHydrating] = useState(true);
-  const submittingRef = useRef(false);
+  // Revision of the approval that counts for the current input token. Switching
+  // the token (or dismissing the receipt) invalidates an earlier ✓ 已授权.
+  const [approvalFloor, setApprovalFloor] = useState(0);
+  // `execute` keeps its pre-migration `Promise<void>` shape: it settles when the
+  // main hash is persisted. The core's own promise resolves from a wallet→pending
+  // render, which a fast/mocked wallet can fold into one commit while awaiting.
+  const sendWaiter = useRef<(() => void) | null>(null);
+  const settleSend = (): void => {
+    const resolve = sendWaiter.current;
+    sendWaiter.current = null;
+    resolve?.();
+  };
 
   const fromKey = from !== undefined ? swapTokenKey(from) : '';
-  // An approval belongs to one token; switching the input must not reuse it.
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    setIsApproved(false);
-    setApprovedAmount(null);
-  }, [from?.address, fromKey]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const onConfirmedRef = useRef<(() => void) | undefined>(onConfirmed);
-  useEffect(() => {
-    onConfirmedRef.current = onConfirmed;
-  });
 
   const scope = useMemo(
     () =>
@@ -141,215 +101,52 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     [account, chainId, router],
   );
 
-  /* eslint-disable react-hooks/set-state-in-effect -- hydration from the namespaced cache */
-  useEffect(() => {
-    setPending(null);
-    setReceipt(null);
-    setError(null);
-    setWalletAction(null);
-    setIsApproved(false);
-    setApprovedAmount(null);
-    submittingRef.current = false;
-    setIsHydrating(true);
-    if (scope === null) {
-      setIsHydrating(false);
-      return;
-    }
-    const stored = readSwapRecord(scope);
-    // Only an unconfirmed (pending) hash is resumed. A confirmed receipt is a
-    // one-time page state: after the user leaves/reloads the page it must not
-    // pop up again (owner 2026-11-14), so it is never restored from the cache.
-    if (stored !== null && !stored.confirmed) {
-      setPending({ kind: 'swap', hash: stored.hash, record: stored });
-    }
-    setIsHydrating(false);
-  }, [scope]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-  const watch = useTxWatch({
-    hash: pending?.hash ?? null,
-    wallet: account,
-    walletAction: walletAction !== null,
-    enabled: pending !== null,
+  const adapter = useSwapAttemptAdapter({
+    scope,
+    chainId,
+    account,
+    router,
+    wrappedAddress,
+    nativeSymbol,
+    fromSymbol: from?.symbol ?? '',
+    ...(onConfirmed !== undefined ? { onConfirmed } : {}),
+    onSendFailed: () => settleSend(),
+    onRecordWritten: () => settleSend(),
   });
-  const onChainReceipt = watch.receipt;
+  const attempt = useWriteAttempt(adapter);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- a mined receipt is an external chain fact */
+  // An approval belongs to one token/wallet; switching either must not reuse it.
+  /* eslint-disable react-hooks/set-state-in-effect -- a token/wallet switch invalidates the session approval */
   useEffect(() => {
-    if (pending === null || onChainReceipt === null) return;
-
-    if (onChainReceipt.status === 'reverted') {
-      if (pending.kind === 'swap' && scope !== null) clearSwapRecord(scope);
-      setPending(null);
-      setError({
-        action: pending.kind,
-        message: copy.swap.errors.reverted,
-        retryLabel: undefined,
-      });
-      onConfirmedRef.current?.();
-      return;
-    }
-
-    if (pending.kind === 'approve') {
-      if (
-        from?.address !== undefined &&
-        from.address.toLowerCase() === pending.tokenAddress.toLowerCase()
-      ) {
-        setIsApproved(true);
-        setApprovedAmount(pending.amount);
-      }
-      setPending(null);
-      onConfirmedRef.current?.();
-      return;
-    }
-
-    const record = pending.record;
-    const parsed = parseSwapReceipt({
-      kind: record.kind,
-      path: record.path as HexAddress[],
-      pairs: pairReadsFromRecord(record),
-      logs: onChainReceipt.logs,
-      account: account ?? '0x0000000000000000000000000000000000000000',
-      amountIn: record.amountIn ?? 0n,
-      minOut: record.minOut ?? 0n,
-    });
-    const nextRecord: SwapRecord = {
-      ...record,
-      actualOut: parsed.actualOut,
-      paidIn: parsed.paidIn,
-      belowMinOut: parsed.belowMinOut,
-      confirmed: true,
-      recordedAt: Date.now(),
-    };
-    // Drop the persisted record as soon as the receipt exists: the receipt is
-    // shown once in this session, never replayed when the page is revisited.
-    if (scope !== null) clearSwapRecord(scope);
-    setReceipt(nextRecord);
-    setPending(null);
-    setError(null);
-    onConfirmedRef.current?.();
-  }, [account, from?.address, onChainReceipt, pending, scope]);
+    setApprovalFloor(attempt.approveRevision);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only on token/wallet change
+  }, [fromKey, account, chainId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // A receipt from another pair must not disable the current form.
   const activeReceipt =
-    receipt !== null &&
+    attempt.receipt !== null &&
     from !== undefined &&
     to !== undefined &&
-    swapRecordMatchesPair(receipt, from, to)
-      ? receipt
+    swapRecordMatchesPair(attempt.receipt, from, to)
+      ? attempt.receipt
       : null;
 
-  const deadlineSeconds = (): bigint => BigInt(Math.floor(Date.now() / 1000) + 1200);
-
-  /** One place for the three write shapes (wrap/unwrap/router). */
-  const writeSwapRequest = async (request: SwapRequest, nonce?: number): Promise<HexHash> => {
-    const nonceOption = nonce !== undefined ? { nonce } : {};
-    if (request.kind === 'wrap') {
-      if (wrappedAddress === undefined) throw new Error('wrapped native unavailable');
-      return writeContractAsync({
-        address: wrappedAddress,
-        abi: weth9Abi,
-        functionName: 'deposit',
-        value: request.amountIn,
-        ...nonceOption,
-      });
-    }
-    if (request.kind === 'unwrap') {
-      if (wrappedAddress === undefined) throw new Error('wrapped native unavailable');
-      return writeContractAsync({
-        address: wrappedAddress,
-        abi: weth9Abi,
-        functionName: 'withdraw',
-        args: [request.amountIn],
-        ...nonceOption,
-      });
-    }
-    if (router === undefined || account === undefined) throw new Error('router unavailable');
-    const path = [...request.path];
-    const swapDeadline = deadlineSeconds();
-    if (request.fromKey === 'native') {
-      return writeContractAsync({
-        address: router,
-        abi: uniswapV2Router02Abi,
-        functionName: 'swapExactETHForTokens',
-        args: [request.minOut, path, account, swapDeadline],
-        value: request.amountIn,
-        ...nonceOption,
-      });
-    }
-    if (request.toKey === 'native') {
-      return writeContractAsync({
-        address: router,
-        abi: uniswapV2Router02Abi,
-        functionName: 'swapExactTokensForETH',
-        args: [request.amountIn, request.minOut, path, account, swapDeadline],
-        ...nonceOption,
-      });
-    }
-    return writeContractAsync({
-      address: router,
-      abi: uniswapV2Router02Abi,
-      functionName: 'swapExactTokensForTokens',
-      args: [request.amountIn, request.minOut, path, account, swapDeadline],
-      ...nonceOption,
-    });
-  };
-
-  /**
-   * Owner 2026-11-14: every send pins the nonce read from the chain the page is
-   * watching. Letting the wallet pick the nonce is what put the first transaction
-   * behind a stale wallet nonce: the hash existed, the transaction sat in the
-   * wallet's queue with a gap, and nothing on the page could move it.
-   *
-   * R5 (owner 2026-11-16): the pin is the **pool-aware** count (`pending`), so a
-   * new swap queues behind a transaction the wallet already broadcast instead of
-   * re-using its nonce.
-   *
-   * A failed read falls back to undefined: the wallet assigns the nonce and the
-   * bounded watcher still turns any gap into the recovery card.
-   */
-  const pinnedNonce = async (): Promise<number | undefined> => {
-    try {
-      return await readPendingNonce();
-    } catch {
-      return undefined;
-    }
-  };
-
-  const submitApprove = async (amount: bigint, tokenAddress: HexAddress): Promise<void> => {
-    if (submittingRef.current || router === undefined) return;
-    setError(null);
-    setIsApproved(false);
-    setWalletAction('approve');
-    submittingRef.current = true;
-    try {
-      const sendNonce = await pinnedNonce();
-      const hash = await writeContractAsync({
-        address: tokenAddress,
-        abi: love20TokenAbi,
-        functionName: 'approve',
-        args: [router, amount],
-        ...(sendNonce !== undefined ? { nonce: sendNonce } : {}),
-      });
-      setPending({ kind: 'approve', hash, amount, tokenAddress });
-    } catch (cause) {
-      const message = describeSwapError(cause, { nativeSymbol, fromSymbol: from?.symbol ?? '' });
-      const recovery = txSendRecoveryKind(cause);
-      setError({
-        action: 'approve',
-        message,
-        retryLabel: swapRetryLabel(message),
-        ...(recovery !== undefined ? { kind: recovery } : {}),
-      });
-    } finally {
-      setWalletAction(null);
-      submittingRef.current = false;
-    }
-  };
+  const approvalIntent = attempt.lastApproval?.intent;
+  const approvedAmount =
+    attempt.lastApproval !== null &&
+    from?.address !== undefined &&
+    attempt.lastApproval.key === from.address.toLowerCase() &&
+    attempt.approveRevision > approvalFloor &&
+    attempt.approveStage === 'idle' &&
+    approvalIntent?.action === 'approve'
+      ? approvalIntent.amount
+      : null;
+  const isApproved = approvedAmount !== null;
 
   const approve = (amount: bigint): void => {
-    if (submittingRef.current || pending !== null || activeReceipt !== null) return;
+    if (attempt.isHydrating || attempt.stage !== 'idle' || attempt.approveStage !== 'idle') return;
+    if (activeReceipt !== null) return;
     if (
       from === undefined ||
       from.kind === 'native' ||
@@ -359,11 +156,19 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     ) {
       return;
     }
-    void submitApprove(amount, from.address);
+    void attempt.approve(from.address.toLowerCase(), {
+      action: 'approve',
+      tokenAddress: from.address,
+      amount,
+    });
   };
 
-  const submitExecution = async (execution: SwapExecution): Promise<void> => {
-    if (submittingRef.current) return;
+  const execute = async (execution: SwapExecution): Promise<void> => {
+    if (attempt.isHydrating || attempt.stage !== 'idle' || attempt.approveStage !== 'idle') return;
+    if (activeReceipt !== null) return;
+    // A settled receipt for another pair is not page state; release it so the
+    // core does not treat it as a submit guard.
+    if (attempt.receipt !== null) attempt.clearReceipt();
     if (
       router === undefined ||
       account === undefined ||
@@ -374,98 +179,52 @@ export function useSwapTransaction(options: SwapTransactionInput): SwapTransacti
     ) {
       return;
     }
-
-    setError(null);
-    setWalletAction('swap');
-    submittingRef.current = true;
-    const request: SwapRequest = {
-      kind: route.kind,
-      fromKey: swapTokenKey(from),
-      toKey: swapTokenKey(to),
-      amountIn: execution.amountIn,
-      minOut: execution.minOut,
-      path: route.kind === 'swap' ? [...route.pathAddresses] : [],
-    };
-    try {
-      const sendNonce = await pinnedNonce();
-      const hash = await writeSwapRequest(request, sendNonce);
-      const record: SwapRecord = {
-        hash,
-        kind: route.kind,
-        fromKey: request.fromKey,
-        toKey: request.toKey,
-        fromSymbol: from.symbol,
-        toSymbol: to.symbol,
-        fromDecimals: from.decimals,
-        toDecimals: to.decimals,
-        amountIn: execution.amountIn,
-        minOut: execution.minOut,
-        quoteOut: execution.quoteOut,
-        actualOut: undefined,
-        paidIn: undefined,
-        path: route.kind === 'swap' ? [...route.pathAddresses] : [],
-        pathSymbols: [...route.displayPath],
-        pairAddresses: route.pairs.map((pair) => pair.address),
-        pairToken0: route.pairs.map((pair) => pair.token0),
-        pairToken1: route.pairs.map((pair) => pair.token1),
-        belowMinOut: false,
-        confirmed: false,
-        recordedAt: Date.now(),
-      };
-      if (scope !== null) writeSwapRecord(scope, record);
-      setPending({ kind: 'swap', hash, record });
-    } catch (cause) {
-      const message = describeSwapError(cause, { nativeSymbol, fromSymbol: from.symbol });
-      const recovery = txSendRecoveryKind(cause);
-      setError({
-        action: 'swap',
-        message,
-        retryLabel: swapRetryLabel(message),
-        ...(recovery !== undefined ? { kind: recovery } : {}),
-      });
-    } finally {
-      setWalletAction(null);
-      submittingRef.current = false;
-    }
-  };
-
-  const execute = async (execution: SwapExecution): Promise<void> => {
-    if (submittingRef.current || pending !== null || activeReceipt !== null) return;
-    await submitExecution(execution);
+    const sent = new Promise<void>((resolve) => {
+      sendWaiter.current = resolve;
+    });
+    void attempt.run(swapMainIntent(route, from, to, execution)).then((ok) => {
+      if (!ok) settleSend();
+    });
+    await sent;
   };
 
   const clearReceipt = (): void => {
-    setReceipt(null);
-    setPending(null);
-    setError(null);
-    setIsApproved(false);
-    setApprovedAmount(null);
-    if (scope !== null) clearSwapRecord(scope);
+    setApprovalFloor(attempt.approveRevision);
+    attempt.clearReceipt();
   };
 
   // Stage stays 'pending' for as long as a hash is in flight: a stuck transaction
   // is reported by the watcher card, it does not re-enable the CTA.
-  const approveStage: SwapTxStage =
-    walletAction === 'approve' ? 'wallet' : pending?.kind === 'approve' ? 'pending' : 'idle';
-  const swapStage: SwapTxStage =
-    walletAction === 'swap' ? 'wallet' : pending?.kind === 'swap' ? 'pending' : 'idle';
+  const error: SwapTxError | null =
+    attempt.error === null
+      ? null
+      : {
+          action: adapter.lastAction(),
+          message: attempt.error.message,
+          retryLabel: swapRetryLabel(attempt.error.message),
+          ...(attempt.error.kind !== undefined ? { kind: attempt.error.kind } : {}),
+        };
 
   return {
-    approveStage,
-    swapStage,
+    approveStage: attempt.approveStage,
+    swapStage: attempt.stage,
     isApproved,
-    approvedAmount: isApproved ? approvedAmount : null,
+    approvedAmount,
     receipt: activeReceipt,
-    pendingHash: pending?.hash ?? null,
-    pendingKind: pending?.kind ?? null,
+    pendingHash: attempt.pendingHash ?? attempt.approveHash,
+    pendingKind:
+      attempt.stage === 'pending' ? 'swap' : attempt.approveStage === 'pending' ? 'approve' : null,
     error,
-    isHydrating,
-    watch,
+    isHydrating: attempt.isHydrating,
+    watch:
+      attempt.stage === 'idle' && attempt.approveStage !== 'idle'
+        ? attempt.approveWatch
+        : attempt.watch,
     approve,
     execute,
     clearReceipt,
     clearError: () => {
-      setError(null);
+      attempt.clearError();
     },
   };
 }
