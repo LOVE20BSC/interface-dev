@@ -143,6 +143,19 @@ export const copy = {
     submitNew: '推举新提案',
     rewards: '治理激励',
     proposalRewards: '提案激励',
+    /**
+     * T006 P2-1..P2-3: the placeholder routes render a real page but had no entry
+     * here, so `app-header.tsx` / `document-title.ts` fell back to
+     * `copy.notFound.title` — the header said 「页面不存在」 above a normal page.
+     * Titles mirror `copy-pages.ts#gov.placeholders[*].title`.
+     */
+    verify: '验证',
+    verifyActions: '验证中的行动',
+    verifyDetail: '验证详情',
+    acting: '社区首页',
+    actingJoin: '加入行动',
+    actionNew: '创建新行动',
+    actionInfo: '行动详情',
   },
   /** Page titles the eager router/header needs; bodies live in ./copy-pages. */
   placeholders: {

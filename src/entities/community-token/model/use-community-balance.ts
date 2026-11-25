@@ -8,6 +8,12 @@ export interface TokenBalance {
   readonly status: BalanceStatus;
   readonly value: bigint | undefined;
   readonly decimals: number | undefined;
+  /**
+   * Re-reads the balance. Exposed so a failed read can offer a next step
+   * (T006 P1-2: `/me` used to render `—` with no explanation and no way to
+   * retry). Optional so existing callers/tests keep working.
+   */
+  readonly refetch?: () => void;
 }
 
 export function useCommunityBalance(
@@ -29,13 +35,16 @@ export function useCommunityBalance(
   if (tokenAddress === undefined) {
     return { status: 'unconfigured', value: undefined, decimals };
   }
+  const refetch = () => {
+    void read.refetch();
+  };
   if (read.isError) {
-    return { status: 'error', value: undefined, decimals };
+    return { status: 'error', value: undefined, decimals, refetch };
   }
   if (read.data === undefined) {
     return { status: 'loading', value: undefined, decimals };
   }
-  return { status: 'ready', value: read.data, decimals };
+  return { status: 'ready', value: read.data, decimals, refetch };
 }
 
 export interface NativeBalance {

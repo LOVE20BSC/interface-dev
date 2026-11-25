@@ -44,13 +44,21 @@ export interface SwapScreenInput {
  * One mutually-exclusive page state. Invalid pair is checked before route
  * loading so a bad deep link never flashes a quote skeleton, and empty-pool is
  * distinct from no-route because the copy and next steps differ (spec §3.5).
+ *
+ * `resolving` (token metadata still in flight) is bounded by the same deadline
+ * as `route-loading`: with the RPC unreachable, `isLoading` never settles and
+ * the panel used to sit on a text-less skeleton forever (T006 P1-1). Past the
+ * deadline it becomes the retryable `route-error` card, so a dead network is a
+ * retry, not a dead end.
  */
 export function selectSwapScreenState(input: SwapScreenInput): SwapScreenState {
   if (!input.configured) return 'unconfigured';
   if (!input.connected) return 'disconnected';
   if (input.wrongChain) return 'wrong-chain';
   if (input.pairInvalid) return 'invalid-pair';
-  if (!input.pairResolved) return 'resolving';
+  if (!input.pairResolved) {
+    return input.routeLoadingTimedOut === true ? 'route-error' : 'resolving';
+  }
   switch (input.routeStatus) {
     case 'ready':
       return 'ready';
@@ -64,6 +72,6 @@ export function selectSwapScreenState(input: SwapScreenInput): SwapScreenState {
       return input.routeLoadingTimedOut === true ? 'route-error' : 'route-loading';
     case 'idle':
     default:
-      return 'resolving';
+      return input.routeLoadingTimedOut === true ? 'route-error' : 'resolving';
   }
 }

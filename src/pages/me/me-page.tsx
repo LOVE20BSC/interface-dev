@@ -88,6 +88,26 @@ export function MePage() {
         <Section id="me-balance-title" title={copy.me.balanceTitle}>
           {token.address === undefined ? (
             <p className="mt-2 text-sm leading-6 text-muted">{copy.me.balanceUnavailable}</p>
+          ) : balance.status === 'error' ? (
+            /* T006 P1-2: a failed read used to render a bare `—` with no
+               explanation and no way out. Unknown is still never shown as 0,
+               but it now says so and offers the one next step (spec §0-7). */
+            <div className="mt-2 space-y-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="min-w-0 truncate font-mono text-lg font-semibold text-foreground">
+                  {copy.common.unknown}
+                </p>
+                <Link to={to('/swap')} className={TEXT_LINK}>
+                  {copy.me.swap}
+                </Link>
+              </div>
+              <p role="alert" className="text-sm leading-6 text-danger-strong">
+                {copy.home.balanceError}
+              </p>
+              <button type="button" onClick={balance.refetch} className={TEXT_LINK}>
+                {copy.common.retry}
+              </button>
+            </div>
           ) : (
             <div className="mt-2 flex items-baseline justify-between gap-3">
               <p className="min-w-0 truncate font-mono text-lg font-semibold text-foreground">

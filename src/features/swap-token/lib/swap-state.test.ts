@@ -65,4 +65,25 @@ describe('swap screen state selector', () => {
       'resolving',
     );
   });
+
+  // T006 P1-1: with the RPC unreachable `pair.status` stays `loading` forever, so
+  // `resolving` was an endless text-less skeleton with no retry. It now shares the
+  // route-loading deadline and falls through to the retryable error card.
+  it('bounds the resolving state with the same deadline (T006 P1-1)', () => {
+    expect(
+      selectSwapScreenState({ ...base, pairResolved: false, routeLoadingTimedOut: true }),
+    ).toBe('route-error');
+  });
+
+  it('bounds the idle route state too, so no unbounded state is left', () => {
+    expect(
+      selectSwapScreenState({ ...base, routeStatus: 'idle', routeLoadingTimedOut: true }),
+    ).toBe('route-error');
+  });
+
+  it('keeps resolving while the pair is still in flight and the deadline has not passed', () => {
+    expect(
+      selectSwapScreenState({ ...base, pairResolved: false, routeLoadingTimedOut: false }),
+    ).toBe('resolving');
+  });
 });

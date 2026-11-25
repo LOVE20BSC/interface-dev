@@ -277,18 +277,25 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
   // a slow/failed route read left the form rendered with `route === null`: the 到
   // amount showed 到 read as —, no quote was requested (quote.enabled needs a ready
   // route) and the user stared at a dead card forever.
+  //
+  // T006 P1-1: `resolving` (token metadata still loading) needs the same deadline.
+  // With the RPC unreachable, `pair.status` stays `loading` forever, so the panel
+  // sat on a text-less skeleton with no way out. Both unbounded states now share
+  // one timer and both fall through to the retryable `route-error` card.
   const [routeLoadingTimedOut, setRouteLoadingTimedOut] = useState(false);
   const [routeRetryKey, setRouteRetryKey] = useState(0);
+  const pairResolved = pair.status !== 'loading';
+  const unbounded = routeStatus === 'loading' || !pairResolved;
   /* eslint-disable react-hooks/set-state-in-effect -- a timeout is an external clock event */
   useEffect(() => {
-    if (routeStatus !== 'loading') {
+    if (!unbounded) {
       setRouteLoadingTimedOut(false);
       return;
     }
     setRouteLoadingTimedOut(false);
     const timer = window.setTimeout(() => setRouteLoadingTimedOut(true), ROUTE_LOADING_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
-  }, [routeStatus, routeRetryKey]);
+  }, [unbounded, routeStatus, pairResolved, routeRetryKey]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const retryRoute = () => {
@@ -298,7 +305,6 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     wrapped.refetch();
   };
 
-  const pairResolved = pair.status !== 'loading';
   const screen = selectSwapScreenState({
     configured,
     connected: isConnected,
@@ -555,7 +561,13 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     );
   }
 
-  if (screen === 'resolving' || tx.isHydrating || pair.status === 'loading') {
+  // T006 P1-1: only `resolving` (the screen the selector returns) may show the
+  // text-less skeleton. The old `|| pair.status === 'loading'` re-asserted the same
+  // condition *after* the selector had already turned the screen into the
+  // retryable `route-error`, so the error card could never render — with the RPC
+  // unreachable this branch won forever. `tx.isHydrating` stays: it is a separate
+  // (restored-write) state that the selector does not know about.
+  if (screen === 'resolving' || tx.isHydrating) {
     return (
       <div className="space-y-4" aria-busy="true">
         <div className={CARD}>
@@ -715,10 +727,11 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
       >
         <Button
           variant="primary"
-          onClick={() => {
-            routeState.retry();
-            wrapped.refetch();
-          }}
+          // T006 P1-1: this card is also reached when the pair/token metadata read
+          // timed out (`resolving` → `route-error`), so the retry must re-arm the
+          // pair lookup too — retrying only the route would land back on the same
+          // stuck skeleton.
+          onClick={retryRoute}
           leadingIcon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
         >
           {copy.swap.states.retry}

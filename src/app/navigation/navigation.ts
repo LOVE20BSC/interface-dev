@@ -89,6 +89,20 @@ const PAGE_TITLES: Readonly<Record<string, string>> = Object.freeze({
   '/group': copy.placeholders.group.title,
   '/me': copy.placeholders.me.title,
   '/theme': copy.pageTitles.theme,
+  // T006 P2-1..P2-3: placeholder routes are real pages (`gov-placeholder`), so
+  // they need real titles; without these the header fell back to
+  // `copy.notFound.title` and said 「页面不存在」 above a normal page.
+  // Titles mirror the cards rendered by GovPlaceholderPage
+  // (`copy.gov.placeholders[*].title`); a coarse per-domain title would put a
+  // different heading above the page than the page itself shows.
+  '/verify': copy.pageTitles.verify,
+  '/verify/actions': copy.pageTitles.verifyActions,
+  '/verify/action': copy.pageTitles.verify,
+  '/verify/detail': copy.pageTitles.verifyDetail,
+  '/acting': copy.pageTitles.acting,
+  '/acting/join': copy.pageTitles.actingJoin,
+  '/action/new': copy.pageTitles.actionNew,
+  '/action/info': copy.pageTitles.actionInfo,
 });
 
 export function pageTitleFor(pathname: string): string | null {
@@ -96,5 +110,13 @@ export function pageTitleFor(pathname: string): string | null {
   if (exact !== undefined) return exact;
   // 动态路由（owner 2026-11-22）：提案投票详情 `/vote/:proposalId` 与列表同标题。
   if (pathname.startsWith('/vote/')) return copy.pageTitles.vote;
+  // T006 P2-4: `/submit/*` renders `SubmitPage` (gov-section matches
+  // `startsWith('/submit/')`), so it must not be titled 「页面不存在」.
+  if (pathname.startsWith('/submit/')) return copy.pageTitles.submit;
+  // T006 P2-1..P2-3: unknown second-level paths inside these domains still fall
+  // back to the placeholder page, so they inherit its title rather than 404.
+  if (/^\/verify(\/|$)/.test(pathname)) return copy.pageTitles.verify;
+  if (/^\/acting(\/|$)/.test(pathname)) return copy.pageTitles.acting;
+  if (/^\/action(\/|$)/.test(pathname)) return copy.pageTitles.actionInfo;
   return null;
 }

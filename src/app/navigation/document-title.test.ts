@@ -37,4 +37,24 @@ describe('documentTitleFor', () => {
   it('falls back to the 404 page title for unknown routes', () => {
     expect(documentTitleFor('/nope', RESOLVED)).toBe('页面不存在 · TestLOVE20');
   });
+
+  // T006 P2-1..P2-4: these routes render a real page (placeholder or SubmitPage),
+  // so the header/tab title must not say 「页面不存在」 above it.
+  it('titles the placeholder domains instead of calling them a missing page', () => {
+    expect(documentTitleFor('/verify', RESOLVED)).toBe('验证 · TestLOVE20');
+    expect(documentTitleFor('/verify/actions', RESOLVED)).toBe('验证中的行动 · TestLOVE20');
+    expect(documentTitleFor('/verify/detail', RESOLVED)).toBe('验证详情 · TestLOVE20');
+    expect(documentTitleFor('/acting', RESOLVED)).toBe('社区首页 · TestLOVE20');
+    expect(documentTitleFor('/acting/join', RESOLVED)).toBe('加入行动 · TestLOVE20');
+    expect(documentTitleFor('/action/new', RESOLVED)).toBe('创建新行动 · TestLOVE20');
+    expect(documentTitleFor('/action/info', RESOLVED)).toBe('行动详情 · TestLOVE20');
+  });
+
+  it('titles any /submit/* path as 提案 because SubmitPage renders there', () => {
+    expect(documentTitleFor('/submit/anything', RESOLVED)).toBe('提案 · TestLOVE20');
+  });
+
+  it('still returns 404 for paths outside every known domain', () => {
+    expect(documentTitleFor('/nope/deeper', RESOLVED)).toBe('页面不存在 · TestLOVE20');
+  });
 });

@@ -151,4 +151,27 @@ describe('MePage', () => {
     const filled = document.querySelectorAll('.bg-brand');
     expect(filled).toHaveLength(0);
   });
+
+  // T006 P1-2: a failed balance read used to render a bare `—` with no explanation
+  // and no way to retry — a dead end (spec §0-7). It must still never show 0, but
+  // now says the read failed and offers exactly one next step.
+  it('explains a failed balance read and offers a retry (T006 P1-2)', () => {
+    const refetch = vi.fn();
+    communityBalance.mockReturnValue({
+      status: 'error',
+      value: undefined,
+      decimals: 18,
+      refetch,
+    });
+    renderPage();
+
+    // Unknown is still not rendered as 0.
+    expect(screen.queryByText(/^0 TestLOVE20$/)).toBeNull();
+    expect(screen.getByText('余额暂时读不到')).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent('余额暂时读不到');
+
+    const retry = screen.getByRole('button', { name: '重试' });
+    fireEvent.click(retry);
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
 });
