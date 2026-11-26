@@ -1,6 +1,7 @@
 import { useAccount } from 'wagmi';
 import { configuredAddress, type AddressBook, type HexAddress } from '@/config/networks';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
+import { govGateState } from '@/shared/lib/gov-gate';
 
 /**
  * 治理域（core）页面共用的**准入判定**：未部署 → 未连接 → 身份 NFT 三态 → 社区读不到 → 就绪。
@@ -39,18 +40,13 @@ export function useGovAccess(
 
   const missingAddress = requiredAddresses.some((key) => configuredAddress(key) === undefined);
 
-  const gate: GovAccessGate = (() => {
-    if (missingAddress) return 'unconfigured';
-    if (account === undefined || identity.status === 'disconnected') return 'connect';
-    if (identity.status === 'loading') return 'identity-loading';
-    if (identity.status === 'unconfigured') return 'identity-unconfigured';
-    if (identity.status === 'error') return 'identity-error';
-    if (identity.status === 'empty') return 'no-identity';
-    if (identity.status === 'needs-selection') return 'needs-selection';
-    if (tokenAddress === undefined) return 'community-unknown';
-    if (identity.status !== 'ready') return 'identity-loading';
-    return 'ready';
-  })();
+  // 阶梯判定来自 `shared/lib/gov-gate`（候选 B）；本域只提供输入。
+  const gate: GovAccessGate = govGateState({
+    unconfigured: missingAddress,
+    connected: account !== undefined,
+    identityStatus: identity.status,
+    communityKnown: tokenAddress !== undefined,
+  });
 
   return {
     gate,

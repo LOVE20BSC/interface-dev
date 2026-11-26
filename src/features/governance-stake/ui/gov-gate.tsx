@@ -67,7 +67,7 @@ export function GovGate({ ctx, isWrongChain, children }: GovGateProps) {
       return (
         <StakeStateCard
           testId="gov-identity-loading"
-          title={copy.gov.stats.loading}
+          title={copy.wallet.identityReading}
           description={copy.gov.gates.connectBody}
         />
       );

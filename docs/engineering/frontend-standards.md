@@ -1735,6 +1735,13 @@ git config --get core.hooksPath           # 应输出 .githooks
 - **正确写法**：用 `entities/community-token/model/use-custom-token.ts` 的 `useCustomToken()` / `customTokenLookupStatus()`。零地址一律 `no-code`、精度读不到一律不是 `ok`、`address` 只按格式过滤（不要用 `isConfiguredAddress` 过滤候选地址，否则零地址静默无响应）。各页只做状态投影（转账叫 `invalid`、加池叫 `idle`），文案差异留在页面。
 - **证据**：[ADR-0013](../adr/0013-custom-token-lookup.md)；`src/entities/community-token/model/use-custom-token.ts`、`use-custom-token.test.ts`。
 
+### 10.19 治理准入阶梯只从 `govGateState` 取判定
+
+- **现象**：一条 9 态阶梯（未部署 → 未连接 → 身份六态 → 社区未知 → 就绪）在两个域各写一遍，文件顶部的注释写着「两个域阶梯保持一致」——**靠注释同步**。已经漂了两处文案；同一条阶梯零单测。
+- **根因**：判定是 hook 内的 IIFE，看起来「只是几行 if」，于是被复制；复制后顺序一变就没人发现。
+- **正确写法**：判定用 `shared/lib/gov-gate.ts` 的 `govGateState()`；两个域只提供输入（core 算 `requiredAddresses`、stake 算质押三项）并把状态投影成自己的卡片。文案口径：`identity-loading` 一律「读取身份 NFT 中…」；`identity-unconfigured` 一律「这个环境还没有部署身份 NFT 合约」；`copy.gov.gates.unconfigured*`（质押合约未部署）只留给真正的 `unconfigured` 门禁。
+- **证据**：[ADR-0014](../adr/0014-gov-gate-ladder.md)；`src/shared/lib/gov-gate.ts`、`gov-gate.test.ts`。
+
 ## 11. 未决项、已知缺口与变更记录
 
 本节是这份规范的「诚实尾巴」：**哪些不一致这次修掉了、哪些要 owner 拍板、哪些现状没有门禁保护、哪些是欠下的代码债。**

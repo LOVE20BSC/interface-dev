@@ -3,6 +3,7 @@ import { useAccount } from 'wagmi';
 import { configuredAddress } from '@/config/networks';
 import type { MemberIdentity } from '@/entities/member-identity/model/use-member-identities';
 import { useMemberIdentity } from '@/entities/member-identity/model/use-member-identity';
+import { govGateState } from '@/shared/lib/gov-gate';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
 import { useParentToken } from '@/entities/community-token/model/use-parent-token';
 import { usePhaseClock } from '@/entities/phase/model/use-phase-clock';
@@ -121,24 +122,14 @@ export function useGovContext(): GovContextValue {
         }
       : undefined;
 
-  const gate: GovGate = (() => {
-    if (
-      stakeAddress === undefined ||
-      parentAddress === undefined ||
-      clock.status === 'unconfigured'
-    ) {
-      return 'unconfigured';
-    }
-    if (account === undefined) return 'connect';
-    if (identity.status === 'loading') return 'identity-loading';
-    if (identity.status === 'unconfigured') return 'identity-unconfigured';
-    if (identity.status === 'error') return 'identity-error';
-    if (identity.status === 'empty') return 'no-identity';
-    if (identity.status === 'needs-selection') return 'needs-selection';
-    if (token === undefined) return 'community-unknown';
-    if (identity.status !== 'ready') return 'identity-loading';
-    return 'ready';
-  })();
+  // 阶梯判定来自 `shared/lib/gov-gate`（候选 B）；本域只提供输入。
+  const gate: GovGate = govGateState({
+    unconfigured:
+      stakeAddress === undefined || parentAddress === undefined || clock.status === 'unconfigured',
+    connected: account !== undefined,
+    identityStatus: identity.status,
+    communityKnown: token !== undefined,
+  });
 
   /** 「读不到 → 重试」要重读页面上所有读模型，不能只刷门禁那几项（member 另有 15 s 轮询兜底）。 */
   const retry = () => {

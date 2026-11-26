@@ -60,11 +60,14 @@ export function GovAccessGate({ access, isWrongChain, symbol, children }: GovAcc
         />
       );
     case 'identity-unconfigured':
+      // 这个态说的是「身份 NFT 合约没部署」，不是「质押合约没部署」；两侧统一用
+      // 身份 NFT 的措辞（owner 2026-11-26 拍）。`copy.gov.gates.unconfigured*`
+      // 仍留给真正的 unconfigured 门禁。
       return (
         <GateCard
           testId="gov-access-identity-unconfigured"
-          title={copy.gov.gates.unconfiguredTitle}
-          body={copy.gov.gates.unconfiguredBody}
+          title={copy.identity.notDeployedTitle}
+          body={copy.identity.notDeployedBody}
         />
       );
     case 'identity-error':
