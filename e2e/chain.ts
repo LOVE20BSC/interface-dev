@@ -71,6 +71,46 @@ export async function anvilRpc<T>(method: string, params: readonly unknown[] = [
   return body.result as T;
 }
 
+/**
+ * 链健康探测：**在每次用例开始前先确认 RPC 能应答**。
+ *
+ * anvil 1.8.1 在单次 `anvil_mine` 连挖约 3,100 块时会 wedge（进程还在 LISTEN、
+ * HTTP 全超时）。楔死之后提交的交易永远不上链，症状是页面断言里「收据 60 秒没
+ * 出现」——看起来像产品 bug，实际是链死了。2026-11-17 与 2026-11-27 各出现过一次。
+ *
+ * 这里把等待压到 2 秒并给出**可直接执行的修复命令**，让排障从「猜」变成「照做」。
+ */
+const CHAIN_PROBE_TIMEOUT_MS = 2_000;
+
+export const CHAIN_WEDGE_HINT =
+  'e2e 链无响应，通常是 anvil wedge（进程还在但没有应答）。' +
+  '修复：make -C ../anvil clean PORT=8555 && make -C ../anvil bootstrap PORT=8555，然后重跑 pnpm e2e。';
+
+export async function probeChain(timeoutMs = CHAIN_PROBE_TIMEOUT_MS): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(ANVIL_RPC, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 0, method: 'eth_chainId', params: [] }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const body = (await response.json()) as JsonRpcResponse;
+    if (body.error !== undefined) throw new Error(body.error.message);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    // AbortError 的 message 是 "This operation was aborted"，补上超时数字更好读。
+    const reason = controller.signal.aborted ? `超时 ${timeoutMs} ms` : detail;
+    throw new Error(`[chain] ${ANVIL_RPC} 探测失败（${reason}）。${CHAIN_WEDGE_HINT}`);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function snapshotChain(): Promise<string> {
   // `anvil_snapshot` is anvil's documented name; `evm_snapshot` is the same call.
   const id = await anvilRpc<string>('anvil_snapshot');
@@ -98,15 +138,23 @@ export const SUITE_MINING = Object.freeze({ automine: false, intervalMining: 1 }
 
 export interface MiningMode {
   readonly automine: boolean;
-  readonly intervalMining: number;
+  /** `null` when interval mining is off (anvil returns null, not 0). */
+  readonly intervalMining: number | null;
 }
 
 export async function readMiningMode(): Promise<MiningMode> {
   const [automine, intervalMining] = await Promise.all([
     anvilRpc<boolean>('anvil_getAutomine'),
-    anvilRpc<number>('anvil_getIntervalMining'),
+    anvilRpc<number | null>('anvil_getIntervalMining'),
   ]);
   return { automine, intervalMining };
+}
+
+/** 链当前是否已经在套件基线（`SUITE_MINING`）上。 */
+export function isSuiteMining(mode: MiningMode): boolean {
+  return (
+    mode.automine === SUITE_MINING.automine && mode.intervalMining === SUITE_MINING.intervalMining
+  );
 }
 
 /**
@@ -138,10 +186,7 @@ export async function restoreMining(): Promise<void> {
     console.error('[chain] restoring the mining mode failed; verifying by read-back', error);
   }
   const mode = await readMiningMode();
-  if (
-    mode.automine !== SUITE_MINING.automine ||
-    mode.intervalMining !== SUITE_MINING.intervalMining
-  ) {
+  if (!isSuiteMining(mode)) {
     throw new Error(
       `[chain] mining mode not restored: automine=${mode.automine} intervalMining=${mode.intervalMining}, ` +
         `expected automine=${SUITE_MINING.automine} intervalMining=${SUITE_MINING.intervalMining}. ` +
@@ -165,8 +210,35 @@ export function isolateChain(): void {
 
   test.beforeAll(async () => {
     await restoreMining();
+    await probeChain();
     snapshotId = await snapshotChain();
     console.log(`[chain] snapshot ${snapshotId} (${ANVIL_RPC})`);
+  });
+
+  // 每个用例开始前先确认链还活着：wedge 时立刻给出可执行的修复命令，而不是让
+  // 页面断言在 60 秒后报「收据没出现」（2026-11-27 就是这么误判过一次）。
+  test.beforeEach(async () => {
+    await probeChain();
+  });
+
+  // 单个用例若在 suspendMining 之后失败（抛错、超时、提前 return），挖矿会停在
+  // 「不自动出块」，后面所有用例都会收据超时。这里每用例结束兜底恢复一次：**先修
+  // 复、再提醒**，不让一个失败用例连坐整轮。
+  test.afterEach(async ({}, testInfo) => {
+    let mode: MiningMode;
+    try {
+      mode = await readMiningMode();
+    } catch {
+      // 链已 wedge：交给下一个 beforeEach 的 probe 报出可执行信息，这里不掩盖真实错误。
+      return;
+    }
+    if (isSuiteMining(mode)) return;
+    console.warn(
+      `[chain] 挖矿模式在用例「${testInfo.title}」结束后被留在 automine=${mode.automine} ` +
+        `intervalMining=${mode.intervalMining}（期望 ${SUITE_MINING.automine}/${SUITE_MINING.intervalMining}）；` +
+        '已自动恢复，避免连坐后续用例。该用例应自己 restoreMining()。',
+    );
+    await restoreMining();
   });
 
   test.afterAll(async () => {
