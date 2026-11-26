@@ -20,7 +20,7 @@
 1. **判定收进 `src/shared/lib/approval-step.ts`**：`approvalStepState(input)` → `hidden | checking | busy | input-pending | needs-approval | approved | long-term`。顺序是规则的一部分：不需要代币 → （铸造）所需量未知 → 授权进行中 → 额度未知 → 长期授权 → 前置输入未填 → 够/不够。
 2. **呈现留在各 flow**：每个 flow 只把状态投影成自己的文案与按钮形态。四个 flow 的措辞差异（「兑换」页说「授权 TestLOVE20」、加池说「授权 TestLOVE20」、质押给一句说明、铸造整行可隐藏）是有意的产品差异，**不进共享层**。
 3. **铸造那条 P1 结论变成模型的默认能力**：`hideWhenNeedUnknown` 让「所需量未知」可以落 `hidden` 而不是被当成「不需要授权」。
-4. **本轮只接三处**：兑换、质押、铸造。**加池暂不接**——它的 `approvalNeed()` 在「额度未读回」时返回 `required`（直接显示「授权」且可点），而共享判定会落 `checking`（显示「读取中」且不可点）。这是**用户可见行为差异**，要 owner 拍口径后才能接。
+4. **本轮接四处**：兑换、质押、铸造，以及加池。加池原先的 `approvalNeed()` 在「额度未读回」时返回 `required`（直接显示一个**可点**的「授权」），与共享判定的 `checking`（读取中、不可点）不同；owner 2026-11-26 批准按共享判定对齐后接上（文案与布局不变）。`approvalNeed()` 保留：撤出路径（`my-liquidity-panel`）仍在用。
 
 ## Consequences
 

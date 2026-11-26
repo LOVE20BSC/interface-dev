@@ -13,6 +13,7 @@ import { Button } from '@/shared/ui/button';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { ActionStack } from '@/shared/ui/action-stack';
 import { approvalKind } from '@/shared/lib/approval-kind';
+import { approvalStepState, type ApprovalStepState } from '@/shared/lib/approval-step';
 import { decideApproveAmount } from '@/shared/lib/approve-amount';
 import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
@@ -25,7 +26,6 @@ import {
 } from '@/features/liquidity-pool/lib/liquidity-math';
 import {
   addSideIssue,
-  approvalNeed,
   deadlineFromNow,
   NATIVE_GAS_RESERVE_WEI,
   parseAmount,
@@ -285,8 +285,18 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
   const spender = hubPath ? hub : router;
   const allowance = hubPath ? tokenAllowanceHub : tokenAllowanceRouter;
   // QA D8：这一笔不需要代币授权（原生币单边 / 数量为 0）时，不能显示成「已授权」。
-  const approval = approvalNeed(requiredTokenAmount, allowance.value);
-  const needsApproval = approval === 'required';
+  // 判定来自 `shared/lib/approval-step`（候选 D）：额度没读回来时给「读取中」且不可点，
+  // 不再先显示一个可点的「授权」（owner 2026-11-26 批准与其余三处对齐）。
+  const approveState: ApprovalStepState =
+    requiredTokenAmount <= 0n
+      ? 'input-pending'
+      : approvalStepState({
+          required: true,
+          stage: tx.approveStage,
+          allowance: allowance.value,
+          need: requiredTokenAmount,
+        });
+  const needsApproval = approveState === 'needs-approval';
 
   // QA D1（P1）：授权每确认一次就无条件重读额度/余额。不能只监听「同一个 token+spender
   // 的 key 变化」——第二次授权后 key 不变，主按钮会永久停在禁用。
@@ -983,19 +993,25 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
               }
               loading={tx.approveStage === 'wallet'}
             >
-              {needsApproval
-                ? useUnlimitedApproval
-                  ? copy.approve.longTermAction(token.symbol)
-                  : copy.liquidity.add.approveToken(token.symbol)
-                : approval === 'not-needed'
-                  ? copy.approve.notNeeded
-                  : allowance.value === undefined
+              {approveState === 'busy'
+                ? tx.approveStage === 'wallet'
+                  ? copy.approve.approving
+                  : copy.approve.confirming
+                : approveState === 'needs-approval'
+                  ? useUnlimitedApproval
+                    ? copy.approve.longTermAction(token.symbol)
+                    : copy.liquidity.add.approveToken(token.symbol)
+                  : approveState === 'checking'
                     ? copy.approve.loading
-                    : approvalKind(allowance.value) === 'unlimited'
+                    : approveState === 'long-term'
                       ? copy.approve.longTermActive
-                      : copy.liquidity.add.approvedToken(token.symbol)}
+                      : approveState === 'approved'
+                        ? copy.liquidity.add.approvedToken(token.symbol)
+                        : copy.approve.notNeeded}
             </Button>
-            {approval !== 'not-needed' && (needsApproval || allowance.value !== undefined) ? (
+            {approveState !== 'input-pending' &&
+            approveState !== 'hidden' &&
+            (needsApproval || allowance.value !== undefined) ? (
               <p className="text-xs leading-5 text-muted">
                 {needsApproval
                   ? useUnlimitedApproval
