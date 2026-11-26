@@ -256,5 +256,7 @@
   "ZeroTokenBAddress": "没有选择第二个代币，请重新选择。",
   "ZeroVerifyVotes": "验证票权为零，暂时不能验证。",
   "ZeroVoteAmount": "投票数量不能为零。",
-  "ZeroVoteWeight": "投票权重为零。"
+  "ZeroVoteWeight": "投票权重为零。",
+  "RewardArraysLengthMismatch": "这一批激励里，行动与链群的数量没有一一对应，这次没有铸造。请刷新页面后重试。",
+  "TooManyRewards": "单次最多铸造 32 项激励，请分批提交。"
 }
