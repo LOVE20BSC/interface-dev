@@ -77,4 +77,29 @@ describe('resolveWriteAttemptAdapter', () => {
     expect(resolved.parseReceipt('main', RECEIPT)).toBe('receipt');
     expect(adapter.parseReceipt).toHaveBeenCalledWith('main', RECEIPT);
   });
+
+  it('落盘 adapter 的 reverted getter 不会被解析过程读取（回归：成功交易被当成回滚）', () => {
+    // 批量转账把 `reverted` 写成 getter，读取即记下「这次尝试回滚过」；它必须在
+    // core 真要回滚文案时才被调用。`{ ...adapter }` 会在解析时无条件触发 getter，
+    // 结果连成功的交易也拿不到收据（2026-11-26 全量 e2e 用例 A）。
+    let reads = 0;
+    const adapter = {
+      persist: 'afterHash' as const,
+      ownerChanged: '',
+      get reverted() {
+        reads += 1;
+        return '回滚了';
+      },
+      readRecord: () => null,
+      writeRecord: () => undefined,
+      clearRecord: () => undefined,
+      send: async () => '0xhash' as const,
+      parseReceipt: () => null,
+      translate: () => ({ message: 'x' }),
+    };
+    const resolved = resolveWriteAttemptAdapter(adapter);
+    expect(reads).toBe(0);
+    expect(resolved.reverted).toBe('回滚了');
+    expect(reads).toBe(1);
+  });
 });

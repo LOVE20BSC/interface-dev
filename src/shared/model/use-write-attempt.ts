@@ -94,10 +94,25 @@ export function resolveWriteAttemptAdapter<Intent, Receipt, Stored>(
     adapter.translate ??
     ((cause: unknown): WriteAttemptError => ({ message: toUserMessage(cause) }));
   if (adapter.persist === 'afterHash') {
+    // 不能 `{ ...adapter }`：落盘形态的 adapter 把 `reverted` 写成 getter，读取时
+    // 会记录「这次尝试回滚过」（批量转账靠它区分授权/转账两句回滚文案）。展开会
+    // 在每次渲染无条件触发那个 getter，于是**成功的交易也被当成回滚**——收据永远
+    // 不出现（2026-11-26 全量 e2e 用例 A 抓到的回归）。这里逐字段拷贝、getter 原样
+    // 转发，保持「只在 core 真要回滚文案时才读」的语义。
     return {
-      ...adapter,
+      persist: adapter.persist,
       approve: adapter.approve ?? 'none',
+      ownerChanged: adapter.ownerChanged,
+      get reverted() {
+        return adapter.reverted;
+      },
+      readRecord: adapter.readRecord,
+      writeRecord: adapter.writeRecord,
+      clearRecord: adapter.clearRecord,
+      send: adapter.send,
+      parseReceipt: adapter.parseReceipt,
       translate,
+      ...(adapter.onConfirmed !== undefined ? { onConfirmed: adapter.onConfirmed } : {}),
     };
   }
   return {

@@ -25,6 +25,7 @@ const deployment = JSON.parse(
     vote: `0x${string}`;
     submit: `0x${string}`;
     mint: `0x${string}`;
+    weth: `0x${string}`;
   };
 };
 
@@ -115,8 +116,11 @@ async function openApprovals(page: Page): Promise<void> {
   });
 }
 
-/** Built-in TestWETH from the committed dev address book (D4 uses its address). */
-const WETH = '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9';
+/**
+ * Built-in TestWETH from the committed dev address book (D4 uses its address)。
+ * 不要在这里写死地址：部署重排后地址会变（2026-11-26 踩过），读地址簿即可。
+ */
+const WETH = deployment.addresses.weth;
 
 const RPC_ABORT_PATTERN = new RegExp(`^${ANVIL_RPC.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
 
