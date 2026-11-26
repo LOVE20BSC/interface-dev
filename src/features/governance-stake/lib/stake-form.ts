@@ -1,4 +1,4 @@
-import { parseUnits } from 'viem';
+import { parseAmountInput } from '@/shared/lib/amount-input';
 import { optimalAmounts } from '@/domain/gov-stake';
 
 /**
@@ -15,21 +15,20 @@ export type ParsedStakeAmount =
   | { readonly kind: 'too-precise'; readonly digits: number }
   | { readonly kind: 'ok'; readonly value: bigint };
 
-const AMOUNT_RE = /^(?:\d+\.?\d*|\.\d+)$/;
 const PHASE_RE = /^\d+$/;
 
 export function parseStakeAmount(raw: string, decimals: number): ParsedStakeAmount {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return { kind: 'empty' };
-  if (!AMOUNT_RE.test(trimmed)) return { kind: 'invalid' };
-  const [whole = '0', fraction = ''] = trimmed.split('.');
-  if (!/\d/.test(trimmed)) return { kind: 'invalid' };
-  if (fraction.length > decimals) return { kind: 'too-precise', digits: decimals };
-  const normalized = fraction.length > 0 ? `${whole === '' ? '0' : whole}.${fraction}` : whole;
-  try {
-    return { kind: 'ok', value: parseUnits(normalized, decimals) };
-  } catch {
-    return { kind: 'invalid' };
+  const parsed = parseAmountInput(raw, { decimals, strategy: 'reject-precision' });
+  switch (parsed.kind) {
+    case 'empty':
+      return { kind: 'empty' };
+    case 'too-precise':
+      return { kind: 'too-precise', digits: parsed.digits };
+    case 'zero':
+    case 'invalid':
+      return { kind: 'invalid' };
+    case 'ok':
+      return { kind: 'ok', value: parsed.value };
   }
 }
 

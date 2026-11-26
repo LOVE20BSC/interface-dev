@@ -1,4 +1,4 @@
-import { parseUnits } from 'viem';
+import { parseAmountInput } from '@/shared/lib/amount-input';
 import { NATIVE_FEE_RESERVE_WEI } from './transfer-types';
 
 /**
@@ -23,27 +23,19 @@ export type ParsedTransferAmount =
     }
   | { readonly kind: 'ok'; readonly value: bigint; readonly truncated: boolean };
 
-const AMOUNT_RE = /^(?:\d+\.?\d*|\.\d+)$/;
-
 export function parseTransferAmount(raw: string, decimals: number): ParsedTransferAmount {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return { kind: 'empty' };
-  // Rejects a leading minus, exponent notation, spaces and full-width digits.
-  if (!AMOUNT_RE.test(trimmed)) return { kind: 'invalid' };
-
-  const [whole = '0', fraction = ''] = trimmed.split('.');
-  if (!/\d/.test(trimmed)) return { kind: 'invalid' };
-  const truncated = fraction.length > decimals;
-  const kept = truncated ? fraction.slice(0, decimals) : fraction;
-
-  let value: bigint;
-  try {
-    value = parseUnits(kept.length > 0 ? `${whole === '' ? '0' : whole}.${kept}` : whole, decimals);
-  } catch {
-    return { kind: 'invalid' };
+  const parsed = parseAmountInput(raw, { decimals, strategy: 'truncate-precision' });
+  switch (parsed.kind) {
+    case 'empty':
+      return { kind: 'empty' };
+    case 'too-precise':
+    case 'invalid':
+      return { kind: 'invalid' };
+    case 'zero':
+      return parsed.truncated === true ? { kind: 'zero', truncated: true } : { kind: 'zero' };
+    case 'ok':
+      return { kind: 'ok', value: parsed.value, truncated: parsed.truncated };
   }
-  if (value === 0n) return truncated ? { kind: 'zero', truncated: true } : { kind: 'zero' };
-  return { kind: 'ok', value, truncated };
 }
 
 /**

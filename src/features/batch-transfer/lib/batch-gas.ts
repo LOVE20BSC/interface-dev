@@ -18,7 +18,10 @@ export const BATCH_GAS_DEFAULT_TOKEN = 60_000;
 export const BATCH_BLOCK_GAS_LIMIT = 30_000_000;
 
 /** Display-only reserve for the native batch (the fee is paid in the same asset). */
-export const NATIVE_FEE_RESERVE_WEI = 10n ** 15n;
+/** 与转账/兑换/加池共用一份（C2 收口）；保留旧名以免动调用方。 */
+import { NATIVE_FEE_RESERVE_WEI } from '@/shared/lib/amount-input';
+
+export { NATIVE_FEE_RESERVE_WEI };
 
 /** Conservative gas price used only to size the reserve; never shown in the UI. */
 const GAS_PRICE_ASSUMPTION_WEI = 10n ** 9n;

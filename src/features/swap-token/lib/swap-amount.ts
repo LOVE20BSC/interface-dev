@@ -1,4 +1,5 @@
-import { parseUnits } from 'viem';
+import { NATIVE_FEE_RESERVE_WEI, parseAmountInput } from '@/shared/lib/amount-input';
+import { applySlippageDown, percentToBps } from '@/shared/lib/percent';
 import type { SwapPairInfo } from './swap-types';
 import { sameAddress } from './swap-types';
 import type { HexAddress } from '@/config/networks';
@@ -8,8 +9,11 @@ export const SLIPPAGE_PRESETS = [0.1, 0.5, 1.0] as const;
 export const MIN_SLIPPAGE_PERCENT = 0.01;
 export const MAX_SLIPPAGE_PERCENT = 50;
 export const QUOTE_MAX_AGE_SECONDS = 30;
-/** Display-only reserve for 全部; the copy always says 约. */
-export const NATIVE_GAS_RESERVE_WEI = 10n ** 15n;
+/**
+ * Display-only reserve for 全部; the copy always says 约.
+ * 值来自 `shared/lib/amount-input`（C2 收口），保留旧名以免动调用方。
+ */
+export const NATIVE_GAS_RESERVE_WEI = NATIVE_FEE_RESERVE_WEI;
 
 export type ParsedSwapAmount =
   | { readonly kind: 'empty' }
@@ -17,26 +21,22 @@ export type ParsedSwapAmount =
   | { readonly kind: 'too-precise'; readonly digits: number }
   | { readonly kind: 'ok'; readonly value: bigint };
 
-const AMOUNT_RE = /^(?:\d+\.?\d*|\.\d+)$/;
-
 export function parseSwapAmount(raw: string, decimals: number): ParsedSwapAmount {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return { kind: 'empty' };
-  if (!AMOUNT_RE.test(trimmed)) return { kind: 'invalid' };
-
-  const [whole = '0', fraction = ''] = trimmed.split('.');
-  if (fraction.length > decimals) return { kind: 'too-precise', digits: decimals };
-  const normalized = fraction.length > 0 ? `${whole === '' ? '0' : whole}.${fraction}` : whole;
-  try {
-    return { kind: 'ok', value: parseUnits(normalized, decimals) };
-  } catch {
-    return { kind: 'invalid' };
+  const parsed = parseAmountInput(raw, { decimals, strategy: 'reject-precision' });
+  switch (parsed.kind) {
+    case 'empty':
+      return { kind: 'empty' };
+    case 'too-precise':
+      return { kind: 'too-precise', digits: parsed.digits };
+    case 'zero':
+    case 'invalid':
+      return { kind: 'invalid' };
+    case 'ok':
+      return { kind: 'ok', value: parsed.value };
   }
 }
 
-export function percentToBps(percent: number): number {
-  return Math.round(percent * 100);
-}
+export { percentToBps };
 
 export function isSlippagePercentValid(percent: number): boolean {
   return (
@@ -46,9 +46,7 @@ export function isSlippagePercentValid(percent: number): boolean {
 
 /** quote × (1 − tolerance), floored to wei. */
 export function applySlippage(quoteOut: bigint, bps: number): bigint {
-  if (bps <= 0) return quoteOut;
-  const bounded = Math.min(bps, 9999);
-  return (quoteOut * BigInt(10_000 - bounded)) / 10_000n;
+  return applySlippageDown(quoteOut, bps);
 }
 
 function reserveFor(

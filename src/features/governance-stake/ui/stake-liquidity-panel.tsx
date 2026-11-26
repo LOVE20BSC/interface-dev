@@ -5,6 +5,8 @@ import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { decideApproveAmount } from '@/shared/lib/approve-amount';
 import { formatTokenAmount, formatUnits, isSameAddress, UNKNOWN } from '@/shared/lib/format';
+import { NATIVE_FEE_RESERVE_WEI as NATIVE_FEE_RESERVE_WEI_SHARED } from '@/shared/lib/amount-input';
+import { applySlippageDown, percentToBps } from '@/shared/lib/percent';
 import { formatPercent } from '@/shared/lib/format-rates';
 
 import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
@@ -32,18 +34,14 @@ import { StakeAmountField, StakeApproveRow } from '@/features/governance-stake/u
 /** 治理权按 18 位小数展示：份额来自 LP 记账，与代币精度无关。 */
 const VOTE_DECIMALS = 18;
 /** 原生币「全部」给网络手续费留的展示口径（与兑换/流动性页一致）。 */
-const NATIVE_FEE_RESERVE_WEI = 10n ** 15n;
+const NATIVE_FEE_RESERVE_WEI = NATIVE_FEE_RESERVE_WEI_SHARED;
 /** 旧版 stakelp 的滑点默认 2.5%；给出的档位与流动性页同一套。 */
 const SLIPPAGE_PRESETS = [0.1, 0.5, 1, 2.5] as const;
 const DEFAULT_SLIPPAGE_PERCENT = 2.5;
 
-function percentToBps(percent: number): number {
-  return Math.round(percent * 100);
-}
-
 /** `value × (10000 − bps) / 10000`，向下取整（最少获得份额）。 */
-function applySlippageDown(value: bigint, bps: number): bigint {
-  return (value * BigInt(10_000 - bps)) / 10_000n;
+function applyStakeSlippageDown(value: bigint, bps: number): bigint {
+  return applySlippageDown(value, bps, { clamp: false });
 }
 
 /** wei → 可编辑的十进制字符串（无千分位、不丢小数）。 */
@@ -238,7 +236,7 @@ export function StakeLiquidityPanel({
   const hubReady = hubPath && hubQuote !== undefined && !quote.isLoading && !quote.isError;
   const minShares =
     hubReady && hubQuote !== undefined
-      ? applySlippageDown(hubQuote.liquiditySharesAdded, bps)
+      ? applyStakeSlippageDown(hubQuote.liquiditySharesAdded, bps)
       : undefined;
 
   // 余额校验用「合约实际会扣走的量」：Hub 是 desired 全额（多余会退），关闭模式用比例截断后的两侧。

@@ -1693,6 +1693,13 @@ git config --get core.hooksPath           # 应输出 .githooks
 - **正确写法**：owner 2026-11-23 决定移除重发。卡住态只显示标题 + 正文「请在钱包或区块浏览器里查看」，无按钮/链接；交易落定由 watcher 自动更新。只保留有 hash 的在途记录；失败/取消不保存请求。不要重新引入站内重发、失败重试或同 nonce 替换。
 - **证据**：[ADR-0006](../adr/0006-no-transaction-resend.md)；`e2e/gov-stake-recovery.spec.ts`、`e2e/transfer-recovery.spec.ts`、`e2e/swap-slow-wallet.spec.ts`、`e2e/tx-recovery.spec.ts`；`src/shared/ui/tx-stuck-hint.tsx`。
 
+### 10.13 金额输入不要再写第二份 parser
+
+- **现象**：兑换 / 加池 / 治理质押 / 代币转账 / 治理投票曾各有一份十进制金额解析，口径已分叉（超精度分别「拒绝」「静默截断」「判非法」）；原生币预留 `10n ** 15n` 五份、`percentToBps` 三份、`applySlippage*` 三份；批量转账甚至跨 feature `import` 转账页的 parser。
+- **根因**：每个 parser 的 interface 几乎等于它的 implementation（一条正则 + `parseUnits` + 四态 union），看起来「太小了不值得下沉」，于是按 feature 复制；规则只写在注释里，不是同一份代码。
+- **正确写法**：用 `src/shared/lib/amount-input.ts` 的 `parseAmountInput(raw, { decimals, strategy })`，策略 `reject-precision` / `truncate-precision` / `reject-as-invalid` 显式声明，feature 只做投影（保留自己的返回类型与 kind）。零的映射按策略区分（`ok 0n` vs `zero`），不要抹平。原生币预留只用 `NATIVE_FEE_RESERVE_WEI`，百分比与滑点只用 `src/shared/lib/percent.ts`。
+- **证据**：[ADR-0008](../adr/0008-amount-input-module.md)；`src/shared/lib/amount-input.ts`、`src/shared/lib/percent.ts`；收口前 `stake-form.ts` / `swap-amount.ts` / `liquidity-form.ts` / `transfer-amount.ts` / `vote-form.ts` 各有一份实现。
+
 ## 11. 未决项、已知缺口与变更记录
 
 本节是这份规范的「诚实尾巴」：**哪些不一致这次修掉了、哪些要 owner 拍板、哪些现状没有门禁保护、哪些是欠下的代码债。**

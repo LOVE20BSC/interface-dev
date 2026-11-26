@@ -189,12 +189,7 @@ export function addressLpPosition(
   };
 }
 
-/** 数量 × (1 − 滑点)，向下取整；滑点为 0 时原样返回。 */
-export function applySlippageDown(amount: bigint, slippageBps: number): bigint {
-  const bounded = Math.min(Math.max(0, Math.round(slippageBps)), 9_999);
-  if (bounded === 0) return amount;
-  return (amount * BigInt(10_000 - bounded)) / 10_000n;
-}
+export { applySlippageDown } from '@/shared/lib/percent';
 
 /**
  * 价格：1 个 `baseSymbol` 值多少个 `quoteSymbol`，用整数比率返回，显示层再

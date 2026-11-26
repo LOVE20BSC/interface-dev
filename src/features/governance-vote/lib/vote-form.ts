@@ -1,4 +1,4 @@
-import { parseUnits } from 'viem';
+import { parseAmountInput } from '@/shared/lib/amount-input';
 import type { VoteAllocation } from '@/domain/gov-core';
 
 /**
@@ -14,21 +14,20 @@ export type ParsedVoteAmount =
   | { readonly kind: 'invalid' }
   | { readonly kind: 'zero' };
 
-const AMOUNT_PATTERN = /^\d*(?:\.\d*)?$/;
-
 export function parseVoteAmount(raw: string, decimals = 18): ParsedVoteAmount {
-  const trimmed = raw.trim();
-  if (trimmed === '') return { kind: 'empty' };
-  if (!AMOUNT_PATTERN.test(trimmed)) return { kind: 'invalid' };
-  const [, fraction = ''] = trimmed.split('.');
-  // viem 的 parseUnits 会把多余小数位**截断**（不报错）；票数上这是静默丢数，直接拒。
-  if (fraction.length > decimals) return { kind: 'invalid' };
-  try {
-    const value = parseUnits(trimmed, decimals);
-    if (value === 0n) return { kind: 'zero' };
-    return { kind: 'ok', value };
-  } catch {
-    return { kind: 'invalid' };
+  // viem 的 parseUnits 会把多余小数位**截断**（不报错）；票数上这是静默丢数，所以
+  // 用 `reject-as-invalid` 策略，超精度直接算非法输入。
+  const parsed = parseAmountInput(raw, { decimals, strategy: 'reject-as-invalid' });
+  switch (parsed.kind) {
+    case 'empty':
+      return { kind: 'empty' };
+    case 'too-precise':
+    case 'invalid':
+      return { kind: 'invalid' };
+    case 'zero':
+      return { kind: 'zero' };
+    case 'ok':
+      return { kind: 'ok', value: parsed.value };
   }
 }
 

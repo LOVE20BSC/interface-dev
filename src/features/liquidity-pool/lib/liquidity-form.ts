@@ -1,4 +1,5 @@
-import { parseUnits } from 'viem';
+import { NATIVE_FEE_RESERVE_WEI, parseAmountInput } from '@/shared/lib/amount-input';
+import { percentToBps } from '@/shared/lib/percent';
 
 /**
  * 添加/撤出表单的纯函数：金额解析、deadline、滑点与撤出比例。
@@ -28,7 +29,7 @@ export const DEADLINE_SECONDS = DEADLINE_MINUTES * 60;
 export const WITHDRAW_PERCENTS = [25, 50, 75, 100] as const;
 
 /** 原生币「全部」的展示型预留（与兑换页同一口径），页面文案永远写「约」。 */
-export const NATIVE_GAS_RESERVE_WEI = 10n ** 15n;
+export const NATIVE_GAS_RESERVE_WEI = NATIVE_FEE_RESERVE_WEI;
 
 export type ParsedAmount =
   | { readonly kind: 'empty' }
@@ -36,20 +37,19 @@ export type ParsedAmount =
   | { readonly kind: 'too-precise'; readonly digits: number }
   | { readonly kind: 'ok'; readonly value: bigint };
 
-const AMOUNT_RE = /^(?:\d+\.?\d*|\.\d+)$/;
-
 /** 金额输入：只接受非负十进制，超过 decimals 的小数位直接拒绝并给出位数。 */
 export function parseAmount(raw: string, decimals: number): ParsedAmount {
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return { kind: 'empty' };
-  if (!AMOUNT_RE.test(trimmed)) return { kind: 'invalid' };
-  const [whole = '0', fraction = ''] = trimmed.split('.');
-  if (fraction.length > decimals) return { kind: 'too-precise', digits: decimals };
-  const normalized = fraction.length > 0 ? `${whole === '' ? '0' : whole}.${fraction}` : whole;
-  try {
-    return { kind: 'ok', value: parseUnits(normalized, decimals) };
-  } catch {
-    return { kind: 'invalid' };
+  const parsed = parseAmountInput(raw, { decimals, strategy: 'reject-precision' });
+  switch (parsed.kind) {
+    case 'empty':
+      return { kind: 'empty' };
+    case 'too-precise':
+      return { kind: 'too-precise', digits: parsed.digits };
+    case 'zero':
+    case 'invalid':
+      return { kind: 'invalid' };
+    case 'ok':
+      return { kind: 'ok', value: parsed.value };
   }
 }
 
@@ -59,10 +59,7 @@ export function isSlippageValid(percent: number): boolean {
   );
 }
 
-/** 百分数 → 基点（0.5% → 50）。 */
-export function percentToBps(percent: number): number {
-  return Math.round(percent * 100);
-}
+export { percentToBps };
 
 /** 页面提交时的 deadline（秒）：`now + 20 分钟`，链上以秒为单位。 */
 export function deadlineFromNow(nowMs: number = Date.now()): bigint {

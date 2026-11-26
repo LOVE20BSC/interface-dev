@@ -1,5 +1,5 @@
 import type { HexAddress } from '@/config/networks';
-import { parseTransferAmount } from '@/features/transfer-token/lib/transfer-amount';
+import { parseAmountInput } from '@/shared/lib/amount-input';
 
 /**
  * Line parser for 批量转账 (pure, no React, no chain).
@@ -154,12 +154,17 @@ export function parseBatchText(text: string, options: ParseBatchOptions): BatchP
       continue;
     }
 
-    const parsed = parseTransferAmount(rawAmount, options.decimals);
+    // C2：批量转账没有自己的金额规则，用共享层的 `truncate-precision` 策略
+    // （与代币转账页同一口径），不再跨 feature import 转账页的 parser。
+    const parsed = parseAmountInput(rawAmount, {
+      decimals: options.decimals,
+      strategy: 'truncate-precision',
+    });
     if (parsed.kind === 'empty') {
       errors.push({ line: lineNumber, reason: 'missingAmount' });
       continue;
     }
-    if (parsed.kind === 'invalid') {
+    if (parsed.kind === 'invalid' || parsed.kind === 'too-precise') {
       errors.push({ line: lineNumber, reason: 'invalidAmount' });
       continue;
     }
