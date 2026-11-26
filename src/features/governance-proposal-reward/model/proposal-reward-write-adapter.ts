@@ -1,7 +1,6 @@
 import { useRef } from 'react';
 import { useWriteContract } from 'wagmi';
 import { mintAbi } from '@/config/abis';
-import { toUserMessage } from '@/shared/lib/errors';
 import type { WriteAttemptAdapter } from '@/shared/model/use-write-attempt';
 import { parseProposalRewardBurned } from '../lib/proposal-reward-receipt';
 import type { ProposalRewardBurnInput, ProposalRewardReceipt } from './use-proposal-reward-write';
@@ -27,13 +26,7 @@ export function useProposalRewardWriteAdapter(
   const intentRef = useRef<ProposalRewardBurnInput | null>(null);
   return {
     persist: 'none',
-    approve: 'none',
-    // `persist:'none'` 时 core 直接跳过 hydration 归属校验（治理本来就没有记录）。
-    ownerChanged: options.reverted,
     reverted: options.reverted,
-    readRecord: () => null,
-    writeRecord: () => undefined,
-    clearRecord: () => undefined,
     send: async (_step, intent, nonce) => {
       intentRef.current = intent;
       return writeContractAsync({
@@ -57,7 +50,6 @@ export function useProposalRewardWriteAdapter(
         ? { proposalId: intent.proposalId, amount: null }
         : { proposalId: burned.proposalId, amount: burned.amount };
     },
-    translate: (cause) => ({ message: toUserMessage(cause) }),
     onConfirmed: options.onConfirmed,
   };
 }

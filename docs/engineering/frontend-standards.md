@@ -1714,6 +1714,13 @@ git config --get core.hooksPath           # 应输出 .githooks
 - **正确写法**：新页面只在 `src/app/router/page-routes.ts` 的 `PAGE_SPECS` 加一行（`path` / `title` / `load` / `exportName`）。`app-router`、`lazy-routes`、`navigation` 都从这张表派生。治理域子路由加标题时改 `GOV_SUBROUTE_TITLES`；**不要把 `pages/gov/gov-section.tsx` 的 if 链搬进 eager 表**（会把十几个页面拉进首屏，违反 ADR-0001 §3）。`page-routes.test.ts` 会拦住缺标题/缺 loader/重复 path。
 - **证据**：[ADR-0010](../adr/0010-page-route-registry.md)；`src/app/router/page-routes.ts`、`src/app/router/page-routes.test.ts`。
 
+### 10.16 不落盘写链 adapter 不要重复填 no-op 端口
+
+- **现象**：六份 `persist:'none'` 的 adapter 各自写逐字相同的三行 no-op（`readRecord`/`writeRecord`/`clearRecord`）、一个语义不成立的 `ownerChanged: options.reverted`、以及固定的 `translate: toUserMessage`；治理五份合计 278 行里只有 8–10 行真正属于 flow。
+- **根因**：adapter 接口把「策略」（`persist`）与「端口」（记录读写）同时暴露，策略为 `none` 时端口仍必填——策略与端口在说同一件事，接口却要求两次表达。
+- **正确写法**：`WriteAttemptAdapter` 是联合类型。不落盘时**不要**填 `ownerChanged` 与三个记录端口（类型上就是 `never`）；默认值由 `resolveWriteAttemptAdapter()` 补齐。新写一个不落盘 flow 只需 `persist` / `reverted` / `send` / `parseReceipt`（+ `onConfirmed`）。只有 `persist:'afterHash'` 才提供落盘端口与归属变更文案。
+- **证据**：[ADR-0011](../adr/0011-ephemeral-write-attempt.md)；`src/shared/model/use-write-attempt.ts`、`src/shared/model/use-write-attempt.test.ts`。
+
 ## 11. 未决项、已知缺口与变更记录
 
 本节是这份规范的「诚实尾巴」：**哪些不一致这次修掉了、哪些要 owner 拍板、哪些现状没有门禁保护、哪些是欠下的代码债。**

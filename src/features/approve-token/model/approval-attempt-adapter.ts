@@ -5,12 +5,7 @@ import { love20TokenAbi } from '@/config/abis';
 import { NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { txSendRecoveryKind } from '@/shared/lib/tx-send-errors';
-import type {
-  WriteAttempt,
-  WriteAttemptError,
-  WriteHash,
-  WriteStep,
-} from '@/shared/lib/write-attempt';
+import type { WriteAttemptError, WriteHash, WriteStep } from '@/shared/lib/write-attempt';
 import type { WriteAttemptAdapter } from '@/shared/model/use-write-attempt';
 import { describeApprovalError } from '@/features/approve-token/lib/approval-errors';
 import { UNLIMITED_APPROVAL_VALUE } from '@/features/approve-token/lib/approval-amount';
@@ -47,21 +42,7 @@ export function useApprovalAttemptAdapter(
 
   return {
     persist: 'none',
-    approve: 'none',
-    ownerChanged: copy.txWatch.ownerChanged,
     reverted: copy.approvals.errors.reverted,
-
-    readRecord(): WriteAttempt<ApprovalRequest> | null {
-      return null;
-    },
-
-    writeRecord(_attempt: WriteAttempt<ApprovalRequest>): null {
-      return null;
-    },
-
-    clearRecord(): void {
-      // Nothing is persisted: the success strip is page state.
-    },
 
     async send(_step: WriteStep, request: ApprovalRequest, nonce?: number): Promise<WriteHash> {
       memory.current.request = request;

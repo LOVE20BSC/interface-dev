@@ -14,10 +14,62 @@ import {
   type WriteStep,
   isWriteAttemptOwner,
 } from '@/shared/lib/write-attempt';
+import { toUserMessage } from '@/shared/lib/errors';
 import { usePendingNonce, useTxWatch, type TxWatch } from '@/shared/model/use-tx-watch';
 import type { TransactionReceipt } from 'viem';
 
-export interface WriteAttemptAdapter<Intent, Receipt, Stored> {
+/**
+ * 写链 adapter 的公共部分：两种落盘形态都要提供的成员。
+ *
+ * C 候选（2026-11-26）收口后，`approve` 与 `translate` 变成可选：
+ * 治理域六条写链全是 `approve:'none'` + `toUserMessage`，让每份 adapter 各写一遍
+ * 只是把同一个默认值抄六次。
+ */
+interface WriteAttemptAdapterBase<Intent, Receipt> {
+  /** 授权阶梯形态，默认 `'none'`。 */
+  readonly approve?: ApprovePolicy;
+  readonly reverted: string;
+  send(step: WriteStep, intent: Intent, nonce?: number): Promise<WriteHash>;
+  parseReceipt(step: WriteStep, receipt: TransactionReceipt): Receipt | null;
+  /** 发送失败/回滚的归一，默认 `toUserMessage`。 */
+  translate?(cause: unknown): WriteAttemptError;
+  onConfirmed?(): void;
+}
+
+/**
+ * `persist:'afterHash'`：写尝试要在哈希之后落盘，因此必须给出记录端口与
+ * 「记录属于上一个钱包/链」时的提示文案。
+ */
+interface PersistedAttemptPorts<Intent, Stored> {
+  readonly persist: 'afterHash';
+  readonly ownerChanged: string;
+  readRecord(): WriteAttempt<Intent> | null;
+  writeRecord(attempt: WriteAttempt<Intent>): Stored;
+  clearRecord(): void;
+}
+
+/**
+ * `persist:'none'` 是一种**标准形态**，不是「忘了填」：治理域六条写链都不落盘，
+ * core 直接跳过 hydration，记录端口与 `ownerChanged` 永远不会被读取。所以这里
+ * 用 `never` 明确禁止填写——填了就是接口放错了地方（C 候选要消灭的正是这五份
+ * 逐字相同的 no-op 三连 + `ownerChanged = reverted`）。
+ */
+interface EphemeralAttemptPorts {
+  readonly persist: 'none';
+  readonly ownerChanged?: never;
+  readonly readRecord?: never;
+  readonly writeRecord?: never;
+  readonly clearRecord?: never;
+}
+
+export type WriteAttemptAdapter<Intent, Receipt, Stored> = WriteAttemptAdapterBase<
+  Intent,
+  Receipt
+> &
+  (PersistedAttemptPorts<Intent, Stored> | EphemeralAttemptPorts);
+
+/** 补齐默认值后的 adapter：hook 内部只认这个形状。 */
+interface ResolvedWriteAttemptAdapter<Intent, Receipt, Stored> {
   readonly persist: PersistPolicy;
   readonly approve: ApprovePolicy;
   readonly ownerChanged: string;
@@ -29,6 +81,39 @@ export interface WriteAttemptAdapter<Intent, Receipt, Stored> {
   parseReceipt(step: WriteStep, receipt: TransactionReceipt): Receipt | null;
   translate(cause: unknown): WriteAttemptError;
   onConfirmed?(): void;
+}
+
+/**
+ * 把 adapter 补齐默认值。导出是为了让「接口即测试面」成立：落盘/不落盘两档的
+ * 默认行为（端口、文案、授权形态）可以表驱动断言，不需要造 wagmi 上下文。
+ */
+export function resolveWriteAttemptAdapter<Intent, Receipt, Stored>(
+  adapter: WriteAttemptAdapter<Intent, Receipt, Stored>,
+): ResolvedWriteAttemptAdapter<Intent, Receipt, Stored> {
+  const translate =
+    adapter.translate ??
+    ((cause: unknown): WriteAttemptError => ({ message: toUserMessage(cause) }));
+  if (adapter.persist === 'afterHash') {
+    return {
+      ...adapter,
+      approve: adapter.approve ?? 'none',
+      translate,
+    };
+  }
+  return {
+    persist: 'none',
+    approve: adapter.approve ?? 'none',
+    // 不落盘形态下这两个字段永远不会被读取，给中性值只是为了形状统一。
+    ownerChanged: '',
+    reverted: adapter.reverted,
+    readRecord: () => null,
+    writeRecord: () => undefined as Stored,
+    clearRecord: () => undefined,
+    send: adapter.send,
+    parseReceipt: adapter.parseReceipt,
+    translate,
+    ...(adapter.onConfirmed !== undefined ? { onConfirmed: adapter.onConfirmed } : {}),
+  };
 }
 
 export interface WriteAttemptView<Intent, Receipt> {
@@ -61,15 +146,16 @@ export function useWriteAttempt<Intent, Receipt, Stored>(
   const { address: account } = useAccount();
   const chainId = useChainId();
   const readPendingNonce = usePendingNonce(account);
+  const resolved = resolveWriteAttemptAdapter(adapter);
   const [state, setState] = useState<WriteAttemptState<Intent, Receipt>>(() =>
-    initialWriteAttemptState(adapter.persist === 'afterHash'),
+    initialWriteAttemptState(resolved.persist === 'afterHash'),
   );
   const stateRef = useRef(state);
   const resolvers = useRef<ResultResolvers>({ main: undefined, approve: undefined });
-  const adapterRef = useRef(adapter);
+  const adapterRef = useRef(resolved);
   // Keep the latest adapter for async effects; ref write is intentional.
   // eslint-disable-next-line react-hooks/refs
-  adapterRef.current = adapter;
+  adapterRef.current = resolved;
 
   const apply = (event: WriteAttemptEvent<Intent, Receipt>): void => {
     const current = adapterRef.current;

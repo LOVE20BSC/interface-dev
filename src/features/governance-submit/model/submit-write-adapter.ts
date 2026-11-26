@@ -1,7 +1,6 @@
 import type { TransactionReceipt } from 'viem';
 import { useWriteContract } from 'wagmi';
 import { submitAbi } from '@/config/abis';
-import { toUserMessage } from '@/shared/lib/errors';
 import type { WriteAttemptAdapter } from '@/shared/model/use-write-attempt';
 import type { SubmitInput, SubmitReceipt } from './use-submit-write';
 
@@ -26,13 +25,7 @@ export function useSubmitWriteAdapter(
   const { writeContractAsync } = useWriteContract();
   return {
     persist: 'none',
-    approve: 'none',
-    // `persist:'none'` 时 core 直接跳过 hydration 归属校验（治理本来就没有记录）。
-    ownerChanged: options.reverted,
     reverted: options.reverted,
-    readRecord: () => null,
-    writeRecord: () => undefined,
-    clearRecord: () => undefined,
     send: async (_step, intent, nonce) =>
       writeContractAsync({
         address: intent.submitAddress,
@@ -42,7 +35,6 @@ export function useSubmitWriteAdapter(
         ...(nonce !== undefined ? { nonce } : {}),
       }),
     parseReceipt: (_step, receipt) => options.parse(receipt),
-    translate: (cause) => ({ message: toUserMessage(cause) }),
     onConfirmed: options.onConfirmed,
   };
 }
