@@ -3,24 +3,8 @@ import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { BASENAME } from '@/app/router/base-path';
 import { AppShell } from '@/app/shell/app-shell';
 import { HomePage } from '@/pages/home/home-page';
-import {
-  AboutPage,
-  ActPage,
-  AirdropPage,
-  ApprovalsPage,
-  AppsPage,
-  BatchTransferPage,
-  GovSectionPage,
-  GroupPage,
-  LiquidityPage,
-  MePage,
-  MintPage,
-  MyNftPage,
-  NotFoundPage,
-  SwapPage,
-  ThemePage,
-  TransferPage,
-} from '@/app/router/lazy-routes';
+import { GovSectionPage } from '@/app/router/lazy-routes';
+import { GOV_SECTION_ROOTS, PAGE_ROUTES, pageRouteFor } from '@/app/router/page-routes';
 import { documentTitleFor } from '@/app/navigation/document-title';
 import { useCommunityDisplay } from '@/entities/community-token/model/use-community-display';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
@@ -45,6 +29,9 @@ function DocumentTitle() {
   return null;
 }
 
+/** `*` 兜底：NotFound 也是一个懒加载 chunk（从注册表取，避免第二次登记）。 */
+const NotFoundRoute = pageRouteFor('/not-found')?.Page ?? (() => null);
+
 export function AppRouter() {
   return (
     <BrowserRouter {...(BASENAME !== '/' ? { basename: BASENAME } : {})}>
@@ -53,28 +40,15 @@ export function AppRouter() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
-          <Route path="my-nft" element={<MyNftPage />} />
-          <Route path="mint" element={<MintPage />} />
-          <Route path="airdrop" element={<AirdropPage />} />
-          <Route path="swap" element={<SwapPage />} />
-          <Route path="liquidity" element={<LiquidityPage />} />
-          <Route path="transfer" element={<TransferPage />} />
-          <Route path="batch-transfer" element={<BatchTransferPage />} />
-          <Route path="approvals" element={<ApprovalsPage />} />
-          <Route path="apps" element={<AppsPage />} />
-          <Route path="about" element={<AboutPage />} />
-          <Route path="gov/*" element={<GovSectionPage />} />
-          <Route path="stake/*" element={<GovSectionPage />} />
-          <Route path="vote/*" element={<GovSectionPage />} />
-          <Route path="verify/*" element={<GovSectionPage />} />
-          <Route path="submit/*" element={<GovSectionPage />} />
-          <Route path="acting/*" element={<GovSectionPage />} />
-          <Route path="action/*" element={<GovSectionPage />} />
-          <Route path="act" element={<ActPage />} />
-          <Route path="group" element={<GroupPage />} />
-          <Route path="me" element={<MePage />} />
-          <Route path="theme" element={<ThemePage />} />
-          <Route path="*" element={<NotFoundPage />} />
+          {/* 一行登记见 page-routes.ts；`/not-found` 只作为 `*` 的落点，不做独立路由。 */}
+          {PAGE_ROUTES.filter((route) => route.path !== '/not-found').map((route) => {
+            const Page = route.Page;
+            return <Route key={route.path} path={route.path.slice(1)} element={<Page />} />;
+          })}
+          {GOV_SECTION_ROOTS.map((root) => (
+            <Route key={root} path={`${root}/*`} element={<GovSectionPage />} />
+          ))}
+          <Route path="*" element={<NotFoundRoute />} />
         </Route>
       </Routes>
     </BrowserRouter>

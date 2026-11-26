@@ -1707,6 +1707,13 @@ git config --get core.hooksPath           # 应输出 .githooks
 - **正确写法**：哈希行用 `src/shared/ui/tx-hash-row.tsx`（`hash` + `testId` + 可选文案覆盖），公共词汇用 `copy.common.txHashLabel / txHashCopy / txHashExplorer`。**回执正文与关闭清理留在各 flow**，不要做成万能回执。布局确实不同的（流动性回执把链接居中、治理域是纯文本链）只共享文案，不改布局。
 - **证据**：[ADR-0009](../adr/0009-receipt-hash-row.md)；`src/shared/ui/tx-hash-row.tsx`；迁移前 `transfer-receipt.tsx` / `swap-receipt.tsx` / `batch-receipt.tsx` / `airdrop-receipt.tsx` / `mint-receipt.tsx` 各有一份同构实现。
 
+### 10.15 新增页面只改一行路由登记
+
+- **现象**：一个页面的路由事实曾散在三处——`app-router.tsx` 的 `<Route>` 列表、`lazy-routes.ts` 的 loader 常量 + `ROUTE_LOADERS` 预取表（同一批 loader 登记两次）、`navigation.ts` 的 `PAGE_TITLES`。漏一处就是「有路由没标题」（页头回落成「页面不存在」）或「能进入但悬停不预取」。
+- **根因**：每张表都只持有一小段事实，看起来「加一行就行」，于是同一份 path 被抄进三张表，靠人记同步。
+- **正确写法**：新页面只在 `src/app/router/page-routes.ts` 的 `PAGE_SPECS` 加一行（`path` / `title` / `load` / `exportName`）。`app-router`、`lazy-routes`、`navigation` 都从这张表派生。治理域子路由加标题时改 `GOV_SUBROUTE_TITLES`；**不要把 `pages/gov/gov-section.tsx` 的 if 链搬进 eager 表**（会把十几个页面拉进首屏，违反 ADR-0001 §3）。`page-routes.test.ts` 会拦住缺标题/缺 loader/重复 path。
+- **证据**：[ADR-0010](../adr/0010-page-route-registry.md)；`src/app/router/page-routes.ts`、`src/app/router/page-routes.test.ts`。
+
 ## 11. 未决项、已知缺口与变更记录
 
 本节是这份规范的「诚实尾巴」：**哪些不一致这次修掉了、哪些要 owner 拍板、哪些现状没有门禁保护、哪些是欠下的代码债。**

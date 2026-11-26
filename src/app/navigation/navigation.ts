@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import { House, LayoutGrid, ListChecks, UserRound, Vote } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy';
+import { GOV_SUBROUTE_TITLES, PAGE_ROUTES } from '@/app/router/page-routes';
 
 export type NavKey = 'home' | 'gov' | 'act' | 'apps' | 'me';
 
@@ -63,46 +64,14 @@ export function isNavActive(pathname: string, item: NavItem): boolean {
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
+/**
+ * 标题只登记一次：独立页面在 `page-routes.ts`（与它的 chunk loader 同一行），
+ * 治理域子路由在 `GOV_SUBROUTE_TITLES`。这里只保留「按 path 查标题」的查询逻辑，
+ * 不再维护第二份 path 列表（C5 收口，2026-11-26）。
+ */
 const PAGE_TITLES: Readonly<Record<string, string>> = Object.freeze({
-  '/my-nft': copy.pageTitles.myNft,
-  '/mint': copy.pageTitles.mint,
-  '/airdrop': copy.pageTitles.airdrop,
-  '/swap': copy.pageTitles.swap,
-  '/transfer': copy.pageTitles.transfer,
-  '/liquidity': copy.pageTitles.liquidity,
-  '/batch-transfer': copy.pageTitles.batchTransfer,
-  '/approvals': copy.pageTitles.approvals,
-  '/apps': copy.pageTitles.apps,
-  '/about': copy.pageTitles.about,
-  '/gov': copy.pageTitles.gov,
-  '/stake/liquidity': copy.pageTitles.stakeLiquidity,
-  '/stake/staketoken': copy.pageTitles.stakeToken,
-  '/stake/unstake': copy.pageTitles.unstake,
-  '/stake/liquid': copy.pageTitles.stakeLiquid,
-  '/vote': copy.pageTitles.vote,
-  '/vote/records': copy.pageTitles.voteRecords,
-  '/submit': copy.pageTitles.submit,
-  '/submit/new': copy.pageTitles.submitNew,
-  '/gov/rewards': copy.pageTitles.rewards,
-  '/gov/proposal-rewards': copy.pageTitles.proposalRewards,
-  '/act': copy.placeholders.act.title,
-  '/group': copy.placeholders.group.title,
-  '/me': copy.placeholders.me.title,
-  '/theme': copy.pageTitles.theme,
-  // T006 P2-1..P2-3: placeholder routes are real pages (`gov-placeholder`), so
-  // they need real titles; without these the header fell back to
-  // `copy.notFound.title` and said 「页面不存在」 above a normal page.
-  // Titles mirror the cards rendered by GovPlaceholderPage
-  // (`copy.gov.placeholders[*].title`); a coarse per-domain title would put a
-  // different heading above the page than the page itself shows.
-  '/verify': copy.pageTitles.verify,
-  '/verify/actions': copy.pageTitles.verifyActions,
-  '/verify/action': copy.pageTitles.verify,
-  '/verify/detail': copy.pageTitles.verifyDetail,
-  '/acting': copy.pageTitles.acting,
-  '/acting/join': copy.pageTitles.actingJoin,
-  '/action/new': copy.pageTitles.actionNew,
-  '/action/info': copy.pageTitles.actionInfo,
+  ...Object.fromEntries(PAGE_ROUTES.map((route) => [route.path, route.title])),
+  ...GOV_SUBROUTE_TITLES,
 });
 
 export function pageTitleFor(pathname: string): string | null {
