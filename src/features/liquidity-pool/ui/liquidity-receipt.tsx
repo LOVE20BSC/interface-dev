@@ -52,7 +52,7 @@ export function LiquidityReceiptSheet({ record, onDismiss }: LiquidityReceiptShe
         </div>
         <dl className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3 text-sm">
           <div className="flex items-start justify-between gap-3">
-            <dt className="shrink-0 text-muted">{copy.liquidity.receipt.hash}</dt>
+            <dt className="shrink-0 text-muted">{copy.common.txHashLabel}</dt>
             <dd className="min-w-0 text-right">
               <span
                 className="break-all font-mono text-[11px] leading-5 text-foreground"
@@ -69,7 +69,7 @@ export function LiquidityReceiptSheet({ record, onDismiss }: LiquidityReceiptShe
                 }}
                 leadingIcon={<Copy className="h-3.5 w-3.5" aria-hidden="true" />}
               >
-                {copied ? copy.common.copied : copy.liquidity.receipt.copyHash}
+                {copied ? copy.common.copied : copy.common.txHashCopy}
               </Button>
             </dd>
           </div>
@@ -87,7 +87,7 @@ export function LiquidityReceiptSheet({ record, onDismiss }: LiquidityReceiptShe
             rel="noreferrer"
             className="block text-center text-xs font-medium text-brand-strong underline-offset-4 hover:underline"
           >
-            {copy.liquidity.receipt.explorer}
+            {copy.common.txHashExplorer}
           </a>
         ) : null}
       </div>

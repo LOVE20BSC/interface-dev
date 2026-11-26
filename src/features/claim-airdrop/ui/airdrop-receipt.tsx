@@ -1,9 +1,6 @@
-import { useState } from 'react';
-import { Check, Copy } from '@/shared/ui/icons';
-import { NETWORK } from '@/config/networks';
+import { Check } from '@/shared/ui/icons';
 import { formatSharePercent } from '@/domain/airdrop-share';
 import { copy } from '@/shared/config/copy-pages';
-import { copyText } from '@/shared/lib/clipboard';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { formatDateTime } from '@/shared/lib/format-rates';
 
@@ -11,6 +8,7 @@ import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { Sheet } from '@/shared/ui/sheet';
+import { TxHashRow } from '@/shared/ui/tx-hash-row';
 import type { AirdropClaimReceipt } from '@/features/claim-airdrop/lib/airdrop-claim-record';
 
 export interface AirdropReceiptProps {
@@ -20,8 +18,6 @@ export interface AirdropReceiptProps {
 }
 
 function ReceiptBody({ receipt, totalShare, onDismiss }: AirdropReceiptProps) {
-  const [copied, setCopied] = useState(false);
-
   const amountKnown =
     receipt.amount !== undefined &&
     receipt.tokenDecimals !== undefined &&
@@ -44,15 +40,6 @@ function ReceiptBody({ receipt, totalShare, onDismiss }: AirdropReceiptProps) {
       : null;
   const recordedAt =
     receipt.recordedAt !== undefined ? formatDateTime(receipt.recordedAt) : undefined;
-
-  const explorerUrl =
-    NETWORK.blockExplorerUrl !== null ? `${NETWORK.blockExplorerUrl}/tx/${receipt.hash}` : null;
-
-  const handleCopy = async () => {
-    const ok = await copyText(receipt.hash);
-    setCopied(ok);
-    if (ok) window.setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <div className="space-y-4">
@@ -91,39 +78,7 @@ function ReceiptBody({ receipt, totalShare, onDismiss }: AirdropReceiptProps) {
             <dd className="text-right font-medium text-foreground">{recordedAt}</dd>
           </div>
         ) : null}
-        <div className="flex items-start justify-between gap-3">
-          <dt className="shrink-0 text-muted">{copy.airdrop.receipt.hashLabel}</dt>
-          <dd className="min-w-0 text-right">
-            <span
-              className="break-all font-mono text-[11px] leading-5 text-foreground"
-              data-testid="airdrop-receipt-hash"
-            >
-              {receipt.hash}
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="ml-1 h-7 px-1.5 text-xs"
-              leadingIcon={<Copy className="h-3 w-3" aria-hidden="true" />}
-              aria-label={copy.airdrop.receipt.copyHash}
-              onClick={() => {
-                void handleCopy();
-              }}
-            >
-              {copied ? copy.common.copied : copy.common.copy}
-            </Button>
-            {explorerUrl !== null ? (
-              <a
-                href={explorerUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1 block text-xs text-brand-strong underline-offset-4 hover:underline"
-              >
-                {copy.airdrop.receipt.explorer}
-              </a>
-            ) : null}
-          </dd>
-        </div>
+        <TxHashRow hash={receipt.hash} testId="airdrop-receipt-hash" />
       </dl>
 
       {/* Owner 2026-11-16: one button only —「好的」closes the receipt and stays

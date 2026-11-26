@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { Check, Copy } from '@/shared/ui/icons';
-import { NETWORK } from '@/config/networks';
+import { Check } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy-pages';
-import { copyText } from '@/shared/lib/clipboard';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { Sheet } from '@/shared/ui/sheet';
+import { TxHashRow } from '@/shared/ui/tx-hash-row';
 import type { MintedIdentity } from '@/features/mint-identity/model/use-mint-transaction';
 
 export interface MintReceiptProps {
@@ -31,11 +30,8 @@ function ReceiptBody({
   canSetIdentity = false,
   onSetIdentity,
 }: MintReceiptProps) {
-  const [copied, setCopied] = useState(false);
   const [identitySelected, setIdentitySelected] = useState(false);
 
-  const explorerUrl =
-    NETWORK.blockExplorerUrl !== null ? `${NETWORK.blockExplorerUrl}/tx/${receipt.hash}` : null;
   const burned =
     paymentDecimals !== undefined && paymentSymbol !== undefined
       ? copy.mintIdentity.receipt.value(
@@ -43,12 +39,6 @@ function ReceiptBody({
           paymentSymbol,
         )
       : UNKNOWN;
-
-  const handleCopy = async () => {
-    const ok = await copyText(receipt.hash);
-    setCopied(ok);
-    if (ok) window.setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <div className="space-y-4">
@@ -77,39 +67,7 @@ function ReceiptBody({
             {burned}
           </dd>
         </div>
-        <div className="flex items-start justify-between gap-3">
-          <dt className="shrink-0 text-muted">{copy.mintIdentity.receipt.hashLabel}</dt>
-          <dd className="min-w-0 text-right">
-            <span
-              className="break-all font-mono text-[11px] leading-5 text-foreground"
-              data-testid="mint-receipt-hash"
-            >
-              {receipt.hash}
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="ml-1 h-7 px-1.5 text-xs"
-              leadingIcon={<Copy className="h-3 w-3" aria-hidden="true" />}
-              aria-label={copy.mintIdentity.receipt.copyHash}
-              onClick={() => {
-                void handleCopy();
-              }}
-            >
-              {copied ? copy.common.copied : copy.common.copy}
-            </Button>
-            {explorerUrl !== null ? (
-              <a
-                href={explorerUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1 block text-xs text-brand-strong underline-offset-4 hover:underline"
-              >
-                {copy.mintIdentity.receipt.explorerLink}
-              </a>
-            ) : null}
-          </dd>
-        </div>
+        <TxHashRow hash={receipt.hash} testId="mint-receipt-hash" />
       </dl>
 
       {canSetIdentity ? (

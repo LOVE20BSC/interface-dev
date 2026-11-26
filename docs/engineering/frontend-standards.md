@@ -1700,6 +1700,13 @@ git config --get core.hooksPath           # 应输出 .githooks
 - **正确写法**：用 `src/shared/lib/amount-input.ts` 的 `parseAmountInput(raw, { decimals, strategy })`，策略 `reject-precision` / `truncate-precision` / `reject-as-invalid` 显式声明，feature 只做投影（保留自己的返回类型与 kind）。零的映射按策略区分（`ok 0n` vs `zero`），不要抹平。原生币预留只用 `NATIVE_FEE_RESERVE_WEI`，百分比与滑点只用 `src/shared/lib/percent.ts`。
 - **证据**：[ADR-0008](../adr/0008-amount-input-module.md)；`src/shared/lib/amount-input.ts`、`src/shared/lib/percent.ts`；收口前 `stake-form.ts` / `swap-amount.ts` / `liquidity-form.ts` / `transfer-amount.ts` / `vote-form.ts` 各有一份实现。
 
+### 10.14 回执的哈希行不要再手写
+
+- **现象**：六个回执 module 加治理域的质押回执，各自手写「算区块浏览器链接 + `copied` 状态 + 复制按钮 + 2 秒复原 + 链接文案」；`交易哈希` 在 copy 里出现 8 次、`在区块浏览器里查看` 8 次、`复制交易哈希` 7 次，连复制成功的文案都分成两派。
+- **根因**：回执正文（标题 / 你得到什么 / 唯一按钮）每个 flow 确实不同，于是「连哈希行也一起复制」——把该复用的末端和不该复用的正文混在一起。
+- **正确写法**：哈希行用 `src/shared/ui/tx-hash-row.tsx`（`hash` + `testId` + 可选文案覆盖），公共词汇用 `copy.common.txHashLabel / txHashCopy / txHashExplorer`。**回执正文与关闭清理留在各 flow**，不要做成万能回执。布局确实不同的（流动性回执把链接居中、治理域是纯文本链）只共享文案，不改布局。
+- **证据**：[ADR-0009](../adr/0009-receipt-hash-row.md)；`src/shared/ui/tx-hash-row.tsx`；迁移前 `transfer-receipt.tsx` / `swap-receipt.tsx` / `batch-receipt.tsx` / `airdrop-receipt.tsx` / `mint-receipt.tsx` 各有一份同构实现。
+
 ## 11. 未决项、已知缺口与变更记录
 
 本节是这份规范的「诚实尾巴」：**哪些不一致这次修掉了、哪些要 owner 拍板、哪些现状没有门禁保护、哪些是欠下的代码债。**

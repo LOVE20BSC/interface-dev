@@ -1,13 +1,11 @@
-import { useState } from 'react';
-import { Check, Copy } from '@/shared/ui/icons';
-import { NETWORK } from '@/config/networks';
+import { Check } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy-pages';
-import { copyText } from '@/shared/lib/clipboard';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
 import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { Sheet } from '@/shared/ui/sheet';
+import { TxHashRow } from '@/shared/ui/tx-hash-row';
 import type { SwapRecord } from '@/features/swap-token/lib/swap-receipt-record';
 
 export interface SwapReceiptProps {
@@ -21,7 +19,6 @@ function amountLine(amount: bigint | undefined, decimals: number | undefined, sy
 }
 
 function ReceiptBody({ record, onDismiss }: SwapReceiptProps) {
-  const [copied, setCopied] = useState(false);
   const actualText = amountLine(record.actualOut, record.toDecimals, record.toSymbol);
   const minText =
     record.minOut !== undefined && record.toDecimals !== undefined
@@ -37,14 +34,6 @@ function ReceiptBody({ record, onDismiss }: SwapReceiptProps) {
     record.minOut !== undefined &&
     record.toDecimals !== undefined;
   const belowMinOut = record.belowMinOut;
-  const explorerUrl =
-    NETWORK.blockExplorerUrl !== null ? `${NETWORK.blockExplorerUrl}/tx/${record.hash}` : null;
-
-  const handleCopy = async () => {
-    const ok = await copyText(record.hash);
-    setCopied(ok);
-    if (ok) window.setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <div className="space-y-4">
@@ -99,39 +88,7 @@ function ReceiptBody({ record, onDismiss }: SwapReceiptProps) {
             <dd className="text-right font-medium text-foreground">{paidText}</dd>
           </div>
         ) : null}
-        <div className="flex items-start justify-between gap-3">
-          <dt className="shrink-0 text-muted">{copy.swap.receipt.hashLabel}</dt>
-          <dd className="min-w-0 text-right">
-            <span
-              className="break-all font-mono text-[11px] leading-5 text-foreground"
-              data-testid="swap-receipt-hash"
-            >
-              {record.hash}
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="ml-1 h-7 px-1.5 text-xs"
-              leadingIcon={<Copy className="h-3 w-3" aria-hidden="true" />}
-              aria-label={copy.swap.receipt.copyHash}
-              onClick={() => {
-                void handleCopy();
-              }}
-            >
-              {copied ? copy.common.copied : copy.common.copy}
-            </Button>
-            {explorerUrl !== null ? (
-              <a
-                href={explorerUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1 block text-xs text-brand-strong underline-offset-4 hover:underline"
-              >
-                {copy.swap.receipt.explorer}
-              </a>
-            ) : null}
-          </dd>
-        </div>
+        <TxHashRow hash={record.hash} testId="swap-receipt-hash" />
       </dl>
 
       {/* Owner 2026-11-16: one button only —「好的」closes the receipt and stays

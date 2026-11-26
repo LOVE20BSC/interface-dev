@@ -17,6 +17,20 @@ const NATIVE_SYMBOL = NETWORK.nativeCurrency.symbol;
 export const copy = {
   ...firstScreenCopy,
   /**
+   * 交易回执的公共词汇（C4 收口，2026-11-26）：五处结构相同的回执哈希行
+   * （转账 / 兑换 / 批量转账 / 空投 / 铸造）已收进 `shared/ui/tx-hash-row.tsx`，
+   * 默认文案就用这三句。放在懒加载层，不占首屏包体。
+   *
+   * 注意：`liquidity`、`gov` 与两个面板的「成功条」布局不同（链接居中/纯文本链），
+   * 本轮保留各自 section 里的同义 key，不强行统一。
+   */
+  common: {
+    ...firstScreenCopy.common,
+    txHashLabel: '交易哈希',
+    txHashCopy: '复制交易哈希',
+    txHashExplorer: '在区块浏览器里查看',
+  },
+  /**
    * Overlays that only open on interaction (wallet menu / no-wallet dialog /
    * error dialog / community menu) render these, so their strings live here
    * instead of ./copy: the trigger buttons keep the shape `copy.<section>.*`

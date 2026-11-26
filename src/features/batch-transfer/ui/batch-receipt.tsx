@@ -1,8 +1,5 @@
-import { useState } from 'react';
-import { AlertTriangle, Check, Copy } from '@/shared/ui/icons';
-import { NETWORK } from '@/config/networks';
+import { AlertTriangle, Check } from '@/shared/ui/icons';
 import { copy } from '@/shared/config/copy-pages';
-import { copyText } from '@/shared/lib/clipboard';
 import { cn } from '@/shared/lib/cn';
 import { formatVisibleTokenAmount } from '@/shared/lib/format-tiny';
 import { useMediaQuery } from '@/shared/lib/use-media-query';
@@ -10,6 +7,7 @@ import { Button } from '@/shared/ui/button';
 import { Card } from '@/shared/ui/card';
 import { CopyableAddress } from '@/shared/ui/copyable-address';
 import { Sheet } from '@/shared/ui/sheet';
+import { TxHashRow } from '@/shared/ui/tx-hash-row';
 import { summarizeBatchAudit, type BatchAuditRow } from '@/features/batch-transfer/lib/batch-audit';
 import type { BatchReceiptRecord } from '@/features/batch-transfer/lib/batch-receipt';
 
@@ -88,9 +86,6 @@ function ReceiptRow({
 }
 
 function ReceiptBody({ record, onDismiss }: BatchReceiptProps) {
-  const [copied, setCopied] = useState(false);
-  const explorerUrl =
-    NETWORK.blockExplorerUrl !== null ? `${NETWORK.blockExplorerUrl}/tx/${record.hash}` : null;
   // D1: the conclusion is derived from the audit, never a static success claim.
   const audit = summarizeBatchAudit(record.rows);
   const verified = audit.outcome === 'verified';
@@ -100,12 +95,6 @@ function ReceiptBody({ record, onDismiss }: BatchReceiptProps) {
       : audit.outcome === 'anomaly'
         ? copy.batchTransfer.receiptMismatch(String(audit.mismatchRows))
         : copy.batchTransfer.atomicReceipt;
-
-  const handleCopy = async () => {
-    const ok = await copyText(record.hash);
-    setCopied(ok);
-    if (ok) window.setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <div className="space-y-4">
@@ -175,39 +164,7 @@ function ReceiptBody({ record, onDismiss }: BatchReceiptProps) {
       </div>
 
       <dl className="space-y-2.5 rounded-2xl border border-line bg-elevated p-3 text-sm">
-        <div className="flex items-start justify-between gap-3">
-          <dt className="shrink-0 text-muted">{copy.batchTransfer.receiptHash}</dt>
-          <dd className="min-w-0 text-right">
-            <span
-              className="break-all font-mono text-[11px] leading-5 text-foreground"
-              data-testid="batch-transfer-receipt-hash"
-            >
-              {record.hash}
-            </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="ml-1 h-7 px-1.5 text-xs"
-              leadingIcon={<Copy className="h-3 w-3" aria-hidden="true" />}
-              aria-label={copy.batchTransfer.copyHash}
-              onClick={() => {
-                void handleCopy();
-              }}
-            >
-              {copied ? copy.common.copied : copy.common.copy}
-            </Button>
-            {explorerUrl !== null ? (
-              <a
-                href={explorerUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1 block text-xs text-brand-strong underline-offset-4 hover:underline"
-              >
-                {copy.batchTransfer.explorer}
-              </a>
-            ) : null}
-          </dd>
-        </div>
+        <TxHashRow hash={record.hash} testId="batch-transfer-receipt-hash" />
       </dl>
 
       {/* Owner 2026-11-16: one button only —「好的」closes the receipt and stays

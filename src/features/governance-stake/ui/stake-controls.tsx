@@ -235,13 +235,13 @@ export function StakeReceiptCard({
         <button
           type="button"
           data-testid="gov-receipt-copy"
-          aria-label={copy.gov.receipt.copyHash}
+          aria-label={copy.common.txHashCopy}
           onClick={() => {
             void copyText(hash).then((ok) => setCopied(ok));
           }}
           className="font-medium text-brand-strong underline-offset-4 hover:underline"
         >
-          {copied ? copy.gov.receipt.copied : copy.gov.receipt.copyHash}
+          {copied ? copy.common.copied : copy.common.txHashCopy}
         </button>
         {explorerUrl !== null ? (
           <a
@@ -250,7 +250,7 @@ export function StakeReceiptCard({
             rel="noreferrer"
             className="font-medium text-brand-strong underline-offset-4 hover:underline"
           >
-            {copy.gov.receipt.explorer}
+            {copy.common.txHashExplorer}
           </a>
         ) : null}
       </div>
