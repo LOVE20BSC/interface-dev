@@ -1721,6 +1721,13 @@ git config --get core.hooksPath           # 应输出 .githooks
 - **正确写法**：`WriteAttemptAdapter` 是联合类型。不落盘时**不要**填 `ownerChanged` 与三个记录端口（类型上就是 `never`）；默认值由 `resolveWriteAttemptAdapter()` 补齐。新写一个不落盘 flow 只需 `persist` / `reverted` / `send` / `parseReceipt`（+ `onConfirmed`）。只有 `persist:'afterHash'` 才提供落盘端口与归属变更文案。
 - **证据**：[ADR-0011](../adr/0011-ephemeral-write-attempt.md)；`src/shared/model/use-write-attempt.ts`、`src/shared/model/use-write-attempt.test.ts`。
 
+### 10.17 授权行只从 `approvalStepState` 取判定
+
+- **现象**：「这一行授权该说什么、按钮能不能点、要不要整行不渲染」曾在四个 flow 各推一遍（兑换 21 行三目、加池五段三目、质押六段 if 链、铸造四行纯函数），同一个「不知道」给了三种答案——其中两种把「未知」说成了「不需要」。
+- **根因**：额度三态（`approvalKind`）早已共享，但「状态 → 结论」这段判定没有；每个面板都以为自己的三目就是规则。
+- **正确写法**：判定用 `shared/lib/approval-step.ts` 的 `approvalStepState()`（7 个状态，判定顺序即规则）；面板只做「状态 → 文案/按钮形态」的投影，措辞差异留在各 flow。**「所需量未知」要不要整行隐藏由 `hideWhenNeedUnknown` 显式声明**，不要靠 `needsApproval = cost !== undefined && allowance < cost` 这种写法把未知算成「不需要」。
+- **证据**：[ADR-0012](../adr/0012-approval-step-module.md)；`src/shared/lib/approval-step.ts`、`approval-step.test.ts`。
+
 ## 11. 未决项、已知缺口与变更记录
 
 本节是这份规范的「诚实尾巴」：**哪些不一致这次修掉了、哪些要 owner 拍板、哪些现状没有门禁保护、哪些是欠下的代码债。**

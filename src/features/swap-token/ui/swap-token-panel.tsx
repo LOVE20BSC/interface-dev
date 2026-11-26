@@ -5,7 +5,7 @@ import { ArrowDownUp, RefreshCw } from '@/shared/ui/icons';
 import { NETWORK, configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
-import { approvalKind } from '@/shared/lib/approval-kind';
+import { approvalStepState } from '@/shared/lib/approval-step';
 import { decideApproveAmount } from '@/shared/lib/approve-amount';
 import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
 import { shouldShowPrecision } from '@/shared/lib/token-precision';
@@ -205,14 +205,20 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
   /** The amount the 授权 button writes: maxUint256 when the preference is on. */
   const approveAmount =
     amountIn === undefined ? undefined : decideApproveAmount(useUnlimitedApproval, amountIn);
-  const needsApproval =
+  const showApproveStepEarly =
     from !== undefined &&
     from.kind !== 'native' &&
     route?.kind === 'swap' &&
     amountIn !== undefined &&
-    amountIn > 0n &&
-    effectiveAllowance !== undefined &&
-    effectiveAllowance < amountIn;
+    amountIn > 0n;
+  /** 提交门禁：还差这一笔授权时主按钮禁用。判定与授权行同源（候选 D）。 */
+  const needsApproval =
+    approvalStepState({
+      required: showApproveStepEarly,
+      stage: tx.approveStage,
+      allowance: effectiveAllowance,
+      need: amountIn,
+    }) === 'needs-approval';
 
   const nativeInput = from?.kind === 'native';
   const availableBalance =
@@ -466,30 +472,39 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
     route?.kind === 'swap' &&
     amountIn !== undefined &&
     amountIn > 0n;
-  const longTermApproved =
-    effectiveAllowance !== undefined && approvalKind(effectiveAllowance) === 'unlimited';
-  const approveLabel = needsApproval
-    ? tx.approveStage === 'wallet'
-      ? copy.approve.approving
-      : tx.approveStage === 'pending'
-        ? copy.approve.confirming
-        : useUnlimitedApproval
+  // 判定来自 `shared/lib/approval-step`（候选 D）；这里只把状态投影成文案与可点性。
+  const approveState = approvalStepState({
+    required: showApproveStep,
+    stage: tx.approveStage,
+    allowance: effectiveAllowance,
+    need: amountIn,
+  });
+  const approveLabel =
+    approveState === 'busy'
+      ? tx.approveStage === 'wallet'
+        ? copy.approve.approving
+        : copy.approve.confirming
+      : approveState === 'needs-approval'
+        ? useUnlimitedApproval
           ? copy.approve.longTermAction(from?.symbol ?? '')
           : copy.approve.action(from?.symbol ?? '')
-    : effectiveAllowance === undefined
-      ? copy.approve.loading
-      : longTermApproved
-        ? copy.approve.longTermActive
-        : copy.approve.approved;
-  const approveNote = needsApproval
-    ? useUnlimitedApproval
-      ? copy.approve.longTermApproveNote(from?.symbol ?? '')
-      : copy.approve.note(from?.symbol ?? '')
-    : effectiveAllowance === undefined
-      ? null
-      : longTermApproved
-        ? copy.approve.longTermNote
-        : copy.approve.approvedNote;
+        : approveState === 'checking'
+          ? copy.approve.loading
+          : approveState === 'long-term'
+            ? copy.approve.longTermActive
+            : approveState === 'approved'
+              ? copy.approve.approved
+              : copy.approve.notNeeded;
+  const approveNote =
+    approveState === 'needs-approval'
+      ? useUnlimitedApproval
+        ? copy.approve.longTermApproveNote(from?.symbol ?? '')
+        : copy.approve.note(from?.symbol ?? '')
+      : approveState === 'checking' || approveState === 'hidden'
+        ? null
+        : approveState === 'long-term'
+          ? copy.approve.longTermNote
+          : copy.approve.approvedNote;
   const swapLabel =
     tx.swapStage === 'wallet'
       ? copy.swap.ladder.swapping

@@ -1,3 +1,5 @@
+import { approvalStepState, type ApprovalStepState } from '@/shared/lib/approval-step';
+
 /**
  * 铸造身份页「授权行」该不该出现（owner 走查 2026-11-21 发现的 P1）。
  *
@@ -8,6 +10,10 @@
  *
  * 正确口径：**价格未知时不给结论**（`hidden`），等输入合法名字、价格算出来以后，
  * 才根据 allowance 与价格的关系显示「授权 / 已授权 / 已长期授权」。
+ *
+ * 判定已收进 `shared/lib/approval-step`（候选 D）：本文件只保留铸造页的类型窄化，
+ * 不变量由共享 module 拥有。`busy` 与 `input-pending` 在这个调用点不可达
+ * （铸造页把 `stage` 单独用于按钮 loading，价格未知已经先落 `hidden`）。
  */
 export type ApprovalRowState = 'hidden' | 'checking' | 'needs-approval' | 'approved' | 'long-term';
 
@@ -21,8 +27,27 @@ export interface ApprovalRowInput {
 }
 
 export function approvalRowState(input: ApprovalRowInput): ApprovalRowState {
-  if (input.cost === undefined) return 'hidden';
-  if (input.allowance === undefined) return 'checking';
-  if (input.allowance < input.cost) return 'needs-approval';
-  return input.longTermApproved ? 'long-term' : 'approved';
+  const state: ApprovalStepState = approvalStepState({
+    required: true,
+    hideWhenNeedUnknown: true,
+    stage: 'idle',
+    allowance: input.allowance,
+    need: input.cost,
+  });
+  switch (state) {
+    case 'hidden':
+    case 'checking':
+    case 'needs-approval':
+      return state;
+    // 铸造页把「长期授权」作为已算好的事实传进来（面板由 `approvalKind` 派生），
+    // 这里以它为准；共享判定只负责「够不够」那一层。
+    case 'approved':
+      return input.longTermApproved ? 'long-term' : 'approved';
+    case 'long-term':
+      return 'long-term';
+    // 不可达：价格未知在 `hideWhenNeedUnknown` 已经落 hidden，stage 恒为 idle。
+    case 'busy':
+    case 'input-pending':
+      return 'checking';
+  }
 }

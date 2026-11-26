@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { copyText } from '@/shared/lib/clipboard';
-import { approvalKind } from '@/shared/lib/approval-kind';
+import { approvalStepState } from '@/shared/lib/approval-step';
 import { cn } from '@/shared/lib/cn';
 import { formatTokenAmount } from '@/shared/lib/format';
 import type { TxWatch } from '@/shared/model/use-tx-watch';
@@ -113,39 +113,52 @@ export function StakeApproveRow({
   testId,
   disabled = false,
 }: StakeApproveRowProps) {
-  const kind = allowance === undefined ? undefined : approvalKind(allowance);
-  const canApprove =
-    stage !== 'wallet' &&
-    stage !== 'pending' &&
-    allowance !== undefined &&
-    kind !== 'unlimited' &&
-    required !== undefined &&
-    required > 0n &&
-    allowance < required;
+  // 判定来自 `shared/lib/approval-step`（候选 D）；这里只把状态投影成文案。
+  const state = approvalStepState({
+    required: true,
+    stage,
+    allowance,
+    need: required,
+  });
+  const canApprove = state === 'needs-approval';
 
   let label: string;
   let note: string;
-  if (stage === 'wallet' || stage === 'pending') {
-    label = stage === 'wallet' ? copy.approve.approving : copy.approve.confirming;
-    note = copy.approve.note(symbol);
-  } else if (allowance === undefined) {
-    label = copy.approve.loading;
-    note = copy.approve.note(symbol);
-  } else if (kind === 'unlimited') {
-    label = copy.approve.longTermActive;
-    note = copy.approve.longTermNote;
-  } else if (required === undefined || required <= 0n) {
-    // 金额还没填完：按钮保持显示但禁用，不给「不需要授权」的假结论。
-    label = copy.approve.notNeeded;
-    note = copy.approve.approvedNote;
-  } else if (allowance >= required) {
-    label = copy.gov.approve.approved(symbol);
-    note = copy.approve.approvedNote;
-  } else {
-    label = unlimitedPreferred ? copy.approve.longTermAction(symbol) : copy.approve.action(symbol);
-    note = unlimitedPreferred
-      ? copy.approve.longTermApproveNote(symbol)
-      : copy.approve.note(symbol);
+  switch (state) {
+    case 'busy':
+      label = stage === 'wallet' ? copy.approve.approving : copy.approve.confirming;
+      note = copy.approve.note(symbol);
+      break;
+    case 'checking':
+      label = copy.approve.loading;
+      note = copy.approve.note(symbol);
+      break;
+    case 'long-term':
+      label = copy.approve.longTermActive;
+      note = copy.approve.longTermNote;
+      break;
+    case 'input-pending':
+      // 金额还没填完：按钮保持显示但禁用，不给「不需要授权」的假结论。
+      label = copy.approve.notNeeded;
+      note = copy.approve.approvedNote;
+      break;
+    case 'approved':
+      label = copy.gov.approve.approved(symbol);
+      note = copy.approve.approvedNote;
+      break;
+    case 'needs-approval':
+      label = unlimitedPreferred
+        ? copy.approve.longTermAction(symbol)
+        : copy.approve.action(symbol);
+      note = unlimitedPreferred
+        ? copy.approve.longTermApproveNote(symbol)
+        : copy.approve.note(symbol);
+      break;
+    // 质押页的授权行永远在流内，不隐藏。
+    case 'hidden':
+      label = copy.approve.notNeeded;
+      note = copy.approve.approvedNote;
+      break;
   }
 
   return (
