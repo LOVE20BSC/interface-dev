@@ -1749,6 +1749,17 @@ git config --get core.hooksPath           # 应输出 .githooks
 - **正确写法**：逐字段拷贝 + 显式转发 getter（`get reverted() { return adapter.reverted }`），或用 `Object.create(adapter)` 走原型链。配一条「解析过程不得读取该 getter」的单测，读一次计数 +1 即可反向验证。
 - **证据**：devlog `write-adapter-spread-regression`；`src/shared/model/use-write-attempt.ts`、`use-write-attempt.test.ts`（回归测试 7 条）。
 
+### 10.21 前端 ABI / 地址簿 与已部署产物的漂移由测试守门
+
+- **现象**：兄弟仓把 `Launch.launchToken` 从 `bytes[]` 改成 `bytes`（破坏性接口变更），前端 ABI 与链上合约对不上，e2e fixture 调 `cast send` 直接 revert。这个漂移是**跑 40 分钟全量 e2e** 才暴露的。
+- **根因**：`src/config/abis/*` 与 `network.json` 是 `pnpm sync:anvil` 的生成物，生成后没人验证它仍与 `../anvil/export` 的部署产物一致；`pnpm sync:anvil` 只在有人记得跑的时候才跑。
+- **正确写法**：`src/config/abis/conformance.test.ts`（3 条，1 秒级）：
+  1. 每个前端 ABI 模块用到的 selector ⊆ 已部署合约 ABI 的 selector（tuple 递归展开成 canonical 签名）；
+  2. `network.json` 里每个非零地址都出现在 `../anvil/export/deployments/anvil31337_dev.json`；
+  3. `manifest.json` 列出的模块文件都存在且导出唯一一个非空 ABI 数组。
+  用 `import.meta.glob` 自动收录生成模块，不手维护第二份清单；干净检出没有兄弟 anvil 仓时整组 `describe.skipIf`。
+- **证据**：`src/config/abis/conformance.test.ts`（反向验证过：注入过期 selector / 错地址都会红）。
+
 ## 11. 未决项、已知缺口与变更记录
 
 本节是这份规范的「诚实尾巴」：**哪些不一致这次修掉了、哪些要 owner 拍板、哪些现状没有门禁保护、哪些是欠下的代码债。**
