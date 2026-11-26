@@ -1,12 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useBytecode, useReadContracts } from 'wagmi';
+import { useReadContracts } from 'wagmi';
 import { love20TokenAbi } from '@/config/abis';
-import {
-  NETWORK,
-  configuredAddress,
-  isConfiguredAddress,
-  type HexAddress,
-} from '@/config/networks';
+import { NETWORK, configuredAddress, type HexAddress } from '@/config/networks';
+import { useCustomToken as useCustomTokenLookup } from '@/entities/community-token/model/use-custom-token';
 import {
   useSwapCatalog,
   type SwapTokenSearchStatus,
@@ -56,88 +52,43 @@ export interface TransferCatalog {
   readonly clearCustomToken: () => void;
 }
 
-const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
-
 function useCustomToken(candidate: string | undefined): CustomTokenState {
-  const address = candidate !== undefined && isConfiguredAddress(candidate) ? candidate : undefined;
-
-  const code = useBytecode({ address, query: { enabled: address !== undefined } });
-
-  const contracts = useMemo(
-    () =>
-      address === undefined
-        ? []
-        : [
-            { address, abi: love20TokenAbi, functionName: 'symbol' as const },
-            { address, abi: love20TokenAbi, functionName: 'decimals' as const },
-          ],
-    [address],
-  );
-  const metadata = useReadContracts({
-    contracts,
-    query: { enabled: address !== undefined },
-  });
-
-  const symbolResult = metadata.data?.[0];
-  const decimalsResult = metadata.data?.[1];
-  const symbol =
-    symbolResult?.status === 'success' &&
-    typeof symbolResult.result === 'string' &&
-    symbolResult.result.length > 0
-      ? symbolResult.result
-      : undefined;
-  const decimals =
-    decimalsResult?.status === 'success' && typeof decimalsResult.result === 'number'
-      ? decimalsResult.result
-      : undefined;
-
-  const retry = () => {
-    void code.refetch();
-    void metadata.refetch();
-  };
-
-  if (candidate === undefined || candidate.length === 0) {
-    return { status: 'idle', token: undefined, address: undefined, retry };
-  }
-  if (!ADDRESS_RE.test(candidate)) {
-    return { status: 'invalid', token: undefined, address: undefined, retry };
-  }
-  if (address === undefined) {
-    return { status: 'invalid', token: undefined, address: undefined, retry };
-  }
-  // viem returns undefined for an address without code; wagmi may surface it as
-  // null, so both mean "no contract at this address".
-  const noCode = code.data === undefined || code.data === null || code.data === '0x';
-  if (code.isLoading || (!code.isFetched && code.data == null)) {
-    return { status: 'checking', token: undefined, address, retry };
-  }
-  if (code.isError) {
-    return { status: 'unreadable', token: undefined, address, retry };
-  }
-  if (noCode) {
-    return { status: 'no-code', token: undefined, address, retry };
-  }
-  if (metadata.isLoading) {
-    return { status: 'checking', token: undefined, address, retry };
-  }
-  if (symbol === undefined || decimals === undefined) {
-    return { status: 'unreadable', token: undefined, address, retry };
-  }
-  return {
-    status: 'ok',
-    address,
-    retry,
-    token: { kind: 'custom', address, symbol, decimals },
-  };
+  // 判定来自 `entities/community-token`（候选 A）：零地址一律「没有合约」、
+  // 精度读不到一律不给结论。转账页把「格式不对」叫作 invalid（输入框自己不做
+  // 格式拦截），加池页叫 idle（输入框有自己的格式提示）。
+  const lookup = useCustomTokenLookup(candidate);
+  const status: CustomTokenStatus =
+    lookup.status === 'empty' ? 'idle' : lookup.status === 'malformed' ? 'invalid' : lookup.status;
+  const token = useMemo((): TransferToken | undefined => {
+    if (lookup.status !== 'ok' || lookup.address === undefined) return undefined;
+    if (lookup.symbol === undefined || lookup.decimals === undefined) return undefined;
+    return {
+      kind: 'custom',
+      address: lookup.address,
+      symbol: lookup.symbol,
+      decimals: lookup.decimals,
+    };
+  }, [lookup.address, lookup.decimals, lookup.status, lookup.symbol]);
+  return { status, token, address: lookup.address, retry: lookup.retry };
 }
 
-function toTransferToken(token: SwapToken): TransferToken {
+/** 精度读不到就不放进可选列表（owner 2026-11-26 拍）：转账金额按精度换算，
+ * 猜一个 18 会让用户看到错误的数量——与加池页同一口径。 */
+function toTransferToken(token: SwapToken): TransferToken | undefined {
+  if (token.decimals === undefined) return undefined;
   return {
     kind: 'community',
     address: token.address,
     symbol: token.symbol,
-    decimals: token.decimals ?? 18,
+    decimals: token.decimals,
   };
+}
+
+function mapTransferTokens(tokens: readonly SwapToken[]): TransferToken[] {
+  return tokens.flatMap((token) => {
+    const mapped = toTransferToken(token);
+    return mapped === undefined ? [] : [mapped];
+  });
 }
 
 export function useTransferCatalog(): TransferCatalog {
@@ -204,11 +155,11 @@ export function useTransferCatalog(): TransferCatalog {
   );
 
   const communityTokens = useMemo(
-    () => swapCatalog.communityTokens.map(toTransferToken),
+    () => mapTransferTokens(swapCatalog.communityTokens),
     [swapCatalog.communityTokens],
   );
   const searchResults = useMemo(
-    () => swapCatalog.searchResults.map(toTransferToken),
+    () => mapTransferTokens(swapCatalog.searchResults),
     [swapCatalog.searchResults],
   );
 

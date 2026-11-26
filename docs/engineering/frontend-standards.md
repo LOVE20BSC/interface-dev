@@ -1728,6 +1728,13 @@ git config --get core.hooksPath           # 应输出 .githooks
 - **正确写法**：判定用 `shared/lib/approval-step.ts` 的 `approvalStepState()`（7 个状态，判定顺序即规则）；面板只做「状态 → 文案/按钮形态」的投影，措辞差异留在各 flow。**「所需量未知」要不要整行隐藏由 `hideWhenNeedUnknown` 显式声明**，不要靠 `needsApproval = cost !== undefined && allowance < cost` 这种写法把未知算成「不需要」。
 - **证据**：[ADR-0012](../adr/0012-approval-step-module.md)；`src/shared/lib/approval-step.ts`、`approval-step.test.ts`。
 
+### 10.18 自定义代币的合法性判定只有一份
+
+- **现象**：转账页与加池页各写一份「这个地址是不是真代币」的判定，已经分叉——零地址在加池页说「这个地址上没有合约」、在转账页说「这不是一个有效的代币地址」（对格式完全正确的地址说格式错）；精度读不到时加池不入列、转账按 18 猜。加池那份的注释写明这是修过的 QA D9 P3，**修了一处漏一处**，并且错误经 `useTransferCatalog` 传播到授权页与批量转账共四个页面。
+- **根因**：判定被写成各 feature 的私有 hook；`isConfiguredAddress`（把零地址当「未配置」）被当成地址合法性检查用错。
+- **正确写法**：用 `entities/community-token/model/use-custom-token.ts` 的 `useCustomToken()` / `customTokenLookupStatus()`。零地址一律 `no-code`、精度读不到一律不是 `ok`、`address` 只按格式过滤（不要用 `isConfiguredAddress` 过滤候选地址，否则零地址静默无响应）。各页只做状态投影（转账叫 `invalid`、加池叫 `idle`），文案差异留在页面。
+- **证据**：[ADR-0013](../adr/0013-custom-token-lookup.md)；`src/entities/community-token/model/use-custom-token.ts`、`use-custom-token.test.ts`。
+
 ## 11. 未决项、已知缺口与变更记录
 
 本节是这份规范的「诚实尾巴」：**哪些不一致这次修掉了、哪些要 owner 拍板、哪些现状没有门禁保护、哪些是欠下的代码债。**
