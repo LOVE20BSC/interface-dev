@@ -1742,6 +1742,13 @@ git config --get core.hooksPath           # 应输出 .githooks
 - **正确写法**：判定用 `shared/lib/gov-gate.ts` 的 `govGateState()`；两个域只提供输入（core 算 `requiredAddresses`、stake 算质押三项）并把状态投影成自己的卡片。文案口径：`identity-loading` 一律「读取身份 NFT 中…」；`identity-unconfigured` 一律「这个环境还没有部署身份 NFT 合约」；`copy.gov.gates.unconfigured*`（质押合约未部署）只留给真正的 `unconfigured` 门禁。
 - **证据**：[ADR-0014](../adr/0014-gov-gate-ladder.md)；`src/shared/lib/gov-gate.ts`、`gov-gate.test.ts`。
 
+### 10.20 带副作用 getter 的对象不许整体展开
+
+- **现象**：`resolveWriteAttemptAdapter` 用 `{ ...adapter, approve, translate }` 补齐默认值。批量转账的 adapter 把 `reverted` 写成 getter（读它就是记录「这次尝试回滚过」，用来区分授权回滚与交易回滚两句文案）。展开会**执行 getter**，于是每次渲染都把尝试标记成回滚过——成功的交易也被判成回滚：链上钱已转走，页面不收据、不报错，按钮转两秒回到原样。
+- **根因**：对象展开是浅拷贝，但 getter 会被**求值**成静态值；副作用就在那一刻发生。看起来只是「复制一份并覆盖两个字段」。
+- **正确写法**：逐字段拷贝 + 显式转发 getter（`get reverted() { return adapter.reverted }`），或用 `Object.create(adapter)` 走原型链。配一条「解析过程不得读取该 getter」的单测，读一次计数 +1 即可反向验证。
+- **证据**：devlog `write-adapter-spread-regression`；`src/shared/model/use-write-attempt.ts`、`use-write-attempt.test.ts`（回归测试 7 条）。
+
 ## 11. 未决项、已知缺口与变更记录
 
 本节是这份规范的「诚实尾巴」：**哪些不一致这次修掉了、哪些要 owner 拍板、哪些现状没有门禁保护、哪些是欠下的代码债。**
