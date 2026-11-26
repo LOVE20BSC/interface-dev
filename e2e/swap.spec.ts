@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { createPublicClient, formatUnits, http, parseAbiItem, parseEventLogs } from 'viem';
-import { isolateChain } from './chain';
+import { isolateChain, revertChain, snapshotChain } from './chain';
 
 /**
  * 通用兑换 (UX spec §3.5) against the local anvil chain.
@@ -383,6 +383,26 @@ async function ledgerFromReceipt(
 
 test.beforeAll(() => {
   ensureFixtures();
+});
+
+/**
+ * 每个用例前后各拍/还原一次链上快照（与 airdrop-numbers 同一手法）。
+ *
+ * 这个文件里十几个用例共用一个「浅池」夹具（TestEMPTY1 只有 1000/1000 的流动性），
+ * 而用例是 serial 顺序执行的：前面用例一旦写入，浅池就被消耗，后面依赖池子还有
+ * 报价的用例（例如「价格冲击 >10% 要二次确认」）会读到「—」而失败——单独跑却一定
+ * 通过（2026-11-26 全量 e2e 抓到）。逐用例快照把这种顺序依赖彻底切断：
+ * beforeAll 建的夹具在快照之外只做一次，用例之间互不影响。
+ */
+let caseSnapshot: string | undefined;
+test.beforeEach(async () => {
+  caseSnapshot = await snapshotChain();
+});
+test.afterEach(async () => {
+  if (caseSnapshot !== undefined) {
+    await revertChain(caseSnapshot);
+    caseSnapshot = undefined;
+  }
 });
 
 test('swap: ETH → TestLOVE20 shows path/min-out and a receipt from the pair Swap event', async ({
