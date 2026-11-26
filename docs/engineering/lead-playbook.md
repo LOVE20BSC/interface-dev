@@ -13,6 +13,17 @@
 
 - **bootstrap 的 python 依赖**（2026-11-20 踩坑）：本机 `/usr/local/bin/python3` 是 3.6（跑 `--version` 都被 macOS `Killed: 9`），而 `make -C ../anvil bootstrap` 会调 `python3` 生成空投快照。用 `PATH="/usr/bin:$PATH"` 让它拿到系统 3.9 即可；这不是链/脚本问题，别去 reset 链。
 
+### 0.1 链与环境事故清单（2026-11-26/27 实测，都是真的翻过车）
+
+- **端口归属别猜，用 `lsof -nP -iTCP:<port> -sTCP:LISTEN`**：本机上 8555 的 anvil 和 8545 的 anvil 谁是谁，`ps aux` 的顺序给不出答案；凭直觉猜会把两条链搞反（我差点 kill 掉 owner 的手测链）。`make -C ../anvil stop PORT=…` 永远带上 PORT。
+- **全量 e2e 期间不要并行跑 `pnpm check`/`tsc`/`build`**：机器只剩 ~240 MB 可用时 preview(4173) 被挤死，症状是 `net::ERR_CONNECTION_REFUSED at 127.0.0.1:4173` + 「7 passed / 144 did not run」。看起来像代码坏了，其实是资源。
+- **8555 在两次 `pnpm e2e` 之间不一定是干净基线**：手工 spec / 调试脚本发过交易后，下一轮的预余额断言会从「10,000」变成「9,997.29」。**跑全量前先 `make -C ../anvil clean PORT=8555 && make -C ../anvil bootstrap PORT=8555`**，或至少确认上一轮结束在快照点。
+- **地址「对上」不等于代码对**：部署地址由 deployer nonce 决定，pinned 与 live 都从 nonce 0 部署时**地址可能逐位相同、合约代码却不同**（`launchToken(bytes[])` vs `launchToken(bytes)`）。判据是 `make -C ../anvil pin-status` 的 pinned vs live 列，不是地址。
+- **re-pin 流程**（live 前进之后）：`make -C ../anvil pin-lock` → `unpin` → `pin` → `bootstrap PORT=8555 PINNED=1`。`pin-lock` 要求 sibling 工作树干净；Python 的 `__pycache__/` 也会被算成脏（把 `__pycache__/` 加进对应仓的 `.gitignore`，或临时移走）。
+- **anvil 1.8.1 会在单次 `anvil_mine` 连挖 ~3,100 块时 wedge**（进程在 LISTEN、HTTP 全超时）。症状是「收据 60 秒没出现」，容易被误判成页面 bug。分块 240 块推、并加链健康探测快速失败。
+- **重建 8545 人工链**（只有 owner 明确授权才做）：`make -C ../anvil stop PORT=8545` → `clean PORT=8545` → `bootstrap PORT=8545`。`clean` 会清共享的 `out/cache/broadcast/export`，但**保留其他端口的 `.anvil/<port>/`**；地址确定性复现，前端地址簿不需要改。
+- **e2e 失败先要证据，不要先改代码**：`--trace on` 拿 DOM 快照 + network，再用临时 `console.log` 在适配器/core 两端加探针（打完立刻 `cp` 备份还原），最后拿**链上回执 status** 与页面状态对账。2026-11-26 的 P0（成功交易被当成回滚）就是这么定位的：回执 0x1、页面无收据、`onConfirmed` 收到 `reverted=true`。
+
 ## 1. 一句话结论
 
 **慢不在写代码，在验证基础设施。** 2026-11-18 两轮同规模改版的实测：串行做 135 分钟 → 拆并行 + 去掉重复验证后约 55 分钟。下面每一条都是为了守住这个数字。

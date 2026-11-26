@@ -95,6 +95,7 @@ M0 范围共 6 项（[m0-scope](product/m0-scope.md)「范围内」）。✅ 完
 | — | 2026-11-26 加池页授权行接入共享判定（D 收尾） | ✅ | 加池页的授权行此前是唯一没接 `shared/lib/approval-step` 的一处：额度未读回来时它返回 `required`，直接显示一个**可点**的「授权」；另外三处都已是「读取中 + 不可点」。owner 2026-11-26 批准对齐后改接共享判定（`approvalStepState`），文案与布局不变：busy→授权中/确认中、checking→读取中、long-term→已长期授权、input-pending→这一笔不需要代币授权、needs-approval→授权 {symbol}、approved→已授权 {symbol}。`approvalNeed()` 仍被「我的流动性」撤出路径使用，保留。 |
 | — | 2026-11-27 P0 修复：成功的批量转账被当成回滚、收据永不出现 | ✅ | 候选 C 引入：`resolveWriteAttemptAdapter` 用 `{ ...adapter }` 展开，而落盘形态的 adapter 把 `reverted` 写成 getter（读取即记录「回滚过」）。展开触发 getter → 成功的交易被判成回滚 → 静默不收据（链上钱已转走）。逐字段拷贝 + 显式 getter 转发修复，回归测试反向验证（撤掉修复即红）。同一提交顺带：`e2e/approvals-numbers` 的 D4 把写死的旧 TestWETH 地址改为读地址簿；`sync:anvil` 同步 live 部署（纯地址变更、ABI 零变化）；registry 第 4 次漂移重生成。提交 8b2f477。`pnpm check` 998 全绿。 |
 | — | 2026-11-27 前端 ABI / 地址簿漂移守门测试 | ✅ | 兄弟仓 `launchToken(bytes[]→bytes)` 的破坏性变更此前只能靠 40 分钟全量 e2e 暴露。新增 `src/config/abis/conformance.test.ts`：①前端 ABI selector ⊆ 已部署合约 ABI；②`network.json` 每个非零地址都出现在 anvil 部署导出；③ manifest 模块文件齐全且导出唯一 ABI 数组。`import.meta.glob` 自动收录，无兄弟仓时整组跳过。**两个方向都反向验证过**（注入过期 selector / 错地址均会红）。同时全量 e2e 在新钉住的 sibling 版本（core a3dbcc1 / action 71f6281）上 174/174 通过。 |
+| — | 2026-11-27 测试策略定稿 + 链运维事故清单 | ✅ | owner 批准「Playwright 保留，钱花在让 e2e 少跑」：新增 ADR-0015（为什么不用 Cypress/Synpress；静态一致性守门；属性测试不引依赖；e2e 优化方向与语义级变更需批准；视觉回归只做 4-6 页）。同时把两天实测的链事故写进 lead-playbook §0.1（端口归属用 lsof、全量 e2e 不并行重活、8555 跨轮不干净、地址相同但代码不同、re-pin 流程、anvil 1.8.1 wedge、8545 重建流程、失败先取证据）。 |
 
 ## 3. 仓库与环境事实
 
