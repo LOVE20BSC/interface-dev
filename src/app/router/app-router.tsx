@@ -4,7 +4,7 @@ import { BASENAME } from '@/app/router/base-path';
 import { AppShell } from '@/app/shell/app-shell';
 import { HomePage } from '@/pages/home/home-page';
 import { GovSectionPage } from '@/app/router/lazy-routes';
-import { GOV_SECTION_ROOTS, PAGE_ROUTES, pageRouteFor } from '@/app/router/page-routes';
+import { GOV_SECTION_ROOTS, NOT_FOUND_ROUTE, PAGE_ROUTES } from '@/app/router/page-routes';
 import { documentTitleFor } from '@/app/navigation/document-title';
 import { useCommunityDisplay } from '@/entities/community-token/model/use-community-display';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
@@ -30,7 +30,7 @@ function DocumentTitle() {
 }
 
 /** `*` 兜底：NotFound 也是一个懒加载 chunk（从注册表取，避免第二次登记）。 */
-const NotFoundRoute = pageRouteFor('/not-found')?.Page ?? (() => null);
+const NotFoundPage = NOT_FOUND_ROUTE.Page;
 
 export function AppRouter() {
   return (
@@ -48,7 +48,7 @@ export function AppRouter() {
           {GOV_SECTION_ROOTS.map((root) => (
             <Route key={root} path={`${root}/*`} element={<GovSectionPage />} />
           ))}
-          <Route path="*" element={<NotFoundRoute />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

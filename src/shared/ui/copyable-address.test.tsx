@@ -1,11 +1,13 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ADDRESS_COPY_FEEDBACK_MS, CopyableAddress } from '@/shared/ui/copyable-address';
-import { copyText } from '@/shared/lib/clipboard';
+import { CopyableAddress } from '@/shared/ui/copyable-address';
+import { COPY_FEEDBACK_MS, copyText } from '@/shared/lib/clipboard';
 
-vi.mock('@/shared/lib/clipboard', () => ({
-  copyText: vi.fn(async () => true),
-}));
+vi.mock('@/shared/lib/clipboard', async () => {
+  // 只换掉 copyText；反馈时长等常量保持真实值（帮助函数已删掉 import() 类型注解）。
+  const actual = await vi.importActual<{ COPY_FEEDBACK_MS: number }>('@/shared/lib/clipboard');
+  return { ...actual, copyText: vi.fn(async () => true) };
+});
 
 const copyTextMock = vi.mocked(copyText);
 const ROUTER = '0x0165878A594ca255338adfa4d48449f69242Eb8F';
@@ -55,7 +57,7 @@ describe('CopyableAddress 全局地址组件', () => {
     });
     expect(button).toHaveTextContent('已复制');
     act(() => {
-      vi.advanceTimersByTime(ADDRESS_COPY_FEEDBACK_MS);
+      vi.advanceTimersByTime(COPY_FEEDBACK_MS);
     });
     expect(button).not.toHaveTextContent('已复制');
     expect(button).toHaveAccessibleName('复制地址：路由合约');

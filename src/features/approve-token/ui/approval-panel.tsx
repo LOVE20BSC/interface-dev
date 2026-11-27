@@ -16,6 +16,7 @@ import { TokenPicker, type TokenPickerGroup, type TokenPickerItem } from '@/shar
 import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import { useTransferBalance } from '@/features/transfer-token/model/use-transfer-balance';
 import { useTransferCatalog } from '@/features/transfer-token/model/use-transfer-catalog';
+import { canRetryCustomToken } from '@/features/transfer-token/lib/custom-token-state';
 import { transferTokenKey, type TransferToken } from '@/features/transfer-token/lib/transfer-types';
 import {
   approvalDisplayText,
@@ -449,13 +450,16 @@ export function ApprovalsPanel({ isConnected, isWrongChain, connectAction }: App
                     data-testid="approvals-token-custom-error"
                   >
                     {customTokenError}{' '}
-                    <button
-                      type="button"
-                      onClick={catalog.custom.retry}
-                      className="font-medium underline underline-offset-4"
-                    >
-                      {copy.approvals.customRetry}
-                    </button>
+                    {/* 只有读失败才给「重新读取」：格式不对 / 地址上没有合约重读也没用。 */}
+                    {canRetryCustomToken(catalog.custom.status) ? (
+                      <button
+                        type="button"
+                        onClick={catalog.custom.retry}
+                        className="font-medium underline underline-offset-4"
+                      >
+                        {copy.approvals.customRetry}
+                      </button>
+                    ) : null}
                   </p>
                 ) : null}
                 {duplicateBuiltin !== undefined && duplicateGroupLabel !== undefined ? (

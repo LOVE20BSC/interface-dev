@@ -14,6 +14,7 @@ import { Skeleton } from '@/shared/ui/skeleton';
 import { ActionStack } from '@/shared/ui/action-stack';
 import { approvalKind } from '@/shared/lib/approval-kind';
 import { approvalStepState, type ApprovalStepState } from '@/shared/lib/approval-step';
+import { NATIVE_FEE_RESERVE_WEI } from '@/shared/lib/amount-input';
 import { decideApproveAmount } from '@/shared/lib/approve-amount';
 import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import { useUnlimitedApprovalPreference } from '@/shared/model/use-unlimited-approval-preference';
@@ -27,7 +28,6 @@ import {
 import {
   addSideIssue,
   deadlineFromNow,
-  NATIVE_GAS_RESERVE_WEI,
   parseAmount,
   percentToBps,
   poolNoticeKind,
@@ -230,8 +230,8 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
   const nativeAvailable =
     nativeBalance.value === undefined
       ? undefined
-      : nativeBalance.value > NATIVE_GAS_RESERVE_WEI
-        ? nativeBalance.value - NATIVE_GAS_RESERVE_WEI
+      : nativeBalance.value > NATIVE_FEE_RESERVE_WEI
+        ? nativeBalance.value - NATIVE_FEE_RESERVE_WEI
         : 0n;
 
   /** Hub 报价 / Router 计划是否已经算出一个可提交的数量（QA D7 用它区分「还在算」与「太小」）。 */
@@ -789,7 +789,7 @@ export function AddLiquidityPanel(props: AddLiquidityPanelProps) {
           {nativeMaxPicked && nativeAmount > 0n ? (
             <p className="text-[11px] leading-4 text-muted" data-testid="liquidity-native-gas-note">
               {copy.liquidity.add.maxNativeNote(
-                formatTokenAmount(NATIVE_GAS_RESERVE_WEI, native.decimals),
+                formatTokenAmount(NATIVE_FEE_RESERVE_WEI, native.decimals),
                 native.symbol,
               )}
             </p>

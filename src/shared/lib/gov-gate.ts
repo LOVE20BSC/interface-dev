@@ -45,7 +45,11 @@ export function govGateState(input: GovGateInput): GovGateState {
   if (input.identityStatus === 'error') return 'identity-error';
   if (input.identityStatus === 'empty') return 'no-identity';
   if (input.identityStatus === 'needs-selection') return 'needs-selection';
-  if (!input.communityKnown) return 'community-unknown';
-  if (input.identityStatus !== 'ready') return 'identity-loading';
-  return 'ready';
+  if (input.identityStatus === 'ready') {
+    return input.communityKnown ? 'ready' : 'community-unknown';
+  }
+  // 到不了：上面的阶梯已经穷尽 `GovGateIdentityStatus`。新增身份态时这一行会
+  // 编译失败，提醒把新态放进阶梯——不要用兜底把它静默猜成「读取中」或「就绪」。
+  const unreachable: never = input.identityStatus;
+  return unreachable;
 }

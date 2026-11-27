@@ -29,16 +29,14 @@ import {
   parseTransferAmount,
   spendableTransferBalance,
 } from '@/features/transfer-token/lib/transfer-amount';
+import { NATIVE_FEE_RESERVE_WEI } from '@/shared/lib/amount-input';
+import { canRetryCustomToken } from '@/features/transfer-token/lib/custom-token-state';
 import { checkTransferRecipient } from '@/features/transfer-token/lib/transfer-recipient';
 import {
   transferAmountText,
   type TransferRecord,
 } from '@/features/transfer-token/lib/transfer-receipt';
-import {
-  NATIVE_FEE_RESERVE_WEI,
-  transferTokenKey,
-  type TransferToken,
-} from '@/features/transfer-token/lib/transfer-types';
+import { transferTokenKey, type TransferToken } from '@/features/transfer-token/lib/transfer-types';
 import {
   useIdentityRecipient,
   type IdentityRecipientMode,
@@ -650,13 +648,16 @@ export function TransferTokenPanel({
                       data-testid="transfer-custom-error"
                     >
                       {customError}{' '}
-                      <button
-                        type="button"
-                        onClick={catalog.custom.retry}
-                        className="font-medium underline underline-offset-4"
-                      >
-                        {copy.transfer.customRetry}
-                      </button>
+                      {/* 只有读失败才给「重新读取」：格式不对 / 地址上没有合约重读也没用。 */}
+                      {canRetryCustomToken(catalog.custom.status) ? (
+                        <button
+                          type="button"
+                          onClick={catalog.custom.retry}
+                          className="font-medium underline underline-offset-4"
+                        >
+                          {copy.transfer.customRetry}
+                        </button>
+                      ) : null}
                     </p>
                   ) : null}
                 </div>

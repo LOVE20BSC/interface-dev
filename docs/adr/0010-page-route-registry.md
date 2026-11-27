@@ -21,10 +21,11 @@
 
 1. **新增 `src/app/router/page-routes.ts`**：一个 `PAGE_SPECS` 表，每行登记 `path` / `title` / `load`（动态 import）/ `exportName`；模块加载时派生出 `PAGE_ROUTES`（含 lazy 组件）与 `pageRouteFor(path)`。
 2. **`app-router.tsx` 由表驱动**：`PAGE_ROUTES.map(...)` 生成 `<Route>`；治理域的七段前缀由 `GOV_SECTION_ROOTS` 生成；`*` 兜底取 `/not-found` 那一行。
-3. **`lazy-routes.ts` 只剩两个职责**：`GovSectionPage` 的懒包装与 `prefetchRoute()`（顺带导出 `LAZY_ROUTE_PATHS` 供测试）。重复的 `ROUTE_LOADERS` 表删除。
+3. **`lazy-routes.ts` 只剩两个职责**：`GovSectionPage` 的懒包装与 `prefetchRoute()`。重复的 `ROUTE_LOADERS` 表删除。（2026-11-27 复核：删掉零引用的 `LAZY_ROUTE_PATHS` 与 `export { GOV_SECTION_RE }`——后者已由 `page-routes.ts` 直接导出。）
 4. **`navigation.ts` 只保留查询逻辑**：`PAGE_TITLES` 由 `PAGE_ROUTES` + `GOV_SUBROUTE_TITLES` 拼出，前缀回落规则不变。
 5. **治理域子路由标题单独一张表**：它们的页面在 `pages/gov/gov-section.tsx` 的 if 链里（静态 import 都在懒加载分区内），把 if 链搬进 eager 注册表会把十几个页面拉进首屏，**违反 ADR-0001 §3**。所以标题留在 eager 表、页面选择留在懒加载分区。
 6. **新增守卫测试** `page-routes.test.ts`：每条登记都有 path / title / loader / 组件；path 不重复、不含 `/` 与 `*`；治理域前缀双向断言（该进的进、不该进的不进）。
+   - 2026-11-27 加固：`PAGE_SPECS` 导出给测试，**真的 `load()` 每个 chunk 校验 `exportName` 存在**（`Page` 只是 `lazy()` 壳，truthy 不代表导出名拼对；拼错要到首次导航才白屏）；导出 `NOT_FOUND_ROUTE`，让 `*` 兜底在登记缺失时模块加载即抛错，而不是 `?? (() => null)` 静默渲染空白页。
 
 ## Consequences
 

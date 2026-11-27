@@ -34,7 +34,12 @@ export interface PageRoute {
   readonly Page: LazyExoticComponent<ComponentType>;
 }
 
-const PAGE_SPECS: readonly PageSpec[] = [
+/**
+ * 登记表本体。导出给守卫测试：只有拿到 `exportName` 才能真去 `load()` 那个 chunk、
+ * 断言模块里确实有这个名字。`Page` 只是 `lazy()` 壳，truthy 不代表导出名拼对了
+ * ——拼错会在首次导航时白屏（`toRoute` 里的运行时检查只在真正加载时触发）。
+ */
+export const PAGE_SPECS: readonly PageSpec[] = [
   {
     path: '/my-nft',
     title: copy.pageTitles.myNft,
@@ -143,6 +148,16 @@ function toRoute(spec: PageSpec): PageRoute {
 
 /** 所有独立成页的路由（不含首页与 `*` 兜底；`/not-found` 用于 `*`）。 */
 export const PAGE_ROUTES: readonly PageRoute[] = PAGE_SPECS.map(toRoute);
+
+/**
+ * `*` 兜底的落点（复用注册表里那一行，不再多建一个 `lazy()`）。登记缺失是
+ * **代码错误**，在模块初始化时直接抛——不要用 `?? (() => null)` 静默渲染成空白页。
+ */
+export const NOT_FOUND_ROUTE: PageRoute = (() => {
+  const route = PAGE_ROUTES.find((entry) => entry.path === '/not-found');
+  if (route === undefined) throw new Error("page-routes: missing '/not-found' registration");
+  return route;
+})();
 
 const ROUTE_BY_PATH = new Map(PAGE_ROUTES.map((route) => [route.path, route]));
 

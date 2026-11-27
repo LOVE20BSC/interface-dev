@@ -1,14 +1,11 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { copy } from '@/shared/config/copy';
 import { cn } from '@/shared/lib/cn';
-import { copyText } from '@/shared/lib/clipboard';
+import { COPY_FEEDBACK_MS, copyText } from '@/shared/lib/clipboard';
 import { shortenAddress } from '@/shared/lib/format';
 import { Check, Copy } from '@/shared/ui/icons';
 
 export type AddressCopyStatus = 'idle' | 'copied' | 'failed';
-
-/** How long the 已复制 / 复制失败 feedback stays on screen. */
-export const ADDRESS_COPY_FEEDBACK_MS = 2000;
 
 /**
  * Break opportunity every N hex characters when a full address has to wrap
@@ -112,7 +109,7 @@ export function CopyableAddress({
     void copyText(address).then((ok) => {
       setStatus(ok ? 'copied' : 'failed');
       if (timer.current !== undefined) window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => setStatus('idle'), ADDRESS_COPY_FEEDBACK_MS);
+      timer.current = window.setTimeout(() => setStatus('idle'), COPY_FEEDBACK_MS);
     });
   };
 

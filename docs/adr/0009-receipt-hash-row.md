@@ -23,4 +23,4 @@
 - 回执规则再变（例如复制反馈时长、链接样式）只改一个组件；七个 flow 的文案改动集中到三句话。
 - 首屏包体不变（prod 159.8 / 160 kB）：组件只被懒加载的回执引用。
 - 流动性回执与治理域回执仍是手写实现，是已知的**有意不一致**（布局不同）；若将来 owner 要求统一视觉，应先改规格再收口。
-- 各域 copy section 里仍留有同义的 `hashLabel` / `copyHash` / `explorer` key，被两个面板的「成功条」与上述两处回执使用，因此本轮**不删除**；真正的去重是把那两处也切到共享组件，属于后续增量。
+- 各域 copy section 里仍留有同义的 `hashLabel` / `copyHash` / `explorer` key。**2026-11-27 复核更正**：五处回执已改指 `copy.common.txHash*` 后，**哈希相关**的 key 已有一部分零引用（`liquidity.receipt.copyHash`、`gov.receipt.{hash,copyHash,copied,explorer}`、airdrop 回执里的同义 key）；`gov.receipt.close/refreshHint/votes` 等非哈希 key 仍在用。零引用那些属于「同一句话两处真相」的待清理项；本轮不删（`copy-pages.ts` 另有在途改动），真正的去重是让面板的「成功条」也切到共享组件。

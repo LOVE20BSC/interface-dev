@@ -34,11 +34,3 @@ export function isSameTransferToken(
   if (a === undefined || b === undefined) return false;
   return transferTokenKey(a) === transferTokenKey(b);
 }
-
-/**
- * Display-only reserve for 全部 on the native coin: the network fee is paid in
- * the same asset, so the max button leaves a small buffer and the copy says 约.
- * Same 0.001 value the 兑换 page uses; it is never part of the amount maths.
- */
-/** 与兑换/加池/批量转账共用一份（C2 收口）；保留旧名以免动调用方。 */
-export { NATIVE_FEE_RESERVE_WEI } from '@/shared/lib/amount-input';

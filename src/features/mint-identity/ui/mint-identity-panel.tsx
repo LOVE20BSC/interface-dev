@@ -5,7 +5,6 @@ import { RefreshCw } from '@/shared/ui/icons';
 import { memberNftAbi } from '@/config/abis';
 import { DEFAULT_SYMBOL, NETWORK } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import { approvalKind } from '@/shared/lib/approval-kind';
 import { decideApproveAmount } from '@/shared/lib/approve-amount';
 import { cn } from '@/shared/lib/cn';
 import { formatAmount, formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
@@ -326,14 +325,11 @@ export function MintIdentityPanel({
       ? formatTokenAmount(cost - balance, config.paymentTokenDecimals)
       : undefined;
 
-  const longTermApproved =
-    effectiveAllowance !== undefined && approvalKind(effectiveAllowance) === 'unlimited';
   // owner 2026-11-21 走查 P1：价格未知（名字没填/不合法）时**不渲染授权行**，
   // 绝不把「不知道」说成「已授权」；价格算出来后再按 allowance 给结论。
   const approvalState = approvalRowState({
     cost,
     allowance: effectiveAllowance,
-    longTermApproved,
   });
   const showApprove = approvalState !== 'hidden';
   const approveLabel =

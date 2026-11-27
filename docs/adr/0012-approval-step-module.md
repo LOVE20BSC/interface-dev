@@ -20,11 +20,12 @@
 1. **判定收进 `src/shared/lib/approval-step.ts`**：`approvalStepState(input)` → `hidden | checking | busy | input-pending | needs-approval | approved | long-term`。顺序是规则的一部分：不需要代币 → （铸造）所需量未知 → 授权进行中 → 额度未知 → 长期授权 → 前置输入未填 → 够/不够。
 2. **呈现留在各 flow**：每个 flow 只把状态投影成自己的文案与按钮形态。四个 flow 的措辞差异（「兑换」页说「授权 TestLOVE20」、加池说「授权 TestLOVE20」、质押给一句说明、铸造整行可隐藏）是有意的产品差异，**不进共享层**。
 3. **铸造那条 P1 结论变成模型的默认能力**：`hideWhenNeedUnknown` 让「所需量未知」可以落 `hidden` 而不是被当成「不需要授权」。
-4. **本轮接四处**：兑换、质押、铸造，以及加池。加池原先的 `approvalNeed()` 在「额度未读回」时返回 `required`（直接显示一个**可点**的「授权」），与共享判定的 `checking`（读取中、不可点）不同；owner 2026-11-26 批准按共享判定对齐后接上（文案与布局不变）。`approvalNeed()` 保留：撤出路径（`my-liquidity-panel`）仍在用。
+4. **本轮接四处**：兑换、质押、铸造，以及加池。加池原先的 `approvalNeed()` 在「额度未读回」时返回 `required`（直接显示一个**可点**的「授权」），与共享判定的 `checking`（读取中、不可点）不同；owner 2026-11-26 批准按共享判定对齐后接上。**唯一用户可见变化**：busy 态按钮从旧的「授权 {symbol}」变成「授权中 / 确认中」（与其余三处一致）；其余文案与布局不变（`add-liquidity-panel.tsx` 的 busy 分支）。`approvalNeed()` 保留：撤出路径（`my-liquidity-panel`）仍在用。
 
 ## Consequences
 
 - 「未知 ≠ 已授权」「授权中不能提交」「长期授权禁用」三条不变量只有一处；今天改其中一条要动四个文件。
 - 新增 9 条表驱动单测（`approval-step.test.ts`），覆盖每种状态与两个边界（busy 优先于 unknown、required=false 优先于一切）。四个 flow 今天只有铸造那份有单测。
-- 加池页仍保留自己的判定，是已知的**有意不一致**；它与共享判定的差异已记录，等 owner 决定「额度未读回时能不能点授权」。
-- 首屏包体不变（`shared/lib` 只被懒侧引用；159.7/160）。
+- 四个 flow（兑换 / 质押 / 铸造 / 加池）已全部接入共享判定（加池收尾见 `dbdaa48`）；加池页的旧 `approvalNeed()` 只留给「我的流动性」撤出路径。
+- 判定只有一处后，再改「未知能不能点授权」这条规则只需改 `shared/lib/approval-step.ts` 与四个投影。
+- 首屏包体不变（`shared/lib` 只被懒侧引用；159.8/160，2026-11-27 复核后实测）。

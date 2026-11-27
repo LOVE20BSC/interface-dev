@@ -8,6 +8,10 @@ import {
   type SwapTokenSearchStatus,
 } from '@/features/swap-token/model/use-swap-catalog';
 import type { SwapToken } from '@/features/swap-token/lib/swap-types';
+import {
+  transferCustomTokenStatus,
+  type CustomTokenStatus,
+} from '@/features/transfer-token/lib/custom-token-state';
 import type { TransferToken } from '@/features/transfer-token/lib/transfer-types';
 
 /**
@@ -19,8 +23,6 @@ import type { TransferToken } from '@/features/transfer-token/lib/transfer-types
  * is validated on demand (bytecode + `symbol()` + `decimals()`) and only joins
  * the list when it is a real token.
  */
-
-export type CustomTokenStatus = 'idle' | 'invalid' | 'checking' | 'no-code' | 'unreadable' | 'ok';
 
 export interface CustomTokenState {
   readonly status: CustomTokenStatus;
@@ -57,8 +59,7 @@ function useCustomToken(candidate: string | undefined): CustomTokenState {
   // 精度读不到一律不给结论。转账页把「格式不对」叫作 invalid（输入框自己不做
   // 格式拦截），加池页叫 idle（输入框有自己的格式提示）。
   const lookup = useCustomTokenLookup(candidate);
-  const status: CustomTokenStatus =
-    lookup.status === 'empty' ? 'idle' : lookup.status === 'malformed' ? 'invalid' : lookup.status;
+  const status = transferCustomTokenStatus(lookup.status);
   const token = useMemo((): TransferToken | undefined => {
     if (lookup.status !== 'ok' || lookup.address === undefined) return undefined;
     if (lookup.symbol === undefined || lookup.decimals === undefined) return undefined;

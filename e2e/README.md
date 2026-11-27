@@ -101,11 +101,25 @@ E2E_ANVIL_RPC=http://127.0.0.1:8556 pnpm e2e
    `readMiningMode()` **回读断言** `automine === SUITE_MINING.automine && intervalMining === SUITE_MINING.intervalMining`；
 3. `isolateChain()` 在 `beforeAll`（取快照前）与 `afterAll`（回滚后）也会各自 `restoreMining()` 一次，
    所以即使某个文件的 `afterAll` 被跳过（worker 被杀、超时、异常退出），下一个文件仍会把链修回来。
+4. **全局兜底只恢复、不判失败（2026-11-27）**：`isolateChain()` 注册的 `afterEach` 在每个用例结束后
+   回读挖矿模式，不是套件基线就**先恢复、再 `console.warn`**（写明用例名、实际值与期望值），
+   防止一个用例的遗留状态连坐整轮。它**刻意不断言失败**：本套件的 spec 允许在用例内
+   `suspendMining()`、在 `afterAll` 才 `restoreMining()`（`swap-slow-wallet.spec.ts`、
+   `transfer-recovery.spec.ts` 的 D1/D2 就是这么写的），逐用例判失败会把正常写法误报成泄漏。
+   **归因仍由第 2 条负责**——新 spec 只要用了 `suspendMining()`，就必须自己
+   `restoreMining()`（`afterAll` 的 `try/finally` 回读断言会红）；全局兜底只防连坐，
+   不负责替你发现漏写。
 
 2026-11-16 的两次全量 flake 就是这条泄漏：`afterAll` 里恢复 automine 的分支被跳过（或恢复成
 automine=true 而不是套件默认的 interval mining），后续 spec 的交易再也没被打包。现在恢复失败会在
 **泄漏的那个文件**里以 `[chain] mining mode not restored …` 失败，而不是让下一个文件神秘超时。
 手工抢救：`pnpm e2e:reset-chain`（或 `cast rpc anvil_setIntervalMining 1 --rpc-url http://127.0.0.1:8555`）。
+
+5. **改了 `e2e/chain.ts` 里的 hook 注册后，先跑 `pnpm exec playwright test --list`**（应报 175 条）：
+   Playwright 要求 `beforeEach` / `afterEach` 的**首参必须是对象解构**。把它改成 `_fixtures`
+   之类的普通形参，整套 23 个 spec 会在**收集阶段**就变成 0 条（报 `First argument must use
+the object destructuring pattern`），而 `tsc` / `eslint` / 单测全绿、发现不了
+   （2026-11-27 复核时踩到）。`playwright test --list` 是这一步唯一可靠的检查。
 
 不隔离的东西：浏览器 local storage（每个测试有独立 context）、`docs/product/screenshots/` 里的截图文件、构建产物、**挖矿模式**（靠上面的约定恢复，不靠快照）。截图是幂等覆盖写，不会跨运行累积。
 

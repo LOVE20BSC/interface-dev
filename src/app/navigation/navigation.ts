@@ -74,18 +74,29 @@ const PAGE_TITLES: Readonly<Record<string, string>> = Object.freeze({
   ...GOV_SUBROUTE_TITLES,
 });
 
+/**
+ * 没登记进表的路径按「根 + 子路径」回落（等价于旧正则 `^/root(/|$)`，T006 P2-1..P2-4）：
+ *
+ * - 动态路由 `/vote/:proposalId` 与列表同标题；
+ * - `/submit/*` 渲染 `SubmitPage`（治理域单入口），不能落「页面不存在」；
+ * - `/verify` / `/acting` / `/action` 本身与它们的未知二级路径仍渲染占位页，继承占位页标题
+ *   （注意 `/action` 没有登记在表里，必须由这里兜住，否则页头显示「页面不存在」）。
+ *
+ * 一张表而不是一串 if：再加一个域时只加一行。
+ */
+const PREFIX_TITLE_FALLBACKS: readonly (readonly [root: string, title: string])[] = [
+  ['/vote', copy.pageTitles.vote],
+  ['/submit', copy.pageTitles.submit],
+  ['/verify', copy.pageTitles.verify],
+  ['/acting', copy.pageTitles.acting],
+  ['/action', copy.pageTitles.actionInfo],
+];
+
 export function pageTitleFor(pathname: string): string | null {
   const exact = PAGE_TITLES[pathname];
   if (exact !== undefined) return exact;
-  // 动态路由（owner 2026-11-22）：提案投票详情 `/vote/:proposalId` 与列表同标题。
-  if (pathname.startsWith('/vote/')) return copy.pageTitles.vote;
-  // T006 P2-4: `/submit/*` renders `SubmitPage` (gov-section matches
-  // `startsWith('/submit/')`), so it must not be titled 「页面不存在」.
-  if (pathname.startsWith('/submit/')) return copy.pageTitles.submit;
-  // T006 P2-1..P2-3: unknown second-level paths inside these domains still fall
-  // back to the placeholder page, so they inherit its title rather than 404.
-  if (/^\/verify(\/|$)/.test(pathname)) return copy.pageTitles.verify;
-  if (/^\/acting(\/|$)/.test(pathname)) return copy.pageTitles.acting;
-  if (/^\/action(\/|$)/.test(pathname)) return copy.pageTitles.actionInfo;
+  for (const [root, title] of PREFIX_TITLE_FALLBACKS) {
+    if (pathname === root || pathname.startsWith(`${root}/`)) return title;
+  }
   return null;
 }

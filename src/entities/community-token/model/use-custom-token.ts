@@ -108,6 +108,10 @@ export function useCustomToken(candidate: string | undefined): CustomTokenLookup
     symbol,
     decimals,
     retry: () => {
+      // 规范 §5.2：TanStack Query 的 `refetch()` 无视 `enabled: false`。地址格式不对
+      // 时两个读都是 disabled，重读只会拿空参数发请求；这个按钮在这种情况下也不该
+      // 出现（两个面板只对 `unreadable` 渲染它）。禁用态绝不手动重读。
+      if (address === undefined) return;
       void code.refetch();
       void metadata.refetch();
     },

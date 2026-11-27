@@ -9,6 +9,8 @@
  * block). Errors are returned as keys; copy lives in `shared/config/copy-pages`.
  */
 
+import { NATIVE_FEE_RESERVE_WEI } from '@/shared/lib/amount-input';
+
 export const BATCH_GAS_MIN = 21_000;
 export const BATCH_GAS_MAX = 1_000_000;
 export const BATCH_GAS_DEFAULT_NATIVE = 30_000;
@@ -16,12 +18,6 @@ export const BATCH_GAS_DEFAULT_TOKEN = 60_000;
 
 /** anvil / BSC block gas limit; `recipients × gasLimit` beyond this cannot mine. */
 export const BATCH_BLOCK_GAS_LIMIT = 30_000_000;
-
-/** Display-only reserve for the native batch (the fee is paid in the same asset). */
-/** 与转账/兑换/加池共用一份（C2 收口）；保留旧名以免动调用方。 */
-import { NATIVE_FEE_RESERVE_WEI } from '@/shared/lib/amount-input';
-
-export { NATIVE_FEE_RESERVE_WEI };
 
 /** Conservative gas price used only to size the reserve; never shown in the UI. */
 const GAS_PRICE_ASSUMPTION_WEI = 10n ** 9n;

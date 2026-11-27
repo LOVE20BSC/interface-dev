@@ -1,4 +1,4 @@
-import { NATIVE_FEE_RESERVE_WEI, parseAmountInput } from '@/shared/lib/amount-input';
+import { parseAmountInput } from '@/shared/lib/amount-input';
 import { percentToBps } from '@/shared/lib/percent';
 
 /**
@@ -27,9 +27,6 @@ export const DEADLINE_SECONDS = DEADLINE_MINUTES * 60;
  * 点一下把对应比例的 LP 数量填进输入框，用户仍然可以手改数量）。
  */
 export const WITHDRAW_PERCENTS = [25, 50, 75, 100] as const;
-
-/** 原生币「全部」的展示型预留（与兑换页同一口径），页面文案永远写「约」。 */
-export const NATIVE_GAS_RESERVE_WEI = NATIVE_FEE_RESERVE_WEI;
 
 export type ParsedAmount =
   | { readonly kind: 'empty' }

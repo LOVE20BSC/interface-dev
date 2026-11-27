@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { NATIVE_FEE_RESERVE_WEI } from '@/shared/lib/amount-input';
 import {
   BATCH_GAS_DEFAULT_NATIVE,
   BATCH_GAS_DEFAULT_TOKEN,
   BATCH_GAS_MAX,
   BATCH_GAS_MIN,
-  NATIVE_FEE_RESERVE_WEI,
   isBatchGasOverBlock,
   nativeBatchAvailable,
   nativeBatchReserve,

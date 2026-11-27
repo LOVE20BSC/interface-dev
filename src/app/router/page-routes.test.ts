@@ -3,7 +3,9 @@ import {
   GOV_SECTION_RE,
   GOV_SECTION_ROOTS,
   GOV_SUBROUTE_TITLES,
+  NOT_FOUND_ROUTE,
   PAGE_ROUTES,
+  PAGE_SPECS,
   pageRouteFor,
 } from '@/app/router/page-routes';
 
@@ -19,6 +21,25 @@ describe('page route registry', () => {
       expect(typeof route.load, `${route.path} 缺 loader`).toBe('function');
       expect(route.Page, `${route.path} 缺组件`).toBeTruthy();
     }
+  });
+
+  it('every loader really exports the registered component name', async () => {
+    // `Page` 是 `lazy()` 壳：truthy 只说明壳在，拼错 `exportName` 要到首次导航
+    // 才白屏。这里真的加载每个 chunk，断言模块里存在那个导出名。
+    for (const spec of PAGE_SPECS) {
+      const module = await spec.load();
+      expect(
+        module[spec.exportName],
+        `${spec.path} 的 chunk 里没有导出 ${spec.exportName}`,
+      ).toBeDefined();
+    }
+    // 这条要真的加载 15 个页面 chunk；全量套件并行时 5 s 上下，给足余量。
+  }, 60_000);
+
+  it('exposes the not-found route for the `*` fallback (no silent blank page)', () => {
+    expect(NOT_FOUND_ROUTE.path).toBe('/not-found');
+    expect(NOT_FOUND_ROUTE.title.length).toBeGreaterThan(0);
+    expect(NOT_FOUND_ROUTE.Page).toBeTruthy();
   });
 
   it('has no duplicate or duplicate-titled paths', () => {

@@ -223,8 +223,12 @@ export function isolateChain(): void {
 
   // 单个用例若在 suspendMining 之后失败（抛错、超时、提前 return），挖矿会停在
   // 「不自动出块」，后面所有用例都会收据超时。这里每用例结束兜底恢复一次：**先修
-  // 复、再提醒**，不让一个失败用例连坐整轮。
-  // eslint-disable-next-line no-empty-pattern -- Playwright 的 afterEach 需要第一个参数位
+  // 复、再提醒**，不让一个失败用例连坐整轮。它刻意不判失败（本套件允许 spec 在
+  // 用例内 suspend、在 afterAll 恢复，逐用例断言会误报）——归因由各 spec 的
+  // `afterAll` 回读断言负责，见 e2e/README.md「挖矿模式」第 4 条。
+  // Playwright 要求 hook 首参是对象解构（`_fixtures` 会让 `playwright test --list` 报
+  // "First argument must use the object destructuring pattern"，整套 e2e 收集为 0）。
+  // eslint-disable-next-line no-empty-pattern -- 见上；这里不能改名绕过
   test.afterEach(async ({}, testInfo) => {
     let mode: MiningMode;
     try {

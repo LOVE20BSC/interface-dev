@@ -1,4 +1,4 @@
-import { NATIVE_FEE_RESERVE_WEI, parseAmountInput } from '@/shared/lib/amount-input';
+import { parseAmountInput } from '@/shared/lib/amount-input';
 import { applySlippageDown, percentToBps } from '@/shared/lib/percent';
 import type { SwapPairInfo } from './swap-types';
 import { sameAddress } from './swap-types';
@@ -9,11 +9,6 @@ export const SLIPPAGE_PRESETS = [0.1, 0.5, 1.0] as const;
 export const MIN_SLIPPAGE_PERCENT = 0.01;
 export const MAX_SLIPPAGE_PERCENT = 50;
 export const QUOTE_MAX_AGE_SECONDS = 30;
-/**
- * Display-only reserve for 全部; the copy always says 约.
- * 值来自 `shared/lib/amount-input`（C2 收口），保留旧名以免动调用方。
- */
-export const NATIVE_GAS_RESERVE_WEI = NATIVE_FEE_RESERVE_WEI;
 
 export type ParsedSwapAmount =
   | { readonly kind: 'empty' }

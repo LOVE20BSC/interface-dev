@@ -1337,7 +1337,7 @@ const restoreAnchorFocus = (event: Event) => {
 | --- | --- | --- | --- |
 | **Stale build id** | `:4173` 上残留旧 `vite preview`，测的是旧 bundle（曾出现「先幽灵失败、杀掉后 49/49 假绿」） | 启动前请求 `/build-id.json` 与本次 `E2E_BUILD_ID` 比对；一致才复用；不一致时只有 `lsof`+`ps` 证明是本端口的 `vite preview` 才重启，否则 `:4173 上是旧构建（A ≠ B），拒绝复用` | `e2e/README.md:36`；`playwright.config.ts:227-265`（`:253` 是报错文案）、`:82-126`（id 如何算） |
 | **Wedged chain** | 端口被占但 anvil 不应答，脚本却去 bootstrap，卡到锁超时 | bootstrap 前 3 s 超时探活：有应答就继续校验 chainId / `cast code <memberNFT>` / 地址簿；占用而不应答立即 fatal 并打印 `lsof`，提示 `pnpm e2e:reset-chain` | `e2e/README.md:37`；`scripts/e2e-chain.mjs:62-63,295-340` |
-| **Mining-mode restore** | spec 冻结出块后没恢复，后续 spec 全部超时（2026-11-16 两次全量 flake 的根因） | `suspendMining()` / `restoreMining()` 成对；`restoreMining()` 回读 `anvil_getAutomine` + `anvil_getIntervalMining` 不一致就**在泄漏的那个文件**里失败；`isolateChain()` 在取快照前、回滚后各恢复一次 | `e2e/README.md:69-87`；`e2e/chain.ts:97-151`（`SUITE_MINING` 与回读断言）、`e2e/chain.ts:163-182` |
+| **Mining-mode restore** | spec 冻结出块后没恢复，后续 spec 全部超时（2026-11-16 两次全量 flake 的根因） | `suspendMining()` / `restoreMining()` 成对；`restoreMining()` 回读 `anvil_getAutomine` + `anvil_getIntervalMining` 不一致就**在泄漏的那个文件**里失败；`isolateChain()` 在取快照前、回滚后各恢复一次；另有逐用例 `afterEach` 兜底：非基线就**先恢复再告警**（只 warn、不判失败——spec 允许用例内 suspend、`afterAll` 恢复，逐用例判失败会误报），归因仍由各 spec 的 `afterAll` 回读断言负责 | `e2e/README.md:69-99`；`e2e/chain.ts:97-151`（`SUITE_MINING` 与回读断言）、`e2e/chain.ts:163-182`、`e2e/chain.ts:220-247`（逐用例兜底） |
 | Known flake fix | 连接后偶发落到 wrong-network pill，恢复流程断言超时 | 提交前断言注入钱包 `eth_chainId` == app chain（31337） | `e2e/README.md:39` |
 
 记住快照**不恢复挖矿模式**（`anvil_snapshot` 不含它），这是上表第三条存在的理由（`e2e/README.md:75-76`）。

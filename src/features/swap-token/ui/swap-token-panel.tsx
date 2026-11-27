@@ -6,6 +6,7 @@ import { NETWORK, configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import { cn } from '@/shared/lib/cn';
 import { approvalStepState } from '@/shared/lib/approval-step';
+import { NATIVE_FEE_RESERVE_WEI } from '@/shared/lib/amount-input';
 import { decideApproveAmount } from '@/shared/lib/approve-amount';
 import { formatTokenAmount, formatUnits } from '@/shared/lib/format';
 import { shouldShowPrecision } from '@/shared/lib/token-precision';
@@ -19,7 +20,6 @@ import {
   applySlippage,
   DEFAULT_SLIPPAGE_PERCENT,
   isSlippagePercentValid,
-  NATIVE_GAS_RESERVE_WEI,
   parseSwapAmount,
   percentToBps,
   priceImpactBps,
@@ -224,8 +224,8 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
   const availableBalance =
     balance.balance !== undefined
       ? nativeInput
-        ? balance.balance > NATIVE_GAS_RESERVE_WEI
-          ? balance.balance - NATIVE_GAS_RESERVE_WEI
+        ? balance.balance > NATIVE_FEE_RESERVE_WEI
+          ? balance.balance - NATIVE_FEE_RESERVE_WEI
           : 0n
         : balance.balance
       : undefined;
@@ -880,7 +880,7 @@ export function SwapTokenPanel({ isConnected, isWrongChain, connectAction }: Swa
           {nativeInput && usedNativeMax ? (
             <p className="mt-1 text-[11px] leading-4 text-muted">
               {copy.swap.maxNativeNote(
-                formatTokenAmount(NATIVE_GAS_RESERVE_WEI, fromDecimals),
+                formatTokenAmount(NATIVE_FEE_RESERVE_WEI, fromDecimals),
                 from.symbol,
               )}
             </p>

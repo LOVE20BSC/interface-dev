@@ -1,5 +1,4 @@
-import { parseAmountInput } from '@/shared/lib/amount-input';
-import { NATIVE_FEE_RESERVE_WEI } from './transfer-types';
+import { NATIVE_FEE_RESERVE_WEI, parseAmountInput } from '@/shared/lib/amount-input';
 
 /**
  * Amount parsing for 代币转账 (pure, no React, no chain).

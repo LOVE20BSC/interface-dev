@@ -10,6 +10,10 @@ import {
 } from '@/features/swap-token/model/use-swap-catalog';
 import { useWrappedNative } from '@/features/swap-token/model/use-wrapped-native';
 import type { LiquidityToken } from '@/features/liquidity-pool/lib/liquidity-types';
+import {
+  liquidityCustomTokenStatus,
+  type CustomTokenStatus,
+} from '@/features/liquidity-pool/lib/custom-token-state';
 
 /**
  * 流动性池的 token 宇宙：社区代币来自 Launch 目录（与兑换页同一份链上注册表），
@@ -65,8 +69,6 @@ function mapTokens(
 }
 
 /** 加池页的对外状态：格式不对交给输入框自己的格式提示，因此 `malformed` 落 `idle`。 */
-export type CustomTokenStatus = 'idle' | 'invalid' | 'checking' | 'no-code' | 'unreadable' | 'ok';
-
 export interface CustomTokenState {
   readonly status: CustomTokenStatus;
   readonly token: LiquidityToken | undefined;
@@ -76,8 +78,7 @@ export interface CustomTokenState {
 function useCustomToken(candidate: string | undefined): CustomTokenState {
   // 判定来自 `entities/community-token`（候选 A）：零地址 → no-code、精度读不到 → 不是 ok。
   const lookup = useCustomTokenLookup(candidate);
-  const status: CustomTokenStatus =
-    lookup.status === 'empty' || lookup.status === 'malformed' ? 'idle' : lookup.status;
+  const status = liquidityCustomTokenStatus(lookup.status);
   // 自定义代币对象必须稳定：页面把它当 effect 依赖，每次渲染新建对象会形成无限循环。
   const token = useMemo((): LiquidityToken | undefined => {
     if (lookup.status !== 'ok' || lookup.address === undefined) return undefined;

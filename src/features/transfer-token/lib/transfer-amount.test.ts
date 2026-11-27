@@ -4,7 +4,7 @@ import {
   parseTransferAmount,
   spendableTransferBalance,
 } from '@/features/transfer-token/lib/transfer-amount';
-import { NATIVE_FEE_RESERVE_WEI } from '@/features/transfer-token/lib/transfer-types';
+import { NATIVE_FEE_RESERVE_WEI } from '@/shared/lib/amount-input';
 
 describe('parseTransferAmount', () => {
   it('parses whole and fractional amounts into exact wei', () => {
