@@ -224,6 +224,7 @@ export function isolateChain(): void {
   // 单个用例若在 suspendMining 之后失败（抛错、超时、提前 return），挖矿会停在
   // 「不自动出块」，后面所有用例都会收据超时。这里每用例结束兜底恢复一次：**先修
   // 复、再提醒**，不让一个失败用例连坐整轮。
+  // eslint-disable-next-line no-empty-pattern -- Playwright 的 afterEach 需要第一个参数位
   test.afterEach(async ({}, testInfo) => {
     let mode: MiningMode;
     try {

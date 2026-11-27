@@ -38,6 +38,9 @@ export function TxStuckHint({ watch }: TxStuckHintProps) {
     <div
       role="alert"
       data-testid="tx-watch-recovery"
+      // 卡住态有四种内部成因（slow / dropped / replaced / nonceGap），用户看到的文案
+      // 相同；这个属性不改视觉，只让测试能断言"到底是哪一种"（2026-11-27 加）。
+      data-status={watch.status}
       className="rounded-2xl border border-warning/20 bg-warning-soft/50 p-3"
     >
       <p className="flex items-start gap-1.5 text-sm font-semibold leading-6 text-warning">
