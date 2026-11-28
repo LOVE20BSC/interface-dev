@@ -21,7 +21,7 @@ function receiptWith(logs: readonly Log[]) {
   return { status: 'success', logs: [...logs] } as never;
 }
 
-function liquidityStakedLog(values: { govVotesAdded: bigint; sharesAdded: bigint }): Log {
+function liquidityStakedLog(values: { govPowerAdded: bigint; sharesAdded: bigint }): Log {
   const topics = encodeEventTopics({
     abi: stakeAbi,
     eventName: 'LiquidityStaked',
@@ -38,11 +38,11 @@ function liquidityStakedLog(values: { govVotesAdded: bigint; sharesAdded: bigint
       5n * 10n ** 17n, // parentTokenAmount
       10n, // promisedWaitingPhases
       0n, // prevPromisedWaitingPhases
-      values.govVotesAdded,
+      values.govPowerAdded,
       values.sharesAdded,
       22_360_679_774_997_896_964n, // liquidityShares
       4_494_496_634_774_577_288_782n, // totalLiquidityShares
-      469_574_275_274_955_836_1458n, // totalGovVotes
+      469_574_275_274_955_836_1458n, // totalGovPower
       4_494_496_634_774_577_288_782n, // totalWithdrawableLp
     ],
   );
@@ -85,14 +85,31 @@ describe('parseStakeReceipt', () => {
       'stakeLiquidity',
       receiptWith([
         liquidityStakedLog({
-          govVotesAdded: 223_606_797_749_978_969_640n,
+          govPowerAdded: 223_606_797_749_978_969_640n,
           sharesAdded: 22_360_679_774_997_896_964n,
         }),
       ]),
     );
-    expect(detail.govVotesAdded).toBe(223_606_797_749_978_969_640n);
+    expect(detail.govPowerAdded).toBe(223_606_797_749_978_969_640n);
+    expect(detail.govPowerRemoved).toBeUndefined();
     expect(detail.liquiditySharesAdded).toBe(22_360_679_774_997_896_964n);
     expect(detail.boostAmount).toBeUndefined();
+  });
+
+  it('reads the removed governance power from Unstaked', () => {
+    const topics = encodeEventTopics({
+      abi: stakeAbi,
+      eventName: 'Unstaked',
+      args: { tokenAddress: TOKEN, round: ROUND, memberId: MEMBER },
+    }) as readonly `0x${string}`[];
+    const data = encodeAbiParameters(
+      parseAbiParameters('uint256, uint256, uint256, uint256, uint256, uint256'),
+      [3n, 90n, 30n, 12n, 8n, 60n],
+    );
+    const detail = parseStakeReceipt('unstake', receiptWith([logOf(topics, data)]));
+    expect(detail.govPowerRemoved).toBe(90n);
+    expect(detail.govPowerAdded).toBeUndefined();
+    expect(detail.promisedWaitingPhases).toBe(3n);
   });
 
   it('reads the 撤出 numbers from StakeWithdrawn (LP side + boost refund)', () => {
@@ -118,7 +135,7 @@ describe('parseStakeReceipt', () => {
       '0x',
     );
     const detail = parseStakeReceipt('stakeLiquidity', receiptWith([unrelated]));
-    expect(detail.govVotesAdded).toBeUndefined();
+    expect(detail.govPowerAdded).toBeUndefined();
     expect(detail.liquiditySharesAdded).toBeUndefined();
   });
 
@@ -127,12 +144,12 @@ describe('parseStakeReceipt', () => {
       'stakeBoost',
       receiptWith([
         liquidityStakedLog({
-          govVotesAdded: 1n,
+          govPowerAdded: 1n,
           sharesAdded: 2n,
         }),
       ]),
     );
-    expect(detail.govVotesAdded).toBeUndefined();
+    expect(detail.govPowerAdded).toBeUndefined();
     expect(detail.boostAmount).toBeUndefined();
   });
 });

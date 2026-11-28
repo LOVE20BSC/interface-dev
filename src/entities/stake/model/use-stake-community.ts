@@ -14,8 +14,8 @@ export interface StakeCommunity {
   readonly totalBoostShares: bigint | undefined;
   /** `totalStake` 第 4 项：已结算的手续费凭证（LP 口径）。 */
   readonly feeLp: bigint | undefined;
-  /** 本阶段社区总治理权（`totalGovVotes(token, 当前阶段)`）。 */
-  readonly totalGovVotes: bigint | undefined;
+  /** 本阶段社区总治理权（`totalGovPower(token, 当前阶段)`）。 */
+  readonly totalGovPower: bigint | undefined;
   /** 本阶段社区有效加速份额（`totalValidBoostShares(token, 当前阶段)`）。 */
   readonly totalValidBoostShares: bigint | undefined;
   /** 累计销毁的社区代币（`totalBurnedToken`）。 */
@@ -35,7 +35,7 @@ const IDLE: StakeCommunity = {
   withdrawableLp: undefined,
   totalBoostShares: undefined,
   feeLp: undefined,
-  totalGovVotes: undefined,
+  totalGovPower: undefined,
   totalValidBoostShares: undefined,
   totalBurnedToken: undefined,
   liquidityTokenAmount: undefined,
@@ -89,7 +89,7 @@ export function useStakeCommunity(
       {
         address: stake,
         abi: stakeAbi,
-        functionName: 'totalGovVotes' as const,
+        functionName: 'totalGovPower' as const,
         args: [tokenAddress, currentPhase] as const,
       },
       {
@@ -114,7 +114,7 @@ export function useStakeCommunity(
   const totalEntry = data?.[0];
   const burnedEntry = data?.[1];
   const principalEntry = data?.[2];
-  const govVotesEntry = phaseDependent ? data?.[3] : undefined;
+  const govPowerEntry = phaseDependent ? data?.[3] : undefined;
   const boostEntry = phaseDependent ? data?.[4] : undefined;
 
   const totalTuple =
@@ -126,7 +126,7 @@ export function useStakeCommunity(
     entry?.status === 'success' && typeof entry.result === 'bigint' ? entry.result : undefined;
 
   // 任何一项子读失败都算「读不到」：否则页面会把失败的字段显示成「—」却没有重试出口。
-  const entries = [totalEntry, burnedEntry, principalEntry, govVotesEntry, boostEntry];
+  const entries = [totalEntry, burnedEntry, principalEntry, govPowerEntry, boostEntry];
   let status: StakeCommunityStatus = 'ready';
   if (read.isLoading) status = 'loading';
   else if (read.isError || entries.some((entry) => entry?.status === 'failure')) status = 'error';
@@ -138,7 +138,7 @@ export function useStakeCommunity(
     withdrawableLp: totalTuple?.[2],
     totalBoostShares: totalTuple?.[4],
     feeLp: totalTuple?.[3],
-    totalGovVotes: uintOf(govVotesEntry),
+    totalGovPower: uintOf(govPowerEntry),
     totalValidBoostShares: uintOf(boostEntry),
     totalBurnedToken: uintOf(burnedEntry),
     liquidityTokenAmount: uintOf(principalEntry),

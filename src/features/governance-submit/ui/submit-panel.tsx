@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { HexAddress } from '@/config/networks';
+import { STAKE_DECIMALS } from '@/domain/gov-stake';
 import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount } from '@/shared/lib/format';
-import { Button } from '@/shared/ui/button';
+import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Sheet } from '@/shared/ui/sheet';
 import { Skeleton } from '@/shared/ui/skeleton';
@@ -30,9 +32,6 @@ import type { SubmitWrite } from '../model/use-submit-write';
  * - 本轮已经推举过（`proposalIdBySubmitterId` 非 0）时整张表单换成「本轮已经推举」。
  */
 
-/** 治理权是 18 位小数的数量（`Stake.govVotes`）。 */
-const GOV_DECIMALS = 18;
-
 const INPUT_CLASS =
   'mt-1 h-11 w-full rounded-2xl border border-line bg-surface px-3 text-sm text-foreground outline-none placeholder:text-muted focus:border-brand-strong/40 focus:ring-2 focus:ring-brand-strong/20 disabled:opacity-60';
 
@@ -43,6 +42,7 @@ type SubmitLimits = NonNullable<SubmitContext['limits']>;
 
 export interface SubmitPanelProps {
   readonly submitAddress: HexAddress;
+  readonly symbol: string;
   readonly tokenAddress: HexAddress;
   readonly memberId: bigint;
   readonly context: SubmitContext;
@@ -54,6 +54,7 @@ export interface SubmitPanelProps {
 
 export function SubmitPanel({
   submitAddress,
+  symbol,
   tokenAddress,
   memberId,
   context,
@@ -96,12 +97,11 @@ export function SubmitPanel({
 
   return (
     <div className="space-y-4">
-      <EligibilityCard context={context} onRefetch={onRefetch} />
-
       {hasSubmitted && submittedId !== undefined ? (
         <SubmittedCard id={submittedId} title={submittedTitle} />
       ) : (
         <>
+          <EligibilityCard context={context} symbol={symbol} onRefetch={onRefetch} />
           <Card data-testid="gov-submit-form">
             <CardTitle>{copy.gov.submit.formTitle}</CardTitle>
             {limits === undefined ? (
@@ -273,12 +273,14 @@ export function SubmitPanel({
 
 function EligibilityCard({
   context,
+  symbol,
   onRefetch,
 }: {
   readonly context: SubmitContext;
+  readonly symbol: string;
   readonly onRefetch: () => void;
 }) {
-  const requiredText = formatTokenAmount(context.requiredVotes, GOV_DECIMALS);
+  const requiredText = formatTokenAmount(context.requiredGovPower, STAKE_DECIMALS);
   return (
     <Card data-testid="gov-submit-eligibility">
       <CardTitle>{copy.gov.submit.eligibilityTitle}</CardTitle>
@@ -309,14 +311,21 @@ function EligibilityCard({
             <>
               <CardDescription>{copy.gov.submit.eligibilityCannot}</CardDescription>
               <CardDescription data-testid="gov-submit-eligibility-reason">
-                {context.totalGovVotes === 0n
+                {context.totalGovPower === 0n
                   ? copy.gov.submit.eligibilityNoCommunity
                   : copy.gov.submit.eligibilityReason(
-                      formatTokenAmount(context.myGovVotes, GOV_DECIMALS),
+                      formatTokenAmount(context.myGovPower, STAKE_DECIMALS),
                       requiredText,
                       submitRatioPercent(context.submitMinRatio) ?? copy.common.unknown,
                     )}
               </CardDescription>
+              <Link
+                to={`/stake/liquidity?symbol=${encodeURIComponent(symbol)}`}
+                className={buttonStyles('secondary', 'md', 'mt-2')}
+                data-testid="gov-submit-eligibility-stake"
+              >
+                {copy.gov.submit.stakeAction}
+              </Link>
             </>
           )}
           {/* P2-5（走查 2026-11-21）：能推举时只给门槛数字；不能推举时原因句里已经

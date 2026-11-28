@@ -1,6 +1,6 @@
 #!/bin/sh
-# Pre-commit gate: exactly the three fast checks CI runs before it builds
-# (`pnpm typecheck`, `pnpm lint`, `pnpm test` — see .github/workflows/deploy.yml).
+# Pre-commit gate: check staged ABI provenance and run the fast checks that CI also runs
+# (`pnpm format:check`, `pnpm typecheck`, `pnpm lint`, `pnpm test`).
 #
 # Deliberately NOT included: `pnpm e2e` (needs a bootstrapped anvil chain on :8555,
 # ~10 minutes) and `pnpm build` (the bundle budget stays a CI/local build gate).
@@ -18,9 +18,9 @@ fi
 
 # Docs-only commits (台账/ADR/截图/spec 文本) skip the ~60 s gate; anything that can
 # change runtime behaviour, the test harness or the toolchain runs it.
-staged=$(git diff --cached --name-only --diff-filter=ACMR)
+staged=$(git diff --cached --name-only --diff-filter=ACDMRT)
 [ -n "$staged" ] || exit 0
-if ! printf '%s\n' "$staged" | grep -Eq '^(src/|tests/|e2e/|scripts/|\.github/|index\.html|package\.json|pnpm-lock\.yaml|tsconfig[^/]*\.json|vite\.config\.ts|vitest\.config\.ts|playwright\.config\.ts|eslint\.config\.js|\.prettierrc\.json)'; then
+if ! printf '%s\n' "$staged" | grep -Eq '^(src/|tests/|e2e/|scripts/|\.github/|\.githooks/|index\.html|package\.json|pnpm-lock\.yaml|tsconfig[^/]*\.json|vite\.config\.ts|vitest\.config\.ts|playwright\.config\.ts|eslint\.config\.js|\.prettierrc\.json)'; then
   echo "pre-commit: no source/tooling files staged — skipping typecheck/lint/test" >&2
   exit 0
 fi
@@ -32,5 +32,6 @@ if ! command -v pnpm >/dev/null 2>&1; then
   exit 1
 fi
 
+pnpm -s abis:check --staged
 echo "pre-commit: pnpm check (typecheck + lint + unit tests)…" >&2
 pnpm -s check

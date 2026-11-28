@@ -1,10 +1,10 @@
 import { parseAmountInput } from '@/shared/lib/amount-input';
-import type { VoteAllocation } from '@/domain/gov-core';
+import { VOTE_DECIMALS, type VoteAllocation } from '@/domain/gov-core';
 
 /**
  * 投票票数输入解析。
  *
- * 治理权是 18 位小数的数量（`Stake.govVotes`），用户在页面上按「票」输入，
+ * 治理票精确到 18 位小数，用户在页面上按「票」输入，
  * 这里负责把输入变成 wei 级 `bigint` 并挡掉明显的坏输入；「合计是否超额度」由
  * `domain/gov-core#validateVoteAllocation` 判断，两件事不混在一个函数里。
  */
@@ -14,7 +14,7 @@ export type ParsedVoteAmount =
   | { readonly kind: 'invalid' }
   | { readonly kind: 'zero' };
 
-export function parseVoteAmount(raw: string, decimals = 18): ParsedVoteAmount {
+export function parseVoteAmount(raw: string, decimals = VOTE_DECIMALS): ParsedVoteAmount {
   // viem 的 parseUnits 会把多余小数位**截断**（不报错）；票数上这是静默丢数，所以
   // 用 `reject-as-invalid` 策略，超精度直接算非法输入。
   const parsed = parseAmountInput(raw, { decimals, strategy: 'reject-as-invalid' });
@@ -45,7 +45,10 @@ export type VoteDraftResult =
   | { readonly kind: 'invalid'; readonly proposalId: bigint }
   | { readonly kind: 'empty' };
 
-export function buildVoteDraft(entries: readonly VoteDraftEntry[], decimals = 18): VoteDraftResult {
+export function buildVoteDraft(
+  entries: readonly VoteDraftEntry[],
+  decimals = VOTE_DECIMALS,
+): VoteDraftResult {
   const allocations: VoteAllocation[] = [];
   for (const entry of entries) {
     const parsed = parseVoteAmount(entry.raw, decimals);

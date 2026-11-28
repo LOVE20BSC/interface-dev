@@ -318,7 +318,7 @@ export const stakeAbi = [
   },
   {
     type: 'function',
-    name: 'govVotes',
+    name: 'govPower',
     inputs: [
       {
         name: 'tokenAddress',
@@ -338,7 +338,7 @@ export const stakeAbi = [
     ],
     outputs: [
       {
-        name: '',
+        name: 'memberGovPower',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -367,7 +367,7 @@ export const stakeAbi = [
     ],
     outputs: [
       {
-        name: 'govVotesAdded',
+        name: 'govPowerAdded',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -464,7 +464,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'firstGovVoteRound',
+        name: 'firstGovPowerRound',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -558,7 +558,7 @@ export const stakeAbi = [
     ],
     outputs: [
       {
-        name: 'govVotesAdded',
+        name: 'govPowerAdded',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -602,7 +602,7 @@ export const stakeAbi = [
     ],
     outputs: [
       {
-        name: 'govVotesAdded',
+        name: 'govPowerAdded',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -635,7 +635,7 @@ export const stakeAbi = [
   },
   {
     type: 'function',
-    name: 'totalGovVotes',
+    name: 'totalGovPower',
     inputs: [
       {
         name: 'tokenAddress',
@@ -650,7 +650,7 @@ export const stakeAbi = [
     ],
     outputs: [
       {
-        name: '',
+        name: 'communityGovPower',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -659,7 +659,7 @@ export const stakeAbi = [
   },
   {
     type: 'function',
-    name: 'totalGovVotesAdded',
+    name: 'totalGovPowerAdded',
     inputs: [
       {
         name: 'tokenAddress',
@@ -674,7 +674,7 @@ export const stakeAbi = [
     ],
     outputs: [
       {
-        name: '',
+        name: 'govPowerAdded',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -683,7 +683,7 @@ export const stakeAbi = [
   },
   {
     type: 'function',
-    name: 'totalGovVotesRemoved',
+    name: 'totalGovPowerRemoved',
     inputs: [
       {
         name: 'tokenAddress',
@@ -698,7 +698,7 @@ export const stakeAbi = [
     ],
     outputs: [
       {
-        name: '',
+        name: 'govPowerRemoved',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -771,7 +771,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'firstGovVoteRound',
+        name: 'firstGovPowerRound',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -973,13 +973,13 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'govVotesAdded',
+        name: 'govPowerAdded',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
       },
       {
-        name: 'govVotes',
+        name: 'govPower',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1003,7 +1003,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'totalGovVotes',
+        name: 'totalGovPower',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1180,7 +1180,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'govVotesAdded',
+        name: 'govPowerAdded',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1204,7 +1204,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'totalGovVotes',
+        name: 'totalGovPower',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1253,7 +1253,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'govVotesAdded',
+        name: 'govPowerAdded',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1387,7 +1387,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'targetGovVotes',
+        name: 'targetGovPower',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1411,7 +1411,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'prevSourceGovVotes',
+        name: 'prevSourceGovPower',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1423,7 +1423,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'totalGovVotes',
+        name: 'totalGovPower',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1460,7 +1460,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'govVotes',
+        name: 'govPowerRemoved',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1484,7 +1484,7 @@ export const stakeAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'totalGovVotes',
+        name: 'totalGovPower',
         type: 'uint256',
         indexed: false,
         internalType: 'uint256',
@@ -1524,6 +1524,27 @@ export const stakeAbi = [
     inputs: [
       {
         name: 'deadline',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'GovPowerUsed',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'round',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+      {
+        name: 'memberId',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -1741,27 +1762,6 @@ export const stakeAbi = [
     type: 'error',
     name: 'StakeNotStarted',
     inputs: [],
-  },
-  {
-    type: 'error',
-    name: 'StakeRightsUsed',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'round',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-      {
-        name: 'memberId',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
   },
   {
     type: 'error',

@@ -1,5 +1,5 @@
 import type { HexAddress } from '@/config/networks';
-import { minProposalVoteAmount } from '@/domain/gov-core';
+import { minProposalVoteAmount, VOTE_DECIMALS } from '@/domain/gov-core';
 import type {
   ProposalRewardRow,
   ProposalRewards,
@@ -15,7 +15,6 @@ import { Sheet } from '@/shared/ui/sheet';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import {
-  GOV_VOTE_DECIMALS,
   proposalRewardRowAmount,
   proposalRewardRowView,
   type ProposalRewardTone,
@@ -179,12 +178,12 @@ export function ProposalRewardPanel({
               />
               <SummaryStat
                 label={copy.gov.proposalRewards.totalVotesLabel}
-                value={formatTokenAmount(rewards.totalVoteAmount, GOV_VOTE_DECIMALS)}
+                value={formatTokenAmount(rewards.totalVoteAmount, VOTE_DECIMALS)}
                 testId="gov-proposal-rewards-total-votes"
               />
               <SummaryStat
                 label={copy.gov.proposalRewards.thresholdLabel}
-                value={formatTokenAmount(threshold, GOV_VOTE_DECIMALS)}
+                value={formatTokenAmount(threshold, VOTE_DECIMALS)}
                 testId="gov-proposal-rewards-threshold"
               />
             </div>
@@ -348,9 +347,9 @@ function ProposalRewardRowItem({
         className="break-words text-right font-mono text-[11px] leading-4 text-muted"
         data-testid={`gov-proposal-rewards-row-votes-${id}`}
       >
-        {`${formatTokenAmount(row.voteAmount, GOV_VOTE_DECIMALS)} / ${formatTokenAmount(
+        {`${formatTokenAmount(row.voteAmount, VOTE_DECIMALS)} / ${formatTokenAmount(
           row.minVoteAmount,
-          GOV_VOTE_DECIMALS,
+          VOTE_DECIMALS,
         )}`}
       </span>
       <span

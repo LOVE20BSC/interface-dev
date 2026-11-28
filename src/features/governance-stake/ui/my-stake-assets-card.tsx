@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
-import { stakeUnlockState } from '@/domain/gov-stake';
+import { STAKE_DECIMALS, stakeUnlockState } from '@/domain/gov-stake';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { Card } from '@/shared/ui/card';
 import { Info } from '@/shared/ui/icons';
@@ -9,8 +9,6 @@ import { Sheet } from '@/shared/ui/sheet';
 import type { GovContextValue } from '@/features/governance-stake/model/use-gov-context';
 import { hasStakePosition } from '@/features/governance-stake/ui/my-stake-summary';
 import { StakeStateCard } from '@/features/governance-stake/ui/stake-controls';
-
-const VOTE_DECIMALS = 18;
 
 /** 金额 + 代币符号；精度或符号缺失时按「未知」处理，不拼出半个单位。 */
 function amountText(
@@ -158,7 +156,7 @@ export function MyStakeAssetsCard({ ctx }: MyStakeAssetsCardProps) {
             className="min-w-0 truncate text-sm font-medium text-foreground"
             data-testid="me-stake-shares"
           >
-            {formatTokenAmount(member.liquidityShares, VOTE_DECIMALS)}
+            {formatTokenAmount(member.liquidityShares, STAKE_DECIMALS)}
           </dd>
         </div>
 
@@ -191,7 +189,7 @@ export function MyStakeAssetsCard({ ctx }: MyStakeAssetsCardProps) {
           <dl className="divide-y divide-line/60">
             <InfoRow
               label={copy.gov.mine.shares}
-              value={formatTokenAmount(member.liquidityShares, VOTE_DECIMALS)}
+              value={formatTokenAmount(member.liquidityShares, STAKE_DECIMALS)}
               testId="me-stake-info-shares"
             />
             <InfoRow

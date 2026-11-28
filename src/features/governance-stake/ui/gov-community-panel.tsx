@@ -1,3 +1,4 @@
+import { STAKE_DECIMALS } from '@/domain/gov-stake';
 import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
 import { formatPercent } from '@/shared/lib/format-rates';
@@ -9,14 +10,12 @@ import type { StakeCommunity } from '@/entities/stake/model/use-stake-community'
 import type { StakeParams } from '@/entities/stake/model/use-stake-params';
 import { StakeStatRow } from '@/features/governance-stake/ui/stake-controls';
 
-const VOTE_DECIMALS = 18;
-
 export interface GovCommunityPanelProps {
   readonly community: StakeCommunity;
   readonly params: StakeParams;
   readonly token: { readonly symbol: string; readonly decimals: number | undefined };
   readonly parent: { readonly symbol: string; readonly decimals: number | undefined };
-  readonly myVotes: bigint | undefined;
+  readonly myGovPower: bigint | undefined;
 }
 
 /**
@@ -30,14 +29,14 @@ export function GovCommunityPanel({
   params,
   token,
   parent,
-  myVotes,
+  myGovPower,
 }: GovCommunityPanelProps) {
   const feeRatio =
     params.feeSettlementRatio === undefined
       ? undefined
       : formatPercent(Number(params.feeSettlementRatio) / 1e16);
 
-  const mySharePercent = govSharePercent(myVotes, community.totalGovVotes);
+  const mySharePercent = govSharePercent(myGovPower, community.totalGovPower);
 
   if (community.status === 'error') {
     return (
@@ -58,13 +57,13 @@ export function GovCommunityPanel({
       <CardTitle>{copy.gov.community.title}</CardTitle>
       <div className="mt-3">
         <StakeStatRow
-          label={copy.gov.community.totalVotes}
-          value={formatTokenAmount(community.totalGovVotes, VOTE_DECIMALS)}
-          testId="gov-community-votes"
+          label={copy.gov.community.totalGovPower}
+          value={formatTokenAmount(community.totalGovPower, STAKE_DECIMALS)}
+          testId="gov-community-gov-power"
         />
         <StakeStatRow
           label={copy.gov.community.totalShares}
-          value={formatTokenAmount(community.totalLiquidityShares, VOTE_DECIMALS)}
+          value={formatTokenAmount(community.totalLiquidityShares, STAKE_DECIMALS)}
           testId="gov-community-shares"
         />
         <StakeStatRow
@@ -74,17 +73,17 @@ export function GovCommunityPanel({
         />
         <StakeStatRow
           label={copy.gov.liquidPage.totalLp}
-          value={formatTokenAmount(community.totalLp, VOTE_DECIMALS)}
+          value={formatTokenAmount(community.totalLp, STAKE_DECIMALS)}
           testId="gov-community-total-lp"
         />
         <StakeStatRow
           label={copy.gov.liquidPage.withdrawableLp}
-          value={formatTokenAmount(community.withdrawableLp, VOTE_DECIMALS)}
+          value={formatTokenAmount(community.withdrawableLp, STAKE_DECIMALS)}
           testId="gov-community-withdrawable-lp"
         />
         <StakeStatRow
           label={copy.gov.liquidPage.feeLp}
-          value={formatTokenAmount(community.feeLp, VOTE_DECIMALS)}
+          value={formatTokenAmount(community.feeLp, STAKE_DECIMALS)}
           testId="gov-community-fee-lp"
         />
         <StakeStatRow

@@ -47,9 +47,7 @@ export function PromisedPhasesCard({ ctx }: PromisedPhasesCardProps) {
                 {duration}
               </p>
             ) : null}
-            <p className="mt-1 text-[11px] leading-4 text-muted">
-              {copy.gov.phasesAdjust.cardHint}
-            </p>
+            <p className="mt-1 text-[11px] leading-4 text-muted">{copy.gov.stats.formula}</p>
           </div>
           <Button
             variant="secondary"

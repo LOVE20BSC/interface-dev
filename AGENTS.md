@@ -13,11 +13,14 @@ LOVE20BSC 协议前端的 **dev 变体**：纯静态、移动优先、无后端�
 
 ## 1. 必读顺序（别跳，按这个次序）
 
+写协议相关文案前，查 [LOVE20BSC 正式术语表](https://github.com/LOVE20BSC/docs/blob/main/GLOSSARY.md)（本地 `../docs/GLOSSARY.md`）。按钮文案、页面状态和交互按本仓的产品规格与文案规则。
+改空投页面时，读[交互规格 §3.4 空投铸造](docs/product/m0-ux-spec.md#34-空投铸造)。
+
 | #   | 读什么                                                                                                  | 什么时候必须读                                                                                                                                                  |
 | --- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 0   | [agent-role.md](docs/engineering/agent-role.md) + [lead-playbook.md](docs/engineering/lead-playbook.md) | **你是接手这个项目的总负责人**（拆活 / 派活 / 复核 / 对 owner 汇报）时：前者讲角色边界，后者是时间分配 / 并行拆分 / 链与 flake 的经验手册；只做单一子任务不用读 |
 | 1   | 本文件                                                                                                  | 开工前                                                                                                                                                          |
-| 2   | [GLOSSARY.md](GLOSSARY.md)                                                                              | **写任何中文文案前**（六条纪律 + 术语表）                                                                                                                       |
+| 2   | 正式术语表 + [GLOSSARY.md](GLOSSARY.md)                                                                 | **写任何中文文案前**（词条 + 项目文案规则）                                                                                                                     |
 | 3   | [m0-ux-spec.md](docs/product/m0-ux-spec.md) §0 设计原则 + §4 横切交互规范                               | 动任何页面/交互前                                                                                                                                               |
 | 4   | [frontend-standards.md](docs/engineering/frontend-standards.md)                                         | 按需查章（目录见 §4）                                                                                                                                           |
 | 5   | [three-line-verification.md](docs/product/three-line-verification.md)                                   | 改会读写链上数值的页面时（**硬门槛**）                                                                                                                          |
@@ -37,7 +40,7 @@ LOVE20BSC 协议前端的 **dev 变体**：纯静态、移动优先、无后端�
    `src/architecture.test.ts` 拦下。句子用参数化 copy 函数，禁止 `+` 拼字符串。
 4. **未知值绝不渲染 `0`**：加载给骨架，未知给「—」，读失败给「读不到」+ 一个下一步按钮。
    余额、价格、倒计时、可铸造金额都适用。
-5. **空投动作叫「空投铸造」**，不叫「领取」；LP 叫「流动性凭证」。术语以 GLOSSARY 为准。
+5. **用户可见的术语**按第 1 节查正式词条与前端文案规则。空投动作写「空投铸造」，禁用「领取」；LP 写「流动性凭证」。
 6. **技术词不出现在漏斗里**：身份 / 空投 / 兑换页不出现 gas、approve、allowance、nonce、
    revert、区块、合约等词。确实需要用户决策的参数（如流动性页的滑点）除外，但
    **授权缓冲不许写成「滑点」**。
@@ -65,7 +68,7 @@ pnpm e2e            # 全量 Playwright（160 条，约 11 分钟；自己起/�
 - 钩子安装一次即可：`pnpm hooks:install`（写 `core.hooksPath=.githooks`，本机生效，不入库）。
   纯文档提交会自动跳过；紧急逃生 `SKIP_PRE_COMMIT=1 git commit …`，但要在提交信息里写明原因。
 - **按改动分级验证（owner 2026-11-20）**：细节调整（文案/样式/局部渲染、不碰链上读写）只跑相关 spec，并复用现有 8555 与 preview——**别加 `E2E_REUSE_PREVIEW=0`、别 `e2e:reset-chain`、别停链**；共享逻辑/数值/链上改动才 `pnpm check` + 全量 e2e。判据表见规范 §7.12。
-- **e2e 不在 CI 里**（CI 只跑 typecheck/lint/test/build）。"CI 绿了"**不能**代替跑 e2e。
+- 在本地跑 e2e。CI 检查 ABI 清单来源、类型、Lint、格式、单测和构建。
 - 改了会读写链上数值的页面 → 三线校验的四个交付物缺一不可（规范 §7.5）。
 
 ## 4. 找规则去哪个文件

@@ -1,4 +1,4 @@
-import { liquiditySharesAdded, optimalAmounts, projectedGovVotesAdded } from '@/domain/gov-stake';
+import { liquiditySharesAdded, optimalAmounts, projectedGovPowerAdded } from '@/domain/gov-stake';
 import { estimateLpMinted } from './stake-form';
 
 /**
@@ -18,7 +18,7 @@ export interface StakePreviewInput {
   readonly totalLiquidityShares: bigint | undefined;
   readonly withdrawableLp: bigint | undefined;
   readonly currentLiquidityShares: bigint | undefined;
-  readonly currentGovVotes: bigint | undefined;
+  readonly currentGovPower: bigint | undefined;
 }
 
 export interface StakePreview {
@@ -27,21 +27,21 @@ export interface StakePreview {
   readonly optimalTokenAmount: bigint | undefined;
   readonly optimalParentAmount: bigint | undefined;
   /** 本次预计新增的治理权。 */
-  readonly votesAdded: bigint | undefined;
+  readonly govPowerAdded: bigint | undefined;
 }
 
 const IDLE: StakePreview = {
   status: 'idle',
   optimalTokenAmount: undefined,
   optimalParentAmount: undefined,
-  votesAdded: undefined,
+  govPowerAdded: undefined,
 };
 
 const UNAVAILABLE: StakePreview = {
   status: 'unavailable',
   optimalTokenAmount: undefined,
   optimalParentAmount: undefined,
-  votesAdded: undefined,
+  govPowerAdded: undefined,
 };
 
 export function computeStakePreview(input: StakePreviewInput): StakePreview {
@@ -55,7 +55,7 @@ export function computeStakePreview(input: StakePreviewInput): StakePreview {
     totalLiquidityShares,
     withdrawableLp,
     currentLiquidityShares,
-    currentGovVotes,
+    currentGovPower,
   } = input;
 
   if (tokenAmount === undefined || parentTokenAmount === undefined) return IDLE;
@@ -68,7 +68,7 @@ export function computeStakePreview(input: StakePreviewInput): StakePreview {
     totalLiquidityShares === undefined ||
     withdrawableLp === undefined ||
     currentLiquidityShares === undefined ||
-    currentGovVotes === undefined ||
+    currentGovPower === undefined ||
     promisedWaitingPhases === undefined
   ) {
     return UNAVAILABLE;
@@ -95,9 +95,9 @@ export function computeStakePreview(input: StakePreviewInput): StakePreview {
     withdrawableLp,
     lpMinted,
   });
-  const votesAdded = projectedGovVotesAdded({
+  const govPowerAdded = projectedGovPowerAdded({
     currentLiquidityShares,
-    currentGovVotes,
+    currentGovPower,
     sharesAdded,
     promisedWaitingPhases,
   });
@@ -106,6 +106,6 @@ export function computeStakePreview(input: StakePreviewInput): StakePreview {
     status: 'ready',
     optimalTokenAmount: optimal.tokenAmount,
     optimalParentAmount: optimal.parentTokenAmount,
-    votesAdded,
+    govPowerAdded,
   };
 }

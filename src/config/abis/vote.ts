@@ -738,22 +738,6 @@ export const voteAbi = [
   },
   {
     type: 'error',
-    name: 'NoVotingPower',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
-      },
-      {
-        name: 'memberId',
-        type: 'uint256',
-        internalType: 'uint256',
-      },
-    ],
-  },
-  {
-    type: 'error',
     name: 'NotMemberOwner',
     inputs: [
       {
@@ -847,6 +831,22 @@ export const voteAbi = [
       },
       {
         name: 'maxVoteAmount',
+        type: 'uint256',
+        internalType: 'uint256',
+      },
+    ],
+  },
+  {
+    type: 'error',
+    name: 'ZeroGovPower',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+      {
+        name: 'memberId',
         type: 'uint256',
         internalType: 'uint256',
       },

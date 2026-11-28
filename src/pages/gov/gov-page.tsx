@@ -1,3 +1,4 @@
+import { STAKE_DECIMALS } from '@/domain/gov-stake';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
@@ -22,8 +23,6 @@ import { MyVotesCard } from '@/features/governance-vote/ui/my-votes-card';
 import { hasStakePosition } from '@/features/governance-stake/ui/my-stake-summary';
 import { StakeStateCard } from '@/features/governance-stake/ui/stake-controls';
 
-const VOTE_DECIMALS = 18;
-
 type HomeTab = 'mine' | 'community';
 
 /**
@@ -38,7 +37,7 @@ type HomeTab = 'mine' | 'community';
  * 旧版的 APY / 预计新增铸币 / SL·ST 凭证在本协议没有对应只读 view，
  * 按硬规则 4 不编数，换成真实口径（见 `GovCommunitySummary` 注释）。
  *
- * 旧版按 `validGovVotes(token, account) > 0` 分叉；本协议按 `govVotes(token, 阶段,
+ * 旧版按 `validGovVotes(token, account) > 0` 分叉；本协议按 `govPower(token, 阶段,
  * memberId)`，主体是身份 NFT 而不是钱包地址。
  */
 export function GovPage() {
@@ -151,7 +150,7 @@ function MineTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string
   }
 
   const phases = ctx.member.promisedWaitingPhases;
-  const myShare = govSharePercent(ctx.member.govVotes, ctx.community.totalGovVotes);
+  const myShare = govSharePercent(ctx.member.govPower, ctx.community.totalGovPower);
   const boostShare = govSharePercent(
     ctx.member.validBoostShares,
     ctx.community.totalValidBoostShares,
@@ -164,9 +163,9 @@ function MineTab({ ctx, q }: { readonly ctx: GovContextValue; readonly q: string
       <Card data-testid="gov-my-assets">
         <div className="grid grid-cols-2 gap-x-3 gap-y-4">
           <GovStatCell
-            label={copy.gov.home.myVotes}
-            value={formatTokenAmount(ctx.member.govVotes, VOTE_DECIMALS)}
-            testId="gov-my-votes"
+            label={copy.gov.home.myGovPower}
+            value={formatTokenAmount(ctx.member.govPower, STAKE_DECIMALS)}
+            testId="gov-my-gov-power"
           />
           <GovStatCell
             label={copy.gov.home.myPhases}

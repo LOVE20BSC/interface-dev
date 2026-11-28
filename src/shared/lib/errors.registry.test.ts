@@ -1,12 +1,8 @@
-import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  CONTRACT_ERROR_CATALOG,
-  CONTRACT_ERROR_MESSAGES,
-  ERROR_REGISTRY_SOURCE,
-} from '@/config/errors.generated';
+import { CONTRACT_ERROR_CATALOG, CONTRACT_ERROR_MESSAGES } from '@/config/errors.generated';
 import { copy } from '@/shared/config/copy';
 import { getContractErrorMessage } from './errors';
 
@@ -73,9 +69,9 @@ describe.skipIf(!registryAvailable)('generated error catalog vs protocol registr
     }
   });
 
-  it('was generated from this exact registry snapshot', () => {
-    const raw = readFileSync(REGISTRY_PATH, 'utf8');
-    const hash = createHash('sha256').update(raw).digest('hex').slice(0, 16);
-    expect(ERROR_REGISTRY_SOURCE).toBe(`registry@sha256:${hash}`);
+  it('matches generation from this exact registry, revision and copy', () => {
+    expect(
+      execFileSync(process.execPath, ['scripts/gen-errors.mjs', '--check'], { encoding: 'utf8' }),
+    ).toContain('selector(s) and registry revision match');
   });
 });

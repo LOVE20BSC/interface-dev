@@ -1,81 +1,147 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "generatedBy": "pnpm sync:anvil",
   "anvilExport": {
     "profile": "anvil31337_dev",
     "path": "../anvil/export",
     "chainId": 31337,
-    "deployBlock": 36,
-    "exportedAt": "2026-11-26T19:56:32.725Z"
+    "deployBlock": 36
+  },
+  "dexArtifactSha256": {
+    "UniswapV2Factory": "2efda82251a17b23b7ee1720d4a8dfb68db1bfc7978b533bdd54c4582a4a22bc",
+    "UniswapV2Router02": "8c7749591bd2e4009a9f6adc817e647d8a515e49bb4d7043e8df1742f007adea",
+    "UniswapV2Pair": "a5c8424fdab1a36ed7d3e62ff5540efc39c65f1c64d4cfab717d6e945ca92cc1"
   },
   "sources": {
     "core": {
-      "head": "a3dbcc1e56da87a35d0c2f359ae5df331ca0e527",
-      "path": "../core",
+      "kind": "commit",
+      "commit": "c40d4700889fb5b268538e5026e3febfeb0b1e9f",
       "abis": {
-        "LOVE20Token": 30,
-        "Phase": 16,
-        "Launch": 48,
-        "MemberNFT": 49,
-        "Stake": 75,
-        "Submit": 38,
-        "Vote": 32,
-        "Mint": 47,
-        "AirdropDistributor": 32
+        "LOVE20Token": {
+          "entries": 30,
+          "sha256": "1088d5389d3785ae27a6d51c530fce4e9e19b8b9944bd3fd041c4716121b08a1"
+        },
+        "Phase": {
+          "entries": 16,
+          "sha256": "16fb051e2fad56a1ccf2676afb6ece5b30892fba14df24920857d14dd7e2b377"
+        },
+        "Launch": {
+          "entries": 48,
+          "sha256": "64046b2f28d0da33c730a114f6aa0ddbc9294f5b69b292a47f730b4b1ffeeb4c"
+        },
+        "MemberNFT": {
+          "entries": 49,
+          "sha256": "4bd88c08c24b1feee5ee7710a1ccd8b5ea6bdb2d870e9c78ba5f7e18b47693fc"
+        },
+        "Stake": {
+          "entries": 75,
+          "sha256": "1e912f203cf752cbf4371037079e2ca49122e2fd1dd7c213c9c3c66fb87b4cee"
+        },
+        "Submit": {
+          "entries": 38,
+          "sha256": "cf03a5c35ee4ccbb466cb2753804f5eaad9b028e3377fdfa89b835629b430418"
+        },
+        "Vote": {
+          "entries": 32,
+          "sha256": "34cc7677ca02735e7eb173c19ea0c74c43bee4c52ad3da0afc2a879dd7b8c751"
+        },
+        "Mint": {
+          "entries": 47,
+          "sha256": "97b41cc172088c68418b19d00cede80225c931fb1c3baac3255c5e575801e139"
+        },
+        "AirdropDistributor": {
+          "entries": 32,
+          "sha256": "a944c8df71bac28abbb01e96ca9e70b0e7c59ec050f148c0518ef176a55ab435"
+        }
       }
     },
     "action": {
-      "head": "71f62811da401887c14906e54a49bb307316bca5",
-      "path": "../action",
+      "kind": "commit",
+      "commit": "31548e3377b4df448eb9d1609cb225306f890b2c",
       "abis": {
-        "ActionTarget": 42,
-        "LpExecutor": 59,
-        "GroupActionExecutor": 188,
-        "GroupServiceExecutor": 107
+        "ActionTarget": {
+          "entries": 42,
+          "sha256": "ec06bec265dee14643a65b45cecfd5ea90d4f4031a769265af0cb3175201f7b6"
+        },
+        "LpExecutor": {
+          "entries": 59,
+          "sha256": "7bb9d51eb8370407986c4fade93ae7879b4390622d9fce4af0d55b87a74666e1"
+        },
+        "GroupActionExecutor": {
+          "entries": 188,
+          "sha256": "5ce13cc505a4237a48baac0d10c7889e42218dac52bad7798fe8d059a2999a88"
+        },
+        "GroupServiceExecutor": {
+          "entries": 107,
+          "sha256": "932907da7197c586f831fee0c3b38bd0511f231a5dbdd26e9fcb0aa0e7b1b80f"
+        }
       }
     },
     "group-chat": {
-      "head": "d2a86643a5f208a99a5e069d854c5b6ab60133f4",
-      "path": "../group-chat",
+      "kind": "commit",
+      "commit": "46650c421aafce02ea3f2c0784b1d6a4e929dc42",
       "abis": {
-        "GroupChat": 67
+        "GroupChat": {
+          "entries": 67,
+          "sha256": "82003b475605626172c9ac6132abf777acab2096704aec62db569efb762516d2"
+        }
       }
     },
     "libs": {
-      "head": "2666459fa2ddfce4314737940913964715b65565",
-      "path": "../libs",
-      "abis": {},
-      "note": "no ABI is exported from this repo; its HEAD pins the linked library bytecode"
+      "kind": "commit",
+      "commit": "2666459fa2ddfce4314737940913964715b65565",
+      "abis": {}
     },
     "dex": {
-      "head": "69c6462ea56baca99b9e4400798c8aca846cb1ea",
-      "path": "../dex",
+      "kind": "commit",
+      "commit": "69c6462ea56baca99b9e4400798c8aca846cb1ea",
       "abis": {
-        "UniswapV2Factory": 10,
-        "UniswapV2Router02": 26,
-        "UniswapV2Pair": 34
+        "UniswapV2Factory": {
+          "entries": 10,
+          "sha256": "a9717b5e2fa0e2a49378866215b490b24bdbe3fb932df35088f10e0be0b10f02"
+        },
+        "UniswapV2Router02": {
+          "entries": 26,
+          "sha256": "af6a8870c4199c40786d3a57df60f41a5f4bc99ff15f954ad898099de703b040"
+        },
+        "UniswapV2Pair": {
+          "entries": 34,
+          "sha256": "126156019b12f1328d6aade267b9b2288d7625c14c03efd6cfb7357bd9067fc5"
+        }
       }
     },
     "anvil": {
-      "head": "40c8d0f0946cb836af03602f34123be8716cdb6b",
-      "path": "../anvil",
+      "kind": "commit",
+      "commit": "00519a38004272ea098b15070814bac68e26f82e",
       "abis": {
-        "WETH9": 16,
-        "Multicall3": 16
+        "WETH9": {
+          "entries": 16,
+          "sha256": "fc8c1835bf0775c188b2dc0e2cde1843c4b4e1f2a202f8f25d3ba20548f06a75"
+        },
+        "Multicall3": {
+          "entries": 16,
+          "sha256": "f938fdf7ce4ebef55d7cb160b3b20cf3215937af1fb551f5ded35fc39b31377a"
+        }
       }
     },
     "periphery": {
-      "head": "9073c475e5e677eb662a572d0c9ed678bc8598c0",
-      "path": "../periphery",
+      "kind": "commit",
+      "commit": "4b2e048799c47a4cdcb13dbdf77486b172b9e4fa",
       "abis": {
-        "LOVE20Hub": 50
+        "LOVE20Hub": {
+          "entries": 50,
+          "sha256": "9e84337cd1538b418613be9a8374aa14ef5cf00eccd28cf9006081f17b640243"
+        }
       }
     },
     "tools": {
-      "head": "aceb3d9c12e73d14b5bc663b3ac13f7536062be4",
-      "path": "../tools",
+      "kind": "commit",
+      "commit": "aceb3d9c12e73d14b5bc663b3ac13f7536062be4",
       "abis": {
-        "BatchTransfer": 20
+        "BatchTransfer": {
+          "entries": 20,
+          "sha256": "9184f987343809463cff9afdcf19e35e726fae3c06f3d3c367ba4a318ecd0c83"
+        }
       }
     }
   },

@@ -2,6 +2,7 @@ import { useReadContract, useReadContracts } from 'wagmi';
 import { submitAbi } from '@/config/abis';
 import { configuredAddress, type HexAddress } from '@/config/networks';
 import type { RoundProposal } from '@/entities/gov-core/model/use-round-proposals';
+import type { SubmitContext } from '@/entities/gov-core/model/use-submit-context';
 
 /**
  * 历史提案读模型（`/submit` 的「推举历史提案」段，owner 2026-11-22）。
@@ -28,10 +29,10 @@ export interface ProposalHistory {
 
 export interface ProposalHistoryOptions {
   readonly limit: number;
-  /** 已创建提案的总数上限；用于「加载更多」。 */
+  /** 跳过的提案数。 */
   readonly offset?: number;
-  /** 当前轮次；给了就读 isSubmitted 并标出本轮已推举的提案。 */
-  readonly round?: bigint | undefined;
+  /** 在推举资格的同一区块检查各提案是否已在本轮获推举。 */
+  readonly round?: SubmitContext['round'];
 }
 
 export function useProposalHistory(
@@ -46,58 +47,64 @@ export function useProposalHistory(
     address: submitAddress,
     abi: submitAbi,
     functionName: 'proposalIds',
-    args: enabled ? [tokenAddress as HexAddress, BigInt(offset), BigInt(limit), true] : undefined,
+    args: enabled ? [tokenAddress, BigInt(offset), BigInt(limit), true] : undefined,
+    blockNumber: round?.blockNumber,
     query: { enabled },
   });
 
   const proposalIds = ids.data?.[0] ?? [];
+  const infosEnabled = enabled && proposalIds.length > 0;
   const infos = useReadContract({
     address: submitAddress,
     abi: submitAbi,
     functionName: 'proposalInfosByProposalIds',
-    args: enabled && proposalIds.length > 0 ? [tokenAddress as HexAddress, proposalIds] : undefined,
-    query: { enabled: enabled && proposalIds.length > 0 },
+    args: infosEnabled ? [tokenAddress, proposalIds] : undefined,
+    query: { enabled: infosEnabled },
   });
 
+  const submittedEnabled = infosEnabled && round !== undefined;
   const submitted = useReadContracts({
-    contracts:
-      ids.data?.[0]?.map((proposalId) => ({
-        address: submitAddress as HexAddress,
-        abi: submitAbi,
-        functionName: 'isSubmitted' as const,
-        args: [tokenAddress as HexAddress, round as bigint, proposalId],
-      })) ?? [],
-    query: { enabled: enabled && round !== undefined && proposalIds.length > 0 },
+    allowFailure: false,
+    blockNumber: round?.blockNumber,
+    contracts: submittedEnabled
+      ? proposalIds.map((proposalId) => ({
+          address: submitAddress,
+          abi: submitAbi,
+          functionName: 'isSubmitted' as const,
+          args: [tokenAddress, round.number, proposalId] as const,
+        }))
+      : [],
+    query: { enabled: submittedEnabled },
   });
 
   const refetch = () => {
-    void ids.refetch();
-    void infos.refetch();
-    void submitted.refetch();
+    if (enabled) void ids.refetch();
+    if (infosEnabled) void infos.refetch();
+    if (submittedEnabled) void submitted.refetch();
   };
 
-  if (submitAddress === undefined || tokenAddress === undefined) {
+  if (!enabled) {
     return { status: 'unconfigured', items: [], total: undefined, refetch };
   }
-  if (ids.status === 'error' || infos.status === 'error') {
+  if (ids.isError || (infosEnabled && infos.isError) || (submittedEnabled && submitted.isError)) {
     return { status: 'error', items: [], total: ids.data?.[1], refetch };
   }
-  if (ids.status === 'pending' || (proposalIds.length > 0 && infos.status === 'pending')) {
+  if (
+    ids.isPending ||
+    (infosEnabled && infos.isPending) ||
+    (submittedEnabled && submitted.isPending)
+  ) {
     return { status: 'loading', items: [], total: undefined, refetch };
   }
 
-  const items = (infos.data ?? []).map((entry, index): HistoryProposal => {
-    // 读失败/未就绪时不臆测「已推举」：宁可不标，也不能把别人的轮次状态算到它头上。
-    const flag = submitted.data?.[index];
-    return {
-      proposalId: entry.head.id,
-      submitterId: entry.head.author,
-      title: entry.body.title,
-      details: entry.body.details,
-      target: entry.body.target,
-      targetMode: Number(entry.body.targetMode),
-      submittedThisRound: flag?.status === 'success' ? flag.result : false,
-    };
-  });
+  const items = (infos.data ?? []).map((entry, index): HistoryProposal => ({
+    proposalId: entry.head.id,
+    authorId: entry.head.author,
+    title: entry.body.title,
+    details: entry.body.details,
+    target: entry.body.target,
+    targetMode: Number(entry.body.targetMode),
+    submittedThisRound: submitted.data?.[index] ?? false,
+  }));
   return { status: 'ready', items, total: ids.data?.[1], refetch };
 }

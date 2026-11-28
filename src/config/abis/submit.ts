@@ -866,7 +866,7 @@ export const submitAbi = [
   },
   {
     type: 'error',
-    name: 'InsufficientSubmitPower',
+    name: 'InsufficientGovPower',
     inputs: [
       {
         name: 'tokenAddress',
@@ -879,12 +879,12 @@ export const submitAbi = [
         internalType: 'uint256',
       },
       {
-        name: 'validVotes',
+        name: 'required',
         type: 'uint256',
         internalType: 'uint256',
       },
       {
-        name: 'requiredVotes',
+        name: 'available',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -908,17 +908,6 @@ export const submitAbi = [
         name: 'memberId',
         type: 'uint256',
         internalType: 'uint256',
-      },
-    ],
-  },
-  {
-    type: 'error',
-    name: 'NoGovVotes',
-    inputs: [
-      {
-        name: 'tokenAddress',
-        type: 'address',
-        internalType: 'address',
       },
     ],
   },
@@ -1016,5 +1005,16 @@ export const submitAbi = [
     type: 'error',
     name: 'ZeroTargetAddress',
     inputs: [],
+  },
+  {
+    type: 'error',
+    name: 'ZeroTotalGovPower',
+    inputs: [
+      {
+        name: 'tokenAddress',
+        type: 'address',
+        internalType: 'address',
+      },
+    ],
   },
 ] as const;

@@ -1,10 +1,8 @@
+import { VOTE_DECIMALS } from '@/domain/gov-core';
 import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount } from '@/shared/lib/format';
 import { myVoteSharePercent } from '../lib/my-votes-share';
 import type { MyVoteRound } from '@/entities/gov-core/model/use-my-votes';
-
-/** 治理票是 18 位小数的数量（`Stake.govVotes`）。 */
-const VOTE_DECIMALS = 18;
 
 export interface MyVoteRoundsProps {
   readonly rounds: readonly MyVoteRound[];
@@ -14,7 +12,7 @@ export interface MyVoteRoundsProps {
 
 /**
  * 「我的投票记录」按轮分组的呈现（旧库 `/vote/records` 的内容）：
- * 每轮一行「治理第 R 轮」，轮内每条 = `#编号 标题` + 「我的投票 X」+「占该提案票数 Y%」。
+ * 每轮一行「治理第 R 轮」，轮内每条 = `#编号 标题` + 「我的投票 X 票」+「占该提案票数 Y%」。
  *
  * 轮头不写「共投出 X 票」（owner 2026-11-22 去重）：那只是下面每条「我的投票」的加总，
  * 单提案轮次里同一个数字会在同一张卡上连着出现两次。

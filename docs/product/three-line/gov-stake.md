@@ -1,30 +1,32 @@
 # 治理·质押 三线校验（理论线 → 合约线 → 前端线）
 
-> 任务来源：owner 本轮要求——`/gov` 治理页要覆盖**流动性质押**（把社区代币 + 包装原生币按池子比例存入、铸流动性凭证、按「承诺解锁期」放大治理票）与**加速激励质押**（社区代币单独存入、按治理票占比拿到加速上限）。规范：`docs/product/three-line-verification.md`。
+> `/gov` 治理页覆盖**流动性质押**（按池子比例存入社区代币和包装原生币，铸出流动性凭证，以尚未申请解锁的质押份额乘以承诺解锁期的阶段数计算治理权）与**加速激励质押**（单独存入社区代币，按治理权占比计算加速质押上限）。验证方法见 `docs/product/three-line-verification.md`。
 >
-> **理论线先于实现完成**：本文件 §0/§1 写于 **2026-11-17 12:40（Asia/Taipei）**，代码基线 `git rev-parse --short HEAD` = **`ace6042`**，早于 `scripts/verify/gov-stake-contract.mjs`、`src/domain/gov-stake.ts`、`/gov` 页面实现与 `e2e/gov-stake-numbers.spec.ts` 的任何代码。实现、合约脚本、前端 spec 都**按本文件写，不反向修改理论值**。
+> **理论线先于实现完成**：本文件 §0/§1 写于 **2026-11-17 12:40（Asia/Taipei）**，当时的前端仓基线为 **`ace6042`**，早于 `scripts/verify/gov-stake-contract.mjs`、`src/domain/gov-stake.ts`、`/gov` 页面实现与 `e2e/gov-stake-numbers.spec.ts` 的任何代码。实现、合约脚本、前端 spec 都**按本文件写，不反向修改理论值**。
 >
 > 三条线相互独立：§1 只用「§0 初始状态快照 + 页面输入 + `Stake.sol` 的整数公式」手算；§2 只用 viem 直接打链（脚本不读前端任何计算结果）；§3 只读页面文字。三线同一用例的数值必须逐 wei 相等。
 >
 > **基线更正（2026-11-17 13:12，Lead 复核后重算）**：§1 初稿用的初始状态快照来自 **8545 人工链**的只读 dump，但 8545 不是 clean bootstrap 态（多一个手工铸造的身份、`TestLOVE20.totalSupply()` 也不同，证据见 §0.4）。理论线的**公式与 C1/C3 数值不变**，只有吃 `token.totalSupply()` 的 **C2（`mintedShare/baseCap/memberCap/boostAmount`）与 C4 的加速退还额/撤出总额**按 **8555 clean bootstrap 基线**重算；旧数字已全部替换，作废值只在 §0.4 与 §2「基线敏感性」里作为反例保留。
 >
-> **§1 的数值不来自链上返回**：`boostStakeCap` / `memberStake` / `totalStake` / `govVotes` 这些 view 在 §2 里只作为**交叉核对**出现（第 4 列「链上交叉核对」），期望值由 §1.2 的公式独立算出。
+> **§1 的数值不来自链上返回**：`boostStakeCap` / `memberStake` / `totalStake` / `govPower` 这些 view 在 §2 里只作为**交叉核对**出现（第 4 列「链上交叉核对」），期望值由 §1.2 的公式独立算出。
+
+2026-11-28 在专用 8566 链从区块 0 部署后复验。合约线从区块 251、阶段 3 开始，**161/161 通过**。脚本从这条链的 Anvil 部署导出读取地址，使用自身声明的 ABI 调用 `govPower`、`totalGovPower` 等接口。8567 是之前的术语复验临时链。历史记录保留当时的地址、交易哈希和字段名。
 
 ## §0 环境与初始状态
 
-### §0.1 验证链与代码基线
+### §0.1 验证链与历史基线
 
 | 项 | 值 |
 | --- | --- |
-| 验证链 | **专用链 `http://127.0.0.1:8566`**（`chainId = 31337`）；跑 §2 时临时切 automine（一个交易一个块，块号可复现），跑完切回套件口径 `automine = false` + interval mining 1s |
-| §0 采样点 | **block = 25231，current phase = 211**（`phaseInfo(211) = (25201, 120)`，即阶段 211 覆盖块 25201–25320；`currentPhaseBlocks() = 120`，`lastSyncPhase = 0`） |
-| 链上状态来源 | **8555（e2e 套件链）的 clean bootstrap 状态**：对 8555 做**只读** `anvil_dumpState`，再用 `anvil --load-state` 在 8566 起独立链（8555 全程只读、未写；8545 未碰）。**不使用 8545 人工链的 dump**——它带手工写入，基线不等价，证据见 §0.4。子代理会话的沙箱不能写 `../anvil`（且 `python3` 被执行器 SIGKILL），所以 `make bootstrap PORT=8566` 无法在本会话内运行，改用 dump/load 等价复现 clean bootstrap 的**状态**。 |
-| 地址簿 | `../anvil/export/deployments/anvil31337_dev.json`（前端副本 `src/config/network/anvil31337_dev/network.json` 同源；端口不影响地址） |
-| ABI | `../anvil/export/abis/Stake.json`（前端副本 `src/config/abis/stake.ts` 同源） |
+| 验证链 | **专用链 `http://127.0.0.1:8566`**（`chainId = 31337`）。合约脚本保留 automine 设置。automine 关闭时，脚本将定时出块设为 1 秒。 |
+| 历史采样点 | **block = 25231，current phase = 211**（`phaseInfo(211) = (25201, 120)`，即阶段 211 覆盖块 25201–25320；`currentPhaseBlocks() = 120`，`lastSyncPhase = 0`） |
+| 历史状态来源 | 2026-11-17 从 8555 的 clean bootstrap 状态执行只读 `anvil_dumpState`，再用 `anvil --load-state` 起独立的 8566。§0.4 记录当时的基线核对。 |
+| 本轮地址簿 | `../anvil/.anvil/8566/export/deployments/anvil31337_dev.json` |
+| 本轮部署 ABI（供核对） | `../anvil/.anvil/8566/export/abis/Stake.json` |
 | 协议参数（dev） | `PROMISED_WAITING_PHASES_MIN = 1`、`PROMISED_WAITING_PHASES_MAX = 100`、`BOOST_STAKE_SUPPLY_FACTOR = 2`、`BOOST_STAKE_MULTIPLIER = 5`、`LIQUIDITY_TOKEN_EQUIVALENCE_FACTOR = 2`、`FEE_SETTLEMENT_RATIO = 2500000000000000`（2.5e15）、`SWAP_FEE_FOR_LP_RATIO = 3000000000000000`（0.30%）、`SWAP_FEE_FOR_PROTOCOL_RATIO = 0`、pair `feeTo = 0x0`（**无协议费**，`_pendingProtocolFeeLp ≡ 0`） |
-| 核心合约 | `core/src/Stake.sol`（1280 行）@ `ace6042`；`_govVotesOf` 在第 1277 行、`_optimalAmounts` 在第 1091 行、`_boostStakeBaseAndMemberCap` 在第 655 行、`_creditLiquidity` 在第 820 行、`_withdrawLiquidity` 在第 1124 行 |
+| 当前核心合约依据 | `core/src/Stake.sol` 的 `_govPowerOf`（1249）、`_optimalAmounts`（1063）、`_boostStakeBaseAndMemberCap`（632）、`_creditLiquidity`（793）、`_withdrawLiquidity`（1096）。实际部署的源码来源见 Anvil 导出 `provenance.repos.core` |
 
-### §0.2 地址簿
+### §0.2 历史地址簿
 
 | 合约 | 地址 |
 | --- | --- |
@@ -38,7 +40,7 @@
 
 > 注：派单文字里的 pair 地址写成 `0x3FC12a5abA69…`（少一位），**正确值是 `0x3FC12a5abAe69C8Eee58C37cEDC266751507620D`**（`export/deployments` 与 `getPair(TestLOVE20, TestWETH)` 一致）。
 
-### §0.3 种子状态（8566，block 25231 / phase 211 实测）
+### §0.3 历史种子状态（8566，block 25231 / phase 211 实测）
 
 | 项 | 值（wei） | 备注 |
 | --- | --- | --- |
@@ -48,18 +50,18 @@
 | pair 代币余额 | TestLOVE20 `200000000000000000000000`、TestWETH `100000000000000000000` | 无捐赠（余额 = 储备，`pendingProtocolFeeLp = 0`） |
 | `stake.totalStake(TestLOVE20)` | `(totalLiquidityShares=4472135954999579391818, totalLp=4472135954999579391818, withdrawableLp=4472135954999579391818, feeLp=0, totalBoostShares=0, tokenAmountForLiquidity=199999999999999999955278, parentTokenAmountForLiquidity=99999999999999999977, firstGovVoteRound=2)` | 种子把**全部 LP** 记在 memberId #1 |
 | `stake.liquidityTokenAmount(TestLOVE20)` | `200000000000000000000000` | 累计存入的社区代币本金 = 2e23 |
-| `stake.memberStake(TestLOVE20, 1)` | `(liquidityShares=4472135954999579391818, boostShares=0, promisedWaitingPhases=1, unlockRequestPhase=0, tokenAmountForLiquidity=199999999999999999955278, parentTokenAmountForLiquidity=99999999999999999977, firstGovVoteRound=2)` | 治理票 `= 4472135954999579391818 × 1` |
+| `stake.memberStake(TestLOVE20, 1)` | `(liquidityShares=4472135954999579391818, boostShares=0, promisedWaitingPhases=1, unlockRequestPhase=0, tokenAmountForLiquidity=199999999999999999955278, parentTokenAmountForLiquidity=99999999999999999977, firstGovVoteRound=2)` | 治理权 `= 4472135954999579391818 × 1` |
 | `stake.memberStake(TestLOVE20, 5)` | 全 `0`（未质押） | 本文件 C1–C4 的操作对象 |
 | `stake.govVotes(TestLOVE20, 211, 1)` / `totalGovVotes(211)` / `totalGovVotesAdded(211)` | `4472135954999579391818` / `4472135954999579391818` / `4472135954999579391818` | `totalGovVotesRemoved(211) = 0` |
 | `stake.totalValidBoostShares(211)` | `0` | 尚无加速质押 |
 | TestLOVE20 `totalSupply()` / `MAX_SUPPLY()` | `999995499999099999909999997` / `10000000000000000000000000000` | 加速上限的唯一供应量输入（`totalSupply` 只在空投铸造与销毁时变化；本链无 swap → 无销毁）。**这个数就是基线错误的敏感点**（旧 8545 口径是 `999994599998649999819999988`，差 `900000450000090000009 wei`） |
 | MemberNFT `totalSupply()` | `5` | 只有 memberId 1–5（`ownerOf(6)` revert `ERC721NonexistentToken(6)`）；owner 见 §0.5 |
 
-### §0.4 基线复核：为什么**不用** 8545 的 dump（旧结论作废）
+### §0.4 历史基线复核（2026-11-17）
 
-> **废止声明（2026-11-17 13:10，Lead 复核）**：本文件初稿用 **8545 人工链**的只读 `anvil_dumpState` 起 8566，并在这里写下「与 clean bootstrap 等价」。**该结论是错的**：8545 比 clean bootstrap 多了一个手工铸造的身份，且 `TestLOVE20.totalSupply()` 不同（见下表）。现在改用 **8555（e2e 套件链）** 的只读 dump 起新 8566（pid 36621）；§1/§2/§3/§4 里吃 `token.totalSupply` 的 **C2 全部中间量与 C4 撤出总额已按新基线重算**，C1/C3 不受影响。
+> **废止声明（2026-11-17 13:10，Lead 复核）**：本文件初稿用 **8545 人工链**的只读 `anvil_dumpState` 起 8566，并在这里写下「与 clean bootstrap 等价」。**该结论是错的**：8545 比 clean bootstrap 多了一个手工铸造的身份，且 `TestLOVE20.totalSupply()` 不同（见下表）。当时改用 **8555（e2e 套件链）** 的只读 dump 起 8566（pid 36621）。依赖 `token.totalSupply` 的 **C2 全部中间量与 C4 撤出总额按这份基线重算**，C1/C3 不受影响。
 
-| 核对项 | 8545 人工链（旧 8566，**错误基线**） | 8555 clean bootstrap（新 8566，**本文口径**） | 差 / 结论 |
+| 核对项 | 8545 人工链（**作废基线**） | 8555 clean bootstrap（**理论线基线**） | 差 / 结论 |
 | --- | --- | --- | --- |
 | `MemberNFT.totalSupply()` | `6` | **`5`** | 8545 多 1 个手工铸造的身份（tokenId 6 → `0x7099…79C8`）；新链 `ownerOf(6)` revert `ERC721NonexistentToken(6)` |
 | `TestLOVE20.totalSupply()` | `999994599998649999819999988` | **`999995499999099999909999997`** | 差 `900000450000090000009 wei`（≈0.9 币）；直接影响 `mintedShare = mulDiv(liquidityTokenAmount, totalSupply, MAX_SUPPLY)` |
@@ -69,7 +71,7 @@
 
 结论：两条基线**只有** `token.totalSupply()` 与「成员 NFT 是否多一个」能区分开；`Stake` 的记账状态在两边完全一致，所以差值恰好只落在**吃 `totalSupply` 的加速上限**（C2 的 `mintedShare/baseCap/memberCap/boostAmount`）与**加速退还额/撤出总额**（C4）上，其余用例的数值不变。8545 只在 dump 时被只读读取，未写；8555 也只读 dump，未写（套件还要用它）。
 
-### §0.5 账户、余额与成员身份
+### §0.5 历史快照的账户、余额与成员身份
 
 anvil 固定账户（mnemonic `test test … junk`）；本文件把「anvil 第 n 个账户」按**导出地址**写，避免序号歧义：
 
@@ -87,12 +89,14 @@ anvil 固定账户（mnemonic `test test … junk`）；本文件把「anvil 第
 ### §0.6 页面显示规则（先于实现定下，前端线照此断言）
 
 - 金额一律走 `src/shared/lib/format.ts` 的 `formatTokenAmount`：整数部分千分位分组、小数位按数量级自适应、**只截断不四舍五入**、去掉末尾 0；未知显示 `—`。**2026-11-19 起**（初版「一律最多 6 位」已作废）：按显示值的整数部分 `<1` → 最多 6 位、`1–999` → 4 位、`1e3–1e6` → 2 位、`≥1e6` → 0 位；实现 `fractionDigitsForMagnitude`。**2026-11-19 四轮追加**：极小**非零**金额改用「第一个有效位 + 2 位」显示、**不设位数上限**（代币精度 ≤ 18：`0.0000001`、1 wei = `0.000000000000000001`）；`< 最小可见单位` 只在显式 `maxFractionDigits` 把值压成 0 时兜底；仍只截断、不四舍五入。权威写法见 [前端规范 §4.5.1](../../engineering/frontend-standards.md)。
-- 治理权、加速份额、流动性份额都是「18 位定点数」，页面按代币数量同样的规则显示（同上，数量级自适应）；**中文一律写「治理权」**（GLOSSARY：投票权 → 治理权，界面不出现「治理票 / 票数」）。
+- 治理权、加速份额和流动性份额都是 18 位定点数，页面按上面的规则显示。质押页把尚未申请解锁的份额乘以承诺解锁期的阶段数，所得数值标为「治理权」。
 - **本文件所有「页面文本 / 页面字符串」栏都已按 2026-11-19 的数字规则换算**；§1 的 wei / 数学值一个都没动，改的只是「页面显示」。
 - 百分比走 `formatPercent`：最多 2 位、截断。**「占比」类**走 `formatTinyPercent`（owner 2026-11-19 四轮）：`≥ 0.01%` 仍 2 位；`< 0.01%` 用「`0.{x}yyyy`」（`x` = 前导 0 个数、其后最多 4 位非零数字）显示、**不设 `x` 上限**，永不落成 0；滑点 / 费率仍固定 2 位。
 - 「承诺解锁期」单位是**阶段**，页面文案写「约 N 分钟」（1 阶段 ≈ 120 秒 = 2 分钟；本链 `TARGET_SECONDS = 120`，只能写「约」）。
 
 ## §1 理论线（手算，先于实现）
+
+本节以 §0.3 的历史种子快照计算，示例从阶段 211 开始。§2 本轮部署从阶段 3 开始，脚本按每笔交易所在阶段核对数值。
 
 ### §1.1 记号与舍入
 
@@ -104,46 +108,46 @@ anvil 固定账户（mnemonic `test test … junk`）；本文件把「anvil 第
 | `L` | 本次 `pair.mint(stake)` 铸出的 LP |
 | `TLS` | `totalStake.totalLiquidityShares`（质押合约记账的「流动性份额」） |
 | `WLP` | `totalStake.withdrawableLp`（可分配 LP；本部署 `feeTo = 0`、无 swap，`feeLp ≡ 0`，所以 `WLP` 恒等于「记账 LP 总量 − 已分掉的份额」） |
-| `V_m(m)` | 成员 `m` 的治理票 `= liquidityShares × promisedWaitingPhases`（`_govVotesOf`，`Stake.sol` 第 1277–1279 行） |
-| `V_tot` | `totalGovVotesAt(token, round) = totalGovVotesAdded.value(round) − totalGovVotesRemoved.value(round)`；`RoundHistoryUint256.value(round)` 取「≤ round 的最近一次记录」的累计值 |
+| `V_m(m)` | 成员 `m` 的治理权 `= liquidityShares × promisedWaitingPhases`，只计尚未申请解锁的份额 |
+| `V_tot` | `totalGovPower(token, round) = totalGovPowerAdded(token, round) − totalGovPowerRemoved(token, round)`；`RoundHistoryUint256.value(round)` 取「≤ round 的最近一次记录」的累计值 |
 | `P` | 当前阶段（`Phase.currentPhase()`，合约里叫 `round`） |
 
 舍入：Solidity 全整数运算，**每一步除法、`Math.sqrt`、`Math.mulDiv` 都向下取整**；本文件所有中间量按同一规则逐式代入，不先取整再回代。`Math.mulDiv(a,b,c) = floor(a·b/c)`（512 位中间量，不溢出）。
 
-> 术语：合约字段/事件叫 `govVotes`、`totalGovVotes`（代码里保留「票」的说法）；**页面中文一律写「治理权」**（GLOSSARY「投票权 → 治理权」，界面不出现「治理票 / 票数」）。§1 下文的「治理票」只作为 `govVotes` 的合约口径别名，§3 的页面文本一律用「治理权」。
+> `Stake.govPower` 返回当前或指定轮次的治理权。申请解锁当轮起治理权为零。投票合约用当前治理权约束当轮累计实投票数。
 
 ### §1.2 闭式公式（照 `Stake.sol` 的整数语义，独立于任何 view）
 
 **① 流动性质押 `stakeLiquidity(token, tIn, pIn, phases, memberId, deadline)`**
 
 1. 前置：`tIn > 0`（否则 `ZeroTokenAmount`）、`pIn > 0`（`ZeroParentTokenAmount`）、`phases ∈ [1, 100]`（`InvalidPromisedWaitingPhases`）、无在途解锁（`UnstakeAlreadyRequested`）、阶段 `P ≠ 0`、非 owner 不得改写已存在的 `phases`、`phases` 不得下降。
-2. 最优两侧（`_optimalAmounts`，第 1091–1108 行）：`p* = floor(tIn·R_P/R_T)`；若 `p* ≤ pIn` 取 `(t, p) = (tIn, p*)`，否则取 `(floor(pIn·R_T/R_P), pIn)`。**只 `transferFrom` 采用的两侧**，多余部分留在用户钱包。
+2. 最优两侧（`_optimalAmounts`，第 1063–1080 行）：`p* = floor(tIn·R_P/R_T)`；若 `p* ≤ pIn` 取 `(t, p) = (tIn, p*)`，否则取 `(floor(pIn·R_T/R_P), pIn)`。**只 `transferFrom` 采用的两侧**，多余部分留在用户钱包。
 3. 铸 LP（pair 先收到两侧，再 `mint`）：`L = min(floor(t·S/R_T), floor(p·S/R_P))`（`S ≠ 0`）。
 4. 记账份额：`sharesAdded = (TLS == 0 || WLP_before == 0) ? L : floor(TLS·L / WLP_before)`。
-5. 治理票增量：`govVotesAdded = (shares_before + sharesAdded)·phases − shares_before·prevPhases`；随后 `shares += sharesAdded`、`phases = phases`、`TLS += sharesAdded`、`WLP += L`、`liquidityTokenAmount += t`、`firstGovVoteRound ??= P`。
+5. 治理权增量：`govPowerAdded = (shares_before + sharesAdded)·phases − shares_before·prevPhases`；随后 `shares += sharesAdded`、`phases = phases`、`TLS += sharesAdded`、`WLP += L`、`liquidityTokenAmount += t`、`firstGovPowerRound ??= P`。
 6. 展平检查（本部署处处成立）：`_applyReclassification` 每次都用 `sqrtK(当前储备)·总LP/有效供应量` 与上一次基线比较，**本任务全程没有 swap**（储备比例恒定），所以 `currentSqrtKOfLp == lastSqrtKOfLp` → 不重分类，`feeLp = 0`、`WLP` 不缩水；`_settleFees` 的 `settlementUnit = floor(effectiveSupply·2.5e15/1e18) > feeLp = 0` → 不结算。**因此 `sharesAdded` 恒等于 `L`**（`TLS == WLP_before` 只在种子后的第一次质押成立；用例 C1 用它，C4 之后又回到相等）。
 
 **② 加速质押 `stakeBoost(token, boostAmount, phases, memberId, deadline)`**
 
 1. 前置：`boostAmount > 0`（`ZeroBoostAmount`）、`phases` 合法、**必须有流动性份额**（`liquidityShares > 0`，否则 `NoStakedLiquidity`）、无在途解锁、非 owner 不得改写/降低 `phases`。
-2. 基础上限（`_boostStakeBaseAndMemberCap`，第 655–676 行）：
+2. 基础上限（`_boostStakeBaseAndMemberCap`，第 632–657 行）：
    ```
    mintedShare = mulDiv(liquidityTokenAmount(token), token.totalSupply(), token.MAX_SUPPLY())
    baseCap     = mintedShare × LIQUIDITY_TOKEN_EQUIVALENCE_FACTOR(2) × BOOST_STAKE_SUPPLY_FACTOR(2) = 4·mintedShare
    memberCap   = mulDiv(baseCap, V_m(memberId, P), V_tot(P)) × BOOST_STAKE_MULTIPLIER(5)
    ```
-   注意 `liquidityTokenAmount` 是**全社区累计本金**（不是该成员的），`V_m/V_tot` 用**当轮**治理票。
+   注意 `liquidityTokenAmount` 是**全社区累计本金**（不是该成员的），`V_m/V_tot` 用**当轮**治理权。
 3. 上限校验：`member.boostShares + boostAmount ≤ memberCap`，否则 `BoostCapExceeded(token, memberId, boostAmount, memberCap − boostShares)`（`allowed` 是**余量**，不是 `memberCap`）。
-4. 效果：`boostShares += boostAmount`、`totalBoostShares += boostAmount`、`validBoostShares(memberId, P) += boostAmount`、`totalValidBoostSharesAdded(P) += boostAmount`；**若 `phases` 未变则治理票不变**（加速质押本身不产生治理票）；`phases` 抬高时才 `govVotesAdded = liquidityShares × (phases − prevPhases)`。
+4. 效果：`boostShares += boostAmount`、`totalBoostShares += boostAmount`、`validBoostShares(memberId, P) += boostAmount`、`totalValidBoostSharesAdded(P) += boostAmount`；**若 `phases` 未变则治理权不变**（加速质押本身不产生治理权）；`phases` 抬高时才 `govPowerAdded = liquidityShares × (phases − prevPhases)`。
 
 **③ 增加解锁期 `increasePromisedWaitingPhases(token, memberId, phases)`**（owner only）
 
-`govVotesAdded = liquidityShares × (phases − prevPhases)`（新值必须 ≥ 旧值，否则 `PromisedWaitingPhasesDecreased`）；`member.phases = phases`。
+`govPowerAdded = liquidityShares × (phases − prevPhases)`（新值必须 ≥ 旧值，否则 `PromisedWaitingPhasesDecreased`）；`member.phases = phases`。
 
 **④ 申请解锁 `unstake(token, memberId)`**（owner only）
 
-前置：有流动性、无在途申请、**本阶段该成员没投过票也没推举过**（否则 `StakeRightsUsed`）。
-效果：`unlockRequestPhase = P`；`govVotesRemoved = V_m = shares × phases`（治理票清零）；`validBoostShares(memberId, P) −= boostShares`（`totalValidBoostSharesRemoved(P) += boostShares`）；**`member.liquidityShares` / `boostShares` 不清零**（撤出时才处理）。
+前置：有流动性、无在途申请、**本阶段该成员没投过票也没推举过**（否则 `GovPowerUsed`）。
+效果：`unlockRequestPhase = P`；`govPowerRemoved = V_m = shares × phases`（治理权清零）；`validBoostShares(memberId, P) −= boostShares`（`totalValidBoostSharesRemoved(P) += boostShares`）；**`member.liquidityShares` / `boostShares` 不清零**（撤出时才处理）。
 
 **⑤ 撤出 `withdraw(token, memberId, deadline)`**（owner only）
 
@@ -172,8 +176,8 @@ member 的 stake 状态整条删除
 | `L`（本次铸出 LP） | `min(两侧)` | `22360679774997896964` | `预计获得 22.3606 流动性凭证` |
 | `WLP_before` | 种子 `withdrawableLp`（无 swap → 不重分类） | `4472135954999579391818` | — |
 | `sharesAdded` | `floor(TLS0·L/WLP_before)` | `22360679774997896964` | — |
-| `govVotesAdded` | `(0+L)·10 − 0` | `223606797749978969640` | `预计治理权 +223.6067` |
-| `firstGovVoteRound` | `= P` | `211`（实测阶段） | — |
+| `govPowerAdded` | `(0+L)·10 − 0` | `223606797749978969640` | `预计治理权 +223.6067` |
+| `firstGovPowerRound` | `= P` | `211`（实测阶段） | — |
 
 C1 执行后的终态（逐 wei）：
 
@@ -182,15 +186,15 @@ C1 执行后的终态（逐 wei）：
 | `memberStake(t,5).liquidityShares` | `22360679774997896964` | `22.3606`（流动性份额） |
 | `.boostShares` / `.promisedWaitingPhases` / `.unlockRequestPhase` | `0` / `10` / `0` | — / 约 `20 分钟` / 未申请 |
 | `.tokenAmountForLiquidity` / `.parentTokenAmountForLiquidity`（**成员份额**折算） | `999999999999999999995` / `499999999999999999` | `999.9999 TestLOVE20` + `0.499999 TestWETH` |
-| `.firstGovVoteRound` | `211` | — |
-| `stake.memberStake(t,5)` 治理权（合约字段 `govVotes`） | `223606797749978969640` | `223.6067` |
+| `.firstGovPowerRound` | `211` | — |
+| 成员治理权（`stake.govPower(t,211,5)`） | `223606797749978969640` | `223.6067` |
 | `stake.totalStake(t).totalLiquidityShares` | `4494496634774577288782` | `4,494.49` |
 | `.totalLp` = `.withdrawableLp` | `4494496634774577288782` | `4,494.49` |
 | `.feeLp` / `.totalBoostShares` | `0` / `0` | — |
 | `.tokenAmountForLiquidity` / `.parentTokenAmountForLiquidity` | `200999999999999999955278` / `100499999999999999977` | `200,999.99` + `100.4999` |
 | `stake.liquidityTokenAmount(t)` | `201000000000000000000000` | `201,000` |
-| `stake.govVotes(t,211,5)` | `223606797749978969640` | `223.6067` |
-| `stake.totalGovVotes(211)` | `4695742752749558361458` | `4,695.74` |
+| `stake.govPower(t,211,5)` | `223606797749978969640` | `223.6067` |
+| `stake.totalGovPower(211)` | `4695742752749558361458` | `4,695.74` |
 | pair `totalSupply` | `4494496634774577289782` | `4,494.49`（LP 总量） |
 | pair 储备 `R_T` / `R_P` | `201000000000000000000000` / `100500000000000000000` | `201,000` / `100.5` |
 | 账户净变化 TestLOVE20 | `−1000000000000000000000` | — |
@@ -212,7 +216,7 @@ C1 执行后的终态（逐 wei）：
 | --- | --- | --- | --- |
 | `mintedShare` | `mulDiv(201000000000000000000000, 999995499999099999909999997, 10000000000000000000000000000)` | `20099909549981909998190` | — |
 | `baseCap` | `mintedShare × 2 × 2` | `80399638199927639992760` | — |
-| `V_tot` | C1 后 `totalGovVotes` | `4695742752749558361458` | `4,695.74` |
+| `V_tot` | C1 后 `totalGovPower` | `4695742752749558361458` | `4,695.74` |
 | `V_m(5)` | `22360679774997896964 × 10` | `223606797749978969640` | `223.6067` |
 | `memberCap` | `mulDiv(baseCap, V_m, V_tot) × 5`（先 `floor(baseCap·V_m/V_tot) = 3828554199996554286170`） | `19142770999982771430850` | `加速上限 19,142.77` |
 | `boostAmount` | `floor(memberCap/2)`（clean bootstrap 基线下 `memberCap` 是偶数 → 恰好整除，余 0 wei） | `9571385499991385715425` | `9,571.38` |
@@ -226,7 +230,7 @@ C2 执行后：
 | `stake.totalStake(t).totalBoostShares` | `9571385499991385715425` | `9,571.38` |
 | `stake.validBoostShares(t,211,5)` | `9571385499991385715425` | `9,571.38` |
 | `stake.totalValidBoostSharesAdded(t,211)` | `9571385499991385715425` | — |
-| **治理权（不变）** | `223606797749978969640` / `totalGovVotes = 4695742752749558361458` | `223.6067` |
+| **治理权（不变）** | `223606797749978969640` / `totalGovPower = 4695742752749558361458` | `223.6067` |
 | 账户 TestLOVE20 扣款 | `9571385499991385715425` | — |
 
 > 上限公式的 `allowed` 只用于 revert 参数的**余量**：本用例后余量 `9571385499991385715425`；再存 `9571385499991385715426` 就会 revert `BoostCapExceeded`（C5①/C6）。`memberCap` 为偶数时 `boostAmount` 恰好是上限的一半，C2 之后「本阶段还能加速」与「加速质押份额」**数值相同**（语义不同：余量 vs 已用）。
@@ -235,10 +239,10 @@ C2 执行后：
 
 | 量 | 公式 | 理论值（wei） | 页面文本 |
 | --- | --- | --- | --- |
-| `govVotesAdded` | `22360679774997896964 × (25 − 10)` | `335410196624968454460` | `预计治理权 +335.4101` |
+| `govPowerAdded` | `22360679774997896964 × (25 − 10)` | `335410196624968454460` | `预计治理权 +335.4101` |
 | `memberStake(t,5).promisedWaitingPhases` | `25` | `25` | 约 `50 分钟` |
-| `govVotes(t,211,5)` | `22360679774997896964 × 25` | `559016994374947424100` | `559.0169` |
-| `totalGovVotes(211)` | `4695742752749558361458 + 335410196624968454460` | `5031152949374526815918` | `5,031.15` |
+| `govPower(t,211,5)` | `22360679774997896964 × 25` | `559016994374947424100` | `559.0169` |
+| `totalGovPower(211)` | `4695742752749558361458 + 335410196624968454460` | `5031152949374526815918` | `5,031.15` |
 
 > 解锁期的单位是「阶段」；`increasePromisedWaitingPhases` 对同一成员**不**要求先解锁（只要求有新值 ≥ 旧值、无在途申请、有流动性）。
 
@@ -253,7 +257,7 @@ C4 从 C3 的状态出发。`unlockRequestPhase = P = 211`（实测，与 §0 �
 | `canWithdraw`（未到期） | `211 ≤ 211 + 25` → `false` | `false` | 未到期 |
 | `totalValidBoostSharesRemoved(t,211)` | `= boostShares` | `9571385499991385715425` | 加速份额归 0 |
 | `validBoostShares(t,211,5)` | `0` | `0` | — |
-| `totalGovVotes(211)`（unstake 后） | `5031152949374526815918 − 559016994374947424100` | `4472135954999579391818` | `4,472.13`（社区总治理权） |
+| `totalGovPower(211)`（unstake 后） | `5031152949374526815918 − 559016994374947424100` | `4472135954999579391818` | `4,472.13`（社区总治理权） |
 
 到期条件：`P_withdraw > 211 + 25 = 236` → **阶段 237**（`phaseInfo(212) = (25321, 120)`，阶段 n 起始块 `= 25201 + (n−211)×120`，故阶段 237 起始块 `= 25201 + 26×120 = 28321`）。`anvil_mine` 推块到 28321 后 `withdraw`：
 
@@ -273,12 +277,12 @@ C4 执行后的链上终态：
 
 | 读取 | 理论值（wei） | 说明 |
 | --- | --- | --- |
-| `memberStake(t,5)` | 全 `0`（含 `unlockRequestPhase = 0`、`firstGovVoteRound = 0`） | 整条删除 |
+| `memberStake(t,5)` | 全 `0`（含 `unlockRequestPhase = 0`、`firstGovPowerRound = 0`） | 整条删除 |
 | `stake.totalStake` 的 `totalLiquidityShares` / `withdrawableLp` / `totalBoostShares` | `4472135954999579391818` / `4472135954999579391818` / `0` | 回到种子份额 |
 | `stake.liquidityTokenAmount` | `199999999999999999999782` | `= 201000000000000000000000 − floor(22360679774997896964×201000000000000000000000/4494496634774577288782)`；不是 `2e23`，差 `218 wei`（本成员本金按份额向下取整扣除，误差留在全社区本金里） |
 | pair `totalSupply` | `4472135954999579392818` | 回到种子值 |
 | pair 储备 `R_T` / `R_P` | `200000000000000000000005` / `100000000000000000001` | 比种子多 `5 wei` / `1 wei`（burn 的每一步向下取整把粉尘留给池子） |
-| `stake.govVotes(t,211,5)` | `0` | 已清零 |
+| `stake.govPower(t,211,5)` | `0` | 已清零 |
 
 ### 用例 C5（边界 4 组，全部静态调用，不发交易）
 
@@ -300,26 +304,40 @@ C4 执行后的链上终态：
 | `memberStake(t,5).boostShares` | 完全相同（`9571385499991385715425`） |
 | `validBoostShares(t,current,5)` / `totalValidBoostShares(current)` | 完全相同 |
 | 账户 TestLOVE20 / TestWETH / pair 储备 / `totalLiquidityShares` | 完全相同 |
-| 治理票 / `liquidityTokenAmount` | 完全相同 |
+| 治理权 / `liquidityTokenAmount` | 完全相同 |
 
 ## §2 合约线（`scripts/verify/gov-stake-contract.mjs`）
 
-运行命令（链：`http://127.0.0.1:8566`；脚本默认 `VERIFY_RPC=http://127.0.0.1:8566`，可用 `VERIFY_RPC` 覆盖）：
+在前端仓执行以下命令。脚本从 `../anvil/.anvil/8566/export/` 读取本次部署的地址。`ANVIL_EXPORT_DIR` 可以指定另一份部署导出。
 
 ```bash
-export PATH="/Users/BigPolarBear/.foundry/bin:/Users/BigPolarBear/.nvm/versions/node/v24.12.0/bin:$PATH"
+make -C ../anvil bootstrap PORT=8566
 node scripts/verify/gov-stake-contract.mjs
 ```
 
-**2026-11-17 13:14 在 8555-clean-bootstrap 基线的新 8566 上实测 161/161 PASS（退出码 0）**，§0 采样 `block = 25231 / phase = 211`；**连跑两遍，交易行逐字相同（`diff` 为空）**，说明同基线可复现。脚本对 C1–C4 用一次 `anvil_snapshot`、C5①/C5②③④/C6 各一次，跑完逐项 `anvil_revert`，**跑完链上仍是 block 25231 / phase 211、状态与跑前逐 wei 相同**，随后切回套件口径（`automine = false` + interval mining 1s）交给前端线。
+**2026-11-28 在本轮 8566 部署上实测 161/161 PASS（退出码 0）**。本轮在 automine 已关闭的状态下将定时出块设为 1 秒。脚本分别为 C1–C4、C5①、C5②③④ 和 C6 创建快照，每组结束后回滚交易和链上状态。2026-11-17 从 8555 快照启动的 8566 复验保留在历史记录中。
 
 > **路径说明（2026-11-19 三轮）**：合约线是**直接调用 `Stake.stakeLiquidity` / `stakeBoost`** 校验 §1 的理论值（受控输入、独立于界面），**本脚本与本节数值都不变**。界面在父币是 WETH 时改走 Hub 的 `stakeLiquidityWithNative`（Hub 内置 wrap、用户不必封装 WETH、只有一笔社区代币授权），前端线断言的页面数值仍与 §1 逐字一致（见 §3.2 三轮记录）。
+
+### 本轮 8566 的关键读回
+
+| 用例 | 本轮证据 |
+| --- | --- |
+| §0 初始状态 | block 251、治理第 3 轮；`govPower = 4472135954999579391818`、`totalGovPower = 4472135954999579391818` |
+| C1 流动性质押 | tx `0xeb76dc92cf6d874a1b3411daaa8361a9aab1cd2836c6cb02db457c1830a396ec`，block 264；`govPower = 223606797749978969640`、`totalGovPower = 4695742752749558361458` |
+| C2 加速质押 | tx `0x1ffc45894326f33ae17ab3c64e3878606585fa98eacb9609a3f5d1e3f223c6c4`，block 272；治理权保持 `223606797749978969640` |
+| C3 增加解锁期 | tx `0xc460f1ec525506de1f1b9cbd13f80086e983280414858bc7aa19fcb329714f72`，block 276；`govPower = 559016994374947424100` |
+| C4 申请解锁 | tx `0xae2c839e423e662d4074b2856674d935e06d8b78a6876c0ce5dfe62f024aba31`，block 280、阶段 3；`govPower = 0`、`totalGovPowerRemoved = 559016994374947424100`，份额仍保留 |
+| C4 撤出 | tx `0xc770038a1686fcf37f8eaa81024e179ca075b1e375e326e104aa1aead915f93f`，block 3362、阶段 29；TestLOVE20 `10571385499991385715420`、TestWETH `499999999999999999` |
+| C6 回滚 | tx `0x7b1714f21b97824f88a6aa555334fb75daeec1a2122b3445b3929e9e38475896`，回执 `reverted`，治理权、份额、余额和池状态均未变化 |
+
+> 下表是 **2026-11-17 的历史 8566 复验**，只用于保留当时的交易证据和可追溯性。表内的 `govVotes`、`totalGovVotes`、`firstGovVoteRound` 等名称属于当时部署，当前接口和本轮结果以本节上面的 `govPower`、`totalGovPower`、`firstGovPowerRound` 为准。
 
 | 用例 | 链上交易 / 读取 | 合约值（wei） | 与理论值差值 |
 | --- | --- | --- | --- |
 | §0 初始状态（37 项） | `pair.getReserves` / `pair.totalSupply` / `stake.totalStake` / `stake.memberStake(1)` / `stake.memberStake(5)` / `stake.liquidityTokenAmount` / `token.totalSupply` / `token.MAX_SUPPLY` / `MemberNFT.totalSupply`+`ownerOf(1)`+`ownerOf(5)` / 8 个协议参数 / 账户余额 | 逐字等于 §0.3–§0.5（含 `token.totalSupply = 999995499999099999909999997`、`MAX_SUPPLY = 1e28`、`MemberNFT.totalSupply = 5`、`ownerOf(5) = 0x15d3…6A65`） | 0 |
 | C1 流动性质押 | tx `0xf442444543bff63eade3f1c2263fd493b0c57ecbfb6bf237f4e91749d20ac8e6`（`stakeLiquidity`，block 25235） | `memberStake(5)`：`liquidityShares = 22360679774997896964`、`phases = 10`、`firstGovVoteRound = 211`、`tokenAmountForLiquidity = 999999999999999999995`、`parentTokenAmountForLiquidity = 499999999999999999`；`totalStake`：`totalLiquidityShares = totalLp = withdrawableLp = 4494496634774577288782`、`feeLp = 0`、`tokenAmountForLiquidity = 200999999999999999955278`、`parent = 100499999999999999977`；`liquidityTokenAmount = 201000000000000000000000`；`govVotes = 223606797749978969640`；`totalGovVotes = totalGovVotesAdded = 4695742752749558361458`；pair `totalSupply = 4494496634774577289782`、储备 `201000000000000000000000` / `100500000000000000000`；扣款 TestLOVE20 `1e21`、TestWETH 净 `+5e17` | 0 |
-| C2 加速质押 | tx `0x24b7780f968eadc0037e42be1b2a9c4425f3bf1a4d840d17adc53c6ab4c44a58`（`stakeBoost`，block 25237；前一笔 `approve` 在 25236） | `boostStakeCap` = `(19142770999982771430850, 0)` → 交易后 `(19142770999982771430850, 9571385499991385715425)`；`member.boostShares = totalStake.totalBoostShares = validBoostShares = totalValidBoostSharesAdded = 9571385499991385715425`；`totalValidBoostSharesRemoved = 0`；`lastMajorStakeRound = 211`（tx 所在阶段）；**治理票 `223606797749978969640` 与 `totalGovVotes 4695742752749558361458` 不变**；扣款 `9571385499991385715425` | 0 |
+| C2 加速质押 | tx `0x24b7780f968eadc0037e42be1b2a9c4425f3bf1a4d840d17adc53c6ab4c44a58`（`stakeBoost`，block 25237；前一笔 `approve` 在 25236） | `boostStakeCap` = `(19142770999982771430850, 0)` → 交易后 `(19142770999982771430850, 9571385499991385715425)`；`member.boostShares = totalStake.totalBoostShares = validBoostShares = totalValidBoostSharesAdded = 9571385499991385715425`；`totalValidBoostSharesRemoved = 0`；`lastMajorStakeRound = 211`（tx 所在阶段）；**治理权 `223606797749978969640` 与 `totalGovVotes 4695742752749558361458` 不变**；扣款 `9571385499991385715425` | 0 |
 | C3 增加解锁期 | tx `0xffc74e1372a6f977fea59a83732ea8b7f7f757164093b7c99686738435b46430`（`increasePromisedWaitingPhases`，block 25238） | `phases = 25`；`govVotes = 559016994374947424100`；`totalGovVotesAdded = totalGovVotes = 5031152949374526815918` | 0 |
 | C4 申请解锁 | tx `0x620dee58299a15c4520a4d1c54d4b428d0afa5c391288287bbe5a4d0dc3ff0cf`（`unstake`，block 25239，phase 211） | `unlockRequestPhase = 211`；`govVotes = 0`；`totalGovVotes = 4472135954999579391818`；`totalGovVotesRemoved = 559016994374947424100`；`validBoostShares = totalValidBoostShares = 0`；`totalValidBoostSharesRemoved = 9571385499991385715425`；`liquidityShares` / `boostShares` 不清零（`22360679774997896964` / `9571385499991385715425`）；`canWithdraw = false` | 0 |
 | C4 到期判定 | `phaseInfo(237) = (28321, 120)`；`anvil_mine` 推到 block 28321 → `phaseAtBlock = 237` | `237 > 211 + 25 = 236` → `canWithdraw = true` | 0 |
@@ -328,49 +346,34 @@ node scripts/verify/gov-stake-contract.mjs
 | C5② 解锁期越界 | `eth_call` `stakeLiquidity(t, 1e21, 5e17, {0,101}, 5, deadline)` | `0x50a046ad` = `InvalidPromisedWaitingPhases(0, 1, 100)` / `(101, 1, 100)` | 0 |
 | C5③ 金额 0 | `eth_call` 三条 | `0x82c4a8c9` `ZeroTokenAmount()` / `0xe6e1b13a` `ZeroParentTokenAmount()` / `0xbbaa8875` `ZeroBoostAmount()` | 0 |
 | C5④ 未质押就加速 | §0 状态 `eth_call` `stakeBoost(t, 1e18, 1, 5, deadline)` | `0x42b29552` = `NoStakedLiquidity(0x8aCd…41FF, 5)` | 0 |
-| C6 失败回滚 | tx `0x1265155bb8fd4c5f149cc9c39621a06b223b5a286e9d75bd71e8878b797f4e7d`（C1+C2 之后发超上限 `stakeBoost`） | 回执 `status = reverted`；`totalBoostShares` / `member.boostShares` / `totalLiquidityShares` / `liquidityTokenAmount` / 治理票 / `validBoostShares` / 两侧余额 / pair 储备与 `totalSupply` 全部与提交前逐 wei 相同 | 0 |
+| C6 失败回滚 | tx `0x1265155bb8fd4c5f149cc9c39621a06b223b5a286e9d75bd71e8878b797f4e7d`（C1+C2 之后发超上限 `stakeBoost`） | 回执 `status = reverted`；`totalBoostShares` / `member.boostShares` / `totalLiquidityShares` / `liquidityTokenAmount` / 治理权 / `validBoostShares` / 两侧余额 / pair 储备与 `totalSupply` 全部与提交前逐 wei 相同 | 0 |
 
-复现单个用例的 `cast`（在手动跑到该状态的链上；脚本内部用 viem 发交易，等价）：
+以下命令从同一份 Anvil 导出取地址，查询链上的当前状态。脚本结束时会回滚场景交易，验证时的读数和交易哈希可在脚本日志中查询。
 
 ```bash
-STAKE=0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e
-TOKEN=0x8aCd85898458400f7Db866d53FCFF6f0D49741FF
-PAIR=0x3FC12a5abAe69C8Eee58C37cEDC266751507620D
-PHASE=0xa513E6E4b8f2a923D98304ec87F64353C4D5C853
-
-# C1 / C2 / C3 / C4 的交易（deadline = 4000000000）
-cast send $STAKE "stakeLiquidity(address,uint256,uint256,uint256,uint256,uint256)" \
-  $TOKEN 1000000000000000000000 1000000000000000000000 10 5 4000000000 --rpc-url http://127.0.0.1:8566
-cast send $STAKE "stakeBoost(address,uint256,uint256,uint256,uint256)" \
-  $TOKEN 9571385499991385715425 10 5 4000000000 --rpc-url http://127.0.0.1:8566
-cast send $STAKE "increasePromisedWaitingPhases(address,uint256,uint256)" $TOKEN 5 25 --rpc-url http://127.0.0.1:8566
-cast send $STAKE "unstake(address,uint256)" $TOKEN 5 --rpc-url http://127.0.0.1:8566
-cast rpc anvil_mine 0xbf6 --rpc-url http://127.0.0.1:8566   # 推到阶段 237 的起始块 28321（从 25239 → 28321 共 3082 块）
-cast send $STAKE "withdraw(address,uint256,uint256)" $TOKEN 5 4000000000 --rpc-url http://127.0.0.1:8566
-
-# 读回（每个用例的断言就是这些调用）
-cast call $STAKE "memberStake(address,uint256)(uint256,uint256,uint256,uint256,uint256,uint256,uint256)" $TOKEN 5 --rpc-url http://127.0.0.1:8566
-cast call $STAKE "totalStake(address)(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)" $TOKEN --rpc-url http://127.0.0.1:8566
-cast call $STAKE "govVotes(address,uint256,uint256)(uint256)" $TOKEN 211 5 --rpc-url http://127.0.0.1:8566
-cast call $STAKE "boostStakeCap(address,uint256)(uint256,uint256)" $TOKEN 5 --rpc-url http://127.0.0.1:8566
-cast call $STAKE "validBoostShares(address,uint256,uint256)(uint256)" $TOKEN 211 5 --rpc-url http://127.0.0.1:8566
-cast call $STAKE "canWithdraw(address,uint256)(bool)" $TOKEN 5 --rpc-url http://127.0.0.1:8566
-cast call $PAIR "getReserves()(uint112,uint112,uint32)" --rpc-url http://127.0.0.1:8566
-cast call $PHASE "phaseInfo(uint256)(uint256,uint256)" 237 --rpc-url http://127.0.0.1:8566
+DEPLOYMENT="${ANVIL_EXPORT_DIR:-../anvil/.anvil/8566/export}/deployments/anvil31337_dev.json"
+RPC="${VERIFY_RPC:-http://127.0.0.1:8566}"
+STAKE=$(jq -r '.addresses.STAKE_ADDRESS' "$DEPLOYMENT")
+TOKEN=$(jq -r '.addresses.LOVE20_TOKEN_ADDRESS' "$DEPLOYMENT")
+PHASE=$(jq -r '.addresses.PHASE_ADDRESS' "$DEPLOYMENT")
+ROUND=$(cast call "$PHASE" 'currentPhase()(uint256)' --rpc-url "$RPC" | awk '{print $1}')
+cast call "$STAKE" 'govPower(address,uint256,uint256)(uint256)' "$TOKEN" "$ROUND" 5 --rpc-url "$RPC"
+cast call "$STAKE" 'totalGovPower(address,uint256)(uint256)' "$TOKEN" "$ROUND" --rpc-url "$RPC"
+cast call "$STAKE" 'canWithdraw(address,uint256)(bool)' "$TOKEN" 5 --rpc-url "$RPC"
 ```
 
 补充事实（供复核）：
 
-- 脚本的期望值全部是 §1 的**常量**；`boostStakeCap` / `memberStake` / `totalStake` / `govVotes` / `validBoostShares` 只作为「交叉核对」行出现（标签里写明），不参与任何期望值推导。
+- 脚本的期望值全部是 §1 的**常量**；`boostStakeCap` / `memberStake` / `totalStake` / `govPower` / `validBoostShares` 只作为「交叉核对」行出现（标签里写明），不参与任何期望值推导。
 - **基线敏感性**：C2 的 `mintedShare` 是唯一吃 `token.totalSupply()` 的量（`mulDiv(201000000000000000000000, 999995499999099999909999997, 1e28)`）。换回 8545 基线（`999994599998649999819999988`）会得到 `20099891459972864996381` / `memberCap 19142753771402728571985` / `boost 9571376885701364285992`——这正是本文件 13:10 前那一版的值，**已作废**。C1/C3 的数值与基线无关（不吃 `totalSupply`），两版逐 wei 相同。
 - **授权是逐笔消耗的**：C1 的 `approve(Stake, 1e21)` 正好用完，C2 的加速质押必须再 `approve(Stake, boostAmount)`，否则会 revert 在 `ERC20InsufficientAllowance`（selector `0xfb8f41b2`）而不是 `BoostCapExceeded`。
-- 阶段推进只用 `anvil_mine`：`phaseInfo(P + phases + 1)` 给出阶段起始块（`P = 211` → 阶段 237 起始块 `28321`），推到该块后 `withdraw` 落块 28322，`phaseAtBlock = 237 > 236`。全程没有 `evm_increaseTime`：dev 链一个阶段固定 120 个块（`lastSyncPhase = 0`，没有 `sync()` 调整）。
+- 本轮用 `anvil_mine` 推到 `phaseInfo(P + phases + 1)` 给出的阶段起始块。C4 在阶段 3 申请解锁，首个可撤阶段是 29，起始块为 3361，`withdraw` 落在区块 3362。
 - `liquidityTokenAmount` 在 C4 之后不是 `2e23`：`201000000000000000000000 − floor(22360679774997896964×201000000000000000000000/4494496634774577288782) = 199999999999999999999782`，即 218 wei 的按份额取整误差留在全社区本金里；`withdrawableLp` / `totalLiquidityShares` / pair `totalSupply` 都精确回到种子值。
 - pair 储备在 C4 之后比种子多 `5 wei` / `1 wei`：`pair.burn` 的 `amount = liquidity×balance/totalSupply` 向下取整，粉尘留在池子里；这是**预期行为**，理论线照实记录。
 
 ## §3 前端线（`e2e/gov-stake-numbers.spec.ts`，已回填）
 
-> 前端线已落地（§3.1 是实际断言与实际页面文本，6/6 PASS × 两条链）。页面字符串按 §0.6 的规则、由 §1 的理论值渲染，前端**不得**另算一套；下列字符串就是前端线要**逐字断言**的文本（实现照此写，不允许反向改理论值）。单位后缀（`TestLOVE20` / `TestWETH` / `流动性凭证` / `治理权` 等）以 copy 里的写法为准，下表给出「数值部分」的逐字文本 + 建议的完整句子。**2026-11-19 起小数位按数量级自适应（§0.6），下表的数值字符串已按新规则换算**（例如 `+223.6067` → `+223.6067`）。
+> 页面数值按 §0.6 的显示规则与 §1 的理论值对照。下表给出应逐字断言的数值，单位和完整提示以页面文案为准。§3.1 记录首版前端实测。
 
 **C1 流动性质押之后（memberId 5，1,000 TestLOVE20 + 1 TestWETH，承诺 10 阶段）**
 
@@ -414,9 +417,10 @@ cast call $PHASE "phaseInfo(uint256)(uint256,uint256)" 237 --rpc-url http://127.
 
 | 页面字段 | 应显示（逐字，数值部分） | 来源（§1 理论值 wei） |
 | --- | --- | --- |
-| 申请解锁后：我的治理权 / 加速质押份额 | `0` / `0` | unstake 把两者清零（`0` 是**已知的零**；未知才写 `—`） |
-| 解锁状态 | `解锁中` + `还要再等 26 个阶段（约 52 分钟）才能撤出`（严格大于 → `Q+26` 才可撤；实测阶段 211 → 237） | `unlockRequestPhase = 211`、`phases = 25` |
-| 到期可用态 | 撤出按钮可点（`canWithdraw = true`，阶段 237） | `237 > 236` |
+| 申请解锁回执 | `扣除治理权 559.0169` | `Unstaked.govPowerRemoved = 559016994374947424100` |
+| 申请解锁后：我的治理权 / 本阶段有效加速份额 | `0` / `0` | `unstake` 扣除治理权与有效加速份额，已质押的流动性份额 `22.3606` 和加速质押量 `9,571.38` 留待撤出 |
+| 解锁状态 | `已申请解锁` + `还要再等 26 个阶段（约 52 分钟）才能撤出` | 申请阶段 `Q`，`phases = 25` |
+| 到期可用态 | 撤出按钮可点（`canWithdraw = true`） | 首个可撤阶段为 `Q + 26` |
 | **撤出回执两侧金额** | `10,571.38 TestLOVE20` + `0.499999 TestWETH` | `10571385499991385715420` / `499999999999999999` |
 | 回执明细（若页面展开）：LP 折算 + 加速退还 | `999.9999 TestLOVE20` + `9,571.38 TestLOVE20`（合计即上一行） | `999999999999999999995` + `9571385499991385715425` |
 | 撤出后：我的流动性质押份额 / 治理权 / 加速份额 | `0` / `0` / `0` | `memberStake(5)` 全 0 |
@@ -438,6 +442,10 @@ cast call $PHASE "phaseInfo(uint256)(uint256,uint256)" 237 --rpc-url http://127.
 | 金额为 0（C5③） | 余额/0 值校验：「金额必须大于 0。」，主按钮禁用（不发交易） |
 | 未质押就加速（C5④） | 「先质押流动性才能加速。」，主按钮禁用 |
 | 回滚（C6） | 「交易上链了，但没有成功。你的资产没有变化。」；页面所有数值不变 |
+
+本轮 8566 浏览器回归中，`gov-stake-numbers.spec.ts` **8/8 通过**。C4 用 25 个阶段的承诺解锁期，回执显示 `扣除治理权 559.0169`。合约线逐 wei 核对扣除值 `559016994374947424100`、治理权归零和质押份额保留。
+
+四档回执截图的交易使用 10 个阶段，显示 `扣除治理权 223.6067`。 [深色手机](../screenshots/unstake-receipt-dark-mobile.png) · [浅色手机](../screenshots/unstake-receipt-light-mobile.png) · [深色桌面](../screenshots/unstake-receipt-dark-desktop.png) · [浅色桌面](../screenshots/unstake-receipt-light-desktop.png)
 
 ### §3.1 前端线的实际断言（Lead 回填，2026-11-17 14:20；数值字符串按 2026-11-19 数字规范换算；2026-11-19 三轮按原生币质押 / 回执 `Sheet` 更新，见本节表格与 §3.2 三轮记录）
 
@@ -516,7 +524,7 @@ spec（**2026-11-17 晚按 TKM 多页面 IA 重写后为 8 条 `test()`**；下�
 - **治理权查询**：改为输入即查询（ID 即时、名称 300 ms 防抖），「查询」按钮只做手动重取；名称占位「输入身份 NFT 名称」；仍只按身份 NFT ID / 名称。
 - **`/stake/stakelp` 顺序**：承诺解锁期卡（有仓位时）→ 质押表单 → 提示 →「我的流动性质押」（倒数第二，不含加速质押数据）→「治理权的作用」（最后）。**（被 2026-11-19 三轮覆盖：删「我的流动性质押」卡、「提示」与「治理权的作用」合并成一张「治理权的作用与提示」卡，见下。）**
 - **`/stake/unstake` 精简**：无页面 intro、无「提高承诺解锁期」按钮；已申请解锁且还不能撤出时动作区没有按钮，解锁状态与「还要再等 N 个阶段（约 X 分钟）」只在摘要卡出现一次（不再重复）。
-- **口径澄清**：治理权 = 流动性质押份额 × 承诺解锁期、**只统计未申请解锁的仓位**；「治理票」是协议层对「本轮能投出的票数」的计量叫法（由治理权决定），页面仍统一写「治理权」；社区总治理权 = `totalGovVotes`（旧规格名 `totalValidGovVotes`，同口径）**不含**已申请解锁份额，社区流动性质押份额（`totalStake` 第 1 项）**含**待解锁份额。
+- **口径澄清**。治理权等于尚未申请解锁的流动性质押份额乘以承诺解锁期的阶段数。每次投票时，本轮已投加本次票数以当时的治理权为上限。社区总治理权由 `totalGovPower` 读取，当时的接口名为 `totalGovVotes`。`totalStake` 返回的社区流动性质押份额也包含待解锁份额。
 - **复跑**：2026-11-19 04:24 全量 e2e **160/160 passed（12.8m，EXIT 0，0 retry）**、单测 **886 passed（3 skipped，122 文件）**；本 spec 8 条在全量内通过；167 张截图按深色默认重拍（总数 207 不变）。
 
 **2026-11-19 三轮（父币=WETH 直接用原生币 / 回执 Sheet / 质押两页收口）**：**C1–C4 的数值口径（§1）与合约线（§2）一个 wei 都没变**，变的是交易路径、授权口径与页面结构：
@@ -542,7 +550,7 @@ spec（**2026-11-17 晚按 TKM 多页面 IA 重写后为 8 条 `test()`**；下�
 - **P2 读失败态**：社区读模型**任一子读失败**即整块显示「社区数据暂时读不到。」+「重试」（不再把失败字段摆成「—」却没有重试出口）；承诺解锁期参数读失败时，表单里该控件显示「网络可能不稳，你的质押没有变化。」+「重试」（`gov-liquidity-phases-error`），主按钮保持禁用、不拿旧值提交。
 - **复跑与截图**：2026-11-19 四轮复跑（收尾版）：全量 e2e **160/160（10.5m，EXIT 0）**、单测 **897 passed**、治理 spec 8/8 仍含在全量内；截图 **207 张（87 张更新）**；首屏 prod **159.2** / dev **160.7** kB（无 WARN）。
 
-**智能模式的合约依据（不在 §1 理论线里，属新增功能）**：单币质押由 periphery `LOVE20Hub` 完成——`stakeLiquidityWithNative`（必须带 value，只填社区代币时会 revert `ZeroNativeTokenAmount`）/ `stakeLiquidityWithToken`（两枚 ERC20，只填社区代币时用它）；页面按「有没有原生币输入」选入口，报价用 `quoteStakeLiquidity(WithNative)` 的 `willSwap / amountToSwap / amountOutFromSwap / prepared* / liquiditySharesAdded / govVotesAdded`，滑点折算后的 `minLiquidityShares` 作为最少份额。**2026-11-19 三轮起**：父币是 WETH 时，关闭智能模式也走 `stakeLiquidityWithNative`（Hub 内置 wrap，用户不需要封装 WETH；只有一笔社区代币授权）；父币不是 WETH 时才走 `Stake.stakeLiquidity` 的两枚 ERC20 路径。**C1–C4 的数值 / wei 不变**，只更新路径与授权口径说明；C2 加速仍走 `Stake.stakeBoost`。
+**智能模式的合约依据（不在 §1 理论线里，属新增功能）**：单币质押由 periphery `LOVE20Hub` 完成——`stakeLiquidityWithNative`（必须带 value，只填社区代币时会 revert `ZeroNativeTokenAmount`）/ `stakeLiquidityWithToken`（两枚 ERC20，只填社区代币时用它）；页面按「有没有原生币输入」选入口，报价用 `quoteStakeLiquidity(WithNative)` 的 `willSwap / amountToSwap / amountOutFromSwap / prepared* / liquiditySharesAdded / govPowerAdded`，滑点折算后的 `minLiquidityShares` 作为最少份额。**2026-11-19 三轮起**：父币是 WETH 时，关闭智能模式也走 `stakeLiquidityWithNative`（Hub 内置 wrap，用户不需要封装 WETH；只有一笔社区代币授权）；父币不是 WETH 时才走 `Stake.stakeLiquidity` 的两枚 ERC20 路径。**C1–C4 的数值 / wei 不变**，只更新路径与授权口径说明；C2 加速仍走 `Stake.stakeBoost`。
 
 ## §4 三线对照表
 
@@ -550,13 +558,13 @@ spec（**2026-11-17 晚按 TKM 多页面 IA 重写后为 8 条 `test()`**；下�
 | --- | --- | --- | --- | --- |
 | §0 初始 pair 储备 / `totalSupply` / 记账 LP | `2e23` / `1e20` / `4472135954999579392818` / `4472135954999579391818` | 同左（37 项全等） | `—` | ✅ |
 | C1 采用两侧 `t` / `p` | `1000000000000000000000` / `500000000000000000` | 同左（扣款实测） | Hub 报价两行 `两侧正好配平，不需要兑换。` + `实际进池 1,000 TestLOVE20 + 0.5 TestWETH`（2026-11-19 三轮起走 Hub `stakeLiquidityWithNative`） | ✅ |
-| C1 `L` / `sharesAdded` / `govVotesAdded` | `22360679774997896964` / 同左 / `223606797749978969640` | 同左 | `22.3606`（我的流动性质押份额）/ `+223.6067`（预计治理权增量） | ✅ |
-| C1 终态 `totalLiquidityShares` / `totalGovVotes` | `4494496634774577288782` / `4695742752749558361458` | 同左 | `4,494.49` / `4,695.74` | ✅ |
+| C1 `L` / `sharesAdded` / `govPowerAdded` | `22360679774997896964` / 同左 / `223606797749978969640` | 同左 | `22.3606`（我的流动性质押份额）/ `+223.6067`（预计治理权增量） | ✅ |
+| C1 终态 `totalLiquidityShares` / `totalGovPower` | `4494496634774577288782` / `4695742752749558361458` | 同左 | `4,494.49` / `4,695.74` | ✅ |
 | C1 我的质押折算（成员口径） | `999999999999999999995` / `499999999999999999` | 同左 | `999.9999` / `0.499999` | ✅ |
 | C2 `baseCap` / `memberCap` / `boostAmount` | `80399638199927639992760` / `19142770999982771430850` / `9571385499991385715425` | 同左（`boostStakeCap` 交叉核对同值） | `19,142.77` / `9,571.38` | ✅ |
 | C2 治理权不变 | `223606797749978969640` | 同左 | `223.6067` | ✅ |
-| C3 `govVotesAdded` / `govVotes` / `totalGovVotes` | `335410196624968454460` / `559016994374947424100` / `5031152949374526815918` | 同左 | `+335.4101` / `559.0169` / `5,031.15` | ✅ |
-| C4 unstake 移除票 / 归零 | `559016994374947424100` / `0` | 同左 | 治理权 `0`、加速份额 `0` | ✅ |
+| C3 `govPowerAdded` / `govPower` / `totalGovPower` | `335410196624968454460` / `559016994374947424100` / `5031152949374526815918` | 同左 | `+335.4101` / `559.0169` / `5,031.15` | ✅ |
+| C4 unstake 扣除治理权 / 归零 | `559016994374947424100` / `0` | 同左 | 回执 `扣除治理权 559.0169`，随后治理权 `0`，已质押份额 `22.3606` | ✅ |
 | C4 `lpAmount` / `tokenOut` / `parentOut` / boost 退还 | `22360679774997896964` / `999999999999999999995` / `499999999999999999` / `9571385499991385715425` | 同左（到账合计 `10571385499991385715420` / `499999999999999999`） | 回执 `已撤出 10,571.38 TestLOVE20 + 0.499999 TestWETH` | ✅ |
 | C4 撤出后 pair `totalSupply` / 储备 | `4472135954999579392818` / `200000000000000000000005` ∕ `100000000000000000001` | 同左 | 页面不显示 pair 口径；社区总流动性质押份额 `4,472.13` 精确回到种子值 | ✅ |
 | C4 撤出后 `liquidityTokenAmount` | `199999999999999999999782` | 同左 | `—`（页面不显示该量） | ✅ |

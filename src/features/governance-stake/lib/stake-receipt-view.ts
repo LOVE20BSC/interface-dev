@@ -1,8 +1,7 @@
+import { STAKE_DECIMALS } from '@/domain/gov-stake';
 import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount } from '@/shared/lib/format';
 import type { StakeReceipt } from './stake-receipt';
-
-const VOTE_DECIMALS = 18;
 
 /** 回执标题按动作取自 copy；纯函数，便于页面与单测共用。 */
 export function stakeReceiptTitle(receipt: StakeReceipt): string {
@@ -39,12 +38,14 @@ export function stakeReceiptLines(
   switch (receipt.action) {
     case 'stakeLiquidity': {
       const lines: string[] = [];
-      if (detail.govVotesAdded !== undefined) {
-        lines.push(copy.gov.receipt.votes(formatTokenAmount(detail.govVotesAdded, VOTE_DECIMALS)));
+      if (detail.govPowerAdded !== undefined) {
+        lines.push(
+          copy.gov.receipt.govPowerAdded(formatTokenAmount(detail.govPowerAdded, STAKE_DECIMALS)),
+        );
       }
       if (detail.liquiditySharesAdded !== undefined) {
         lines.push(
-          copy.gov.receipt.shares(formatTokenAmount(detail.liquiditySharesAdded, VOTE_DECIMALS)),
+          copy.gov.receipt.shares(formatTokenAmount(detail.liquiditySharesAdded, STAKE_DECIMALS)),
         );
       }
       return lines;
@@ -65,13 +66,22 @@ export function stakeReceiptLines(
           copy.gov.receipt.increasePhasesNote(formatTokenAmount(detail.promisedWaitingPhases, 0)),
         );
       }
-      if (detail.govVotesAdded !== undefined) {
-        lines.push(copy.gov.receipt.votes(formatTokenAmount(detail.govVotesAdded, VOTE_DECIMALS)));
+      if (detail.govPowerAdded !== undefined) {
+        lines.push(
+          copy.gov.receipt.govPowerAdded(formatTokenAmount(detail.govPowerAdded, STAKE_DECIMALS)),
+        );
       }
       return lines;
     }
     case 'unstake':
-      return [copy.gov.receipt.unstakeNote];
+      return detail.govPowerRemoved === undefined
+        ? [copy.gov.receipt.unstakeNote]
+        : [
+            copy.gov.receipt.unstakeNote,
+            copy.gov.receipt.govPowerRemoved(
+              formatTokenAmount(detail.govPowerRemoved, STAKE_DECIMALS),
+            ),
+          ];
     case 'withdraw': {
       if (detail.tokenAmount === undefined || detail.parentTokenAmount === undefined) return [];
       const tokenTotal = detail.tokenAmount + (detail.boostAmount ?? 0n);

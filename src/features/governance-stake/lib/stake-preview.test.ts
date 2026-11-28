@@ -12,11 +12,11 @@ const SEEDED: Omit<
   totalLiquidityShares: 4_472_135_954_999_579_391_818n,
   withdrawableLp: 4_472_135_954_999_579_391_818n,
   currentLiquidityShares: 0n,
-  currentGovVotes: 0n,
+  currentGovPower: 0n,
 };
 
 describe('computeStakePreview', () => {
-  it('estimates the LP, the shares and the votes for a proportional stake', () => {
+  it('estimates the LP, the shares and the governance power for a proportional stake', () => {
     const preview = computeStakePreview({
       ...SEEDED,
       tokenAmount: 1000n * 10n ** 18n,
@@ -29,14 +29,14 @@ describe('computeStakePreview', () => {
     expect(preview.optimalTokenAmount).toBe(1000n * 10n ** 18n);
     expect(preview.optimalParentAmount).toBe(5n * 10n ** 17n);
     // LP = 0.5% of the pair supply; shares are 1:1 with LP on the seeded pool.
-    expect(preview.votesAdded).toBe(223_606_797_749_978_969_640n);
+    expect(preview.govPowerAdded).toBe(223_606_797_749_978_969_640n);
   });
 
-  it('adds to the existing votes instead of replacing them', () => {
+  it('adds to the existing governance power instead of replacing it', () => {
     const preview = computeStakePreview({
       ...SEEDED,
       currentLiquidityShares: 1_000n * 10n ** 18n,
-      currentGovVotes: 3_000n * 10n ** 18n,
+      currentGovPower: 3_000n * 10n ** 18n,
       tokenAmount: 1000n * 10n ** 18n,
       parentTokenAmount: 10n ** 18n,
       promisedWaitingPhases: 10n,
@@ -44,7 +44,7 @@ describe('computeStakePreview', () => {
     expect(preview.status).toBe('ready');
     // (1000e18 + sharesAdded) × 10 − 3000e18, truncated exactly like the EVM:
     // 1022360679774997896964 × 10 − 3000e18.
-    expect(preview.votesAdded).toBe(7_223_606_797_749_978_969_640n);
+    expect(preview.govPowerAdded).toBe(7_223_606_797_749_978_969_640n);
   });
 
   it('is idle until both amounts are valid', () => {
@@ -75,6 +75,6 @@ describe('computeStakePreview', () => {
       promisedWaitingPhases: 10n,
     });
     expect(preview.status).toBe('unavailable');
-    expect(preview.votesAdded).toBeUndefined();
+    expect(preview.govPowerAdded).toBeUndefined();
   });
 });

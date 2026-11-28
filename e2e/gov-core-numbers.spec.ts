@@ -8,6 +8,7 @@ import {
   formatUnits,
   http,
   parseAbi,
+  toFunctionSelector,
 } from 'viem';
 import {
   ANVIL_RPC,
@@ -18,6 +19,7 @@ import {
   snapshotChain,
   suspendMining,
 } from './chain';
+import { failReadsWithSelector } from './rpc-read-failure';
 import { ACCOUNTS, connect, installWallet, seedIdentity } from './wallet-stub';
 
 /**
@@ -63,7 +65,7 @@ import { ACCOUNTS, connect, installWallet, seedIdentity } from './wallet-stub';
  *   小数位按数量级自适应——|值| < 1 → 6 位、1–999 → 4 位、1e3–1e6 → 2 位、≥1e6 → 0 位，
  *   一律**截断不四舍五入**，整数部分千分位分组。`expectedAmount()` 是本文件里对这条规则的
  *   独立实现（故意不复用 `src/` 的格式化函数：页面格式化写错了，测试才会红）。
- * - `ceil` 口径一样从合约抄：推举门槛 `ceil(totalGovVotes * SUBMIT_MIN_RATIO / 1e18)`、
+ * - `ceil` 口径一样从合约抄：推举门槛 `ceil(totalGovPower * SUBMIT_MIN_RATIO / 1e18)`、
  *   提案激励门槛 `ceil(totalVoteAmount * PROPOSAL_REWARD_MIN_VOTE_RATIO / 1e18)`。
  *
  * ## 夹具
@@ -95,7 +97,7 @@ import { ACCOUNTS, connect, installWallet, seedIdentity } from './wallet-stub';
 const SHOTS = resolve(process.cwd(), 'docs/product/screenshots');
 const SYMBOL = 'TestLOVE20';
 const QUERY = `?symbol=${SYMBOL}`;
-/** 治理票 18 位小数（`Stake.govVotes`）。 */
+/** 治理权与治理票都精确到 18 位小数。 */
 const VOTE_DECIMALS = 18;
 /** 合约里的 `PRECISION`（`Submit.sol:17`、`Mint.sol:14`）。 */
 const PRECISION = 10n ** 18n;
@@ -104,7 +106,7 @@ const ACCOUNT = ACCOUNTS.withIdentity;
 const MEMBER_ID = '1';
 /** 本用例投出的票数（页面输入「票」，18 位小数展开）。 */
 const VOTE_AMOUNT = 100n * 10n ** BigInt(VOTE_DECIMALS);
-/** G7 里第二个提案的票数（一笔交易分给两个提案：100 + 50）。 */
+/** G7 里第二个提案先收到的票数。 */
 const HALF_VOTE_AMOUNT = 50n * 10n ** BigInt(VOTE_DECIMALS);
 /**
  * G7/G8 需要第二个有治理权的身份：8555 上只种了 member 1–5，其中 #4 持 memberId 5。
@@ -159,11 +161,12 @@ const PHASE_ABI = parseAbi([
 ]);
 const STAKE_ABI = parseAbi([
   'function stakeLiquidity(address tokenAddress, uint256 tokenAmount, uint256 parentTokenAmount, uint256 promisedWaitingPhases, uint256 memberId, uint256 deadline) returns (uint256, uint256)',
+  'function increasePromisedWaitingPhases(address tokenAddress, uint256 memberId, uint256 promisedWaitingPhases) returns (uint256)',
   'function stakeBoost(address tokenAddress, uint256 boostAmount, uint256 promisedWaitingPhases, uint256 memberId, uint256 deadline) returns (uint256)',
-  'function memberStake(address tokenAddress, uint256 memberId) view returns (uint256 liquidityShares, uint256 boostShares, uint256 promisedWaitingPhases, uint256 unlockRequestPhase, uint256 tokenAmountForLiquidity, uint256 parentTokenAmountForLiquidity, uint256 firstGovVoteRound)',
+  'function memberStake(address tokenAddress, uint256 memberId) view returns (uint256 liquidityShares, uint256 boostShares, uint256 promisedWaitingPhases, uint256 unlockRequestPhase, uint256 tokenAmountForLiquidity, uint256 parentTokenAmountForLiquidity, uint256 firstGovPowerRound)',
   'function boostStakeCap(address tokenAddress, uint256 memberId) view returns (uint256 memberCap, uint256 memberUsed)',
-  'function govVotes(address tokenAddress, uint256 round, uint256 memberId) view returns (uint256)',
-  'function totalGovVotes(address tokenAddress, uint256 round) view returns (uint256)',
+  'function govPower(address tokenAddress, uint256 round, uint256 memberId) view returns (uint256)',
+  'function totalGovPower(address tokenAddress, uint256 round) view returns (uint256)',
 ]);
 const VOTE_ABI = parseAbi([
   'function voterBoost(address tokenAddress, uint256 round, uint256 memberId) view returns (uint256)',
@@ -303,20 +306,20 @@ async function readPhaseInfo(target: bigint): Promise<{ startBlock: bigint; phas
   return { startBlock, phaseBlocks };
 }
 
-async function readGovVotes(target: bigint): Promise<bigint> {
+async function readGovPower(target: bigint): Promise<bigint> {
   return client.readContract({
     address: stake,
     abi: STAKE_ABI,
-    functionName: 'govVotes',
+    functionName: 'govPower',
     args: [tokenAddress, target, BigInt(MEMBER_ID)],
   });
 }
 
-async function readTotalGovVotes(target: bigint): Promise<bigint> {
+async function readTotalGovPower(target: bigint): Promise<bigint> {
   return client.readContract({
     address: stake,
     abi: STAKE_ABI,
-    functionName: 'totalGovVotes',
+    functionName: 'totalGovPower',
     args: [tokenAddress, target],
   });
 }
@@ -803,20 +806,20 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     await expect(page.getByTestId('gov-vote-list')).toHaveCount(0);
     await expect(page.getByTestId('gov-vote-receipt')).toHaveCount(0);
 
-    // 投票额度就是本轮的治理权（`Vote.maxVoteAmount` 内部读 `Stake.govVotes`）。
+    // 投票额度就是本轮的治理权（`Vote.maxVoteAmount` 内部读 `Stake.govPower`）。
     maxVoteAmount = await readMaxVoteAmount();
-    const govVotes = await readGovVotes(phase);
-    expect(maxVoteAmount, '本轮治理权应当来自 Stake.govVotes').toBe(govVotes);
+    const govPower = await readGovPower(phase);
+    expect(maxVoteAmount, '本轮票数上限应等于当前治理权').toBe(govPower);
     expect(maxVoteAmount, '种子仓位应当给 memberId 1 一笔可投票的治理权').toBeGreaterThan(0n);
     // owner 2026-11-22：额度卡只留「已投 / 还能投」两格（治理权 = 两者之和）；
     // 卡片上的数字仍与链上 `maxVoteAmount` 对得上（还没投时 还能投 = 额度）。
-    await expect(page.getByTestId('gov-vote-power-used')).toHaveText(expectedAmount(0n), {
+    await expect(page.getByTestId('gov-vote-quota-used')).toHaveText('0 票', {
       timeout: 30_000,
     });
-    await expect(page.getByTestId('gov-vote-power-remaining')).toHaveText(
-      expectedAmount(maxVoteAmount),
+    await expect(page.getByTestId('gov-vote-quota-remaining')).toHaveText(
+      `${expectedAmount(maxVoteAmount)} 票`,
     );
-    await expect(page.getByTestId('gov-vote-power-max')).toHaveCount(0);
+    await expect(page.getByTestId('gov-vote-quota-max')).toHaveCount(0);
     await expect(page.getByTestId('gov-vote-error')).toHaveCount(0);
 
     // ---- 2. /submit：资格 + 字节计数器 → 真实推举交易 → 回执 ----
@@ -825,15 +828,15 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     await expect(page.getByTestId('gov-submit-page-title')).toHaveText('推举新提案');
     await expect(page.getByTestId('gov-submit-eligibility')).toContainText('推举资格');
 
-    const totalGovVotes = await readTotalGovVotes(phase);
+    const totalGovPower = await readTotalGovPower(phase);
     const submitMinRatio = await readSubmitMinRatio();
-    const requiredVotes = ceilMulDiv(totalGovVotes, submitMinRatio, PRECISION);
+    const requiredGovPower = ceilMulDiv(totalGovPower, submitMinRatio, PRECISION);
     expect(await readCanSubmit(), '种子身份（治理权 = 社区 100%）应当满足推举门槛').toBe(true);
     await expect(page.getByTestId('gov-submit-eligibility')).toContainText('这一轮可以推举');
     // 可以推举时页面不渲染「为什么不能推举」的原因行，只写门槛数字。
     await expect(page.getByTestId('gov-submit-eligibility-reason')).toHaveCount(0);
     await expect(page.getByTestId('gov-submit-eligibility-threshold')).toHaveText(
-      `本轮推举门槛：${expectedAmount(requiredVotes)} 治理权`,
+      `本轮推举门槛：${expectedAmount(requiredGovPower)} 治理权`,
       { timeout: 30_000 },
     );
 
@@ -869,6 +872,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
       `你在本轮推举了提案 #${proposalId.toString()}「${TITLE}」，同一轮不能推举第二个。`,
     );
     await expect(page.getByTestId('gov-submit-form')).toHaveCount(0);
+    await expect(page.getByTestId('gov-submit-eligibility')).toHaveCount(0);
 
     // 回到历史列表页：本轮已经推举过 → 顶部给原因、行内只读、右上不再给「推举新提案」。
     await page.goto(`/submit${QUERY}`);
@@ -913,7 +917,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     await expect(page.getByTestId('gov-vote-detail-author')).toHaveText(`#${MEMBER_ID}`);
     await expect(page.getByTestId('gov-vote-detail-submitter')).toHaveText(`#${MEMBER_ID}`);
     // 还没人投过：当轮得票 0、两个占比 0%、未过激励阈值。
-    await expect(page.getByTestId('gov-vote-detail-total')).toHaveText('0');
+    await expect(page.getByTestId('gov-vote-detail-total')).toHaveText('0 票');
     await expect(page.getByTestId('gov-vote-detail-round-share')).toHaveText('0%');
     await expect(page.getByTestId('gov-vote-detail-gov-share')).toHaveText('0%');
     await expect(page.getByTestId('gov-vote-detail-threshold-state')).toHaveText('未过激励阈值');
@@ -942,7 +946,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     await expect(receiptLines.nth(0)).toHaveText(
       `提案 #${proposalId.toString()}：${expectedAmount(VOTE_AMOUNT)} 票`,
     );
-    await expect(receiptLines.nth(1)).toHaveText(`本轮合计投出 ${expectedAmount(VOTE_AMOUNT)} 票`);
+    await expect(receiptLines.nth(1)).toHaveText(`本次合计投出 ${expectedAmount(VOTE_AMOUNT)} 票`);
     await page.getByTestId('gov-vote-receipt-close').click();
     await expect(page.getByTestId('gov-vote-receipt')).toHaveCount(0);
 
@@ -953,7 +957,9 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     );
     // 投完之后：当轮得票 = 100；当轮总投票占比 100%（只有这一个提案）；
     // 100 票 >> 阈值（5% × 100 = 5 票）→ 已过激励阈值。
-    await expect(page.getByTestId('gov-vote-detail-total')).toHaveText(expectedAmount(VOTE_AMOUNT));
+    await expect(page.getByTestId('gov-vote-detail-total')).toHaveText(
+      `${expectedAmount(VOTE_AMOUNT)} 票`,
+    );
     await expect(page.getByTestId('gov-vote-detail-round-share')).toHaveText('100%');
     await expect(page.getByTestId('gov-vote-detail-threshold-state')).toHaveText('已过激励阈值');
     await page.getByTestId('gov-vote-detail-back').click();
@@ -975,7 +981,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     expect(await readTotalVoteAmount(round), '本轮总票数').toBe(VOTE_AMOUNT);
     expect(await readGovReward(round), '本轮第一次投票应当触发预留治理激励池').toBeGreaterThan(0n);
 
-    // 页面上的券额与提案行随 refetch 更新（不拿输入冒充链上结果）。
+    // 不重载页面：返回列表后，当轮额度和每项提案都应显示最新链上票数。
     await expect(page.getByTestId(`gov-vote-proposal-mine-${proposalId.toString()}`)).toHaveText(
       `我已投 ${expectedAmount(VOTE_AMOUNT)} 票`,
       { timeout: 30_000 },
@@ -983,9 +989,11 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     await expect(page.getByTestId(`gov-vote-proposal-total-${proposalId.toString()}`)).toHaveText(
       `该提案本轮共 ${expectedAmount(VOTE_AMOUNT)} 票`,
     );
-    await expect(page.getByTestId('gov-vote-power-used')).toHaveText(expectedAmount(VOTE_AMOUNT));
-    await expect(page.getByTestId('gov-vote-power-remaining')).toHaveText(
-      expectedAmount(maxVoteAmount - VOTE_AMOUNT),
+    await expect(page.getByTestId('gov-vote-quota-used')).toHaveText(
+      `${expectedAmount(VOTE_AMOUNT)} 票`,
+    );
+    await expect(page.getByTestId('gov-vote-quota-remaining')).toHaveText(
+      `${expectedAmount(maxVoteAmount - VOTE_AMOUNT)} 票`,
     );
   });
 
@@ -1033,11 +1041,11 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
           await expect(
             target.getByTestId(`gov-vote-proposal-mine-${proposalId.toString()}`),
           ).toHaveText(`我已投 ${expectedAmount(VOTE_AMOUNT)} 票`, { timeout: 30_000 });
-          await expect(target.getByTestId('gov-vote-power-used')).toHaveText(
-            expectedAmount(VOTE_AMOUNT),
+          await expect(target.getByTestId('gov-vote-quota-used')).toHaveText(
+            `${expectedAmount(VOTE_AMOUNT)} 票`,
           );
         },
-        'gov-vote-power',
+        'gov-vote-quota',
       );
 
       // 投票详情页（owner 2026-11-22）：快捷 25/50/100% + 自定义输入。
@@ -1307,9 +1315,12 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     // 「本轮可投」= 上面摘要卡的有效治理权、「未投」= 有效治理权 − 本轮已投、
     // 卡片头的轮次 = 记录行的轮次，三处都在同一页重复过，已全部删掉。
     await expect(page.getByTestId('gov-my-votes-max')).toHaveCount(0);
-    await expect(page.getByTestId('gov-my-votes-used')).toHaveText(expectedAmount(usedNow), {
-      timeout: 30_000,
-    });
+    await expect(page.getByTestId('gov-my-votes-used')).toHaveText(
+      `${expectedAmount(usedNow)} 票`,
+      {
+        timeout: 30_000,
+      },
+    );
     await expect(page.getByTestId('gov-my-votes-remaining')).toHaveCount(0);
     await expect(page.getByTestId('gov-my-votes-round')).toHaveCount(0);
 
@@ -1330,7 +1341,9 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
       '/gov',
       async (target) => {
         await expect(target.getByTestId('gov-my-votes-card')).toBeVisible({ timeout: 30_000 });
-        await expect(target.getByTestId('gov-my-votes-used')).toHaveText(expectedAmount(usedNow));
+        await expect(target.getByTestId('gov-my-votes-used')).toHaveText(
+          `${expectedAmount(usedNow)} 票`,
+        );
       },
       'gov-my-votes-card',
     );
@@ -1357,7 +1370,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
       const block = await client.getBlock();
       const deadline = block.timestamp + 600n;
 
-      // 1) 加速质押：金额取「上限内」的一个确定值（1,000 票或剩余额度，取小）。
+      // 1) 加速质押：取 1,000 枚社区代币与剩余额度的较小值。
       const [memberCap, memberUsed] = await client.readContract({
         address: stake,
         abi: STAKE_ABI,
@@ -1568,13 +1581,12 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
   });
 
   /**
-   * 用例 G7 · 多提案分票（走查覆盖缺口：G1 只投了 1 个提案，分配式投票从未跑过）。
+   * 用例 G7 · 多提案分票、当轮加票和切轮。
    *
-   * 夹具：同一轮里两个身份各推举一个提案（#0 → member1、#5 → member6），然后由 member1
-   * 用**一次交易**给两个提案分票（100 + 50），核对「逐提案票数 / 本轮已投 / 剩余额度 / 回执」。
-   * 夹具里的两笔推举走 anvil 未锁账户直接发交易（页面推举已由 G1 覆盖）。
+   * 同轮推举两个提案、分别投 100 和 50 票。提高治理权后在详情页再加 50 票。
+   * 进下一轮后检查旧提案停止投票、重新推举后恢复、已投归零和上一轮票数保持原值。
    */
-  test('用例 G7 · 治理核心：两个提案分别投票（100 + 50）后累加正确', async ({ page }) => {
+  test('用例 G7 · 治理核心：两项提案累加投票、提高治理权与自动切轮', async ({ page }) => {
     const snapshot = await snapshotChain();
     try {
       // G1 已经在它那一轮推举过 member1；同一身份每轮只能推举一个，所以这里强制换一轮
@@ -1617,11 +1629,11 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
       await expect(page.getByTestId(`gov-vote-proposal-mine-${p2.toString()}`)).toHaveText(
         `我已投 ${expectedAmount(HALF_VOTE_AMOUNT)} 票`,
       );
-      await expect(page.getByTestId('gov-vote-power-used')).toHaveText(
-        expectedAmount(VOTE_AMOUNT + HALF_VOTE_AMOUNT),
+      await expect(page.getByTestId('gov-vote-quota-used')).toHaveText(
+        `${expectedAmount(VOTE_AMOUNT + HALF_VOTE_AMOUNT)} 票`,
       );
-      await expect(page.getByTestId('gov-vote-power-remaining')).toHaveText(
-        expectedAmount(maxVote - VOTE_AMOUNT - HALF_VOTE_AMOUNT),
+      await expect(page.getByTestId('gov-vote-quota-remaining')).toHaveText(
+        `${expectedAmount(maxVote - VOTE_AMOUNT - HALF_VOTE_AMOUNT)} 票`,
       );
 
       // 详情页也一致（单提案口径）。
@@ -1631,7 +1643,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
         { timeout: 30_000 },
       );
       await expect(page.getByTestId('gov-vote-detail-total')).toHaveText(
-        expectedAmount(HALF_VOTE_AMOUNT),
+        `${expectedAmount(HALF_VOTE_AMOUNT)} 票`,
       );
 
       // 链上：逐提案票数、本轮已投、本轮总票数三者与页面一致。
@@ -1639,6 +1651,72 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
       expect(await readVoteByProposal(round, p2)).toBe(HALF_VOTE_AMOUNT);
       expect(await readVoteByMember(round)).toBe(VOTE_AMOUNT + HALF_VOTE_AMOUNT);
       expect(await readTotalVoteAmount(round)).toBe(VOTE_AMOUNT + HALF_VOTE_AMOUNT);
+
+      // 种子承诺期由 1 提到 2，本轮治理权翻倍，已经投出的 150 票照原数记。
+      const increase = await sendAs(
+        ACCOUNT,
+        stake,
+        encodeFunctionData({
+          abi: STAKE_ABI,
+          functionName: 'increasePromisedWaitingPhases',
+          args: [tokenAddress, BigInt(MEMBER_ID), 2n],
+        }),
+      );
+      expect(increase.status).toBe('success');
+      const increasedLimit = maxVote * 2n;
+      expect(await readMaxVoteAmount()).toBe(increasedLimit);
+      await expect(page.getByTestId('gov-vote-detail-hint')).toHaveText(
+        `最多可投 ${expectedAmount(increasedLimit - VOTE_AMOUNT - HALF_VOTE_AMOUNT)} 票`,
+        { timeout: 30_000 },
+      );
+      expect(await readVoteByMember(round)).toBe(VOTE_AMOUNT + HALF_VOTE_AMOUNT);
+
+      await page.getByTestId('gov-vote-detail-amount').fill('50');
+      await page.getByTestId('gov-vote-detail-submit').click();
+      const receipt = page.getByRole('dialog').getByTestId('gov-vote-receipt');
+      await expect(receipt).toBeVisible({ timeout: 60_000 });
+      await expect(receipt.locator('p')).toHaveText([
+        `提案 #${p2.toString()}：50 票`,
+        '本次合计投出 50 票',
+      ]);
+      await page.getByTestId('gov-vote-receipt-close').click();
+      await expect(page.getByTestId('gov-vote-detail-mine')).toHaveText('我已投 100 票');
+      const cumulative = VOTE_AMOUNT + 2n * HALF_VOTE_AMOUNT;
+      expect(await readVoteByMember(round)).toBe(cumulative);
+
+      // 停在旧提案详情上跨轮。旧提案未推举进新一轮，该页应自动停止接受投票。
+      await mineToNextPhase();
+      await expect(page.getByTestId('gov-vote-detail-round')).toHaveText(roundLabelOf(round + 1n), {
+        timeout: 30_000,
+      });
+      await expect(page.getByTestId('gov-vote-detail-not-submitted')).toBeVisible();
+      await expect(page.getByTestId('gov-vote-detail-submit')).toHaveCount(0);
+
+      // 另一个身份重新推举同一提案，停在详情页也能投票。
+      const submission = await sendAs(
+        ACCOUNT,
+        submit,
+        encodeFunctionData({
+          abi: SUBMIT_ABI,
+          functionName: 'submit',
+          args: [tokenAddress, BigInt(MEMBER_ID), p2, '0x'],
+        }),
+      );
+      expect(submission.status).toBe('success');
+      expect(await readIsSubmitted(round + 1n, p2)).toBe(true);
+      await expect(page.getByTestId('gov-vote-detail-submit')).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId('gov-vote-detail-submit')).toHaveText('投票');
+      await expect(page.getByTestId('gov-vote-detail-author')).toHaveText(`#${SECOND_MEMBER_ID}`);
+      await expect(page.getByTestId('gov-vote-detail-submitter')).toHaveText(`#${MEMBER_ID}`);
+      await page.getByTestId('gov-vote-detail-back').click();
+      await expect(page.getByTestId(`gov-vote-proposal-${p2}`)).toContainText(
+        `提案创建人 #${SECOND_MEMBER_ID}`,
+      );
+      await expect(page.getByTestId('gov-vote-quota-used')).toHaveText('0 票');
+      await expect(page.getByTestId('gov-vote-quota-remaining')).toHaveText(
+        `${expectedAmount(increasedLimit)} 票`,
+      );
+      expect(await readVoteByMember(round)).toBe(cumulative);
     } finally {
       await revertChain(snapshot);
     }
@@ -1651,7 +1729,12 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
    * 「推举历史提案」段把它推举进本轮——一笔 `Submit.submit(proposalId)`，
    * 回执来自 `ProposalSubmitted`，链上 `isSubmitted(本轮, 提案)` 变 true。
    */
-  test('用例 G12 · 治理核心：推举历史提案进本轮（submit(proposalId)）', async ({ page }) => {
+  test('用例 G12 · 治理核心：推举资格与推举历史提案进本轮', async ({
+    page,
+    browser,
+    contextOptions,
+    baseURL,
+  }) => {
     const snapshot = await snapshotChain();
     try {
       await mineToNextPhase();
@@ -1670,8 +1753,50 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
       const round = await readPhase();
       expect(round).toBeGreaterThan(seedRound);
 
+      // member2 没有流动性质押。历史页和直接访问新建页都应给出质押入口。
+      const ineligible = await browser.newContext({
+        ...contextOptions,
+        ...(baseURL === undefined ? {} : { baseURL }),
+      });
+      try {
+        const guest = await ineligible.newPage();
+        const member2 = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+        await installWallet(guest, member2);
+        await seedIdentity(guest, member2, '2');
+        await guest.goto(`/submit${QUERY}`);
+        await connect(guest);
+        const stakeLink = guest.getByTestId('gov-submit-history-stake');
+        await expect(stakeLink).toHaveText('去质押流动性');
+        await expect(stakeLink).toHaveAttribute('href', `/stake/liquidity${QUERY}`);
+        await expect(guest.getByTestId('gov-submit-history-new')).toHaveCount(0);
+        await expect(
+          guest.getByTestId(`gov-submit-history-action-${proposal.toString()}`),
+        ).toBeDisabled();
+        await guest.goto(`/submit/new${QUERY}`);
+        await connect(guest);
+        await expect(guest.getByTestId('gov-submit-eligibility-stake')).toHaveAttribute(
+          'href',
+          `/stake/liquidity${QUERY}`,
+        );
+        await expect(guest.getByTestId('gov-submit-submit')).toBeDisabled();
+      } finally {
+        await ineligible.close();
+      }
+
+      const restoreSubmissionReads = await failReadsWithSelector(
+        page,
+        toFunctionSelector('isSubmitted(address,uint256,uint256)'),
+      );
       await openPage(page, '/submit');
       await expect(page.getByTestId('gov-submit-history')).toBeVisible({ timeout: 30_000 });
+      const historyError = page.getByTestId('gov-submit-history-error');
+      await expect(historyError).toBeVisible();
+      await expect(
+        page.getByTestId(`gov-submit-history-action-${proposal.toString()}`),
+      ).toHaveCount(0);
+      await restoreSubmissionReads();
+      await historyError.getByTestId('gov-submit-history-retry').click();
+
       // 本轮还没推举 → 右上「推举新提案」在，列表给「推举」按钮。
       await expect(page.getByTestId('gov-submit-history-new')).toBeVisible();
       const row = page.getByTestId(`gov-submit-history-row-${proposal.toString()}`);
@@ -1701,6 +1826,72 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
         '本轮已推举',
         { timeout: 20_000 },
       );
+
+      // 留在同一页跨轮，确认本轮资格和各提案的推举状态一起切换。
+      await mineToNextPhase();
+      await expect(page.getByTestId('gov-submit-history-new')).toBeVisible({ timeout: 25_000 });
+      await expect(page.getByTestId('gov-submit-history-blocked')).toHaveCount(0);
+      await expect(action).toBeEnabled();
+      await expect(action).toHaveText('推举');
+    } finally {
+      await revertChain(snapshot);
+    }
+  });
+
+  test('用例 G13 · 阶段读取失败时，投票列表与详情都可以重试', async ({ page }) => {
+    const selector = toFunctionSelector('currentPhase()');
+    const restoreListReads = await failReadsWithSelector(page, selector);
+    await openPage(page, '/vote');
+    const listError = page.getByTestId('gov-vote-list-error');
+    await expect(listError).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('gov-vote-empty')).toHaveCount(0);
+    await restoreListReads();
+    await listError.getByTestId('gov-vote-list-retry').click();
+    await expect(page.getByTestId('gov-vote-quota')).toBeVisible({ timeout: 30_000 });
+
+    const restoreDetailReads = await failReadsWithSelector(page, selector);
+    await openPage(page, `/vote/${proposalId.toString()}`);
+    const detailError = page.getByTestId('gov-vote-detail-error');
+    await expect(detailError).toBeVisible({ timeout: 30_000 });
+    await restoreDetailReads();
+    await detailError.getByTestId('gov-vote-detail-retry').click();
+    await expect(page.getByTestId('gov-vote-detail-proposal')).toBeVisible({ timeout: 30_000 });
+  });
+
+  test('用例 G14 · 提案票数读取部分失败时，保留可用数据并可重试', async ({ page }) => {
+    const snapshot = await snapshotChain();
+    try {
+      await mineToNextPhase();
+      const currentRound = await readPhase();
+      const id = await seedProposal(currentRound, ACCOUNT, BigInt(MEMBER_ID), '票数读取重试');
+      const selector = toFunctionSelector('voteAmountByProposalId(address,uint256,uint256)');
+      const restoreListReads = await failReadsWithSelector(page, selector);
+      await openPage(page, '/vote');
+      const listError = page.getByTestId('gov-vote-proposal-votes-error');
+      await expect(listError).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId('gov-vote-quota-used')).toHaveText('0 票');
+      await expect(page.getByTestId(`gov-vote-proposal-mine-${id}`)).toHaveText('我已投 0 票');
+      await expect(page.getByTestId(`gov-vote-proposal-total-${id}`)).toHaveText('—');
+      await restoreListReads();
+      await listError.getByTestId('gov-vote-proposal-votes-retry').click();
+      await expect(page.getByTestId(`gov-vote-proposal-total-${id}`)).toHaveText(
+        '该提案本轮共 0 票',
+      );
+      await expect(listError).toHaveCount(0);
+
+      const restoreDetailReads = await failReadsWithSelector(page, selector);
+      await openPage(page, `/vote/${id}`);
+      const detailError = page.getByTestId('gov-vote-detail-votes-error');
+      await expect(detailError).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId('gov-vote-detail-submit')).toBeVisible();
+      await expect(page.getByTestId('gov-vote-detail-mine')).toHaveText('我已投 0 票');
+      await expect(page.getByTestId('gov-vote-detail-total')).toHaveText('—');
+      await restoreDetailReads();
+      await detailError.getByTestId('gov-vote-detail-votes-retry').click();
+      await expect(page.getByTestId('gov-vote-detail-total')).toHaveText(
+        `${expectedAmount(await readVoteByProposal(currentRound, id))} 票`,
+      );
+      await expect(detailError).toHaveCount(0);
     } finally {
       await revertChain(snapshot);
     }
@@ -1724,7 +1915,7 @@ test.describe('治理域 core 前端线（推举 / 投票 / 治理激励 / 提�
     ).toContainText(`#${proposalId.toString()} ${TITLE}`);
     await expect(
       page.getByTestId(`gov-vote-records-mine-${round.toString()}-${proposalId.toString()}`),
-    ).toHaveText(`我的投票 ${expectedAmount(VOTE_AMOUNT)}`);
+    ).toHaveText(`我的投票 ${expectedAmount(VOTE_AMOUNT)} 票`);
     const proposalVotes = (await client.readContract({
       address: deployment.addresses.vote,
       abi: VOTE_ABI,

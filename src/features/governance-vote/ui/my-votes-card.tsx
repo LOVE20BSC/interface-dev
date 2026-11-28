@@ -1,16 +1,15 @@
 import { Link } from 'react-router-dom';
 import type { HexAddress } from '@/config/networks';
+import { VOTE_DECIMALS } from '@/domain/gov-core';
 import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount } from '@/shared/lib/format';
 import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { useMyVotes } from '@/entities/gov-core/model/use-my-votes';
-import { useVotePower } from '@/entities/gov-core/model/use-vote-power';
+import { useVoteQuota } from '@/entities/gov-core/model/use-vote-quota';
 import { MyVoteRounds } from './my-vote-rounds';
 
-/** 治理票是 18 位小数的数量（`Stake.govVotes`）。 */
-const VOTE_DECIMALS = 18;
 /** 卡片只预览最近两轮，完整记录在 `/vote/records`（owner 2026-11-21）。 */
 const PREVIEW_ROUNDS = 2;
 
@@ -38,7 +37,7 @@ export interface MyVotesCardProps {
  * 读失败给「读不到 + 重试」，不把未知渲染成 0（硬规则 4）。
  */
 export function MyVotesCard({ tokenAddress, memberId, round, symbol }: MyVotesCardProps) {
-  const power = useVotePower(tokenAddress, round, memberId, []);
+  const quota = useVoteQuota(tokenAddress, round, memberId);
   const votes = useMyVotes(tokenAddress, {
     memberId,
     currentPhase: round,
@@ -46,7 +45,7 @@ export function MyVotesCard({ tokenAddress, memberId, round, symbol }: MyVotesCa
   });
 
   const q = `?symbol=${encodeURIComponent(symbol)}`;
-  const remaining = power.remaining;
+  const remaining = quota.remaining;
   const hasRecord = votes.rounds.length > 0;
 
   return (
@@ -60,16 +59,28 @@ export function MyVotesCard({ tokenAddress, memberId, round, symbol }: MyVotesCa
         - 卡片头右侧的「治理第 N 轮」也删掉：记录行本身带轮次，同轮会在同一张卡上出现两次。
         还有多少票可投由下面按钮承载（「去投票」/「本轮票已经投完」）。
       */}
-      <div className="mt-3">
-        <Stat
-          label={copy.gov.myVotes.statVoted}
-          value={formatTokenAmount(power.usedVoteAmount, VOTE_DECIMALS)}
-          testId="gov-my-votes-used"
-        />
-      </div>
+      {quota.status === 'loading' || quota.status === 'error' ? null : (
+        <div className="mt-3">
+          <p className="text-xs text-muted">{copy.gov.myVotes.statVoted}</p>
+          <p className="mt-1 text-base font-medium text-foreground" data-testid="gov-my-votes-used">
+            {quota.usedVoteAmount === undefined
+              ? copy.common.unknown
+              : copy.gov.vote.count(formatTokenAmount(quota.usedVoteAmount, VOTE_DECIMALS))}
+          </p>
+        </div>
+      )}
 
       <div className="mt-3">
-        {power.status === 'ready' && power.maxVoteAmount === 0n ? (
+        {quota.status === 'error' ? (
+          <>
+            <CardDescription>{copy.gov.vote.quotaReadFailed}</CardDescription>
+            <Button variant="secondary" size="sm" className="mt-2" onClick={quota.refetch}>
+              {copy.gov.vote.retry}
+            </Button>
+          </>
+        ) : quota.status === 'loading' ? (
+          <Skeleton className="h-10 w-full" />
+        ) : quota.status === 'ready' && quota.maxVoteAmount === 0n ? (
           <p className="text-xs leading-5 text-muted" data-testid="gov-my-votes-no-power">
             {copy.gov.myVotes.noPower}
           </p>
@@ -81,11 +92,11 @@ export function MyVotesCard({ tokenAddress, memberId, round, symbol }: MyVotesCa
           >
             {copy.gov.myVotes.goVote}
           </Link>
-        ) : (
+        ) : remaining === 0n ? (
           <Button type="button" variant="secondary" size="md" className="w-full" disabled>
             {copy.gov.myVotes.allVoted}
           </Button>
-        )}
+        ) : null}
       </div>
 
       <div className="mt-4 border-t border-line pt-3">
@@ -129,25 +140,5 @@ export function MyVotesCard({ tokenAddress, memberId, round, symbol }: MyVotesCa
         )}
       </div>
     </Card>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  testId,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly testId: string;
-}) {
-  return (
-    <div>
-      <p className="text-xs text-muted">{label}</p>
-      <p className="mt-1 text-base font-medium text-foreground" data-testid={testId}>
-        {value}
-      </p>
-      <p className="text-xs text-muted">{copy.gov.myVotes.unit}</p>
-    </div>
   );
 }

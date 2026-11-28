@@ -2,28 +2,28 @@ import { describe, expect, it } from 'vitest';
 import {
   boostAmountFitsCap,
   boostRemainingCap,
-  govVotesOf,
-  increasedPromisedWaitingPhasesVotes,
+  govPowerOf,
+  govPowerAddedByIncreasingPhases,
   isPromisedWaitingPhasesInRange,
   liquiditySharesAdded,
   optimalAmounts,
   phasesToDuration,
   phasesToMinutes,
-  projectedGovVotesAdded,
-  projectedLiquidityGovVotes,
+  projectedGovPowerAdded,
+  projectedLiquidityGovPower,
   stakeUnlockState,
 } from './gov-stake';
 
-describe('govVotesOf', () => {
+describe('govPowerOf', () => {
   it('multiplies shares by the promised waiting phases', () => {
-    expect(govVotesOf(0n, 5n)).toBe(0n);
-    expect(govVotesOf(1n, 1n)).toBe(1n);
-    expect(govVotesOf(1_000n, 3n)).toBe(3_000n);
+    expect(govPowerOf(0n, 5n)).toBe(0n);
+    expect(govPowerOf(1n, 1n)).toBe(1n);
+    expect(govPowerOf(1_000n, 3n)).toBe(3_000n);
   });
 
   it('keeps 19-22 digit amounts exact instead of going through number', () => {
-    expect(govVotesOf(1_234_567_890_123_456_789n, 3n)).toBe(3_703_703_670_370_370_367n);
-    expect(govVotesOf(1_234_567_890_123_456_789_012n, 100n)).toBe(123_456_789_012_345_678_901_200n);
+    expect(govPowerOf(1_234_567_890_123_456_789n, 3n)).toBe(3_703_703_670_370_370_367n);
+    expect(govPowerOf(1_234_567_890_123_456_789_012n, 100n)).toBe(123_456_789_012_345_678_901_200n);
   });
 });
 
@@ -160,23 +160,23 @@ describe('liquiditySharesAdded', () => {
   });
 });
 
-describe('projectedLiquidityGovVotes', () => {
-  it('counts votes on the post-deposit share total', () => {
+describe('projectedLiquidityGovPower', () => {
+  it('counts governance power on the post-deposit share total', () => {
     expect(
-      projectedLiquidityGovVotes({
+      projectedLiquidityGovPower({
         currentLiquidityShares: 1_000n,
-        currentGovVotes: 3_000n,
+        currentGovPower: 3_000n,
         sharesAdded: 234n,
         promisedWaitingPhases: 3n,
       }),
     ).toBe(3_702n);
   });
 
-  it('returns the current votes when nothing is added', () => {
+  it('returns the current governance power when nothing is added', () => {
     expect(
-      projectedLiquidityGovVotes({
+      projectedLiquidityGovPower({
         currentLiquidityShares: 1_234_567_890_123_456_789n,
-        currentGovVotes: 2_469_135_780_246_913_578n,
+        currentGovPower: 2_469_135_780_246_913_578n,
         sharesAdded: 0n,
         promisedWaitingPhases: 2n,
       }),
@@ -185,9 +185,9 @@ describe('projectedLiquidityGovVotes', () => {
 
   it('stays 0 for an empty member with no deposit', () => {
     expect(
-      projectedLiquidityGovVotes({
+      projectedLiquidityGovPower({
         currentLiquidityShares: 0n,
-        currentGovVotes: 0n,
+        currentGovPower: 0n,
         sharesAdded: 0n,
         promisedWaitingPhases: 100n,
       }),
@@ -195,12 +195,12 @@ describe('projectedLiquidityGovVotes', () => {
   });
 });
 
-describe('projectedGovVotesAdded', () => {
-  it('subtracts the current votes from the projected total', () => {
+describe('projectedGovPowerAdded', () => {
+  it('subtracts the current governance power from the projected total', () => {
     expect(
-      projectedGovVotesAdded({
+      projectedGovPowerAdded({
         currentLiquidityShares: 1_000n,
-        currentGovVotes: 3_000n,
+        currentGovPower: 3_000n,
         sharesAdded: 234n,
         promisedWaitingPhases: 3n,
       }),
@@ -208,11 +208,11 @@ describe('projectedGovVotesAdded', () => {
   });
 
   it('returns 0 instead of a negative delta when the phases shrank', () => {
-    // Before: 10 shares × 3 phases = 30 votes. After: 10 shares × 2 phases = 20.
+    // Before: 10 shares × 3 phases = 30 governance power. After: 10 shares × 2 phases = 20.
     expect(
-      projectedGovVotesAdded({
+      projectedGovPowerAdded({
         currentLiquidityShares: 10n,
-        currentGovVotes: 30n,
+        currentGovPower: 30n,
         sharesAdded: 0n,
         promisedWaitingPhases: 2n,
       }),
@@ -220,20 +220,20 @@ describe('projectedGovVotesAdded', () => {
 
     // A deposit cannot rescue it either: 8 shares × 4 phases = 32 < 35.
     expect(
-      projectedGovVotesAdded({
+      projectedGovPowerAdded({
         currentLiquidityShares: 7n,
-        currentGovVotes: 35n,
+        currentGovPower: 35n,
         sharesAdded: 1n,
         promisedWaitingPhases: 4n,
       }),
     ).toBe(0n);
   });
 
-  it('returns 0 when the projected total equals the current votes', () => {
+  it('returns 0 when the projected total equals the current governance power', () => {
     expect(
-      projectedGovVotesAdded({
+      projectedGovPowerAdded({
         currentLiquidityShares: 10n,
-        currentGovVotes: 40n,
+        currentGovPower: 40n,
         sharesAdded: 0n,
         promisedWaitingPhases: 4n,
       }),
@@ -243,9 +243,9 @@ describe('projectedGovVotesAdded', () => {
   it('keeps 22 digit deltas exact', () => {
     // (1234567890123456789012 + 1) × 100 - 123456789012345678901200 = 100
     expect(
-      projectedGovVotesAdded({
+      projectedGovPowerAdded({
         currentLiquidityShares: 1_234_567_890_123_456_789_012n,
-        currentGovVotes: 123_456_789_012_345_678_901_200n,
+        currentGovPower: 123_456_789_012_345_678_901_200n,
         sharesAdded: 1n,
         promisedWaitingPhases: 100n,
       }),
@@ -253,10 +253,10 @@ describe('projectedGovVotesAdded', () => {
   });
 });
 
-describe('increasedPromisedWaitingPhasesVotes', () => {
+describe('govPowerAddedByIncreasingPhases', () => {
   it('charges the phase difference against the current shares', () => {
     expect(
-      increasedPromisedWaitingPhasesVotes({
+      govPowerAddedByIncreasingPhases({
         liquidityShares: 1_000n,
         previousPhases: 2n,
         nextPhases: 5n,
@@ -266,7 +266,7 @@ describe('increasedPromisedWaitingPhasesVotes', () => {
 
   it('keeps 19 digit shares exact', () => {
     expect(
-      increasedPromisedWaitingPhasesVotes({
+      govPowerAddedByIncreasingPhases({
         liquidityShares: 1_234_567_890_123_456_789n,
         previousPhases: 2n,
         nextPhases: 5n,
@@ -276,21 +276,21 @@ describe('increasedPromisedWaitingPhasesVotes', () => {
 
   it('returns 0 when the phases do not increase', () => {
     expect(
-      increasedPromisedWaitingPhasesVotes({
+      govPowerAddedByIncreasingPhases({
         liquidityShares: 1_000n,
         previousPhases: 5n,
         nextPhases: 5n,
       }),
     ).toBe(0n);
     expect(
-      increasedPromisedWaitingPhasesVotes({
+      govPowerAddedByIncreasingPhases({
         liquidityShares: 1_000n,
         previousPhases: 5n,
         nextPhases: 2n,
       }),
     ).toBe(0n);
     expect(
-      increasedPromisedWaitingPhasesVotes({
+      govPowerAddedByIncreasingPhases({
         liquidityShares: 0n,
         previousPhases: 0n,
         nextPhases: 100n,

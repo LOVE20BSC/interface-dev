@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
 import {
+  VOTE_DECIMALS,
   isProposalRewardEligible,
   minProposalVoteAmount,
   validateVoteAllocation,
@@ -17,11 +18,11 @@ import { Sheet } from '@/shared/ui/sheet';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import type { ProposalDetail } from '@/entities/gov-core/model/use-proposal-detail';
-import type { VotePower } from '@/entities/gov-core/model/use-vote-power';
+import type { VoteQuota } from '@/entities/gov-core/model/use-vote-quota';
 import { parseVoteAmount } from '../lib/vote-form';
 import { VOTE_QUICK_PERCENTS, votesForPercent, votesToInputText } from '../lib/vote-share';
 import type { VoteWrite } from '../model/use-vote-write';
-import { VOTE_DECIMALS, VotePowerCard } from './vote-power-card';
+import { VoteQuotaCard } from './vote-quota-card';
 
 export interface VoteDetailPanelProps {
   readonly voteAddress: HexAddress;
@@ -30,7 +31,7 @@ export interface VoteDetailPanelProps {
   readonly symbol: string;
   readonly roundLabel: string;
   readonly detail: ProposalDetail;
-  readonly power: VotePower;
+  readonly quota: VoteQuota;
   readonly write: VoteWrite;
   readonly onRefetch: () => void;
 }
@@ -49,16 +50,18 @@ export function VoteDetailPanel({
   symbol,
   roundLabel,
   detail,
-  power,
+  quota,
   write,
   onRefetch,
 }: VoteDetailPanelProps) {
   const [raw, setRaw] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const remaining = power.remaining;
+  const remaining = quota.remaining;
   const busy = write.stage !== 'idle' || write.receipt !== null;
   const parsed = parseVoteAmount(raw);
+  const isSubmitted = detail.submitterId !== undefined && detail.submitterId > 0n;
+  const supportsVoting = detail.targetMode === 0;
   const allocationIssue =
     parsed.kind === 'ok'
       ? validateVoteAllocation(
@@ -68,6 +71,8 @@ export function VoteDetailPanel({
       : null;
   const canSubmit =
     detail.status === 'ready' &&
+    isSubmitted &&
+    supportsVoting &&
     !busy &&
     remaining !== undefined &&
     remaining > 0n &&
@@ -88,6 +93,7 @@ export function VoteDetailPanel({
       setLocalError(copy.gov.vote.amountTooMany(formatTokenAmount(remaining ?? 0n, VOTE_DECIMALS)));
       return;
     }
+    if (!canSubmit) return;
     write.submit({
       voteAddress,
       tokenAddress,
@@ -114,7 +120,8 @@ export function VoteDetailPanel({
 
   if (detail.status === 'loading' || detail.status === 'unconfigured') {
     return (
-      <div className="space-y-2" data-testid="gov-vote-detail-loading">
+      <div aria-busy="true" className="space-y-2" data-testid="gov-vote-detail-loading">
+        <span className="sr-only">{copy.common.loading}</span>
         <Skeleton className="h-5 w-40" />
         <Skeleton className="h-24 w-full" />
       </div>
@@ -124,24 +131,43 @@ export function VoteDetailPanel({
   if (detail.status === 'error') {
     return (
       <Card data-testid="gov-vote-detail-error">
-        <CardDescription>{copy.gov.vote.detail.readFailed}</CardDescription>
-        <Button type="button" variant="secondary" size="md" className="mt-3" onClick={onRefetch}>
+        <CardDescription role="alert">{copy.gov.vote.detail.readFailed}</CardDescription>
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          className="mt-3"
+          data-testid="gov-vote-detail-retry"
+          onClick={onRefetch}
+        >
           {copy.gov.vote.detail.retry}
         </Button>
       </Card>
     );
   }
 
-  const noPower = power.status === 'ready' && power.maxVoteAmount === 0n;
+  const noPower = quota.status === 'ready' && quota.maxVoteAmount === 0n;
   const exhausted = !noPower && remaining === 0n;
 
   return (
     <div className="space-y-4">
       {/* 0. 投多少票：输入 + 快捷百分比 + 提交（owner 2026-11-22 布局） */}
-      {noPower ? (
-        <VotePowerCard power={power} symbol={symbol} testId="gov-vote-detail-power" />
-      ) : null}
-      {exhausted ? (
+      {detail.submitterId === undefined || quota.status === 'loading' ? (
+        <div aria-busy="true">
+          <span className="sr-only">{copy.common.loading}</span>
+          <Skeleton className="h-24 w-full" />
+        </div>
+      ) : !isSubmitted ? (
+        <Card data-testid="gov-vote-detail-not-submitted">
+          <CardDescription>{copy.gov.vote.detail.notSubmitted}</CardDescription>
+        </Card>
+      ) : !supportsVoting ? (
+        <Card>
+          <CardDescription>{copy.gov.vote.targetUnsupported}</CardDescription>
+        </Card>
+      ) : quota.status === 'error' || noPower ? (
+        <VoteQuotaCard quota={quota} symbol={symbol} testId="gov-vote-detail-quota" />
+      ) : exhausted ? (
         <Card data-testid="gov-vote-detail-exhausted">
           <CardDescription>{copy.gov.vote.quotaUsed}</CardDescription>
           <Link
@@ -151,8 +177,7 @@ export function VoteDetailPanel({
             {copy.gov.vote.noPowerAction}
           </Link>
         </Card>
-      ) : null}
-      {noPower || exhausted ? null : (
+      ) : (
         <Card data-testid="gov-vote-detail-quick">
           <label htmlFor="gov-vote-detail-amount" className="block text-xs font-medium text-muted">
             {copy.gov.vote.amountLabel}
@@ -299,7 +324,7 @@ function ProposalInfoCard({
       ? undefined
       : isProposalRewardEligible(votes, thresholdVotes);
   const roundShare = formatSharePercent(votes, detail.roundTotalVotes);
-  const govShare = formatSharePercent(votes, detail.roundGovVotes);
+  const govShare = formatSharePercent(votes, detail.roundGovPower);
   const ratioText = formatSharePercent(detail.minVoteRatio, 10n ** 18n);
 
   return (
@@ -348,7 +373,7 @@ function ProposalInfoCard({
             className="mt-0.5 font-medium text-foreground"
             data-testid="gov-vote-detail-submitter"
           >
-            {detail.submitterId === undefined
+            {detail.submitterId === undefined || detail.submitterId === 0n
               ? copy.common.unknown
               : `#${detail.submitterId.toString()}`}
           </dd>
@@ -356,61 +381,99 @@ function ProposalInfoCard({
       </dl>
 
       {/* 3. 当轮得票 + 两个占比（阈值状态） */}
-      <div className="mt-4 space-y-2 border-t border-line pt-3 text-xs leading-5">
+      <div
+        aria-busy={detail.votesStatus === 'loading' || undefined}
+        className="mt-4 space-y-2 border-t border-line pt-3 text-xs leading-5"
+      >
+        {detail.votesStatus === 'error' ? (
+          <div data-testid="gov-vote-detail-votes-error">
+            <p role="alert" className="text-danger-strong">
+              {copy.gov.vote.detail.votesReadFailed}
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="mt-2"
+              data-testid="gov-vote-detail-votes-retry"
+              onClick={detail.refetchVotes}
+            >
+              {copy.gov.vote.detail.retry}
+            </Button>
+          </div>
+        ) : null}
         <p className="text-muted">
           <span data-testid="gov-vote-detail-round">{roundLabel}</span>
           {' · '}
           {copy.gov.vote.detail.roundVotesLabel}{' '}
-          <span className="font-semibold text-foreground" data-testid="gov-vote-detail-total">
-            {votes === undefined ? copy.common.unknown : formatTokenAmount(votes, VOTE_DECIMALS)}
-          </span>{' '}
-          {copy.gov.vote.powerUnit}
-        </p>
-        <p className="text-muted" data-testid="gov-vote-detail-mine">
-          {detail.mine === undefined
-            ? copy.common.unknown
-            : copy.gov.vote.myVotesOn(formatTokenAmount(detail.mine, VOTE_DECIMALS))}
-        </p>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-muted">{copy.gov.vote.detail.roundShareLabel}</span>
-          <span className="flex items-center gap-2">
-            <span
-              className="font-semibold text-foreground"
-              data-testid="gov-vote-detail-round-share"
-            >
-              {roundShare === undefined ? copy.common.unknown : `${roundShare}%`}
+          {detail.votesStatus === 'loading' && votes === undefined ? (
+            <Skeleton className="inline-block h-3 w-12 align-middle" />
+          ) : (
+            <span className="font-semibold text-foreground" data-testid="gov-vote-detail-total">
+              {votes === undefined
+                ? copy.common.unknown
+                : copy.gov.vote.count(formatTokenAmount(votes, VOTE_DECIMALS))}
             </span>
-            <Badge
-              tone={passed === true ? 'success' : passed === false ? 'warning' : 'neutral'}
-              data-testid="gov-vote-detail-threshold-state"
-            >
-              {passed === true
-                ? copy.gov.vote.detail.thresholdPassed
-                : passed === false
-                  ? copy.gov.vote.detail.thresholdFailed
-                  : copy.gov.vote.detail.thresholdUnknown}
-            </Badge>
-          </span>
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-muted">{copy.gov.vote.detail.govShareLabel}</span>
-          <span className="flex items-center gap-2">
-            <span className="font-semibold text-foreground" data-testid="gov-vote-detail-gov-share">
-              {govShare === undefined ? copy.common.unknown : `${govShare}%`}
-            </span>
-            <Badge tone="neutral" data-testid="gov-vote-detail-gov-share-badge">
-              {copy.gov.vote.detail.referenceBadge}
-            </Badge>
-          </span>
-        </div>
-        <p className="text-[11px] leading-4 text-muted" data-testid="gov-vote-detail-threshold">
-          {ratioText === undefined || thresholdVotes === undefined
-            ? copy.gov.vote.detail.thresholdUnknown
-            : copy.gov.vote.detail.thresholdLine(
-                `${ratioText}%`,
-                formatTokenAmount(thresholdVotes, VOTE_DECIMALS),
-              )}
+          )}
         </p>
+        {detail.votesStatus === 'loading' ? (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-full" />
+            <span className="sr-only">{copy.common.loading}</span>
+          </div>
+        ) : (
+          <>
+            <p className="text-muted" data-testid="gov-vote-detail-mine">
+              {detail.mine === undefined
+                ? copy.common.unknown
+                : copy.gov.vote.myVotesOn(formatTokenAmount(detail.mine, VOTE_DECIMALS))}
+            </p>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted">{copy.gov.vote.detail.roundShareLabel}</span>
+              <span className="flex items-center gap-2">
+                <span
+                  className="font-semibold text-foreground"
+                  data-testid="gov-vote-detail-round-share"
+                >
+                  {roundShare === undefined ? copy.common.unknown : `${roundShare}%`}
+                </span>
+                <Badge
+                  tone={passed === true ? 'success' : passed === false ? 'warning' : 'neutral'}
+                  data-testid="gov-vote-detail-threshold-state"
+                >
+                  {passed === true
+                    ? copy.gov.vote.detail.thresholdPassed
+                    : passed === false
+                      ? copy.gov.vote.detail.thresholdFailed
+                      : copy.gov.vote.detail.thresholdUnknown}
+                </Badge>
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-muted">{copy.gov.vote.detail.govShareLabel}</span>
+              <span className="flex items-center gap-2">
+                <span
+                  className="font-semibold text-foreground"
+                  data-testid="gov-vote-detail-gov-share"
+                >
+                  {govShare === undefined ? copy.common.unknown : `${govShare}%`}
+                </span>
+                <Badge tone="neutral" data-testid="gov-vote-detail-gov-share-badge">
+                  {copy.gov.vote.detail.referenceBadge}
+                </Badge>
+              </span>
+            </div>
+            <p className="text-[11px] leading-4 text-muted" data-testid="gov-vote-detail-threshold">
+              {ratioText === undefined || thresholdVotes === undefined
+                ? copy.gov.vote.detail.thresholdUnknown
+                : copy.gov.vote.detail.thresholdLine(
+                    `${ratioText}%`,
+                    formatTokenAmount(thresholdVotes, VOTE_DECIMALS),
+                  )}
+            </p>
+          </>
+        )}
       </div>
     </Card>
   );

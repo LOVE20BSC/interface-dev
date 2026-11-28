@@ -5,7 +5,7 @@
 // 直连验证链（默认 http://127.0.0.1:8566，即本任务专用链；支持 VERIFY_RPC 覆盖），
 // 用 viem test client 走 anvil 的 unlocked 账户发交易，逐 wei 断言
 // docs/product/three-line/gov-stake.md §1 的理论值（期望值全部是本文件里写死的常量，
-// 来自 §1 的公式手算；`boostStakeCap` / `memberStake` / `totalStake` / `govVotes` 这些
+// 来自 §1 的公式手算；`boostStakeCap` / `memberStake` / `totalStake` / `govPower` 这些
 // view 只作为「交叉核对」出现在断言标签里，不参与期望值计算）。
 //
 // 每个用例前后 snapshot/revert，跑完链上状态与跑前完全一致。绝不触碰 8545（人工链）
@@ -13,6 +13,9 @@
 //
 // 退出码非 0 = 失败。
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   createTestClient,
   decodeErrorResult,
@@ -25,14 +28,27 @@ import {
 
 const RPC = (process.env.VERIFY_RPC ?? 'http://127.0.0.1:8566').replace(/\/+$/, '');
 const CHAIN_ID = 31337;
+const { port } = new URL(RPC);
+if (port === '8545' || port === '8555') {
+  throw new Error(`端口 ${port} 留给人工或全量测试，请用专用验证链 8566。`);
+}
 
-// §0 地址簿（../anvil/export/deployments/anvil31337_dev.json，端口不影响地址）
-const STAKE = '0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e';
-const MEMBER_NFT = '0x610178dA211FEF7D417bC0e6FeD39F05609AD788';
-const TOKEN = '0x8aCd85898458400f7Db866d53FCFF6f0D49741FF'; // TestLOVE20
-const WETH = '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9'; // TestWETH（WETH9）
-const PAIR = '0x3FC12a5abAe69C8Eee58C37cEDC266751507620D';
-const PHASE = '0xa513E6E4b8f2a923D98304ec87F64353C4D5C853';
+// 地址来自 Anvil 部署导出，理论值从文档的种子状态独立推导。
+const EXPORT_DIR = resolve(
+  process.env.ANVIL_EXPORT_DIR ??
+    fileURLToPath(new URL(`../../../anvil/.anvil/${port}/export/`, import.meta.url)),
+);
+const { addresses } = JSON.parse(
+  readFileSync(resolve(EXPORT_DIR, 'deployments/anvil31337_dev.json'), 'utf8'),
+);
+const {
+  STAKE_ADDRESS: STAKE,
+  MEMBER_NFT_ADDRESS: MEMBER_NFT,
+  LOVE20_TOKEN_ADDRESS: TOKEN,
+  WETH_ADDRESS: WETH,
+  UNISWAP_V2_PAIR_ADDRESS: PAIR,
+  PHASE_ADDRESS: PHASE,
+} = addresses;
 
 // anvil 固定账户（mnemonic `test test … junk`）
 const ACCOUNT_0 = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
@@ -55,7 +71,7 @@ const T = {
   LIQ0: 200000000000000000000000n,
   SEED_TOKEN_AMOUNT: 199999999999999999955278n,
   SEED_PARENT_AMOUNT: 99999999999999999977n,
-  SEED_VOTES: 4472135954999579391818n,
+  SEED_GOV_POWER: 4472135954999579391818n,
   TOKEN_SUPPLY: 999995499999099999909999997n,
   MAX_SUPPLY: 10000000000000000000000000000n,
 
@@ -67,8 +83,8 @@ const T = {
   C1_P: 500000000000000000n,
   C1_LP: 22360679774997896964n,
   C1_SHARES: 22360679774997896964n,
-  C1_VOTES_ADDED: 223606797749978969640n,
-  C1_MEMBER_VOTES: 223606797749978969640n,
+  C1_GOV_POWER_ADDED: 223606797749978969640n,
+  C1_MEMBER_GOV_POWER: 223606797749978969640n,
   C1_TLS: 4494496634774577288782n,
   C1_WLP: 4494496634774577288782n,
   C1_LIQ: 201000000000000000000000n,
@@ -82,7 +98,7 @@ const T = {
   C1_PAIR_SUPPLY: 4494496634774577289782n,
   C1_R_T: 201000000000000000000000n,
   C1_R_P: 100500000000000000000n,
-  C1_TOTAL_VOTES: 4695742752749558361458n,
+  C1_TOTAL_GOV_POWER: 4695742752749558361458n,
 
   // 用例 C2（加速质押 = 上限的一半；clean bootstrap 基线下 memberCap 为偶数 → 恰好整除，余 0）
   C2_MINTED_SHARE: 20099909549981909998190n,
@@ -94,12 +110,12 @@ const T = {
 
   // 用例 C3（承诺解锁期 10 → 25）
   C3_PHASES: 25n,
-  C3_VOTES_ADDED: 335410196624968454460n,
-  C3_MEMBER_VOTES: 559016994374947424100n,
-  C3_TOTAL_VOTES: 5031152949374526815918n,
+  C3_GOV_POWER_ADDED: 335410196624968454460n,
+  C3_MEMBER_GOV_POWER: 559016994374947424100n,
+  C3_TOTAL_GOV_POWER: 5031152949374526815918n,
 
   // 用例 C4（申请解锁 + 到期撤出）
-  C4_VOTES_REMOVED: 559016994374947424100n,
+  C4_GOV_POWER_REMOVED: 559016994374947424100n,
   C4_LP_AMOUNT: 22360679774997896964n,
   C4_TOKEN_OUT: 999999999999999999995n,
   C4_PARENT_OUT: 499999999999999999n,
@@ -139,10 +155,10 @@ const stakeAbi = parseAbi([
   'function memberStake(address,uint256) view returns (uint256,uint256,uint256,uint256,uint256,uint256,uint256)',
   'function totalStake(address) view returns (uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)',
   'function liquidityTokenAmount(address) view returns (uint256)',
-  'function govVotes(address,uint256,uint256) view returns (uint256)',
-  'function totalGovVotes(address,uint256) view returns (uint256)',
-  'function totalGovVotesAdded(address,uint256) view returns (uint256)',
-  'function totalGovVotesRemoved(address,uint256) view returns (uint256)',
+  'function govPower(address,uint256,uint256) view returns (uint256)',
+  'function totalGovPower(address,uint256) view returns (uint256)',
+  'function totalGovPowerAdded(address,uint256) view returns (uint256)',
+  'function totalGovPowerRemoved(address,uint256) view returns (uint256)',
   'function validBoostShares(address,uint256,uint256) view returns (uint256)',
   'function totalValidBoostShares(address,uint256) view returns (uint256)',
   'function totalValidBoostSharesAdded(address,uint256) view returns (uint256)',
@@ -226,23 +242,23 @@ async function pairState() {
 }
 
 async function memberState(memberId = MEMBER_ID) {
-  const [shares, boost, phases, unlock, tokenAmt, parentAmt, firstRound] = await read(
+  const [shares, boost, phases, unlock, tokenAmt, parentAmt, firstGovPowerRound] = await read(
     STAKE,
     stakeAbi,
     'memberStake',
     [TOKEN, memberId],
   );
-  return { shares, boost, phases, unlock, tokenAmt, parentAmt, firstRound };
+  return { shares, boost, phases, unlock, tokenAmt, parentAmt, firstGovPowerRound };
 }
 
 async function totalState() {
-  const [tls, totalLp, wlp, feeLp, boost, tokenAmt, parentAmt, firstRound] = await read(
+  const [tls, totalLp, wlp, feeLp, boost, tokenAmt, parentAmt, firstGovPowerRound] = await read(
     STAKE,
     stakeAbi,
     'totalStake',
     [TOKEN],
   );
-  return { tls, totalLp, wlp, feeLp, boost, tokenAmt, parentAmt, firstRound };
+  return { tls, totalLp, wlp, feeLp, boost, tokenAmt, parentAmt, firstGovPowerRound };
 }
 
 const approve = (token, owner, spender, amount) =>
@@ -398,7 +414,7 @@ async function main() {
   check('§0 totalStake.totalBoostShares', 0n, t0.boost);
   check('§0 totalStake.tokenAmountForLiquidity', T.SEED_TOKEN_AMOUNT, t0.tokenAmt);
   check('§0 totalStake.parentTokenAmountForLiquidity', T.SEED_PARENT_AMOUNT, t0.parentAmt);
-  check('§0 totalStake.firstGovVoteRound', 2n, t0.firstRound);
+  check('§0 totalStake.firstGovPowerRound', 2n, t0.firstGovPowerRound);
   check(
     '§0 liquidityTokenAmount',
     T.LIQ0,
@@ -409,23 +425,23 @@ async function main() {
   check('§0 memberId1.boostShares', 0n, m1.boost);
   check('§0 memberId1.promisedWaitingPhases', 1n, m1.phases);
   check('§0 memberId1.unlockRequestPhase', 0n, m1.unlock);
-  check('§0 memberId1.firstGovVoteRound', 2n, m1.firstRound);
+  check('§0 memberId1.firstGovPowerRound', 2n, m1.firstGovPowerRound);
   const m5 = await memberState();
   check('§0 memberId5 未质押（全 0）', 0n, m5.shares);
   check(
-    '§0 govVotes(current,1) = 4472135954999579391818×1',
-    T.SEED_VOTES,
-    await read(STAKE, stakeAbi, 'govVotes', [TOKEN, round0, 1n]),
+    '§0 govPower(current,1) = 4472135954999579391818×1',
+    T.SEED_GOV_POWER,
+    await read(STAKE, stakeAbi, 'govPower', [TOKEN, round0, 1n]),
   );
   check(
-    '§0 totalGovVotes = 种子治理票',
-    T.SEED_VOTES,
-    await read(STAKE, stakeAbi, 'totalGovVotes', [TOKEN, round0]),
+    '§0 totalGovPower = 种子治理权',
+    T.SEED_GOV_POWER,
+    await read(STAKE, stakeAbi, 'totalGovPower', [TOKEN, round0]),
   );
   check(
-    '§0 totalGovVotesRemoved = 0',
+    '§0 totalGovPowerRemoved = 0',
     0n,
-    await read(STAKE, stakeAbi, 'totalGovVotesRemoved', [TOKEN, round0]),
+    await read(STAKE, stakeAbi, 'totalGovPowerRemoved', [TOKEN, round0]),
   );
   check(
     '§0 totalValidBoostShares = 0',
@@ -505,7 +521,7 @@ async function main() {
       T.C1_MEMBER_PARENT_AMOUNT,
       m.parentAmt,
     );
-    check('C1 memberStake.firstGovVoteRound = tx 所在阶段', c1.round, m.firstRound);
+    check('C1 memberStake.firstGovPowerRound = tx 所在阶段', c1.round, m.firstGovPowerRound);
 
     const t = await totalState();
     check('C1 totalStake.totalLiquidityShares', T.C1_TLS, t.tls);
@@ -521,24 +537,24 @@ async function main() {
       await read(STAKE, stakeAbi, 'liquidityTokenAmount', [TOKEN]),
     );
     check(
-      'C1 member govVotes',
-      T.C1_MEMBER_VOTES,
-      await read(STAKE, stakeAbi, 'govVotes', [TOKEN, c1.round, MEMBER_ID]),
+      'C1 member govPower',
+      T.C1_MEMBER_GOV_POWER,
+      await read(STAKE, stakeAbi, 'govPower', [TOKEN, c1.round, MEMBER_ID]),
     );
     check(
-      'C1 totalGovVotesAdded',
-      T.C1_TOTAL_VOTES,
-      await read(STAKE, stakeAbi, 'totalGovVotesAdded', [TOKEN, c1.round]),
+      'C1 totalGovPowerAdded',
+      T.C1_TOTAL_GOV_POWER,
+      await read(STAKE, stakeAbi, 'totalGovPowerAdded', [TOKEN, c1.round]),
     );
     check(
-      'C1 totalGovVotes',
-      T.C1_TOTAL_VOTES,
-      await read(STAKE, stakeAbi, 'totalGovVotes', [TOKEN, c1.round]),
+      'C1 totalGovPower',
+      T.C1_TOTAL_GOV_POWER,
+      await read(STAKE, stakeAbi, 'totalGovPower', [TOKEN, c1.round]),
     );
     check(
-      'C1 totalGovVotesRemoved',
+      'C1 totalGovPowerRemoved',
       0n,
-      await read(STAKE, stakeAbi, 'totalGovVotesRemoved', [TOKEN, c1.round]),
+      await read(STAKE, stakeAbi, 'totalGovPowerRemoved', [TOKEN, c1.round]),
     );
     const p1 = await pairState();
     check('C1 pair.reserveToken', T.C1_R_T, p1.rT);
@@ -606,14 +622,14 @@ async function main() {
     const m2b = await memberState();
     check('C2 剩余额度 = memberCap − used', T.C2_REMAINING, T.C2_MEMBER_CAP - m2b.boost);
     check(
-      'C2 治理票不变（加速不产生治理票）',
-      T.C1_MEMBER_VOTES,
-      await read(STAKE, stakeAbi, 'govVotes', [TOKEN, c2.round, MEMBER_ID]),
+      'C2 治理权不变（加速不产生治理权）',
+      T.C1_MEMBER_GOV_POWER,
+      await read(STAKE, stakeAbi, 'govPower', [TOKEN, c2.round, MEMBER_ID]),
     );
     check(
-      'C2 totalGovVotes 不变',
-      T.C1_TOTAL_VOTES,
-      await read(STAKE, stakeAbi, 'totalGovVotes', [TOKEN, c2.round]),
+      'C2 totalGovPower 不变',
+      T.C1_TOTAL_GOV_POWER,
+      await read(STAKE, stakeAbi, 'totalGovPower', [TOKEN, c2.round]),
     );
     check(
       'C2 加速扣款（社区代币）',
@@ -637,19 +653,19 @@ async function main() {
     check('C3 memberStake.promisedWaitingPhases', T.C3_PHASES, m3.phases);
     check('C3 memberStake.liquidityShares 不变', T.C1_SHARES, m3.shares);
     check(
-      'C3 member govVotes',
-      T.C3_MEMBER_VOTES,
-      await read(STAKE, stakeAbi, 'govVotes', [TOKEN, round3, MEMBER_ID]),
+      'C3 member govPower',
+      T.C3_MEMBER_GOV_POWER,
+      await read(STAKE, stakeAbi, 'govPower', [TOKEN, round3, MEMBER_ID]),
     );
     check(
-      'C3 totalGovVotesAdded',
-      T.C1_TOTAL_VOTES + T.C3_VOTES_ADDED,
-      await read(STAKE, stakeAbi, 'totalGovVotesAdded', [TOKEN, round3]),
+      'C3 totalGovPowerAdded',
+      T.C1_TOTAL_GOV_POWER + T.C3_GOV_POWER_ADDED,
+      await read(STAKE, stakeAbi, 'totalGovPowerAdded', [TOKEN, round3]),
     );
     check(
-      'C3 totalGovVotes',
-      T.C3_TOTAL_VOTES,
-      await read(STAKE, stakeAbi, 'totalGovVotes', [TOKEN, round3]),
+      'C3 totalGovPower',
+      T.C3_TOTAL_GOV_POWER,
+      await read(STAKE, stakeAbi, 'totalGovPower', [TOKEN, round3]),
     );
 
     // C4 申请解锁 → 到期 → 撤出
@@ -673,19 +689,19 @@ async function main() {
     check('C4 申请解锁后 liquidityShares 不清零', T.C1_SHARES, m4.shares);
     check('C4 申请解锁后 boostShares 不清零', T.C2_BOOST, m4.boost);
     check(
-      'C4 申请解锁后 govVotes = 0',
+      'C4 申请解锁后 govPower = 0',
       0n,
-      await read(STAKE, stakeAbi, 'govVotes', [TOKEN, unlockPhase, MEMBER_ID]),
+      await read(STAKE, stakeAbi, 'govPower', [TOKEN, unlockPhase, MEMBER_ID]),
     );
     check(
-      'C4 申请解锁后 totalGovVotes = 种子票',
-      T.SEED_VOTES,
-      await read(STAKE, stakeAbi, 'totalGovVotes', [TOKEN, unlockPhase]),
+      'C4 申请解锁后 totalGovPower = 种子治理权',
+      T.SEED_GOV_POWER,
+      await read(STAKE, stakeAbi, 'totalGovPower', [TOKEN, unlockPhase]),
     );
     check(
-      'C4 totalGovVotesRemoved',
-      T.C4_VOTES_REMOVED,
-      await read(STAKE, stakeAbi, 'totalGovVotesRemoved', [TOKEN, unlockPhase]),
+      'C4 totalGovPowerRemoved',
+      T.C4_GOV_POWER_REMOVED,
+      await read(STAKE, stakeAbi, 'totalGovPowerRemoved', [TOKEN, unlockPhase]),
     );
     check(
       'C4 validBoostShares = 0',
@@ -748,7 +764,7 @@ async function main() {
     check('C4 撤出后 memberStake 全 0（boost）', 0n, m5after.boost);
     check('C4 撤出后 memberStake 全 0（phases）', 0n, m5after.phases);
     check('C4 撤出后 memberStake 全 0（unlock）', 0n, m5after.unlock);
-    check('C4 撤出后 memberStake 全 0（firstGovVoteRound）', 0n, m5after.firstRound);
+    check('C4 撤出后 memberStake 全 0（firstGovPowerRound）', 0n, m5after.firstGovPowerRound);
     const t4 = await totalState();
     check('C4 撤出后 totalLiquidityShares', T.TLS0, t4.tls);
     check('C4 撤出后 withdrawableLp', T.WLP0, t4.wlp);
@@ -763,9 +779,9 @@ async function main() {
     check('C4 撤出后 pair.reserveParent（多 1 wei 粉尘）', T.C4_R_P_AFTER, p4.rP);
     check('C4 撤出后 pair.totalSupply = 种子', T.S0, p4.supply);
     check(
-      'C4 撤出后 govVotes = 0',
+      'C4 撤出后 govPower = 0',
       0n,
-      await read(STAKE, stakeAbi, 'govVotes', [TOKEN, round4, MEMBER_ID]),
+      await read(STAKE, stakeAbi, 'govPower', [TOKEN, round4, MEMBER_ID]),
     );
     check('C4 撤出后 Stake 社区代币余额 0', 0n, await balanceOf(TOKEN, STAKE));
     check('C4 撤出后 Stake WETH 余额 0', 0n, await balanceOf(WETH, STAKE));
@@ -904,7 +920,7 @@ async function main() {
       token: await balanceOf(TOKEN, OWNER_5),
       weth: await balanceOf(WETH, OWNER_5),
       liq: await read(STAKE, stakeAbi, 'liquidityTokenAmount', [TOKEN]),
-      govVotes: await read(STAKE, stakeAbi, 'govVotes', [TOKEN, round, MEMBER_ID]),
+      govPower: await read(STAKE, stakeAbi, 'govPower', [TOKEN, round, MEMBER_ID]),
       validBoost: await read(STAKE, stakeAbi, 'validBoostShares', [TOKEN, round, MEMBER_ID]),
     };
     const tx = await send({
@@ -927,9 +943,9 @@ async function main() {
       await read(STAKE, stakeAbi, 'liquidityTokenAmount', [TOKEN]),
     );
     check(
-      'C6 回滚后 治理票 不变',
-      before.govVotes,
-      await read(STAKE, stakeAbi, 'govVotes', [TOKEN, round, MEMBER_ID]),
+      'C6 回滚后 治理权 不变',
+      before.govPower,
+      await read(STAKE, stakeAbi, 'govPower', [TOKEN, round, MEMBER_ID]),
     );
     check(
       'C6 回滚后 validBoostShares 不变',

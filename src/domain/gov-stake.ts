@@ -4,8 +4,8 @@
  * Every formula below transcribes one concrete branch of the deployed
  * `core/src/Stake.sol`; none of them is re-derived here:
  *
- *   - 治理票 `govVotes = liquidityShares * promisedWaitingPhases`
- *     — `_govVotesOf` (`member.liquidityShares * member.promisedWaitingPhases`).
+ *   - 未申请解锁的份额产生治理权 `govPower = liquidityShares * promisedWaitingPhases`
+ *     — `_govPowerOf` (`member.liquidityShares * member.promisedWaitingPhases`).
  *   - `optimalAmounts`, the two-side clamping done before the pair mint
  *     — `_optimalAmounts`: `optParent = tokenAmount * R_parent / R_token`;
  *       keep both inputs when `optParent <= parentTokenAmount`, otherwise mirror
@@ -16,16 +16,16 @@
  *       `totalLiquidityShares == 0 || withdrawableLpBefore == 0
  *        ? lpMinted
  *        : totalLiquidityShares * lpMinted / withdrawableLpBefore`.
- *   - `projectedLiquidityGovVotes`, the member's votes after the stake
+ *   - `projectedLiquidityGovPower`, the member's governance power after the stake
  *     — `_stakeLiquidity` → `_creditLiquidity`:
  *       `(member.liquidityShares + sharesAdded) * promisedWaitingPhases`.
- *   - `projectedGovVotesAdded`, the delta the contract records for the turn
- *     — `_creditLiquidity`: `newVotes - _govVotesOf(member)`. Because the
- *       contract recomputes the member's votes with the *new* promised phases,
+ *   - `projectedGovPowerAdded`, the delta the contract records for the turn
+ *     — `_creditLiquidity`: `newGovPower - _govPowerOf(member)`. Because the
+ *       contract recomputes the member's governance power with the *new* promised phases,
  *       that subtraction can go negative when the phases shrank. The only use
  *       here is a "预计 +X" hint, which must never read negative, so it is
  *       clamped at 0 (documented divergence: display only, never accounting).
- *   - `increasedPromisedWaitingPhasesVotes`
+ *   - `govPowerAddedByIncreasingPhases`
  *     — `increasePromisedWaitingPhases` (and `_stakeBoost`):
  *       `liquidityShares * (next - previous)`; the contract reverts when
  *       `next < previous`, so the `< 0` branch is clamped at 0 defensively.
@@ -52,8 +52,11 @@
  * Pure TypeScript. No React, no browser globals, no chain SDKs.
  */
 
-/** 治理票: `liquidityShares × promisedWaitingPhases` (`_govVotesOf`). */
-export function govVotesOf(liquidityShares: bigint, promisedWaitingPhases: bigint): bigint {
+/** 流动性凭证、流动性质押份额和由此换算的治理权共用 18 位小数。 */
+export const STAKE_DECIMALS = 18;
+
+/** `liquidityShares × promisedWaitingPhases`，调用方传入尚未申请解锁的份额。 */
+export function govPowerOf(liquidityShares: bigint, promisedWaitingPhases: bigint): bigint {
   return liquidityShares * promisedWaitingPhases;
 }
 
@@ -112,33 +115,33 @@ export function liquiditySharesAdded(input: LiquiditySharesAddedInput): bigint {
   return (totalLiquidityShares * lpMinted) / withdrawableLp;
 }
 
-export interface ProjectedVotesInput {
+export interface ProjectedGovPowerInput {
   readonly currentLiquidityShares: bigint;
-  /** `_govVotesOf(member)` right now, i.e. the "before" value of the delta. */
-  readonly currentGovVotes: bigint;
+  /** `_govPowerOf(member)` right now, i.e. the "before" value of the delta. */
+  readonly currentGovPower: bigint;
   readonly sharesAdded: bigint;
   readonly promisedWaitingPhases: bigint;
 }
 
-/** 质押后该成员的治理票总数（不是增量）。 */
-export function projectedLiquidityGovVotes(input: ProjectedVotesInput): bigint {
-  return govVotesOf(input.currentLiquidityShares + input.sharesAdded, input.promisedWaitingPhases);
+/** 质押后该成员的治理权总量。 */
+export function projectedLiquidityGovPower(input: ProjectedGovPowerInput): bigint {
+  return govPowerOf(input.currentLiquidityShares + input.sharesAdded, input.promisedWaitingPhases);
 }
 
-/** 本次质押新增的治理票（≥ 0）。 */
-export function projectedGovVotesAdded(input: ProjectedVotesInput): bigint {
-  const added = projectedLiquidityGovVotes(input) - input.currentGovVotes;
+/** 本次质押新增的治理权（≥ 0）。 */
+export function projectedGovPowerAdded(input: ProjectedGovPowerInput): bigint {
+  const added = projectedLiquidityGovPower(input) - input.currentGovPower;
   return added > 0n ? added : 0n;
 }
 
-export interface IncreasedPhasesVotesInput {
+export interface IncreasedPhasesGovPowerInput {
   readonly liquidityShares: bigint;
   readonly previousPhases: bigint;
   readonly nextPhases: bigint;
 }
 
-/** 提高承诺解锁期的新增治理票 (`increasePromisedWaitingPhases`), never negative. */
-export function increasedPromisedWaitingPhasesVotes(input: IncreasedPhasesVotesInput): bigint {
+/** 提高承诺解锁期的新增治理权 (`increasePromisedWaitingPhases`), never negative. */
+export function govPowerAddedByIncreasingPhases(input: IncreasedPhasesGovPowerInput): bigint {
   const { liquidityShares, previousPhases, nextPhases } = input;
   if (nextPhases <= previousPhases) return 0n;
   return liquidityShares * (nextPhases - previousPhases);

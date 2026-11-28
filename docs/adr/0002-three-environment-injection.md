@@ -59,12 +59,12 @@ owner 同时否决了在仓内追加发布日志（`docs/release-log.md`）：�
 
 ### 3. ABI 流水线
 
-1. **来源**：`core/out/<File>.sol/<Contract>.json` 的 `.abi`、`action/out/**`、`group-chat/out/**`。**从不**读 `libs/out`（只会得到空数组与测试合约垃圾）。生成前先在对侧仓 `forge build --deny warnings`（子模块需 `recursive`，`group-chat` 是三层嵌套）。
-2. **生成**：一个小脚本读产物 → 跳过 `abi` 为空的条目 → 输出 `export const <name>Abi = [...] as const`，并写一份 `manifest.json`：每份 ABI 的来源仓、`git rev-parse HEAD`、产物路径、条目数、生成时间。
-3. **提交**：生成物随源码提交。理由：干净的前端 checkout 与前端 CI 里没有 `forge`、也没有兄弟仓，产物必须已经在仓里。
-4. **漂移门禁**：在**有 `forge` 和兄弟仓**的 job 里重新生成并 `git diff --exit-code`，有差异即失败并提示重跑。这条门禁是本研究里唯一被证明“本来能拦住”的检查（`Mint` 42 → 43 的漂移正是它该拦的）。
-5. **不用** `@wagmi/cli` / viem typegen：同样的输入（`forge build` + `out/`），多一层工具链，且没有任何现成先例；`as const` 已经给出字面量类型。
-6. **错误映射**：从 ABI 的 `type: "error"` 条目导出 selector → 签名 → 中文文案三层映射；协议错误不在公共签名库中，缺了这张表就只能把十六进制抛给用户。
+1. **来源**是 [ADR-0004 §6](0004-anvil-local-chain.md#6-export-契约与单向同步) 定义的 Anvil 部署导出。Anvil 在部署时记录实际编译的来源和 ABI，DEX 使用部署读入的发布产物。
+2. **生成**由 `pnpm sync:anvil` 完成。它校验每份 ABI 的 SHA-256，输出 `export const <name>Abi = [...] as const`，并将部署的来源记录、区块号、ABI 条目数和哈希写入 `manifest.json`。
+3. **提交**时将生成物随对应的前端改动提交，方便仅检出前端的构建使用。
+4. **漂移门禁**用 `pnpm abis:check` 逐字节比对部署导出及其生成物。正式验收要求部署来自已提交源码；工作区部署用 `pnpm abis:check --allow-working-tree` 做本地核对。
+5. **ABI 类型**由 `as const` 保留字面量。
+6. **错误映射**消费 `matt-gov/registry/errors.json` 与 `scripts/error-messages.zh.json`，按 selector 查错误名和文案。`pnpm gen:errors --check` 校验内容与注册表来源。
 
 ### 4. 同步模型：单命令、fast-forward、同一 commit、零写入
 
@@ -128,7 +128,7 @@ Git tag 只用于标记里程碑，**不是同步的前置条件**；同步只�
 
 - **仓内没有发布历史**：查“某个 commit 什么时候进了 test/prod”要去 GitHub 的 Actions run 列表与 Pages `deployments` 页，不能在仓库里 `git log docs/…`。这是刻意取舍：仓内日志会被推到下一个仓并产生归属歧义（Context），而共享 SHA + GitHub 记录不需要额外维护。
 - 每次上游合约变更都要重跑生成器并提交产物，否则门禁红；这是刻意的摩擦。
-- 漂移门禁不能跑在前端仓自己的 CI 里（没有 `forge`、没有兄弟仓），必须挂在能检出源码的 job 上；前端仓只能校验 manifest 格式与来源 SHA 的存在性。这个分工要写进 workflow 注释，否则下一个人会以为门禁不存在。
+- 部署导出比对需要 Anvil 的 `export/`；仅检出前端的构建使用仓内生成物。
 - 发布只能 fast-forward：任何热修都必须先落 `interface-dev`，再逐级 `pnpm release-to LOVE20BSC/interface-test`、`pnpm release-to LOVE20BSC/interface`；不能在目标仓直接改，也不能靠 merge 把目标仓的提交带回。
 - 不变量依赖分支保护：三仓都要禁止 force-push、禁止在 `main` 上 merge / 直接提交；任一仓的网页 merge 都会让下一次发布失败。
 - 名字不含 `dev` / `test` 的 fork 按 prod 构建并显示「正式版」徽章；名字含 `dev` 的 fork 构建 dev 变体（§5 的已接受代价）。徽章只是提示，不能阻止 fork 复制代码或地址。

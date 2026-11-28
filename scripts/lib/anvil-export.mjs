@@ -4,9 +4,9 @@
 // `scripts/check-abis.mjs` regenerates the same bytes in memory and compares them with the
 // committed files. Keeping both on one implementation is what makes "generate then commit" and
 // the drift gate agree by construction (ADR-0002 §3, ADR-0004 §6).
-import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, relative, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
 import { encodeAbiParameters, keccak256 } from 'viem';
@@ -17,7 +17,7 @@ export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const ANVIL_REPO_DIR = process.env.ANVIL_REPO_DIR
   ? resolve(process.env.ANVIL_REPO_DIR)
   : resolve(ROOT, '../anvil');
-/** Overridable for drift drills: read a copied export while still recording the real repo HEAD. */
+/** A copied export carries the same deployment provenance as the original. */
 export const ANVIL_EXPORT_DIR = process.env.ANVIL_EXPORT_DIR
   ? resolve(process.env.ANVIL_EXPORT_DIR)
   : resolve(ANVIL_REPO_DIR, 'export');
@@ -79,9 +79,7 @@ export const ABI_MODULES = [
 ];
 
 /**
- * Which sibling repository each export ABI came from. `libs` is required by ADR-0002 §3 even though
- * it contributes no ABI: its HEAD decides the linked library bytecode that GroupActionExecutor and
- * GroupServiceExecutor delegatecall into.
+ * Which repository supplies each export ABI. `libs` contributes linked code without its own ABI.
  */
 const REPO_ABIS = {
   core: [
@@ -132,6 +130,8 @@ export const ADDRESS_KEYS = {
 };
 
 const HEX_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+const GIT_COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const SHA256 = /^[0-9a-f]{64}$/;
 
 export class ExportError extends Error {}
 
@@ -155,10 +155,13 @@ function readJsonText(path, label) {
 }
 
 export function readJson(path, label) {
+  return parseJson(readJsonText(path, label), path, label);
+}
+
+function parseJson(text, path, label) {
   try {
-    return JSON.parse(readJsonText(path, label));
+    return JSON.parse(text);
   } catch (error) {
-    if (error instanceof ExportError) throw error;
     fail(`${label} is not valid JSON: ${path}\n  ${error.message}`);
   }
 }
@@ -258,6 +261,10 @@ export function loadAnvilExport() {
   }
 
   const deployment = readJsonExact(DEPLOYMENT_FILE, 'anvil deployment export');
+  const { provenance } = deployment;
+  if (provenance?.version !== 1) {
+    fail('export has no supported deployment provenance. Bootstrap Anvil on a fresh local chain.');
+  }
   const snapshot = readJson(AIRDROP_FILE, 'anvil airdrop snapshot');
 
   const chainId = requireUint(deployment.chainId, 'export.chainId');
@@ -278,14 +285,30 @@ export function loadAnvilExport() {
 
   const abis = {};
   for (const contract of Object.values(REPO_ABIS).flat()) {
-    const abi = readJson(resolve(ABIS_DIR, `${contract}.json`), `ABI ${contract}`);
+    const path = resolve(ABIS_DIR, `${contract}.json`);
+    const text = readJsonText(path, `ABI ${contract}`);
+    const hash = createHash('sha256').update(text).digest('hex');
+    if (provenance.abiSha256?.[contract] !== hash) {
+      fail(`ABI ${contract} does not match the deployment provenance: ${path}`);
+    }
+    const abi = parseJson(text, path, `ABI ${contract}`);
     if (!Array.isArray(abi) || abi.length === 0) {
-      fail(`ABI ${contract} must be a non-empty array (${resolve(ABIS_DIR, `${contract}.json`)})`);
+      fail(`ABI ${contract} must be a non-empty array (${path})`);
     }
     abis[contract] = abi;
   }
 
-  return { deployment, snapshot, abis, chainId, deployBlock, network, rpcUrl, addresses };
+  return {
+    deployment,
+    provenance,
+    snapshot,
+    abis,
+    chainId,
+    deployBlock,
+    network,
+    rpcUrl,
+    addresses,
+  };
 }
 
 function requireDecimal(value, label) {
@@ -457,61 +480,69 @@ export function validateAirdrop(exportData) {
   return verifyMerkle(snapshot, exportAirdrop.merkleRoot);
 }
 
-function gitHead(repoPath) {
-  try {
-    return execFileSync('git', ['-C', repoPath, 'rev-parse', 'HEAD'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-  } catch {
-    fail(`cannot read git HEAD for ${repoPath} (the manifest must record the source commit)`);
+function requireGitSource(repo, source) {
+  if (source?.kind === 'commit' && GIT_COMMIT.test(source.commit)) {
+    return { kind: source.kind, commit: source.commit };
   }
+  if (
+    source?.kind === 'working-tree' &&
+    GIT_COMMIT.test(source.baseCommit) &&
+    SHA256.test(source.sha256)
+  ) {
+    return { kind: source.kind, baseCommit: source.baseCommit, sha256: source.sha256 };
+  }
+  fail(`invalid deployment source record for ${repo}`);
+}
+
+export function assertManifestSources(manifest, { allowWorkingTree = false } = {}) {
+  if (manifest?.schemaVersion !== 2) {
+    fail('ABI manifest has no supported deployment provenance. Run `pnpm sync:anvil`.');
+  }
+  const drafts = Object.keys(REPO_ABIS).filter(
+    (repo) => requireGitSource(repo, manifest.sources?.[repo]).kind === 'working-tree',
+  );
+  if (drafts.length > 0 && !allowWorkingTree) {
+    fail(
+      `deployment includes uncommitted sources: ${drafts.join(', ')}.\n` +
+        '  For local review run `pnpm abis:check --allow-working-tree`. ' +
+        'For a commit-ready export, bootstrap from committed sources.',
+    );
+  }
+  return drafts;
 }
 
 export function buildManifest(exportData) {
-  const anvilDir = ANVIL_REPO_DIR;
-  const repoPaths = {
-    core: resolve(anvilDir, '../core'),
-    action: resolve(anvilDir, '../action'),
-    'group-chat': resolve(anvilDir, '../group-chat'),
-    libs: resolve(anvilDir, '../libs'),
-    dex: resolve(anvilDir, '../dex'),
-    anvil: anvilDir,
-    periphery: resolve(anvilDir, '../periphery'),
-    tools: resolve(anvilDir, '../tools'),
-  };
-
+  const { provenance } = exportData;
   const sources = {};
   for (const [repo, contracts] of Object.entries(REPO_ABIS)) {
-    const abis = {};
-    for (const contract of contracts) {
-      abis[contract] = exportData.abis[contract].length;
-    }
     sources[repo] = {
-      head: gitHead(repoPaths[repo]),
-      path: relative(ROOT, repoPaths[repo]),
-      abis,
-      ...(contracts.length === 0
-        ? { note: 'no ABI is exported from this repo; its HEAD pins the linked library bytecode' }
-        : {}),
+      ...requireGitSource(repo, provenance.repos?.[repo]),
+      abis: Object.fromEntries(
+        contracts.map((contract) => [
+          contract,
+          { entries: exportData.abis[contract].length, sha256: provenance.abiSha256[contract] },
+        ]),
+      ),
     };
   }
-
-  // Anvil export timestamps are not part of the export JSON (it must stay byte-identical between
-  // two clean bootstraps). The file mtime is the honest "when this export was produced" value; the
-  // drift gate ignores only this field when comparing manifests.
-  const exportedAt = statSync(DEPLOYMENT_FILE).mtime.toISOString();
+  const dexArtifactSha256 = Object.fromEntries(
+    REPO_ABIS.dex.map((contract) => {
+      const hash = provenance.dexArtifactSha256?.[contract];
+      if (!SHA256.test(hash)) fail(`invalid deployment build hash for ${contract}`);
+      return [contract, hash];
+    }),
+  );
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedBy: 'pnpm sync:anvil',
     anvilExport: {
       profile: exportData.network,
-      path: relative(ROOT, ANVIL_EXPORT_DIR),
+      path: '../anvil/export',
       chainId: exportData.chainId,
       deployBlock: exportData.deployBlock,
-      exportedAt,
     },
+    dexArtifactSha256,
     sources,
     modules: Object.fromEntries(
       ABI_MODULES.map(({ file, contract }) => [
@@ -583,33 +614,4 @@ export async function buildSyncOutputs() {
   outputs.set(FRONTEND_AIRDROP_FILE, readFileSync(AIRDROP_FILE, 'utf8'));
 
   return { outputs, manifest, root, exportData };
-}
-
-/**
- * Stable comparison form: the export timestamp and each sibling repository's HEAD SHA are
- * **provenance**, not content. A docs-only commit in a sibling repo changes `sources.<repo>.head`
- * without changing a single ABI, so comparing them would fail the drift gate for a reason that
- * cannot break the app. Content (ABI entry lists, paths, address-book keys) stays in the
- * comparison; {@link manifestHeadDrift} reports the provenance difference separately.
- */
-export function manifestContent(manifest) {
-  const copy = JSON.parse(JSON.stringify(manifest));
-  delete copy.anvilExport.exportedAt;
-  for (const source of Object.values(copy.sources ?? {})) delete source.head;
-  return `${JSON.stringify(copy, null, 2)}\n`;
-}
-
-/** @deprecated use {@link manifestContent}; kept so older callers keep compiling. */
-export const comparableManifest = manifestContent;
-
-/** Sibling HEADs recorded in the manifest that no longer match the export they were made from. */
-export function manifestHeadDrift(committed, expected) {
-  const drift = [];
-  for (const [repo, expectedSource] of Object.entries(expected.sources ?? {})) {
-    const committedHead = committed.sources?.[repo]?.head;
-    if (committedHead !== undefined && committedHead !== expectedSource.head) {
-      drift.push({ repo, committed: committedHead, expected: expectedSource.head });
-    }
-  }
-  return drift;
 }

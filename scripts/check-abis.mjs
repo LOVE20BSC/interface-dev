@@ -1,18 +1,17 @@
 #!/usr/bin/env node
 // ABI/address drift gate (ADR-0002 §3, ADR-0004 §6).
 //
-// Regenerates every artifact `pnpm sync:anvil` owns and compares it with the committed file. It
-// fails when the committed ABI modules, manifest, address book or snapshot disagree with the
-// current sibling export. A clean frontend checkout / CI job has no `../anvil/export`, so in that
-// case the check skips with an explicit message instead of failing for the wrong reason.
+// Checks the frontend manifest even in a frontend-only checkout. With the deployment export
+// available, also regenerates every artifact `pnpm sync:anvil` owns and compares the bytes.
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { relative, sep } from 'node:path';
 import {
   ANVIL_EXPORT_DIR,
-  buildSyncOutputs,
-  manifestContent,
-  manifestHeadDrift,
   FRONTEND_MANIFEST_FILE,
-  readJson,
+  ROOT,
+  assertManifestSources,
+  buildSyncOutputs,
 } from './lib/anvil-export.mjs';
 
 function firstDifference(expected, actual) {
@@ -36,19 +35,30 @@ function clip(value) {
 }
 
 async function main() {
+  const staged = process.argv.includes('--staged');
+  const pathInRepo = relative(ROOT, FRONTEND_MANIFEST_FILE).split(sep).join('/');
+  const text = staged
+    ? execFileSync('git', ['show', `:${pathInRepo}`], { cwd: ROOT, encoding: 'utf8' })
+    : readFileSync(FRONTEND_MANIFEST_FILE, 'utf8');
+  const drafts = assertManifestSources(JSON.parse(text), {
+    allowWorkingTree: !staged && process.argv.includes('--allow-working-tree'),
+  });
+  if (drafts.length > 0) {
+    console.log(`[abis:check] working-tree deployment sources: ${drafts.join(', ')}.`);
+  } else {
+    console.log('[abis:check] ABI manifest records committed deployment sources.');
+  }
+  if (staged || process.argv.includes('--sources-only')) return;
+
   if (!existsSync(ANVIL_EXPORT_DIR)) {
-    console.log(
-      `[abis:check] ${ANVIL_EXPORT_DIR} not found; skipping ABI/address drift check ` +
-        '(a clean frontend checkout or CI job has no sibling repos).',
-    );
+    console.log(`[abis:check] ${ANVIL_EXPORT_DIR} not found; skipping export comparison.`);
     return;
   }
 
-  const { outputs, manifest } = await buildSyncOutputs();
+  const { outputs } = await buildSyncOutputs();
   const mismatches = [];
 
   for (const [path, expected] of outputs) {
-    if (path === FRONTEND_MANIFEST_FILE) continue;
     if (!existsSync(path)) {
       mismatches.push(`${path}: missing (run \`pnpm sync:anvil\`)`);
       continue;
@@ -63,39 +73,14 @@ async function main() {
     );
   }
 
-  if (!existsSync(FRONTEND_MANIFEST_FILE)) {
-    mismatches.push(`${FRONTEND_MANIFEST_FILE}: missing (run \`pnpm sync:anvil\`)`);
-  } else {
-    const committed = readJson(FRONTEND_MANIFEST_FILE, 'manifest');
-    const same = manifestContent(committed) === manifestContent(manifest);
-    if (!same) {
-      const diff = firstDifference(manifestContent(manifest), manifestContent(committed));
-      mismatches.push(
-        `${FRONTEND_MANIFEST_FILE}: differs at line ${diff.line}\n` +
-          `    committed: ${clip(diff.actual)}\n` +
-          `    expected : ${clip(diff.expected)}`,
-      );
-    }
-  }
-
   if (mismatches.length === 0) {
     console.log(
-      '[abis:check] ABIs, manifest, address book and airdrop snapshot match ../anvil/export.',
+      `[abis:check] ABIs, manifest, address book and snapshot match ${ANVIL_EXPORT_DIR}.`,
     );
-    // Provenance-only drift: a sibling repo gained commits (typically docs/style) after the last
-    // `pnpm sync:anvil`. The artifacts are identical, so this must not fail the gate; it is still
-    // worth printing, because the manifest's `sources.*.head` is the record of what was built.
-    const drift = manifestHeadDrift(readJson(FRONTEND_MANIFEST_FILE, 'manifest'), manifest);
-    for (const { repo, committed, expected } of drift) {
-      console.warn(
-        `[abis:check] note: ${repo} HEAD moved ${committed.slice(0, 8)} → ${expected.slice(0, 8)} ` +
-          'with no artifact change; run `pnpm sync:anvil` to refresh provenance.',
-      );
-    }
     return;
   }
 
-  console.error('[abis:check] FAIL: committed generated files do not match ../anvil/export:');
+  console.error(`[abis:check] FAIL: generated files do not match ${ANVIL_EXPORT_DIR}:`);
   for (const mismatch of mismatches) console.error(`  ${mismatch}`);
   console.error('\n  Regenerate and commit: pnpm sync:anvil');
   process.exit(1);

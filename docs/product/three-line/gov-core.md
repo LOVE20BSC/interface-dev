@@ -14,14 +14,14 @@
 | --- | --- |
 | 验证链 | **专用链 `http://127.0.0.1:8566`**（`chainId = 31337`），由 `make -C ../anvil bootstrap PORT=8566` 起 clean bootstrap |
 | 禁止 | **8545 人工链**（自动化永不触碰）、8555（e2e 套件自有链，跑前端线用） |
-| 地址簿 | `../anvil/export/deployments/anvil31337_dev.json`（前端副本 `src/config/network/anvil31337_dev/network.json` 同源；端口不影响地址） |
-| ABI | `../anvil/export/abis/{Vote,Submit,Mint,Phase,Stake}.json`（前端副本 `src/config/abis/{vote,submit,mint,phase,stake}.ts` 由 `pnpm sync:anvil` 生成） |
+| 地址簿 | `../anvil/.anvil/8566/export/deployments/anvil31337_dev.json` |
+| ABI | `../anvil/.anvil/8566/export/abis/{Vote,Submit,Mint,Phase,Stake}.json` |
 | 核心参数（dev） | `PRECISION = 1e18`、`SUBMIT_MIN_RATIO = 5e15`（0.5%）、`PROPOSAL_REWARD_MIN_VOTE_RATIO = 5e16`（5%）、`ROUND_REWARD_GOV_RATIO = ROUND_REWARD_PROPOSAL_RATIO = 5e14`（各 0.05%）、`VOTE_POOL_DIVISOR = 2`、`MAX_TITLE_LENGTH = MAX_DETAILS_LENGTH = 1024`、`MAX_CREATION_DATA_BYTES = 16384`、`SUBMIT_ROUND_LIMIT = 1000`（私有常量，界面不显示） |
-| 合约基线 | core `f5707ce` 加上工作区的回调参数改动 |
-| 地址 | `Vote 0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82`、`Submit 0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0`、`Mint 0x9A676e781A523b5d0C0e43731313A708CB607508`、`Phase 0xa513E6E4b8f2a923D98304ec87F64353C4D5C853`、`Stake 0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e`、`MemberNFT 0x610178dA211FEF7D417bC0e6FeD39F05609AD788`、`TestLOVE20 0x8aCd85898458400f7Db866d53FCFF6f0D49741FF` |
+| 历史合约基线 | core `f5707ce` 加上当时工作区的回调参数改动 |
+| 历史部署地址 | `Vote 0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82`、`Submit 0xA51c1fc2f0D1a1b8494Ed1FE312d7C3a78Ed91C0`、`Mint 0x9A676e781A523b5d0C0e43731313A708CB607508`、`Phase 0xa513E6E4b8f2a923D98304ec87F64353C4D5C853`、`Stake 0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e`、`MemberNFT 0x610178dA211FEF7D417bC0e6FeD39F05609AD788`、`TestLOVE20 0x8aCd85898458400f7Db866d53FCFF6f0D49741FF` |
 | 操作账户 | anvil #0 `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`（= 身份 NFT #1、种子把**全部**流动性质押记在 memberId #1） |
 
-回调参数复验使用从区块 0 新建的 `127.0.0.1:8574` 临时链，`8566` 已有进程运行。理论值沿用 §1。
+2026-11-28 在从区块 0 部署的专用 8566 链复验，合约线 191/191。本轮合约地址和来源查部署 JSON 的 `addresses`、`provenance`。当前脚本使用 `Stake.govPower`、`Stake.totalGovPower`。先前术语复验的临时链是 8567，回调参数复验的临时链是 8574，历史记录保留当时的接口名、块高和轮次。
 
 ## §1 理论线（先手算，再看链）
 
@@ -29,30 +29,28 @@
 
 | 量 | 公式（合约行号） | 期望 |
 | --- | --- | --- |
-| 推举门槛 | `requiredVotes = ceil(totalGovVotes × SUBMIT_MIN_RATIO / PRECISION)`（`Submit.sol:84`） | `ceil(4472135954999579391818 × 5e15 / 1e18)` = **`22360679774997896960`**（页面 `22.3606`） |
-| 能否推举 | `totalGovVotes ≠ 0 且 govVotes(member1) ≥ requiredVotes`（`Submit.sol:91-99`） | `4472135954999579391818 ≥ 22360679774997896960` → **可以** |
-| 正文上限 | `bytes(title) ≤ 1024`、`bytes(details) ≤ 1024`（`Submit.sol:264-281`） | 一个中文字 = 3 字节；页面按 UTF-8 字节计数 |
-| 每轮名额 | 每个身份每轮 1 个（`MemberAlreadySubmitted`，`Submit.sol:329-341`） | 第二次推举必 revert |
+| 推举门槛 | `requiredGovPower = ceil(totalGovPower × SUBMIT_MIN_RATIO / PRECISION)`（`core/src/Submit.sol:83`） | `ceil(4472135954999579391818 × 5e15 / 1e18)` = **`22360679774997896960`**（页面 `22.3606`） |
+| 能否推举 | `totalGovPower ≠ 0 且 govPower(member1) ≥ requiredGovPower`（`core/src/Submit.sol:67,90`） | `4472135954999579391818 ≥ 22360679774997896960` → **可以** |
+| 正文上限 | `bytes(title) ≤ 1024`、`bytes(details) ≤ 1024`（`Submit.sol:278-284`） | 一个中文字 = 3 字节；页面按 UTF-8 字节计数 |
+| 每轮名额 | 每个身份每轮 1 个（`MemberAlreadySubmitted`，`Submit.sol:334-344`） | 第二次推举必 revert |
 
 ### §1.2 投票（`Vote`）
 
 | 量 | 公式（合约行号） | 期望 |
 | --- | --- | --- |
-| 本轮可投 | `maxVoteAmount = Stake.govVotes(token, currentPhase, member1)`（`Vote.sol:117-119`、`317-319`） | `4472135954999579391818`（页面 `4,472.13`） |
-| 累计上限 | `Σ 本轮已投 + 本次 ≤ maxVoteAmount`，超出 revert `VoteLimitExceeded`（`Vote.sol:282-286`） | 用例投 100 票：`100e18 ≤ 4472.14e18` → 通过；投 `max+1` → revert |
-| 单提案票数 | 同一提案可累加（`Vote.sol:291`） | 投 100 → `voteAmountByProposalId = 100e18` |
-| 激励预留触发 | **本轮第一票**时 `Mint.reserveRoundReward`（`Vote.sol:304-307`） | 投完后 `Mint.govReward(round) > 0` |
-| 加速份额 | 首次投票记录 `Stake.validBoostShares`；本次种子无加速质押 → 0（`Vote.sol:264-277`） | `voterBoost = 0`、`totalVoterBoost = 0` |
+| 当轮累计票数上限 | `maxVoteAmount = Stake.govPower(token, currentPhase, member1)`（`core/src/Vote.sol:115,315`） | `4472135954999579391818`（当轮已投为 0 时，「还能投」为 `4,472.13`） |
+| 累计检查 | `本轮已投 + 本次 ≤ 本次调用读取的 maxVoteAmount`，超出 revert `VoteLimitExceeded`（`core/src/Vote.sol:280-284`） | 用例投 100 票：`100e18 ≤ 4472135954999579391818` → 通过；投 `max+1` → revert |
+| 单提案票数 | 同一提案可累加（`Vote.sol:286-289`） | 投 100 → `voteAmountByProposalId = 100e18` |
+| 激励预留触发 | **本轮第一票**时 `Mint.reserveRoundReward`（`Vote.sol:302-305`） | 投完后 `Mint.govReward(round) > 0` |
+| 加速份额 | 首次投票记录 `Stake.validBoostShares`；本次种子无加速质押 → 0（`Vote.sol:262-275`） | `voterBoost = 0`、`totalVoterBoost = 0` |
 
 ### §1.2b 治理首页「我的投票」卡
 
 | 量 | 公式（合约行号） | 期望 |
 | --- | --- | --- |
-| 本轮可投 | `maxVoteAmount = Stake.govVotes(token, currentPhase, member1)`（`Vote.sol:117-119`） | `4472135954999579391818`（页面 `4,472.13`） |
-| 本轮已投 / 未投 | `voteAmountByMemberId(round, member1)`；未投 = 可投 − 已投（下限 0，`Vote.sol:282-286` 同口径）。**本轮可投不在卡片重复**（= 摘要卡的有效治理权，owner 2026-11-21 复核删掉） | 投票后 `100e18` / `4372135954999579391818`（页面 `100` / `4,372.13`） |
-| 记录页 `/vote/records` | 同一组读数（`votedProposalIdsByMemberId` + `voteAmountByProposalId` + 标题），一页 10 轮 + 加载更多 | 与卡片同口径；`治理第 111 轮 · 共投出 100 票`、`我的投票 100`、`占该提案票数 100%` |
+| 本轮已投 | `voteAmountByMemberId(token, round, member1)` | 投票后 `100e18`（卡片显示 `100`）。投票页用 `maxVoteAmount − 本轮已投` 计算「还能投」，本例为 `4372135954999579391818`（`4,372.13`）。 |
+| 记录页 `/vote/records` | 同一组读数（`votedProposalIdsByMemberId` + `voteAmountByProposalId` + 标题），一页 10 轮 + 加载更多 | `治理第 R 轮`、`我的投票 100`、`占该提案票数 100%` |
 | 按轮记录 | `votedProposalIdsByMemberId(token, round, member1, 0, 50, false)` → (提案 id 列表, 我在每个提案的票数, 总数)（`Vote.sol:183-197`） | 投票那一轮返回 `[1]`、`[100e18]`、`1` |
-| 该轮我投出合计 | 上面票数数组求和 | `100e18`（页面 `共投出 100 票`） |
 | 占该提案票数 | `myVoteSharePercent(我的票数, Vote.voteAmountByProposalId(round, 提案))` —— **分母是该提案的总票数**（owner 2026-11-21 更正；不是该轮总票数） | 本用例只有我投票 → `100e18 / 100e18` → `100%`；单测 `my-votes-share.test.ts` 用 100/400 证明分母不是轮总票数 |
 | 标题 | `Submit.proposalInfosByProposalIds(token, [ids])` 的 `body.title`（`ISubmit.sol:157-160`） | 与提案标题逐字相同 |
 
@@ -80,20 +78,21 @@
 | 谁能铸 | 只有**提案目标合约**（`onlyProposalTarget`，`Mint.sol:207-224`） | 前端不给铸造按钮 |
 | 不达标怎么办 | 任何人可 `burnProposalReward`；票数为 0 时是空操作（`Mint.sol:152-191`） | 未达门槛且票数 > 0 才给「销毁这部分」 |
 
+每一轮从零累计已投票数。治理权变化后，已经投出的票照原数计入结果。
+
 ## §2 合约线
 
 > 脚本 `scripts/verify/gov-core-contract.mjs` 默认连接 8566，支持通过 `--rpc` 指定临时链，拒绝 8545 和 8555。
-> 运行：`make -C ../anvil bootstrap PORT=8566` 后 `node scripts/verify/gov-core-contract.mjs`（或 `VERIFY_RPC=…`）。
+> 运行：`make -C ../anvil bootstrap PORT=8566` 后执行 `node scripts/verify/gov-core-contract.mjs`。地址、ABI 和 `coreParams` 取自同一份 Anvil 导出。为临时 Anvil 副本设置 `ANVIL_EXPORT_DIR`。
 
 跑法：viem test client + `anvil_mine`；每组 `snapshot`/`revert`，跑完链状态逐 wei 回到跑前；先关 interval mining 再开 automine（顺序反了 anvil 会忽略 `setAutomine`），`finally` 恢复原值。
 
 | 项 | 结果 |
 | --- | --- |
-| 新 ABI 复验 | `node scripts/verify/gov-core-contract.mjs --rpc http://127.0.0.1:8574`，**191 PASS / 0 FAIL**。新增 `ProposalCreated.creationData` 读回断言，期望 `0x`，实际 `0x` |
-| 阶段推进实测 | 3→4（+63 块）、4→5（+114）、5→6（+117） |
-| 跑后状态 | 两组用例均回滚，回到起始区块 296、治理第 3 轮 |
+| 本轮 8566 | 起始区块 247、治理第 3 轮，**191/191 PASS**，各用例回滚后回到起始区块 |
+| 历史 8574 | **191 PASS / 0 FAIL**。新增 `ProposalCreated.creationData` 读回断言，期望 `0x`，实际 `0x`。阶段依次推进 3→4→5→6，最后回到起始区块 296、治理第 3 轮 |
 
-按节覆盖（每条都是「链上读回 ↔ 手算」成对断言，不抄常量）：
+历史 8574 运行的分节记录如下。当时的接口名保留。
 
 | 节 | PASS | 验证内容 |
 | --- | --- | --- |
@@ -116,16 +115,24 @@
 
 ## §3 前端线
 
-> spec：`e2e/gov-core-numbers.spec.ts`（`pnpm e2e --grep "治理核心"`，跑在 8555 自动化链，账户 = anvil #1 + 身份 NFT #1）。
+> 复现命令为 `E2E_ANVIL_RPC=http://127.0.0.1:8566 pnpm e2e e2e/gov-core-numbers.spec.ts`。账户为种子身份 NFT #1 的持有人。
 
 | 用例 | 覆盖 | 断言口径 |
 | --- | --- | --- |
-| G1 | `/vote` 空态 → `/submit` 填表推举（真实交易）→ 回执 → `/vote` 投 100 票（真实交易）→ 回执 | 55 处 `toHaveText` 整串精确；期望值由 spec **直连 RPC 读回**再派生，`expectedAmount()` 独立实现格式化规则（不 import `src/`，避免页面格式化写错时静默通过） |
-| G2 | 推举 / 投票两态四档截图（`suspendMining` 冻结当轮再拍） | `gov-core-submit-submitted-*` 与 `gov-core-vote-voted-*` 各四张（390×844 / 1280×800 × 浅/深） |
+| G1 | `/vote` 空态 → `/submit/new` 填表推举 → `/vote/:id` 投 100 票 → 回执 → 返回 `/vote` | 回执是 `本次合计投出 100 票`。返回列表时显示 `我已投 100 票`、`该提案本轮共 100 票` 与本轮剩余额度，无需重载页面。`expectedAmount()` 独立实现格式化规则 |
+| G2 | 推举和投票四档截图（`suspendMining` 冻结当轮再拍） | `gov-core-submit-submitted-*`、`gov-core-submit-history-*`、`gov-core-vote-voted-*`、`gov-core-vote-detail-*` 各四张（390×844 / 1280×800 × 浅/深） |
 | G3 | `anvil_mine` 推一轮 → `/gov/rewards` 出现可铸造行 → 铸造（真实交易）→ 行变「已铸造」 | `1 轮可铸造` → `2,250,001` → `已铸造` / `0 轮可铸造` |
 | G4 | `/gov/proposal-rewards` 默认上一轮 → 池 / 总票数 / 门槛 / 行金额 / 达标说明 → `prev` 到空轮 → `next` 回 | `4,500,002` / `100` / `5` / `100 / 5` / `待结算` |
-| G5 | `/gov` 「我的投票」卡：两格额度（已投 / 未投，按**当前轮**现读现算）+ 「查看全部投票记录」入口 + 「去投票」 | `gov-my-votes-max` **不存在**（不重复）；已投按当轮读回值；卡片只预览两轮 |
-| G6 | `/vote/records` 独立记录页：标题 + 「去投票」+ 按轮分组（轮次行 / 编号标题 / 我的投票 / 占该提案票数） | `治理第 R 轮 · 共投出 100 票`、`#1 …`、`我的投票 100`、`占该提案票数 100%` |
+| G5 | `/gov` 「我的投票」卡显示本轮已投、记录预览和完整记录入口 | 已投按当轮读回值校验，记录只预览两轮 |
+| G6 | `/vote/records` 独立记录页：标题 + 「去投票」+ 按轮分组（轮次行 / 编号标题 / 我的投票 / 占该提案票数） | `治理第 R 轮`、`#1 …`、`我的投票 100`、`占该提案票数 100%` |
+| G7 | 本轮分给两个提案 100 与 50 票 → 承诺解锁期从 1 提到 2 → 给第二个提案再加 50 票 → 切轮并重新推举 | 上限翻倍，已投仍为 150 票，加票回执为 `本次合计投出 50 票`。切轮后旧轮共 200 票，新轮已投 `0 票`、还能投 `8,944.27 票`。留在原详情页时，表单在新一轮重新推举成功后恢复，分别显示创建人和当轮推举人 |
+| G8 | `/gov/proposal-rewards` 销毁未达门槛的提案激励 | 两个提案分别得 100 票、1 票，门槛为 5.05 票。为后者确认销毁后，页面收起销毁入口，链上销毁增量等于按 1 票分得的提案激励 |
+| G9 | 加速质押并投票，下一轮在 `/gov/rewards` 查看治理激励 | 投票激励和加速激励分别按各自的池与占比核对，加速激励大于零，页面有铸造入口 |
+| G12 | 资格不足、历史提案推举状态读取失败与恢复、同轮推举及切轮 | 两页资格不足时给质押入口。读失败时不给行内推举按钮。推举后显示 `本轮已推举`，留在原页切轮后恢复推举按钮 |
+| G13 | `/vote` 和 `/vote/:id` 的阶段读取失败与恢复 | 两页给出「重试」，恢复后分别显示额度和提案 |
+| G14 | `/vote` 和 `/vote/:id` 单独读不到提案总票数 | 额度和「我已投」仍可读，总票数显示 `—`，详情仍有投票入口。点对应「重试」后，列表恢复显示 `该提案本轮共 0 票`，详情显示 `0 票` |
+
+本轮 8566 浏览器回归中，`gov-core-numbers.spec.ts` **12/12 通过**。验收截图覆盖投票列表和详情的浅色、深色、手机与桌面。 [投票列表](../screenshots/gov-core-vote-voted-dark-mobile.png) · [投票详情](../screenshots/gov-core-vote-detail-light-desktop.png)
 
 实跑（2026-11-21 07:30 前后，8555，复用链与 preview）：
 
@@ -140,7 +147,7 @@ Running 4 tests using 1 worker
 
 同一条 8555 链第二遍：`4 passed (49.1s) EXIT=0`；跑后回读 `automine=false`、`intervalMining=1`（挖矿模式未泄漏）。**8545 全程未被自动化触碰。**
 
-回调参数复验使用同一条 8574 临时链。`gov-core-numbers.spec.ts` 的 G1–G6 均通过，G1 的投票回执显示 100 票。G2 重新生成推举和投票成功状态的八张截图，分别核对了主题和视口尺寸。
+历史回调参数复验使用 8574 临时链。G1–G6 均通过，G2 重拍了推举和投票成功状态的八张截图。
 
 ## §4 三线对照表
 
@@ -149,9 +156,10 @@ Running 4 tests using 1 worker
 | 推举门槛 | `22360679774997896960` | 同左（§1，ceil 定义式独立复算） | `22.3606`（`gov-submit-eligibility-threshold`） | ✅ |
 | 推举成功 | `proposalId = 旧 count + 1`、`isSubmitted = true` | 同左（§2，15 条） | 回执 `提案 #1「…」已经推举进本轮。`；`gov-submit-submitted` | ✅ |
 | 同轮再推举 | revert `MemberAlreadySubmitted` | `0xc3487d0d`，参数 `(token, round, 1)` | 不覆盖（页面只渲染一次表单；合约兜底） | ✅ |
-| 投票 | `voteAmountByProposalId = voteAmountByMemberId = totalVoteAmount = 100e18` | 同左（§3，23 条） | 回执 `提案 #1：100 票` / `本轮合计投出 100 票`；页面 `我已投 100 票`、`本轮共 100 票` | ✅ |
+| 投票（前端线） | `voteAmountByProposalId = voteAmountByMemberId = totalVoteAmount = 100e18` | 前端线场景的链上读数与理论值相等 | 回执 `提案 #1：100 票` / `本次合计投出 100 票`；页面 `我已投 100 票`、`该提案本轮共 100 票` | ✅ |
+| 投票（合约线独立场景） | 该脚本独立使用 `1000e18` 输入并按同一公式核对三笔读数 | 三笔读数均等于 `1000e18` | 前端线不复用该场景 | ✅ |
 | 超额投票 | revert `VoteLimitExceeded` | `0xb60c38d3`，参数与手算逐字相等 | 前端本地拦截（`validateVoteAllocation`），不发交易 | ✅ |
-| 本轮治理权 | `4472135954999579391818` | 同左 | `4,472.13`（`gov-vote-power-max`） | ✅ |
+| 投票额度 | 未投票时，`maxVoteAmount = 4472135954999579391818` | 同左 | 「本轮已投」`0 票`，「还能投」`4,472.13 票`（`gov-vote-quota-used` / `gov-vote-quota-remaining`） | ✅ |
 | 激励预留 | `gov = proposal = floor(9000004500000900000090000003 × 5e14/1e18) = 4500002250000450000045000` | 同左（§4，30 条；`RoundRewardReserved` 逐字相等） | 页面不展示池子（只在提案激励页展示提案池） | ✅ |
 | 我的投票激励 | `2250001125000225000022500` | 同左（§6） | `2,250,001`（`gov-rewards-vote-<round>`） | ✅ |
 | 我的加速激励 | `0`（种子无加速质押） | 同左 | `0` | ✅ |
@@ -160,16 +168,9 @@ Running 4 tests using 1 worker
 | 提案激励池 | `4500002250000450000045000` | 同左 | `4,500,002`（`gov-proposal-rewards-pool`） | ✅ |
 | 提案门槛 | `ceil(100e18 × 5e16/1e18) = 5e18` | 同左（多投票人场景为 `234787137637477918073`） | `5`（`gov-proposal-rewards-threshold`）；行 `100 / 5` | ✅ |
 | 达标提案份额 | `4500002250000450000045000` | 同左（§7：`floor(pool×票/总票)`） | `4,500,002` + 说明「票数已过门槛，由提案目标合约铸造。」 | ✅ |
-| 未达标提案销毁 | `ceil` 门槛不足的份额 | 同左（`status=2`、`totalRewardBurned` 增量、事件逐字相等；重复销毁不 revert） | 前端线未覆盖（需同轮第二个被投票的提案 + 第二个有治理权的身份，见 §3 说明） | ✅（合约线覆盖） |
+| 未达标提案销毁 | `ceil` 门槛不足的份额 | 同左（`status=2`、`totalRewardBurned` 增量、事件逐字相等；重复销毁不 revert） | G8 覆盖从页面销毁低票提案激励 | ✅ |
 | `burnUnusedBoostReward` | `gov − gov/2` | 同左（§8） | 前端线不覆盖（页面没有入口） | ✅（合约线覆盖） |
-| 我的投票卡 · 本轮额度 | `voteAmountByMemberId` / 治理权 − 已投 | 同左（§1.2b / §3 G5；前端线按**当前轮**重新读） | `100` / `4,372.13`（`gov-my-votes-used/remaining`）；**不再出现** `gov-my-votes-max` | ✅ |
-| 记录（卡片预览两轮 / `/vote/records` 全量） | `votedProposalIdsByMemberId` + `voteAmountByProposalId`（分母=提案总票数） | 同左（§3 G5/G6） | 卡片：`查看全部投票记录 >>`；记录页：`治理第 R 轮 · 共投出 100 票`、`#1 …`、`我的投票 100`、`占该提案票数 100%` | ✅ |
-| 我的投票卡 · 本轮额度 | `maxVoteAmount` / `voteAmountByMemberId` | 同左（§1.2b / §3；前端线按当前轮重新读） | `4,472.13` / `100` / `4,372.13`（`gov-my-votes-max/used/remaining`） | ✅ |
-| 记录（卡片预览两轮 / `/vote/records` 全量） | `votedProposalIdsByMemberId` + `voteAmountByProposalId`（分母=提案总票数） | 同左（§3 G5/G6） | 卡片：`查看全部投票记录 >>`；记录页：`治理第 R 轮 · 共投出 100 票`、`#1 …`、`我的投票 100`、`占该提案票数 100%` | ✅ |
+| 我的投票卡 · 本轮已投 | `voteAmountByMemberId` | 同左（§1.2b / §3 G5） | `100`（`gov-my-votes-used`，若当前轮已切换则为 `0`） | ✅ |
+| 记录（卡片预览两轮 / `/vote/records` 全量） | `votedProposalIdsByMemberId` + `voteAmountByProposalId`（分母=提案总票数） | 同左（§3 G5/G6） | 卡片 `查看全部投票记录 >>`。记录页 `治理第 R 轮`、`#1 …`、`我的投票 100`、`占该提案票数 100%` | ✅ |
 
-**结论**：
-
-1. **§1 理论线与 §2 合约线逐 wei 相等**：190 条断言里所有数值用例都成对通过（推举门槛、票数累计、两池拆分、成员份额、提案份额、销毁金额）。§1 的公式与 `domain/gov-core.ts` 的实现一一对应（合约线复核过，无偏差）。
-2. **§3 前端线与 §2 的页面可见数值逐字相等**：`4,472.13` / `22.3606` / `100` / `2,250,001` / `4,500,002` / `5`。前端线用 55 处 `toHaveText` 整串精确断言，且期望值由 spec 直连 RPC 读回、独立实现格式化规则（不 import `src/` 的格式化函数）。
-3. **未覆盖**（如实记录）：达标提案的 `mintProposalReward`（只有提案目标合约能调，本地链没有已注册的目标合约）、未达标销毁的**前端**路径（需要同轮第二个被投票的提案，e2e 夹具成本高；合约线已覆盖）、错误路径（`RoundNotEnded`、`ProposalBelowThreshold` 等）与批量混入不可铸轮次。
-4. **验证命令**：`node scripts/verify/gov-core-contract.mjs --rpc http://127.0.0.1:8566`（190/190，EXIT 0，连跑 3 次一致）；`pnpm e2e --grep "治理核心"`（6/6）；全量 `pnpm e2e` **164/164（11.0m，EXIT 0）**；`pnpm check`（format+typecheck+lint+单测 **924 passed**）；首屏包体 prod **159.4 kB** gzip（预算 160，无 WARN）。
+前端线按预期字符串精确校验，并独立实现格式化规则。部分旧用例用直连链的读数作为输入，§1 保留独立手算的数值基线。达标提案的 `mintProposalReward` 只能由目标合约调用，当前页面只展示状态。

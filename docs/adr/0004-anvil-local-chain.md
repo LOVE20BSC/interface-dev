@@ -1,6 +1,6 @@
 # 0004 本地链（anvil）：可复现部署与集成夹具
 
-`anvil/` 是独立的兄弟仓，唯一职责是为前端提供**可复现的本地链部署与集成夹具**：一条 `make bootstrap` 从空链、deployer nonce 0 开始拉起 anvil，部署 Multicall3、WETH/UniswapV2、Airdrop、core、action、group-chat，按真实协议路径 seed，导出地址簿/ABI，并逐项验证（约 45–50 秒）。它只读兄弟合约仓，不修改它们；`anvil/export/deployments/anvil31337_dev.json` + `export/abis/*.json` 是前端 anvil 变体**唯一**的地址来源，前端只通过 `pnpm sync:anvil` 消费。
+`anvil/` 是独立的兄弟仓，负责为前端提供**可复现的本地链部署与集成夹具**。`make bootstrap` 从空链、deployer nonce 0 开始部署协议，写入种子数据，导出地址簿和 ABI，并逐项验证。它只读取兄弟仓的合约源码。前端通过 `pnpm sync:anvil` 从选定的部署导出同步地址簿和 ABI。
 
 - **Status**: Accepted
 - **Date**: 2026-11-11
@@ -13,7 +13,7 @@
 
 约束：
 
-- 兄弟仓 `core/`、`action/`、`group-chat/`、`libs/`、`dex/` 是**只读输入**；本仓只编译与读取产物（`core/out`、`action/out`、`group-chat/out`、`dex/build`），不在兄弟仓里执行 `forge build`。
+- 兄弟仓 `core/`、`action/`、`group-chat/`、`libs/`、`dex/` 是**只读输入**。Anvil 编译部署所需的 ABI，并读取 `dex/build` 中的发布产物。
 - `dex/build/` 是外部前置；缺失时 preflight 直接报错并给出自行构建的命令，不代劳。
 - **全新链 + nonce 0** 下地址与导出块高都确定：bootstrap 期间 anvil 用 automine（一笔交易一个块），结束后才切回 `--block-time 1`；两次 `make stop && make clean && make bootstrap` 的 `export/deployments/anvil31337_dev.json` 字节相同。
 - 历史教训：曾经在一条已经用过的链上重跑 bootstrap，导出被写成 nonce 43 的地址，随后又反过来手工设置 nonce 去迎合地址簿；地址簿因此不可复现。该做法已被代码禁止（见 §6）。
@@ -39,7 +39,7 @@ seed 不使用 `deal`、`anvil_setStorageAt` 或任何状态伪造；每个测�
 
 **铸造空投份额（合约 `claim`）→ 用铸造到的 LOVE20 铸造 MemberNFT → `Stake.stakeLiquidity` 注入首个池子**。
 
-原因：`Launch` 只 `createPair`，交易对按设计是**零储备**的，所以第一个可交易的池子只能由成员主动质押流动性产生。fixture 覆盖 10 个账户（各 1e17 share）；前 5 个铸造空投份额并铸造身份，member 0 再质押 2e23 首币 + 1e20 WETH，得到 200,000 token / 100 WETH 的初始池。这条路径同时证明“空投 → 身份 → 流动性 → 治理权重”的 onboarding 漏斗可达：`Stake` 把 `liquidityShares` 记为 `govVotes`，seed 出的成员可以直接投票/提交。
+`Launch` 创建零储备的交易对。种子快照覆盖 10 个账户，每个账户有 `1e17` 空投份额。前 5 个账户铸造空投并铸造身份，Anvil 账户 #0（身份 NFT #1）再质押 `2e23` 首币和 `1e20` WETH，得到 200,000 首币和 100 WETH 的初始池。种子仓位尚未申请解锁，承诺解锁期为 1 个阶段，所以 `Stake.govPower` 等于其流动性质押份额。该身份可以用这笔治理权推举提案和投出治理票。
 
 ### 4. Airdrop 必须先于 core
 
@@ -49,19 +49,18 @@ vendored 的 Airdrop（来自 `LOVE20TKM/burn`）没有实现 `ILaunchDistributo
 
 ### 5. 端口策略
 
-默认且规范端口是 **`127.0.0.1:8545`**：`make bootstrap` 与 `make anvil` 都按它起链，前端环境包的 `rpcUrls` 只能有一条，规范值就是这条 8545。`make bootstrap` **从不复用**已运行的链：它要求 `make stop && make clean` 后的全新状态，否则直接失败。`make anvil` 单独使用时才在能确认“这是自己启动的链”时复用（`.anvil/anvil.pid` 与端点匹配）；否则拒绝附着，并打印“停掉它”或“换端口”两条出路。`PORT=` / `HOST=` 会同时移动 anvil 进程与所有 RPC URL，但只作一次性逃生口。
-
-**8555 只用于一次历史验证，不是第二个默认值**：早前的一次验证运行时，一个更早的前端 checkout 留下的 anvil 占着 8545 跑了一整天，因此那次用 `PORT=8555` 完成。后来该外来进程已停掉，规范链重新在 8545 上 `make bootstrap` 并在 8545 上验证；`export/deployments/anvil31337_dev.json` 与前端地址簿的地址、块高都来自这一规范运行，且在全新链上可复现。**同一时刻只允许一条本地链**：前端只指向一个 RPC，两条 anvil 并行会让导出地址与页面读数分属两条链。端口冲突时先停掉占用 8545 的进程，再 `make bootstrap`；本仓不杀不是自己启动的进程。
+**8545** 是默认人工链，导出到 `export/`。**8555** 供全量浏览器测试，**8566** 供三线校验。其他端口的运行记录、Foundry 产物和导出均位于 `.anvil/<port>/`，因此各链可以并行部署。`make bootstrap` 需要该端口的全新链。`make anvil` 可以复用本仓启动且 PID 与端点都匹配的链。
 
 ### 6. Export 契约与单向同步
 
-`export/deployments/anvil31337_dev.json`（`network`、`chainId`、`rpcUrl`、`contracts`、`addresses`、`libraries`、`uniswapV2`、`airdrop`、`params`）与 `export/abis/*.json`（19 份 ABI）是前端 anvil 变体**唯一**的地址/ABI 来源。
+`export/deployments/anvil31337_dev.json` 与 `export/abis/*.json`（21 份 ABI）是前端 Anvil 变体的地址和 ABI 来源。
 
 - **地址只认 JSON 的 `addresses` / `contracts`**；任何文档表格、README 示例、聊天记录里的地址都不算来源。
 - **兄弟仓提交的 `script/network/anvil31337_dev/addresses.*.params` 永不读取**：它们与本地实际部署不一致，且彼此互相矛盾（README §4 已记录）。
-- **地址永远由部署派生**：`make bootstrap` → `pnpm sync:anvil` → 提交生成物。`scripts/sync-anvil.mjs` 一次性写 `src/config/network/anvil31337_dev/network.json`、`src/config/abis/*.ts`、`src/config/abis/manifest.json` 与 `src/config/network/anvil31337_dev/airdrop.json`；脚本可重复执行，第二次只打印 `unchanged`。
+- **地址永远由部署派生**。`pnpm sync:anvil` 默认读 `../anvil/export`。验证链可用 `ANVIL_EXPORT_DIR=../anvil/.anvil/8566/export` 指定同一次部署的产物。同步一次写入 `src/config/network/anvil31337_dev/network.json`、`src/config/abis/*.ts`、`src/config/abis/manifest.json` 和空投快照。重复同步相同产物时，文件内容不变。
 - **禁止手改地址/Nonce**：不手工 pin 地址，不 `anvil_setNonce`，不为了“让链匹配地址簿”改部署顺序。地址簿跟随部署，不是部署跟随地址簿。结构性偏移（本仓没有）只能作为 `params/anvil31337_dev/*.params` 的显式参数。
-- **`manifest.json` 是 ADR-0002 §3 的落点**：每个来源仓（core/action/group-chat/libs，另加 dex/anvil）的 git HEAD、anvil 导出块高/时间、每个合约的 ABI 条目数与生成模块清单。`pnpm abis:check` 在存在 `../anvil/export` 时重新生成并逐字节比对，缺失时明确跳过（CI 没有兄弟仓）。
+- **`manifest.json` 记录部署来源**。Anvil 在部署时从本次 Foundry 产物和发布的 DEX 产物取得 ABI；部署 JSON 的 `provenance` 记录各来源仓的提交，或注明工作区、基线提交及变更指纹。同步校验 ABI 的 SHA-256，并在前端清单记录导出区块号、各 ABI 的条目数及哈希。
+- **`pnpm abis:check`** 逐字节核对导出与前端生成物。正式检查要求来源为已提交源码，`--allow-working-tree` 供本地送审核对。缺少 `../anvil/export` 时跳过导出比对。
 - **确定性证明**（两次输出必须同 hash）：
 
 ```bash
@@ -88,4 +87,4 @@ dev profile 以 **120 块/phase** 为准（`PHASE_ORIGIN_PHASE_BLOCKS=120`，`ma
 - 地址只在**全新链**上确定；重跑前必须 `make stop && make clean`，bootstrap 会拒绝复用旧链（见 §2、§5）。规范端口 8545 可能被别的 anvil 占用，先停掉占用者再 `make bootstrap`。
 - 本地链无法可靠给手机钱包用（钱包拒绝 `http:` RPC），移动端验收仍走测试网或 HTTPS 隧道（ADR-0001）。
 - **Pages 上的 dev 构建只能做 UI/文案预览**：HTTPS 页面里的浏览器会拦截对回环 RPC 的请求（2026-11-12 复现：`Permission was denied for this request to access the 'loopback' address space`，目标 `http://127.0.0.1:8545/`，来源 `https://love20bsc.github.io`）。交互测试必须用 `localhost` 本地服务（`pnpm dev`，如 `http://localhost:5180`），或换成可访问的链；界面在命中「HTTPS 页面 + 回环 RPC」时显示一次可关闭的说明（`src/app/shell/rpc-blocked-notice.tsx`），不要把浏览器拦截误报成「网络可能不稳」。
-- 前端生成物（地址簿、ABI、manifest、快照）必须与 anvil 导出同一个 commit 一起提交；`pnpm abis:check` 是本地/有兄弟仓 job 的漂移门禁，CI 前端 job 无兄弟仓时只能跳过。
+- 更新部署时，先在各源码仓提交对应变更，再用这些提交部署。在 Anvil 仓提交导出，并在前端仓提交同一部署生成的地址簿、ABI、清单和快照。

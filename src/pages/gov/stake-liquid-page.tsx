@@ -1,3 +1,4 @@
+import { STAKE_DECIMALS } from '@/domain/gov-stake';
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount, UNKNOWN } from '@/shared/lib/format';
@@ -13,8 +14,6 @@ import { GovCommunityPanel } from '@/features/governance-stake/ui/gov-community-
 import { GovGate, GovTxFeedback } from '@/features/governance-stake/ui/gov-gate';
 import { hasStakePosition, MyStakeSummary } from '@/features/governance-stake/ui/my-stake-summary';
 import { StakeStatRow } from '@/features/governance-stake/ui/stake-controls';
-
-const VOTE_DECIMALS = 18;
 
 /**
  * 流动性质押数据（复刻 TKM `/stake/liquid`，只读）：社区流动性质押 + 我的明细 +
@@ -41,7 +40,7 @@ function LiquidBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q: str
   const { token, parent } = ctx;
   if (token === undefined || parent === undefined) return null;
 
-  const mySharePercent = govSharePercent(ctx.member.govVotes, ctx.community.totalGovVotes);
+  const mySharePercent = govSharePercent(ctx.member.govPower, ctx.community.totalGovPower);
 
   return (
     <div className="space-y-4">
@@ -50,7 +49,7 @@ function LiquidBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q: str
         params={ctx.params}
         token={token}
         parent={parent}
-        myVotes={ctx.member.govVotes}
+        myGovPower={ctx.member.govPower}
       />
 
       <Card data-testid="gov-liquid-mine">
@@ -60,7 +59,7 @@ function LiquidBody({ ctx, q }: { readonly ctx: GovContextValue; readonly q: str
           <div className="mt-3">
             <StakeStatRow
               label={copy.gov.liquidPage.myShares}
-              value={formatTokenAmount(ctx.member.liquidityShares, VOTE_DECIMALS)}
+              value={formatTokenAmount(ctx.member.liquidityShares, STAKE_DECIMALS)}
               testId="gov-liquid-my-shares"
             />
             <StakeStatRow

@@ -1431,7 +1431,7 @@ export const copy = {
       durationDays: (days: string) => `约 ${days} 天`,
       /** 下拉选项：阶段数 + 预估时长，例如「10 个阶段 · 约 20 分钟」。 */
       phasesWithDuration: (phases: string, duration: string) => `${phases} 个阶段 · ${duration}`,
-      formula: '治理权 = 流动性质押份额 × 承诺解锁期',
+      formula: '治理权 = 尚未申请解锁的流动性质押份额 × 承诺解锁期的阶段数',
       boostNote: '只统计本阶段有效的加速份额',
       loading: '读取质押状态中…',
       errorTitle: '质押状态暂时读不到',
@@ -1460,9 +1460,9 @@ export const copy = {
       insufficient: (symbol: string, shortfall: string) => `${symbol} 不够，还差 ${shortfall}`,
       optimalHint: (token: string, tokenSymbol: string, parent: string, parentSymbol: string) =>
         `按池子比例实际存入 ${token} ${tokenSymbol} + ${parent} ${parentSymbol}。`,
-      votesLabel: '预计获得治理权',
-      votesValue: (votes: string) => `+${votes}`,
-      votesNote: '按链上实际份额计算，成交后以回执为准。',
+      govPowerLabel: '预计获得治理权',
+      govPowerValue: (power: string) => `+${power}`,
+      govPowerNote: '按链上实际份额计算，成交后以回执为准。',
       submit: '质押流动性',
       submitting: '质押中…',
       approveTitle: '质押前先授权这两枚代币',
@@ -1498,7 +1498,7 @@ export const copy = {
       emptyTitle: '这个身份 NFT 还没有质押。',
       emptyBody: '质押流动性之后，这里会显示流动性质押份额与加速激励质押量。',
       emptyAction: '去质押流动性',
-      votes: '我的治理权',
+      govPower: '我的治理权',
       shares: '流动性质押份额',
       boost: '加速质押份额',
       phases: '承诺解锁期',
@@ -1513,7 +1513,7 @@ export const copy = {
           ? `还要再等 ${phases} 个阶段才能撤出。`
           : `还要再等 ${phases} 个阶段（约 ${minutes} 分钟）才能撤出。`,
       stateWithdrawable: '可以撤出了',
-      stateWithdrawableNote: '撤出后这些代币会回到钱包，治理权清零。',
+      stateWithdrawableNote: '治理权在申请解锁时已清零。撤出后这些代币会回到钱包。',
       stateUnknown: '解锁状态暂时读不到。',
       /** 已申请解锁时治理页「我的」不再显示四项数据，只提示状态 + 去解锁页（owner 2026-11-19）。 */
       unlockingTitle: '已申请解锁',
@@ -1535,7 +1535,7 @@ export const copy = {
       unstakeConfirm: '确认申请解锁',
       withdraw: '撤出',
       withdrawTitle: '确认撤出？',
-      withdrawBody: '撤出后这份质押结束，治理权和加速份额一起清零。',
+      withdrawBody: '撤出后这份质押结束，可取回的代币会回到钱包。',
       withdrawConfirm: '确认撤出',
       cancel: '取消',
       readError: '质押数据暂时读不到。',
@@ -1543,7 +1543,7 @@ export const copy = {
     },
     community: {
       title: '社区治理数据',
-      totalVotes: '社区总治理权',
+      totalGovPower: '社区总治理权',
       totalShares: '社区总流动性质押份额',
       myShare: '我的占比',
       totalBoost: '本阶段社区有效加速份额',
@@ -1552,8 +1552,6 @@ export const copy = {
     },
     rules: {
       title: '规则',
-      votes:
-        '治理权 = 流动性质押份额 × 承诺解锁期。份额来自你存入的流动性；承诺解锁期可以增加，不能缩短。',
       boost:
         '加速质押不产生治理权。投票时会按当时的加速份额记入这一轮；治理激励里「加速激励」那一部分，按它占社区加速份额的比例分配。',
       unlock:
@@ -1592,7 +1590,7 @@ export const copy = {
     home: {
       tabs: { mine: '我的', community: '社区' },
       /** 「我的」摘要四格。 */
-      myVotes: '我的有效治理权',
+      myGovPower: '我的有效治理权',
       myPhases: '我承诺的解锁期',
       myShare: '我的治理权占比',
       myBoostShare: '加速质押占比',
@@ -1601,7 +1599,7 @@ export const copy = {
       boostLink: '增加加速激励',
       mintRewardAction: '铸造治理激励',
       /** 「社区」摘要：头条数字 + 一个行动入口 + 四格。 */
-      communityVotes: '社区总治理权',
+      communityGovPower: '社区总治理权',
       communityShares: '社区流动性质押份额',
       communityLp: '流动性凭证总量',
       communityBoost: '本阶段有效加速份额',
@@ -1623,7 +1621,6 @@ export const copy = {
           : `当前承诺解锁期：${phases} 个阶段（${duration}）`,
       /** owner 2026-11-18 20:05：按钮文案从「调整」改成「提高」。 */
       action: '提高',
-      cardHint: '质押期间治理权 = 流动性质押份额 × 承诺解锁期；想提高治理权就提高承诺解锁期。',
     },
     /**
      * 治理权查询（owner 2026-11-18 20:12 按 TKM 旧版截图重排）：
@@ -1652,8 +1649,8 @@ export const copy = {
       holder: '当前持有人地址',
       nameUnknown: '读不到名称',
       target: '查询目标地址',
-      votes: '治理权',
-      votesNote: '本阶段有效治理权',
+      govPower: '治理权',
+      govPowerNote: '本阶段有效治理权',
       share: '占总治理权比例',
       noteTitle: '备注',
       note: '治理权按本阶段有效值统计；已经申请解锁的质押，治理权为 0。',
@@ -1670,7 +1667,8 @@ export const copy = {
     myLiquidityTitle: '我的流动性质押',
     governorIntro: {
       title: '治理权的作用',
-      itemOwner: '治理权来自流动性质押：份额越多、承诺解锁期越长，治理权越大。',
+      itemOwner:
+        '治理权等于尚未申请解锁的流动性质押份额乘以承诺解锁期的阶段数。份额越多、承诺解锁期越长，治理权越大。',
       itemReward: (percent: string) => `每轮获得 ${percent}% 以上投票支持的提案，有提案激励。`,
       itemSubmit: (percent: string) => `有 ${percent}% 的治理权，每轮可推举一个提案进入投票列表。`,
     },
@@ -1776,11 +1774,12 @@ export const copy = {
       increasePhases: '承诺解锁期已提高',
       unstake: '已申请解锁',
       withdraw: '已撤出',
-      votes: (votes: string) => `治理权 +${votes}`,
+      govPowerAdded: (power: string) => `治理权 +${power}`,
       shares: (shares: string) => `流动性质押份额 +${shares}`,
       boostAmount: (amount: string, symbol: string) => `加速质押 ${amount} ${symbol}`,
       increasePhasesNote: (phases: string) => `承诺解锁期现在是 ${phases} 个阶段。`,
       unstakeNote: '治理权已经清零，等承诺解锁期走完就可以撤出。',
+      govPowerRemoved: (power: string) => `扣除治理权 ${power}`,
       withdrawNote: (token: string, tokenSymbol: string, parent: string, parentSymbol: string) =>
         `已撤出 ${token} ${tokenSymbol} + ${parent} ${parentSymbol}`,
       hash: '交易哈希',
@@ -1791,20 +1790,17 @@ export const copy = {
       refreshHint: '质押状态已重新读取。',
     },
     /**
-     * 治理·投票（core `Vote`）。术语按正式词条：投票 / 提案 / 治理权；
-     * 「治理票」只用于解释额度来源，界面统一写「治理权」。
+     * 治理·投票（core `Vote`）。质押与推举用「治理权」，治理票的数量写「X 票」。
      */
     vote: {
       title: '投票',
-      // owner 2026-11-22：投票改成「一屏一个提案」后，「一次投给多个提案」已不成立；
-      // 同时这句只讲额度规则，怎么投交给列表下方那句（同页两处都在教怎么投 = 重复）。
-      intro: '每轮能投的票数等于你的治理权，同一个提案可以分几次继续加票。',
-      powerTitle: '我的投票额度',
-      powerUsed: '本轮已投',
-      powerRemaining: '还能投',
-      powerUnit: '票',
-      powerNote: '治理权由流动性质押份额和承诺解锁期决定，每轮重新计算。',
-      noPowerBody: '治理权来自流动性质押。先质押流动性，下一轮就能投票。',
+      // 2026-11-27：页头说明累计上限。操作方式由列表提示说明。
+      intro: '每次投票时，本轮已投的票加上这次的票，不能超过你当前的治理权。',
+      quotaTitle: '我的投票额度',
+      quotaUsedLabel: '本轮已投',
+      quotaRemaining: '还能投',
+      count: (votes: string) => `${votes} 票`,
+      noPowerBody: '先质押流动性获得治理权，就能给本轮已推举的提案投票。',
       noPowerAction: '去质押流动性',
       roundTitle: '本轮提案',
       roundHint: (round: string) => `治理第 ${round} 轮`,
@@ -1814,23 +1810,25 @@ export const copy = {
       proposeAction: '推举提案',
       loading: '读取本轮提案中…',
       readFailed: '本轮提案暂时读不到。',
+      quotaReadFailed: '投票额度暂时读不到。',
+      proposalVotesReadFailed: '提案票数暂时读不到。',
       retry: '重试',
       targetUnsupported: '这个提案由目标合约处理，要在对应的行动页投票。',
       amountLabel: '投多少票',
       amountPlaceholder: '0',
-      amountInvalid: '投票票数要是大于 0 的整数。',
+      amountInvalid: '请输入大于 0 的票数。',
       amountTooMany: (remaining: string) => `合计超过还能投的 ${remaining} 票。`,
       amountNone: '至少给一个提案分票。',
-      /** 走查 2026-11-21（P2-3）：额度用完是中性状态，不该复用「超额」的错误口吻。 */
-      quotaUsed: '本轮票已经投完，等下一轮再投。',
+      /** 2026-11-27 对齐治理规则：提高当前治理权后可在同一轮继续加票。 */
+      quotaUsed: '本轮可投的票已用完。增加治理权后，本轮还能继续投票。',
       waitingWallet: '等待你在钱包确认',
       pending: '已提交，等待上链',
       revert: '交易上链了，但没有成功，票数没有变化。',
       receiptTitle: '投票结果',
       receiptLine: (id: string, votes: string) => `提案 #${id}：${votes} 票`,
-      receiptTotal: (votes: string) => `本轮合计投出 ${votes} 票`,
+      receiptTotal: (votes: string) => `本次合计投出 ${votes} 票`,
       /** 2026-11-22 owner：点列表里的提案进入独立的投票详情页。 */
-      listHint: '点任意提案进入投票；可以一次投 25%、50%、100% 的可用票数，也可以自己填。',
+      listHint: '点提案进入投票。可以按比例投，也可以自己填。同一个提案可以分多次加票。',
       openProposal: '去投票',
       myVotesOn: (votes: string) => `我已投 ${votes} 票`,
       totalVotesOn: (votes: string) => `该提案本轮共 ${votes} 票`,
@@ -1858,6 +1856,8 @@ export const copy = {
         referenceBadge: '不判激励阈值',
         notFoundTitle: '没有找到这个提案',
         notFoundBody: '提案编号可能不对，回本轮提案列表看看。',
+        notSubmitted: '这个提案本轮还没有被推举。推举进本轮后，这里会开放投票。',
+        votesReadFailed: '这个提案的投票数据暂时读不到。',
         readFailed: '这个提案暂时读不到。',
         retry: '重试',
         submit: '投票',
@@ -1873,7 +1873,6 @@ export const copy = {
       title: '我的投票',
       roundLabel: (round: string) => `治理第 ${round} 轮`,
       statVoted: '本轮已投',
-      unit: '票',
       goVote: '去投票',
       allVoted: '本轮票已经投完',
       noPower: '当前身份 NFT 本轮没有治理权，先质押流动性。',
@@ -1882,7 +1881,7 @@ export const copy = {
       emptyRecord: '还没有投票记录',
       emptyRecordHint: '给本轮提案投票后，这里会按轮次列出你投过的提案。',
       entryLine: (id: string, title: string) => (title.length > 0 ? `#${id} ${title}` : `#${id}`),
-      entryMine: (votes: string) => `我的投票 ${votes}`,
+      entryMine: (votes: string) => `我的投票 ${votes} 票`,
       entryShare: (percent: string) => `占该提案票数 ${percent}%`,
       loadMore: '加载更多轮次',
       loadingMore: '读取更多轮次中…',
@@ -1907,7 +1906,8 @@ export const copy = {
       eligibilityReason: (mine: string, required: string, ratio: string) =>
         `推举需要本轮治理权不低于 ${required}（社区总治理权的 ${ratio}），你现在是 ${mine}。`,
       eligibilityThreshold: (required: string) => `本轮推举门槛：${required} 治理权`,
-      eligibilityNoCommunity: '社区本轮还没有人质押，暂时算不出推举门槛。',
+      eligibilityNoCommunity: '社区本轮的总治理权是 0，暂时算不出推举门槛。',
+      stakeAction: '去质押流动性',
       /** 2026-11-22 owner：推举历史提案（`Submit.submit(proposalId)`）。 */
       historyTitle: '推举历史提案',
       historyIntro:
@@ -1924,8 +1924,8 @@ export const copy = {
       /** 本轮已经推举过（同一身份每轮一个）时，历史段顶部换成这条说明、不再给按钮。 */
       historyBlockedSubmitted: (id: string) =>
         `你本轮已经推举过提案 #${id}，历史提案要等下一轮才能推举。`,
-      /** 本轮还没有推举权（治理权没到门槛）时，历史段顶部给原因。 */
-      historyBlockedNoPower: '本轮还不能推举：治理权没到推举门槛。先质押流动性，下一轮再来。',
+      /** 2026-11-27 对齐治理规则：本轮达到门槛后即可推举。 */
+      historyBlockedNoPower: '治理权还没到本轮的推举门槛。质押流动性可以增加治理权。',
       historyNextRoundBadge: '下一轮',
       historyMineBadge: '我推举的',
       historyReceiptTitle: '推举结果',

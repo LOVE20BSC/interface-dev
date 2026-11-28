@@ -21,6 +21,7 @@
   make -C ../anvil bootstrap PORT=8566        # 约 1 分钟；结束时链在 http://127.0.0.1:8566
   # 用完： make -C ../anvil stop PORT=8566 && make -C ../anvil clean PORT=8566
   ```
+  这条链的地址簿和 ABI 位于 `../anvil/.anvil/8566/export/`。
   **禁止用 8545（人工链）跑任何校验**，也禁止用 8555（e2e 链）做本规范的合约线写入（e2e 链路有自己的快照语义）。
 - **账户**：anvil 固定账户（mnemonic `test test … junk`），**只升级需要的两个**：
   - `#1 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`（有身份 NFT，e2e 默认发送方）

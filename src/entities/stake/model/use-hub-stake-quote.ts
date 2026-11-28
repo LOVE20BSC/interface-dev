@@ -7,7 +7,7 @@ import type { HexAddress } from '@/config/networks';
  *
  * 原协议里「单币也能完成流动性质押」只能由 Hub 完成：它先把可支配的一侧换一点成
  * 另一侧，再以两侧存入 `Stake.stakeLiquidity`。报价同时给出最终治理权增量
- * （`govVotesAdded`）与份额增量（`liquiditySharesAdded`），页面用它显示「预计」并
+ * （`govPowerAdded`）与份额增量（`liquiditySharesAdded`），页面用它显示「预计」并
  * 折算滑点后的最少份额 `minLiquidityShares`——不在前端另算一套公式。
  */
 
@@ -25,7 +25,7 @@ export interface HubStakeQuoteFields {
   readonly expectedLiquidity: bigint;
   readonly liquiditySharesAdded: bigint;
   readonly liquidityShares: bigint;
-  readonly govVotesAdded: bigint;
+  readonly govPowerAdded: bigint;
 }
 
 export interface UseHubStakeQuoteOptions {

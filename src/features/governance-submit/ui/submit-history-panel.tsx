@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom';
 import type { HexAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import { Button } from '@/shared/ui/button';
+import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
 import { Sheet } from '@/shared/ui/sheet';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { TxStuckHint } from '@/shared/ui/tx-stuck-hint';
 import type { ProposalHistory } from '@/entities/gov-core/model/use-proposal-history';
+import type { SubmitContext } from '@/entities/gov-core/model/use-submit-context';
 import type { SubmitExistingWrite } from '../model/use-submit-existing';
 
 export interface SubmitHistoryPanelProps {
@@ -14,10 +15,7 @@ export interface SubmitHistoryPanelProps {
   readonly symbol: string;
   readonly tokenAddress: HexAddress;
   readonly memberId: bigint;
-  /** 本轮还能不能推举（门槛 + 每轮一个）；false 时按钮禁用并给原因。 */
-  readonly canSubmit: boolean;
-  /** 本轮这个身份已经推举的提案编号（0/undefined = 还没推举）。 */
-  readonly submittedThisRoundId: bigint | undefined;
+  readonly context: SubmitContext;
   /** 当前页（页码从 1 开始由页面换算成 offset）。 */
   readonly page: number;
   readonly totalPages: number | undefined;
@@ -41,8 +39,7 @@ export function SubmitHistoryPanel({
   symbol,
   tokenAddress,
   memberId,
-  canSubmit,
-  submittedThisRoundId,
+  context,
   page,
   totalPages,
   history,
@@ -51,7 +48,9 @@ export function SubmitHistoryPanel({
   onPageChange,
 }: SubmitHistoryPanelProps) {
   const busy = write.stage !== 'idle' || write.receipt !== null;
+  const submittedThisRoundId = context.submittedProposalThisRound;
   const alreadySubmitted = submittedThisRoundId !== undefined && submittedThisRoundId !== 0n;
+  const canSubmit = context.status === 'ready' && context.canSubmit === true && !alreadySubmitted;
   const canGoPrev = page > 1;
   const canGoNext = totalPages !== undefined && page < totalPages;
 
@@ -62,7 +61,7 @@ export function SubmitHistoryPanel({
           <CardTitle>{copy.gov.submit.listTitle}</CardTitle>
           <CardDescription className="mt-1">{copy.gov.submit.listIntro}</CardDescription>
         </div>
-        {alreadySubmitted ? null : (
+        {canSubmit ? (
           <Link
             to={`/submit/new?symbol=${encodeURIComponent(symbol)}`}
             data-testid="gov-submit-history-new"
@@ -70,7 +69,7 @@ export function SubmitHistoryPanel({
           >
             {copy.gov.submit.newAction}
           </Link>
-        )}
+        ) : null}
       </div>
 
       {alreadySubmitted ? (
@@ -80,17 +79,33 @@ export function SubmitHistoryPanel({
         >
           {copy.gov.submit.historyBlockedSubmitted(submittedThisRoundId.toString())}
         </p>
-      ) : canSubmit ? null : (
-        <p
-          className="mt-3 rounded-2xl border border-line bg-elevated px-3 py-2 text-xs leading-5 text-muted"
-          data-testid="gov-submit-history-blocked"
-        >
-          {copy.gov.submit.historyBlockedNoPower}
-        </p>
-      )}
+      ) : context.status === 'loading' ? (
+        <Skeleton className="mt-3 h-5 w-40" />
+      ) : context.status !== 'ready' ? (
+        <div className="mt-3">
+          <p role="alert" className="text-sm text-danger-strong">
+            {copy.common.readFailed}
+          </p>
+          <Button type="button" variant="secondary" size="md" className="mt-2" onClick={onRefetch}>
+            {copy.gov.gates.retry}
+          </Button>
+        </div>
+      ) : context.canSubmit === false ? (
+        <div className="mt-3 rounded-2xl border border-line bg-elevated px-3 py-2 text-xs leading-5 text-muted">
+          <p data-testid="gov-submit-history-blocked">{copy.gov.submit.historyBlockedNoPower}</p>
+          <Link
+            to={`/stake/liquidity?symbol=${encodeURIComponent(symbol)}`}
+            className={buttonStyles('secondary', 'md', 'mt-2')}
+            data-testid="gov-submit-history-stake"
+          >
+            {copy.gov.submit.stakeAction}
+          </Link>
+        </div>
+      ) : null}
 
       {history.status === 'loading' ? (
-        <div className="mt-3 space-y-2" data-testid="gov-submit-history-loading">
+        <div aria-busy="true" className="mt-3 space-y-2" data-testid="gov-submit-history-loading">
+          <span className="sr-only">{copy.common.loading}</span>
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-4 w-28" />
         </div>
@@ -99,7 +114,14 @@ export function SubmitHistoryPanel({
           <p role="alert" className="text-sm text-danger-strong">
             {copy.gov.submit.historyReadFailed}
           </p>
-          <Button type="button" variant="secondary" size="md" className="mt-2" onClick={onRefetch}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="md"
+            className="mt-2"
+            data-testid="gov-submit-history-retry"
+            onClick={onRefetch}
+          >
             {copy.gov.submit.historyRetry}
           </Button>
         </div>
@@ -125,7 +147,7 @@ export function SubmitHistoryPanel({
                     </p>
                     {/* 「本轮已推举」只由右侧状态列表达，行内不再重复一遍（owner 2026-11-22 去重口径）。 */}
                     <p className="mt-0.5 text-[11px] leading-4 text-muted">
-                      {copy.gov.vote.detail.authorLabel} #{proposal.submitterId.toString()}
+                      {copy.gov.vote.detail.authorLabel} #{proposal.authorId.toString()}
                     </p>
                   </div>
                   {alreadySubmitted ? (

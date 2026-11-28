@@ -1,4 +1,5 @@
 import { formatUnits } from 'viem';
+import { VOTE_DECIMALS } from '@/domain/gov-core';
 
 /**
  * 「提案投票详情页」的快捷百分比（owner 2026-11-22）。
@@ -19,7 +20,7 @@ export type VoteQuickPercent = (typeof VOTE_QUICK_PERCENTS)[number];
 export function votesForPercent(
   remaining: bigint | undefined,
   percent: VoteQuickPercent,
-  decimals = 18,
+  decimals = VOTE_DECIMALS,
 ): bigint | undefined {
   if (remaining === undefined || remaining <= 0n) return undefined;
   const oneVote = 10n ** BigInt(decimals);
@@ -30,7 +31,7 @@ export function votesForPercent(
 }
 
 /** 票数 → 输入框文本：整数不带小数点，小数去掉尾随 0（与页面其他金额输入同一形）。 */
-export function votesToInputText(value: bigint, decimals = 18): string {
+export function votesToInputText(value: bigint, decimals = VOTE_DECIMALS): string {
   const text = formatUnits(value, decimals);
   if (!text.includes('.')) return text;
   return text.replace(/0+$/, '').replace(/\.$/, '');

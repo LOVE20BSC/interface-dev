@@ -456,19 +456,16 @@ const loadMintPage = () => import('@/pages/mint/mint-page');
 
 ### 3.10 CI 跑什么（G9）
 
-`.github/workflows/deploy.yml` 三个 job：
+`.github/workflows/deploy.yml` 定义四个作业。
 
 | job | 行号 | 步骤（顺序即失败顺序） |
 | --- | --- | --- |
 | `prepare` | `:50-122` | 按仓库名解析变体（含 `dev` → dev；含 `test` → test；否则 prod，`:74-83`），默认 base `/interface-dev/`、`/interface-test/`、`/`（`:88-96`），`vars.VITE_ENV` / `vars.VITE_BASE` / `vars.VITE_SITE_ORIGIN` 显式覆盖 |
-| `check` | `:124-159` | 拒绝被跟踪的 `.account`（`:130-135`）→ pnpm 11.5.1（`:137-139`）→ Node 24（`:141-144`）→ `pnpm install --frozen-lockfile`（`:146-147`）→ `pnpm typecheck`（`:149-150`）→ `pnpm lint`（`:152-153`）→ `pnpm format:check`（2026-11-17 新增）→ `pnpm test`（`:155-156`）→ `pnpm build`（`:158-159`） |
-| `build` | `:161-199` | 再装一次 → `pnpm build`（`:182-187`，注入 `VITE_ENV`/`VITE_BASE`/`VITE_SITE_ORIGIN`）→ `configure-pages` → `upload-pages-artifact` |
-| `deploy` | `:201-214` | `deploy-pages`（`permissions: pages: write, id-token: write`） |
+| `check` | `:124-168` | 拒绝被跟踪的 `.account` → 安装 pnpm 11.5.1 和 Node 24 → `pnpm install --frozen-lockfile` → `pnpm abis:check --sources-only` → 类型、Lint、格式、单测、构建 |
+| `build` | `:170-205` | 再装一次 → `pnpm build`（注入 `VITE_ENV`/`VITE_BASE`/`VITE_SITE_ORIGIN`）→ `configure-pages` → `upload-pages-artifact` |
+| `deploy` | `:206-219` | `deploy-pages`（`permissions: pages: write, id-token: write`） |
 
-CI 明确不做的两件事：
-
-- ABI 漂移门禁（`pnpm abis:check`）不在这个 workflow：注释 `:189-191` 说明该 checkout 没有 forge / 兄弟仓库。
-- 不跑 e2e（需要 anvil 链）。`format:check` 自 2026-11-17 起已在 `check` job 里，不再属于缺口。
+CI 校验 ABI 清单中的部署来源，工作区来源会拦下构建。完整的 ABI、地址簿和快照比对需要同一次部署的 Anvil 导出。e2e 在本地用专用 Anvil 链运行。
 
 `pnpm build` 自身是一条 5 段链：`gen-build-id` → `pnpm typecheck` → `vite build` → `postbuild` → `check-bundle`（`package.json:12`）；所以「CI 的 build 步」= 类型 + 产物 + 404.html + 包体门禁。
 
@@ -1535,7 +1532,7 @@ git config --get core.hooksPath           # 应输出 .githooks
 
 | 情况 | 行为 |
 | --- | --- |
-| 改了源码/测试/脚本/配置 | 跑完整 `pnpm check`，失败即拦下提交 |
+| 改了源码/测试/脚本/配置 | 检查暂存的 ABI 清单来源，再跑完整 `pnpm check`，失败即拦下提交 |
 | 只改 `docs/`、`ledger/`、截图等 | 自动跳过（不匹配白名单路径），不浪费时间 |
 | 机器上没有 `pnpm` | 报错退出，**不静默放行**，并提示装 pnpm 或显式跳过 |
 | 紧急情况 | `SKIP_PRE_COMMIT=1 git commit …` 或 `git commit --no-verify`；允许，但必须在提交信息里写明原因 |
@@ -1544,7 +1541,7 @@ git config --get core.hooksPath           # 应输出 .githooks
 **必须知道的边界**
 
 - 钩子可以被 `--no-verify` 绕过，所以它是**质量默认值**，不是安全机制。
-- 钩子只存在于装过它的机器；CI（typecheck / lint / test / build）才是最终底线。
+- CI 复核 ABI 清单来源，并执行类型、Lint、格式、单测和构建检查。
 - e2e 既不在钩子里也不在 CI 里 → **「CI 绿了」不能代替跑 e2e**（§7.6）。
 - 钩子拦不住判断类规则（文案、术语、「未知值不显示 0」）——那些靠 §4/§5 与 §7 的测试策略。
 ### 9.3 三仓发布顺序
@@ -1782,7 +1779,7 @@ git config --get core.hooksPath           # 应输出 .githooks
 | # | 决定 | 现状 | 建议 |
 | --- | --- | --- | --- |
 | D1 | **Prettier 要不要变成门禁** | **已决 2026-11-17：选 A**。一次性全仓格式化（71 个文件，`ledger/` 加入 `.prettierignore`）→ `format:check` 并入 `pnpm check` → CI 加独立步。现状：`pnpm format:check` 全绿，格式是 [门禁] | — |
-| D2 | **format:check / e2e 要不要进 CI** | CI 只有 typecheck / lint / test / build；e2e 需要 anvil 链（约 10 分钟） | e2e 进 CI 的成本是每次 10 分钟 + 起链脚本；当前选择是本地跑、CI 不跑。若 M1 开始并行开发，建议至少给 `main` 加一条 nightly e2e |
+| D2 | **e2e 要不要进 CI** | 格式和 ABI 清单来源已在 CI 校验。e2e 在本地用 Anvil 链运行 | 如果 M1 并行开发需要定期回归，考虑在 `main` 增加定时 e2e |
 | D3 | **三线校验端口是否强制钉死** | 规范钉 8566；实际任务里出现过 8569 / 8574（原因未记录） | 建议强制「换端口必须在三线文档 §0 写明本次端口与原因」，避免复现时对不上环境 |
 
 ### 11.3 现状记录（[必守] 或干脆没有门禁，别误以为有保护）

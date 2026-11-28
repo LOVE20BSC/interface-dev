@@ -4,13 +4,14 @@ import { configuredAddress } from '@/config/networks';
 import { usePhaseClock } from '@/entities/phase/model/use-phase-clock';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
 import { useGovAccess } from '@/entities/gov-core/model/use-gov-access';
+import { useProposalVotes } from '@/entities/gov-core/model/use-proposal-votes';
 import { useRoundProposals } from '@/entities/gov-core/model/use-round-proposals';
-import { useVotePower } from '@/entities/gov-core/model/use-vote-power';
+import { useVoteQuota } from '@/entities/gov-core/model/use-vote-quota';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { GOV_POLL_MS } from '@/features/governance-stake/model/use-gov-context';
 import { RoundProposalList } from '@/features/governance-vote/ui/round-proposal-list';
-import { VotePowerCard } from '@/features/governance-vote/ui/vote-power-card';
+import { VoteQuotaCard } from '@/features/governance-vote/ui/vote-quota-card';
 import { GovAccessGate } from '@/widgets/gov-access-gate/gov-access-gate';
 import { buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
@@ -31,7 +32,8 @@ export function VotePage() {
   const round = clock.currentPhase;
 
   const proposals = useRoundProposals(token.address, { round });
-  const power = useVotePower(
+  const quota = useVoteQuota(token.address, round, access.memberId);
+  const votes = useProposalVotes(
     token.address,
     round,
     access.memberId,
@@ -41,7 +43,8 @@ export function VotePage() {
 
   const refetchAll = () => {
     proposals.refetch();
-    power.refetch();
+    quota.refetch();
+    votes.refetch();
     clock.refetch();
     token.refetch();
     access.refetch();
@@ -54,7 +57,7 @@ export function VotePage() {
       </h1>
       <p className="text-sm leading-6 text-muted">{copy.gov.vote.intro}</p>
       <GovAccessGate access={access} isWrongChain={isWrongChain} symbol={symbol}>
-        {proposals.status === 'error' ? (
+        {clock.status === 'error' || proposals.status === 'error' ? (
           <div className="space-y-3" data-testid="gov-vote-list-error">
             <p role="alert" className="text-sm text-danger-strong">
               {copy.gov.vote.readFailed}
@@ -62,12 +65,13 @@ export function VotePage() {
             <button
               type="button"
               className="h-11 rounded-2xl border border-line bg-surface px-4 text-sm text-foreground"
+              data-testid="gov-vote-list-retry"
               onClick={refetchAll}
             >
               {copy.gov.vote.retry}
             </button>
           </div>
-        ) : proposals.status === 'loading' ? (
+        ) : clock.status === 'loading' || proposals.status === 'loading' ? (
           <p className="text-sm text-muted" data-testid="gov-vote-loading">
             {copy.gov.vote.loading}
           </p>
@@ -77,7 +81,7 @@ export function VotePage() {
           </p>
         ) : (
           <>
-            <VotePowerCard power={power} symbol={symbol} />
+            <VoteQuotaCard quota={quota} symbol={symbol} />
             {proposals.items.length === 0 ? (
               <Card data-testid="gov-vote-empty">
                 <CardTitle>{copy.gov.vote.emptyTitle}</CardTitle>
@@ -92,7 +96,7 @@ export function VotePage() {
             ) : (
               <RoundProposalList
                 proposals={proposals.items}
-                power={power}
+                votes={votes}
                 symbol={symbol}
                 roundLabel={
                   round === undefined

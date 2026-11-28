@@ -11,7 +11,7 @@
 // 口径：期望值全部由「链上读回的读数 + core/src/{Submit,Vote,Mint}.sol 的整数公式」在脚本里
 // 现算（`Math.mulDiv` 即 floor；推举门槛/提案门槛是 `Math.Rounding.Ceil`，逐式照合约），
 // 链上 view 只作为被断言对象，不抄任何 §1 常量。地址读
-// `src/config/network/anvil31337_dev/network.json`，ABI 读 `../anvil/export/abis/*.json`。
+// 所选端口的 Anvil 导出（默认 `../anvil/.anvil/8566/export`），ABI 读同一份导出。
 //
 // 交易用 anvil 的 unlocked 确定性账户（#0 `0xf39F…2266` 持身份 NFT #1 与全部治理权；
 // §7 的第二个推举人/投票人用持身份 NFT #5 的 #4 `0x15d3…6A65`）。
@@ -20,7 +20,7 @@
 // （automine / interval mining）在 finally 里恢复原值。退出码非 0 = 失败。
 
 import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   createTestClient,
@@ -35,12 +35,6 @@ import {
 } from 'viem';
 
 // ─── 0. 路径 / 参数 / 链守卫 ─────────────────────────────────────────────────────
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = resolve(HERE, '../../..'); // LOVE20BSC
-const FRONTEND_ROOT = resolve(REPO_ROOT, 'interface-dev-dsh');
-const NETWORK_FILE = resolve(FRONTEND_ROOT, 'src/config/network/anvil31337_dev/network.json');
-const ABI_DIR = resolve(REPO_ROOT, 'anvil/export/abis');
 
 const CHAIN_ID = 31337;
 const DEFAULT_RPC = 'http://127.0.0.1:8566';
@@ -117,11 +111,18 @@ function assertDedicatedChain(rpcUrl) {
         '  专用验证链：cd ../anvil && make bootstrap PORT=8566，然后 --rpc http://127.0.0.1:8566。',
     );
   }
+  return port;
 }
 
 const args = parseArgs(process.argv.slice(2));
 const RPC = (args.rpc ?? process.env.VERIFY_RPC ?? DEFAULT_RPC).replace(/\/+$/, '');
-assertDedicatedChain(RPC);
+const port = assertDedicatedChain(RPC);
+const EXPORT_DIR = resolve(
+  process.env.ANVIL_EXPORT_DIR ??
+    fileURLToPath(new URL(`../../../anvil/.anvil/${port}/export/`, import.meta.url)),
+);
+const NETWORK_FILE = resolve(EXPORT_DIR, 'deployments/anvil31337_dev.json');
+const ABI_DIR = resolve(EXPORT_DIR, 'abis');
 
 const ABI_FILES = {
   LOVE20Token: 'LOVE20Token.json',
@@ -141,29 +142,29 @@ const ABIS = Object.fromEntries(
   ]),
 );
 
-const network = loadJson(NETWORK_FILE, '地址簿（network.json）');
+const network = loadJson(NETWORK_FILE, '部署地址簿');
 const addresses = network?.addresses ?? {};
-const params = network?.params ?? {};
+const params = network?.coreParams ?? {};
 
 const CONTRACTS = {
-  token: { addressKey: 'tokenAddress', abi: 'LOVE20Token', label: 'LOVE20Token' },
-  memberNFT: { addressKey: 'memberNFT', abi: 'MemberNFT', label: 'MemberNFT' },
-  stake: { addressKey: 'stake', abi: 'Stake', label: 'Stake' },
-  submit: { addressKey: 'submit', abi: 'Submit', label: 'Submit' },
-  vote: { addressKey: 'vote', abi: 'Vote', label: 'Vote' },
-  mint: { addressKey: 'mint', abi: 'Mint', label: 'Mint' },
-  phase: { addressKey: 'phase', abi: 'Phase', label: 'Phase' },
-  launch: { addressKey: 'launch', abi: 'Launch', label: 'Launch' },
-  weth: { addressKey: 'weth', abi: 'WETH9', label: 'WETH9' },
+  token: { addressKey: 'LOVE20_TOKEN_ADDRESS', abi: 'LOVE20Token', label: 'LOVE20Token' },
+  memberNFT: { addressKey: 'MEMBER_NFT_ADDRESS', abi: 'MemberNFT', label: 'MemberNFT' },
+  stake: { addressKey: 'STAKE_ADDRESS', abi: 'Stake', label: 'Stake' },
+  submit: { addressKey: 'SUBMIT_ADDRESS', abi: 'Submit', label: 'Submit' },
+  vote: { addressKey: 'VOTE_ADDRESS', abi: 'Vote', label: 'Vote' },
+  mint: { addressKey: 'MINT_ADDRESS', abi: 'Mint', label: 'Mint' },
+  phase: { addressKey: 'PHASE_ADDRESS', abi: 'Phase', label: 'Phase' },
+  launch: { addressKey: 'LAUNCH_ADDRESS', abi: 'Launch', label: 'Launch' },
+  weth: { addressKey: 'WETH_ADDRESS', abi: 'WETH9', label: 'WETH9' },
 };
 
 for (const [name, contract] of Object.entries(CONTRACTS)) {
   const address = addresses[contract.addressKey];
   if (!address) {
-    die(`地址簿 network.json 缺少 addresses.${contract.addressKey}（${contract.label}）`);
+    die(`部署地址簿缺少 addresses.${contract.addressKey}（${contract.label}）`);
   }
   if (!isAddress(address)) {
-    die(`地址簿 network.json 的 addresses.${contract.addressKey} 不是合法地址：${address}`);
+    die(`部署地址簿的 addresses.${contract.addressKey} 不是合法地址：${address}`);
   }
   CONTRACTS[name].address = address;
 }
@@ -183,7 +184,7 @@ const PRECISION = 10n ** 18n;
 const VOTE_POOL_DIVISOR = 2n;
 
 // 本脚本选定的操作量（输入，不是期望值）
-const VOTE_AMOUNT = 1000000000000000000000n; // 每轮第一票投 1000e18 治理权
+const VOTE_AMOUNT = 1000000000000000000000n; // 每轮测试的第一笔投出 1,000 票
 const BOOST_AMOUNT = 1000000000000000000000n; // 成员1 加速质押 1000e18（§6 round1 起让 voterBoost 非 0）
 const BOOST_AMOUNT_5 = 100000000000000000000n; // 成员5 加速质押 100e18（§7 多投票人）
 const MEMBER5_TOKEN_IN = 1000000000000000000000n; // 成员5 流动性质押 1000e18（换成治理权，才够推举门槛）
@@ -631,22 +632,22 @@ async function runGovFlow() {
     await read('submit', 'currentRound'),
   );
 
-  const totalGovVotes0 = await read('stake', 'totalGovVotes', [CONTRACTS.token.address, round0]);
-  const member1GovVotes0 = await read('stake', 'govVotes', [
+  const totalGovPower0 = await read('stake', 'totalGovPower', [CONTRACTS.token.address, round0]);
+  const member1GovPower0 = await read('stake', 'govPower', [
     CONTRACTS.token.address,
     round0,
     MEMBER,
   ]);
-  const requiredSubmitVotes = mulDivCeil(totalGovVotes0, submitMinRatio, PRECISION);
+  const requiredSubmitGovPower = mulDivCeil(totalGovPower0, submitMinRatio, PRECISION);
   // ceil 的定义式（不依赖任何常量）：required 是使 required×1e18 ≥ total×ratio 的最小整数
   check(
-    '§1 推举门槛 = ceil(totalGovVotes×ratio/1e18) 的 ceil 语义',
+    '§1 推举门槛 = ceil(totalGovPower×ratio/1e18) 的 ceil 语义',
     true,
-    requiredSubmitVotes * PRECISION >= totalGovVotes0 * submitMinRatio &&
-      (requiredSubmitVotes - 1n) * PRECISION < totalGovVotes0 * submitMinRatio,
+    requiredSubmitGovPower * PRECISION >= totalGovPower0 * submitMinRatio &&
+      (requiredSubmitGovPower - 1n) * PRECISION < totalGovPower0 * submitMinRatio,
   );
-  const handCanSubmit = requiredSubmitVotes !== 0n && member1GovVotes0 >= requiredSubmitVotes;
-  check('§1 手算 canSubmit(成员1) = required≠0 且 govVotes ≥ required', true, handCanSubmit);
+  const handCanSubmit = requiredSubmitGovPower !== 0n && member1GovPower0 >= requiredSubmitGovPower;
+  check('§1 手算 canSubmit(成员1) = required≠0 且 govPower ≥ required', true, handCanSubmit);
   const chainCanSubmit = await read('submit', 'canSubmit', [CONTRACTS.token.address, MEMBER]);
   check('§1 Submit.canSubmit(成员1) 与手算结论一致', handCanSubmit, chainCanSubmit);
   check('§1 canSubmit(成员1) = true（种子治理权全部在成员1）', true, chainCanSubmit);
@@ -656,8 +657,8 @@ async function runGovFlow() {
     await read('submit', 'canSubmit', [CONTRACTS.token.address, MEMBER_2]),
   );
   note(
-    `[§1] totalGovVotes=${totalGovVotes0} govVotes(round0,1)=${member1GovVotes0} ` +
-      `required=ceil(total×${submitMinRatio}/1e18)=${requiredSubmitVotes}`,
+    `[§1] totalGovPower=${totalGovPower0} govPower(round0,1)=${member1GovPower0} ` +
+      `required=ceil(total×${submitMinRatio}/1e18)=${requiredSubmitGovPower}`,
   );
 
   // ═══ §2 创建 + 推举 ════════════════════════════════════════════════════════════
@@ -720,8 +721,8 @@ async function runGovFlow() {
   // ═══ §3 投票 + §4 激励预留 ═════════════════════════════════════════════════════
   const maxVoteAmount0 = await read('vote', 'maxVoteAmount', [CONTRACTS.token.address, MEMBER]);
   check(
-    '§3 Vote.maxVoteAmount(成员1) = Stake.govVotes(round0, 1)',
-    member1GovVotes0,
+    '§3 Vote.maxVoteAmount(成员1) = Stake.govPower(round0, 1)',
+    member1GovPower0,
     maxVoteAmount0,
   );
   const totalVoteBefore = await read('vote', 'totalVoteAmount', [CONTRACTS.token.address, round0]);
@@ -1209,8 +1210,12 @@ async function runProposalRewardFlow() {
       DEADLINE,
     ]),
   });
-  const member5Votes = await read('stake', 'govVotes', [CONTRACTS.token.address, round, MEMBER_5]);
-  check('§7 前置：成员5 流动性质押后本轮获得治理权', true, member5Votes > 0n);
+  const member5GovPower = await read('stake', 'govPower', [
+    CONTRACTS.token.address,
+    round,
+    MEMBER_5,
+  ]);
+  check('§7 前置：成员5 流动性质押后本轮获得治理权', true, member5GovPower > 0n);
   check(
     '§7 前置：成员5 Submit.canSubmit = true（达到推举门槛）',
     true,

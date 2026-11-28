@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { stakeAbi } from '@/config/abis';
 import { copy } from '@/shared/config/copy-pages';
 import {
-  increasedPromisedWaitingPhasesVotes,
+  govPowerAddedByIncreasingPhases,
   isPromisedWaitingPhasesInRange,
 } from '@/domain/gov-stake';
 import { formatTokenAmount } from '@/shared/lib/format';
@@ -54,7 +54,7 @@ export function IncreasePhasesSheet({
 
   const preview =
     valid && parsed.kind === 'ok' && member.liquidityShares !== undefined
-      ? increasedPromisedWaitingPhasesVotes({
+      ? govPowerAddedByIncreasingPhases({
           liquidityShares: member.liquidityShares,
           previousPhases: currentPhases,
           nextPhases: parsed.value,
@@ -122,7 +122,7 @@ export function IncreasePhasesSheet({
         </div>
         {preview !== undefined && preview > 0n ? (
           <p className="text-sm leading-6 text-foreground" data-testid={`${testIdPrefix}-preview`}>
-            {copy.gov.receipt.votes(formatTokenAmount(preview, 18))}
+            {copy.gov.receipt.govPowerAdded(formatTokenAmount(preview, 18))}
           </p>
         ) : null}
         {error !== undefined ? (

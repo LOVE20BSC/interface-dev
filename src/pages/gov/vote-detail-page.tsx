@@ -5,7 +5,7 @@ import { usePhaseClock } from '@/entities/phase/model/use-phase-clock';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
 import { useGovAccess } from '@/entities/gov-core/model/use-gov-access';
 import { useProposalDetail } from '@/entities/gov-core/model/use-proposal-detail';
-import { useVotePower } from '@/entities/gov-core/model/use-vote-power';
+import { useVoteQuota } from '@/entities/gov-core/model/use-vote-quota';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
 import { GOV_POLL_MS } from '@/features/governance-stake/model/use-gov-context';
@@ -33,18 +33,13 @@ export function VoteDetailPage() {
 
   const proposalId = /^\d+$/.test(rawId) ? BigInt(rawId) : undefined;
 
-  const detail = useProposalDetail(token.address, round, access.memberId, proposalId);
-  const power = useVotePower(
-    token.address,
-    round,
-    access.memberId,
-    proposalId === undefined ? [] : [proposalId],
-  );
+  const detail = useProposalDetail(token.address, round, access.memberId, proposalId, GOV_POLL_MS);
+  const quota = useVoteQuota(token.address, round, access.memberId);
   const voteAddress = configuredAddress('vote');
 
   const refetchAll = () => {
     detail.refetch();
-    power.refetch();
+    quota.refetch();
     clock.refetch();
     token.refetch();
     access.refetch();
@@ -76,10 +71,6 @@ export function VoteDetailPage() {
           <p className="text-sm text-muted" data-testid="gov-vote-detail-bad-id">
             {copy.gov.vote.detail.notFoundBody}
           </p>
-        ) : power.status === 'error' ? (
-          <p role="alert" className="text-sm text-danger-strong">
-            {copy.gov.vote.readFailed}
-          </p>
         ) : voteAddress === undefined || token.address === undefined ? (
           <p className="text-sm text-muted" data-testid="gov-vote-detail-unavailable">
             {copy.gov.gates.unconfiguredBody}
@@ -93,8 +84,8 @@ export function VoteDetailPage() {
             roundLabel={
               round === undefined ? copy.common.unknown : copy.gov.vote.roundHint(round.toString())
             }
-            detail={detail}
-            power={power}
+            detail={clock.status === 'error' ? { ...detail, status: 'error' } : detail}
+            quota={quota}
             write={write}
             onRefetch={refetchAll}
           />

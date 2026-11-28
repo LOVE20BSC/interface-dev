@@ -503,7 +503,7 @@ export const love20HubAbi = [
             internalType: 'uint256',
           },
           {
-            name: 'govVotesAdded',
+            name: 'govPowerAdded',
             type: 'uint256',
             internalType: 'uint256',
           },
@@ -614,7 +614,7 @@ export const love20HubAbi = [
             internalType: 'uint256',
           },
           {
-            name: 'govVotesAdded',
+            name: 'govPowerAdded',
             type: 'uint256',
             internalType: 'uint256',
           },
@@ -667,7 +667,7 @@ export const love20HubAbi = [
     ],
     outputs: [
       {
-        name: 'govVotesAdded',
+        name: 'govPowerAdded',
         type: 'uint256',
         internalType: 'uint256',
       },
@@ -728,7 +728,7 @@ export const love20HubAbi = [
     ],
     outputs: [
       {
-        name: 'govVotesAdded',
+        name: 'govPowerAdded',
         type: 'uint256',
         internalType: 'uint256',
       },

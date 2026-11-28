@@ -12,6 +12,9 @@
 /** 合约里的 `PRECISION`。`Submit.sol:17`、`Mint.sol:14` 都是 `1e18`。 */
 export const PRECISION = 10n ** 18n;
 
+/** 治理票沿用治理权的 18 位小数精度。 */
+export const VOTE_DECIMALS = 18;
+
 /** 向上取整的 `mulDiv`，与 OpenZeppelin `Math.mulDiv(..., Rounding.Ceil)` 同义。 */
 function mulDivCeil(a: bigint, b: bigint, denominator: bigint): bigint {
   if (denominator === 0n) return 0n;
@@ -29,8 +32,8 @@ export function minProposalVoteAmount(totalVoteAmount: bigint, minVoteRatio: big
 }
 
 /** 推举（`Submit`）所需治理权：`Submit.sol:84`，同样是向上取整。 */
-export function requiredSubmitVotes(totalGovVotes: bigint, submitMinRatio: bigint): bigint {
-  return mulDivCeil(totalGovVotes, submitMinRatio, PRECISION);
+export function requiredSubmitGovPower(totalGovPower: bigint, submitMinRatio: bigint): bigint {
+  return mulDivCeil(totalGovPower, submitMinRatio, PRECISION);
 }
 
 /**

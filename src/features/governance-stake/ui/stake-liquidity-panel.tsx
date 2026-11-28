@@ -1,3 +1,4 @@
+import { STAKE_DECIMALS } from '@/domain/gov-stake';
 import { useEffect, useMemo, useState } from 'react';
 import { useAccount, useBalance } from 'wagmi';
 import { love20HubAbi, love20TokenAbi, stakeAbi } from '@/config/abis';
@@ -31,8 +32,6 @@ import { useStakeAllowances } from '@/features/governance-stake/model/use-stake-
 import type { StakeTransactionState } from '@/features/governance-stake/model/use-stake-transaction';
 import { StakeAmountField, StakeApproveRow } from '@/features/governance-stake/ui/stake-controls';
 
-/** 治理权按 18 位小数展示：份额来自 LP 记账，与代币精度无关。 */
-const VOTE_DECIMALS = 18;
 /** 原生币「全部」给网络手续费留的展示口径（与兑换/流动性页一致）。 */
 const NATIVE_FEE_RESERVE_WEI = NATIVE_FEE_RESERVE_WEI_SHARED;
 /** 旧版 stakelp 的滑点默认 2.5%；给出的档位与流动性页同一套。 */
@@ -200,13 +199,13 @@ export function StakeLiquidityPanel({
         totalLiquidityShares: community.totalLiquidityShares,
         withdrawableLp: community.withdrawableLp,
         currentLiquidityShares: member.liquidityShares,
-        currentGovVotes: member.govVotes,
+        currentGovPower: member.govPower,
       }),
     [
       community.totalLiquidityShares,
       community.withdrawableLp,
       hubPath,
-      member.govVotes,
+      member.govPower,
       member.liquidityShares,
       parentAmount,
       phasesReady,
@@ -545,12 +544,12 @@ export function StakeLiquidityPanel({
   ]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const votesPreview = hubPath
+  const govPowerPreview = hubPath
     ? hubReady && hubQuote !== undefined
-      ? hubQuote.govVotesAdded
+      ? hubQuote.govPowerAdded
       : undefined
     : preview.status === 'ready'
-      ? preview.votesAdded
+      ? preview.govPowerAdded
       : undefined;
 
   return (
@@ -759,16 +758,20 @@ export function StakeLiquidityPanel({
         ) : null}
 
         <div className="rounded-2xl border border-line bg-elevated/60 px-3 py-2">
-          <span className="text-xs text-muted">{copy.gov.liquidity.votesLabel}</span>
+          <span className="text-xs text-muted">{copy.gov.liquidity.govPowerLabel}</span>
           <p
-            data-testid="gov-liquidity-preview-votes"
+            data-testid="gov-liquidity-preview-power"
             className="text-2xl font-semibold text-foreground"
           >
-            {votesPreview === undefined
+            {govPowerPreview === undefined
               ? UNKNOWN
-              : copy.gov.liquidity.votesValue(formatTokenAmount(votesPreview, VOTE_DECIMALS))}
+              : copy.gov.liquidity.govPowerValue(
+                  formatTokenAmount(govPowerPreview, STAKE_DECIMALS),
+                )}
           </p>
-          <span className="text-[11px] leading-4 text-muted">{copy.gov.liquidity.votesNote}</span>
+          <span className="text-[11px] leading-4 text-muted">
+            {copy.gov.liquidity.govPowerNote}
+          </span>
         </div>
 
         {hubPath ? (
@@ -798,7 +801,7 @@ export function StakeLiquidityPanel({
                 className="mt-1 text-xs leading-5 text-muted"
                 data-testid="gov-liquidity-min-shares"
               >
-                {copy.gov.smart.minSharesNote(formatTokenAmount(minShares, VOTE_DECIMALS))}
+                {copy.gov.smart.minSharesNote(formatTokenAmount(minShares, STAKE_DECIMALS))}
               </p>
             ) : null}
           </div>

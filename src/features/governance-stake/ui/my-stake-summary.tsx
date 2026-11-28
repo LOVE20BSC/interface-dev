@@ -1,12 +1,10 @@
 import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount } from '@/shared/lib/format';
-import { stakeUnlockState } from '@/domain/gov-stake';
+import { STAKE_DECIMALS, stakeUnlockState } from '@/domain/gov-stake';
 import type { MemberStake } from '@/entities/stake/model/use-member-stake';
 import type { PhaseClock } from '@/entities/phase/model/use-phase-clock';
 import { phaseDurationText, phasesValueText } from '@/features/governance-stake/lib/phase-duration';
 import { StakeStatRow } from '@/features/governance-stake/ui/stake-controls';
-
-const VOTE_DECIMALS = 18;
 
 export interface MyStakeSummaryProps {
   readonly member: MemberStake;
@@ -15,7 +13,7 @@ export interface MyStakeSummaryProps {
   readonly parent: { readonly symbol: string; readonly decimals: number | undefined };
   readonly testIdPrefix?: string;
   /** 首页摘要卡已经单独显示治理权 / 承诺解锁期时，明细里不再重复。 */
-  readonly showVotes?: boolean;
+  readonly showGovPower?: boolean;
   readonly showPhases?: boolean;
   /** 流动性质押页的「我的流动性质押」卡不展示加速质押相关数据（owner 2026-11-19）。 */
   readonly showBoost?: boolean;
@@ -28,9 +26,9 @@ export function hasStakePosition(member: MemberStake): boolean {
 
 /**
  * 我的质押摘要（TKM 旧版 `MyLiquidityStakePanel` / `MyGovInfoPanel` 的等价块，按新
- * 协议换成「治理权 = 流动性质押份额 × 承诺解锁期」这套口径）。
+ * 协议按尚未申请解锁的份额与承诺解锁期显示治理权）。
  *
- * 只读：数值都来自 `memberStake` / `govVotes` / `validBoostShares`；未知给「—」。
+ * 只读：数值都来自 `memberStake` / `govPower` / `validBoostShares`；未知给「—」。
  */
 export function MyStakeSummary({
   member,
@@ -38,7 +36,7 @@ export function MyStakeSummary({
   token,
   parent,
   testIdPrefix = 'gov-my',
-  showVotes = true,
+  showGovPower = true,
   showPhases = true,
   showBoost = true,
 }: MyStakeSummaryProps) {
@@ -60,17 +58,17 @@ export function MyStakeSummary({
 
   return (
     <div>
-      {showVotes ? (
+      {showGovPower ? (
         <StakeStatRow
-          label={copy.gov.mine.votes}
-          value={formatTokenAmount(member.govVotes, VOTE_DECIMALS)}
+          label={copy.gov.mine.govPower}
+          value={formatTokenAmount(member.govPower, STAKE_DECIMALS)}
           note={copy.gov.stats.formula}
-          testId={`${testIdPrefix}-votes`}
+          testId={`${testIdPrefix}-gov-power`}
         />
       ) : null}
       <StakeStatRow
         label={copy.gov.mine.shares}
-        value={formatTokenAmount(member.liquidityShares, VOTE_DECIMALS)}
+        value={formatTokenAmount(member.liquidityShares, STAKE_DECIMALS)}
         testId={`${testIdPrefix}-shares`}
       />
       {showBoost ? (

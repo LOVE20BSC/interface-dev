@@ -1,3 +1,4 @@
+import { STAKE_DECIMALS } from '@/domain/gov-stake';
 import { Link } from 'react-router-dom';
 import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount } from '@/shared/lib/format';
@@ -5,8 +6,6 @@ import { Button, buttonStyles } from '@/shared/ui/button';
 import { Card, CardDescription } from '@/shared/ui/card';
 import type { StakeCommunity } from '@/entities/stake/model/use-stake-community';
 import { GovStatCell } from '@/features/governance-stake/ui/gov-home-parts';
-
-const VOTE_DECIMALS = 18;
 
 export interface GovCommunitySummaryProps {
   readonly community: StakeCommunity;
@@ -45,12 +44,12 @@ export function GovCommunitySummary({ community, tokenDecimals, q }: GovCommunit
   return (
     <Card data-testid="gov-community-panel">
       <div className="text-center">
-        <p className="text-sm leading-5 text-muted">{copy.gov.home.communityVotes}</p>
+        <p className="text-sm leading-5 text-muted">{copy.gov.home.communityGovPower}</p>
         <p
           className="mt-1 break-words text-3xl font-semibold leading-10 text-brand-strong"
-          data-testid="gov-community-votes"
+          data-testid="gov-community-gov-power"
         >
-          {formatTokenAmount(community.totalGovVotes, VOTE_DECIMALS)}
+          {formatTokenAmount(community.totalGovPower, STAKE_DECIMALS)}
         </p>
       </div>
 
@@ -73,12 +72,12 @@ export function GovCommunitySummary({ community, tokenDecimals, q }: GovCommunit
       <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4">
         <GovStatCell
           label={copy.gov.home.communityShares}
-          value={formatTokenAmount(community.totalLiquidityShares, VOTE_DECIMALS)}
+          value={formatTokenAmount(community.totalLiquidityShares, STAKE_DECIMALS)}
           testId="gov-community-shares"
         />
         <GovStatCell
           label={copy.gov.home.communityLp}
-          value={formatTokenAmount(community.totalLp, VOTE_DECIMALS)}
+          value={formatTokenAmount(community.totalLp, STAKE_DECIMALS)}
           testId="gov-community-total-lp"
         />
         <GovStatCell

@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { configuredAddress } from '@/config/networks';
 import { copy } from '@/shared/config/copy-pages';
-import { usePhaseClock } from '@/entities/phase/model/use-phase-clock';
 import { useCommunityToken } from '@/entities/community-token/model/use-community-token';
 import { useGovAccess } from '@/entities/gov-core/model/use-gov-access';
 import { useProposalHistory } from '@/entities/gov-core/model/use-proposal-history';
 import { useSubmitContext } from '@/entities/gov-core/model/use-submit-context';
 import { useWalletConnection } from '@/features/connect-wallet/model/use-wallet-connection';
 import { useCommunityContext } from '@/features/switch-community/model/use-community-context';
-import { GOV_POLL_MS } from '@/features/governance-stake/model/use-gov-context';
 import { useSubmitExisting } from '@/features/governance-submit/model/use-submit-existing';
 import { SubmitHistoryPanel } from '@/features/governance-submit/ui/submit-history-panel';
 import { GovAccessGate } from '@/widgets/gov-access-gate/gov-access-gate';
@@ -28,16 +26,14 @@ export function SubmitPage() {
   const token = useCommunityToken(symbol);
   const { isWrongChain } = useWalletConnection();
   const access = useGovAccess(token.address, ['submit', 'stake', 'phase']);
-  const clock = usePhaseClock({ refetchIntervalMs: GOV_POLL_MS });
-  const round = clock.currentPhase;
   const submitAddress = configuredAddress('submit');
-  const context = useSubmitContext(token.address, round, access.memberId);
+  const context = useSubmitContext(token.address, access.memberId);
 
   const [page, setPage] = useState(1);
   const history = useProposalHistory(token.address, {
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
-    round,
+    round: context.round,
   });
 
   const totalPages =
@@ -48,7 +44,6 @@ export function SubmitPage() {
   const refetchAll = (): void => {
     history.refetch();
     context.refetch();
-    clock.refetch();
     token.refetch();
     access.refetch();
   };
@@ -80,8 +75,7 @@ export function SubmitPage() {
             symbol={symbol}
             tokenAddress={token.address}
             memberId={access.memberId}
-            canSubmit={context.canSubmit === true}
-            submittedThisRoundId={context.submittedProposalThisRound}
+            context={context}
             page={page}
             totalPages={totalPages}
             history={history}

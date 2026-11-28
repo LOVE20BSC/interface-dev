@@ -1,3 +1,4 @@
+import { STAKE_DECIMALS } from '@/domain/gov-stake';
 import { useEffect, useMemo, useState } from 'react';
 import { useReadContract, useReadContracts } from 'wagmi';
 import { memberNftAbi, stakeAbi } from '@/config/abis';
@@ -14,8 +15,6 @@ import { Check, Copy } from '@/shared/ui/icons';
 import { useMemberNftAddress } from '@/entities/member-identity/model/use-member-nft-address';
 
 import type { GovContextValue } from '@/features/governance-stake/model/use-gov-context';
-
-const VOTE_DECIMALS = 18;
 
 type QueryMode = 'id' | 'name';
 
@@ -90,7 +89,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 /**
  * 治理权查询（owner 2026-11-18 23:20：移除按地址查询，只按身份 NFT，支持 ID / 名称两种）：
  *
- * - **按 NFT ID**：输入编号 → `govVotes(token, 当前阶段, memberId)` + `memberStake`；
+ * - **按 NFT ID**：输入编号 → `govPower(token, 当前阶段, memberId)` + `memberStake`；
  * - **按 NFT 名称**：先用合约的 `memberId(name)` 把名称解析成编号（O(1)，未知名称返回 0），
  *   再走同一套读取。名称不区分大小写由合约负责，页面不做二次猜测。
  *
@@ -155,7 +154,7 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
       {
         address: stakeAddress,
         abi: stakeAbi,
-        functionName: 'govVotes' as const,
+        functionName: 'govPower' as const,
         args: [token.address, phase, resolvedId] as const,
       },
       {
@@ -201,7 +200,7 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
 
   // ---- 读结果 -------------------------------------------------------------
   const data = nftRead.data;
-  const votes = readBigint(data?.[0]);
+  const govPower = readBigint(data?.[0]);
   const stakeTuple =
     data?.[1]?.status === 'success' && Array.isArray(data[1].result)
       ? (data[1].result as readonly bigint[])
@@ -227,7 +226,7 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
     !nftLoading &&
     (nftRead.isError ||
       data?.[0]?.status === 'failure' ||
-      votes === undefined ||
+      govPower === undefined ||
       stakeTuple === undefined);
   // 编号不存在时 ownerOf 会 revert（其余读成功）：这是「查不到」，不是「读不到」。
   const nftMissing = resolvedId !== undefined && !nftFailed && data?.[3]?.status === 'failure';
@@ -236,9 +235,9 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
     !nftFailed &&
     stakeTuple !== undefined &&
     (stakeTuple[0] ?? 0n) === 0n &&
-    (votes ?? 0n) === 0n;
+    (govPower ?? 0n) === 0n;
 
-  const share = govSharePercent(votes, community.totalGovVotes);
+  const share = govSharePercent(govPower, community.totalGovPower);
   const displayId = resolvedId ?? (target?.mode === 'id' ? target.id : undefined);
 
   return (
@@ -388,10 +387,10 @@ export function GovQueryPanel({ ctx }: { readonly ctx: GovContextValue }) {
               ) : null}
 
               <ResultStat
-                label={copy.gov.query.votes}
-                note={copy.gov.query.votesNote}
-                value={formatTokenAmount(votes, VOTE_DECIMALS)}
-                testId="gov-query-votes"
+                label={copy.gov.query.govPower}
+                note={copy.gov.query.govPowerNote}
+                value={formatTokenAmount(govPower, STAKE_DECIMALS)}
+                testId="gov-query-gov-power"
               />
               <ResultStat
                 label={copy.gov.query.share}

@@ -22,7 +22,7 @@ export type RoundProposalsStatus = 'unconfigured' | 'loading' | 'error' | 'ready
 
 export interface RoundProposal {
   readonly proposalId: bigint;
-  readonly submitterId: bigint;
+  readonly authorId: bigint;
   readonly title: string;
   readonly details: string;
   readonly target: HexAddress;
@@ -86,7 +86,7 @@ export function useRoundProposals(
       if (info === undefined) continue;
       items.push({
         proposalId: submitted.proposalId,
-        submitterId: submitted.submitterId,
+        authorId: info.head.author,
         title: info.body.title,
         details: info.body.details,
         target: info.body.target,

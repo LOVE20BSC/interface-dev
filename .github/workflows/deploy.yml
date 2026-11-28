@@ -146,6 +146,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Check ABI deployment sources
+        run: pnpm abis:check --sources-only
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -191,10 +194,6 @@ jobs:
           VITE_ENV: ${{ needs.prepare.outputs.environment }}
           VITE_BASE: ${{ needs.prepare.outputs.base_path }}
           VITE_SITE_ORIGIN: ${{ needs.prepare.outputs.site_origin }}
-
-      # The ABI drift gate (ADR-0002 §3.4) cannot run here: this checkout has no
-      # forge and no sibling contract repos. It belongs in the anvil/contracts
-      # job that can `forge build` and regenerate the ABI manifest.
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

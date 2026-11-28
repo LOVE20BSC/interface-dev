@@ -13,14 +13,15 @@ import type { HexHash } from '@/shared/lib/tx-watch';
  *   - 申请解锁：`Unstaked` → 清掉的治理权；
  *   - 撤出：`StakeWithdrawn` → 取回的两侧数量与加速代币。
  *
- * 解不出来时返回 `null` 字段：回执只显示标题与哈希，不回退成估算值。
+ * 无法解码的数值保留为 `undefined`，回执仍显示交易哈希。
  */
 
 export type StakeReceiptAction =
   'stakeLiquidity' | 'stakeBoost' | 'increasePhases' | 'unstake' | 'withdraw';
 
 export interface StakeReceiptDetail {
-  readonly govVotesAdded: bigint | undefined;
+  readonly govPowerAdded: bigint | undefined;
+  readonly govPowerRemoved: bigint | undefined;
   readonly liquiditySharesAdded: bigint | undefined;
   readonly boostAmount: bigint | undefined;
   readonly boostShares: bigint | undefined;
@@ -30,7 +31,8 @@ export interface StakeReceiptDetail {
 }
 
 const EMPTY_DETAIL: StakeReceiptDetail = {
-  govVotesAdded: undefined,
+  govPowerAdded: undefined,
+  govPowerRemoved: undefined,
   liquiditySharesAdded: undefined,
   boostAmount: undefined,
   boostShares: undefined,
@@ -80,7 +82,7 @@ export function parseStakeReceipt(
     const entry = logs.find((log) => log.eventName === 'LiquidityStaked');
     return {
       ...EMPTY_DETAIL,
-      govVotesAdded: argOf(entry?.args, 'govVotesAdded'),
+      govPowerAdded: argOf(entry?.args, 'govPowerAdded'),
       liquiditySharesAdded: argOf(entry?.args, 'liquiditySharesAdded'),
     };
   }
@@ -89,7 +91,7 @@ export function parseStakeReceipt(
     const entry = logs.find((log) => log.eventName === 'BoostStaked');
     return {
       ...EMPTY_DETAIL,
-      govVotesAdded: argOf(entry?.args, 'govVotesAdded'),
+      govPowerAdded: argOf(entry?.args, 'govPowerAdded'),
       boostAmount: argOf(entry?.args, 'boostAmount'),
       boostShares: argOf(entry?.args, 'boostShares'),
     };
@@ -99,7 +101,7 @@ export function parseStakeReceipt(
     const entry = logs.find((log) => log.eventName === 'PromisedWaitingPhasesIncreased');
     return {
       ...EMPTY_DETAIL,
-      govVotesAdded: argOf(entry?.args, 'govVotesAdded'),
+      govPowerAdded: argOf(entry?.args, 'govPowerAdded'),
       promisedWaitingPhases: argOf(entry?.args, 'promisedWaitingPhases'),
     };
   }
@@ -108,7 +110,7 @@ export function parseStakeReceipt(
     const entry = logs.find((log) => log.eventName === 'Unstaked');
     return {
       ...EMPTY_DETAIL,
-      govVotesAdded: argOf(entry?.args, 'govVotes'),
+      govPowerRemoved: argOf(entry?.args, 'govPowerRemoved'),
       promisedWaitingPhases: argOf(entry?.args, 'promisedWaitingPhases'),
     };
   }

@@ -2,9 +2,6 @@ import { proposalRewardShare } from '@/domain/gov-core';
 import type { ProposalRewardRow } from '@/entities/gov-core/model/use-proposal-rewards';
 import { copy } from '@/shared/config/copy-pages';
 
-/** 治理票是 18 位小数的数量（`Stake.govVotes`，与投票页同一口径）。 */
-export const GOV_VOTE_DECIMALS = 18;
-
 export type ProposalRewardTone = 'neutral' | 'success' | 'danger';
 
 export interface ProposalRewardRowView {

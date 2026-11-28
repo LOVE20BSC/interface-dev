@@ -1,40 +1,68 @@
 import { describe, expect, it } from 'vitest';
-import { manifestContent, manifestHeadDrift } from '../scripts/lib/anvil-export.mjs';
+import manifest from '../src/config/abis/manifest.json';
+import { assertManifestSources, buildManifest } from '../scripts/lib/anvil-export.mjs';
 
-/**
- * The drift gate compares generated artifacts. Sibling HEAD SHAs are provenance: a docs-only
- * commit in `core` must not fail `pnpm abis:check`, because no ABI, address or snapshot changed.
- * These cases pin that split so the gate cannot silently become content-blind either.
- */
-function manifest(head: string, stakeEntries = 75) {
+const commit = 'a'.repeat(40);
+const sha256 = 'b'.repeat(64);
+
+function deployment() {
+  const contracts = Object.values(manifest.sources).flatMap((source) => Object.keys(source.abis));
   return {
-    schemaVersion: 1,
-    generatedBy: 'pnpm sync:anvil',
-    anvilExport: { profile: 'anvil31337_dev', chainId: 31337, deployBlock: 34, exportedAt: 'x' },
-    sources: {
-      core: { head, path: '../core', abis: { Stake: stakeEntries } },
+    network: 'anvil31337_dev',
+    chainId: 31337,
+    deployBlock: 36,
+    abis: Object.fromEntries(contracts.map((contract) => [contract, [{}]])),
+    provenance: {
+      repos: Object.fromEntries(
+        Object.keys(manifest.sources).map((repo) => [repo, { kind: 'commit', commit }]),
+      ),
+      abiSha256: Object.fromEntries(contracts.map((contract) => [contract, sha256])),
+      dexArtifactSha256: manifest.dexArtifactSha256,
     },
-    artifacts: { modules: 13, abiEntries: 340 },
   };
 }
 
-describe('manifest drift comparison', () => {
-  it('ignores sibling HEAD and export timestamp', () => {
-    const committed = manifest('a'.repeat(40));
-    const expected = { ...manifest('b'.repeat(40)) };
-    expected.anvilExport.exportedAt = 'y';
-
-    expect(manifestContent(committed)).toBe(manifestContent(expected));
-    expect(manifestHeadDrift(committed, expected)).toEqual([
-      { repo: 'core', committed: 'a'.repeat(40), expected: 'b'.repeat(40) },
-    ]);
+describe('ABI deployment manifest', () => {
+  it('copies the deployment revision and each ABI hash', () => {
+    expect(buildManifest(deployment())).toMatchObject({
+      sources: { core: { kind: 'commit', commit, abis: { Stake: { entries: 1, sha256 } } } },
+    });
   });
 
-  it('still sees a real artifact difference', () => {
-    const committed = manifest('a'.repeat(40), 75);
-    const expected = manifest('a'.repeat(40), 76);
+  it('keeps the base commit and fingerprint of a working-tree deployment distinct', () => {
+    const input = deployment();
+    Object.assign(input.provenance.repos, {
+      core: { kind: 'working-tree', baseCommit: commit, sha256 },
+    });
+    expect(buildManifest(input)).toMatchObject({
+      sources: { core: { kind: 'working-tree', baseCommit: commit, sha256 } },
+    });
+  });
 
-    expect(manifestContent(committed)).not.toBe(manifestContent(expected));
-    expect(manifestHeadDrift(committed, expected)).toEqual([]);
+  it('rejects a source record that has only a base revision', () => {
+    const input = deployment();
+    Object.assign(input.provenance.repos, { core: { kind: 'working-tree', baseCommit: commit } });
+    expect(() => buildManifest(input)).toThrow('invalid deployment source record for core');
+  });
+
+  it('checks the frontend manifest without an Anvil export', () => {
+    const published = buildManifest(deployment());
+    expect(assertManifestSources(published)).toEqual([]);
+    expect(() => assertManifestSources({ ...published, sources: {} })).toThrow(
+      'invalid deployment source record for core',
+    );
+    expect(() => assertManifestSources({ ...published, schemaVersion: 1 })).toThrow(
+      'no supported deployment provenance',
+    );
+  });
+
+  it('rejects draft sources unless explicitly checking a local draft', () => {
+    const input = deployment();
+    Object.assign(input.provenance.repos, {
+      core: { kind: 'working-tree', baseCommit: commit, sha256 },
+    });
+    const draft = buildManifest(input);
+    expect(() => assertManifestSources(draft)).toThrow('deployment includes uncommitted sources');
+    expect(assertManifestSources(draft, { allowWorkingTree: true })).toEqual(['core']);
   });
 });

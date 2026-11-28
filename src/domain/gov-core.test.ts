@@ -9,7 +9,7 @@ import {
   mintableRounds,
   proposalRewardShare,
   remainingVotes,
-  requiredSubmitVotes,
+  requiredSubmitGovPower,
   utf8ByteLength,
   validateProposalDraft,
   validateVoteAllocation,
@@ -40,10 +40,10 @@ describe('minProposalVoteAmount', () => {
   });
 });
 
-describe('requiredSubmitVotes', () => {
+describe('requiredSubmitGovPower', () => {
   it('0.5% 的推举门槛向上取整', () => {
     // 4472135954999579391818 * 5e15 / 1e18 = 22360679774997896959.09 → 22360679774997896960
-    expect(requiredSubmitVotes(4472135954999579391818n, 5n * 10n ** 15n)).toBe(
+    expect(requiredSubmitGovPower(4472135954999579391818n, 5n * 10n ** 15n)).toBe(
       22360679774997896960n,
     );
   });

@@ -1,13 +1,12 @@
-import { useReadContract, useReadContracts } from 'wagmi';
+import { useReadContract } from 'wagmi';
 import { mintAbi, stakeAbi, submitAbi, voteAbi } from '@/config/abis';
 import { configuredAddress, type HexAddress } from '@/config/networks';
+import { useProposalVotes } from './use-proposal-votes';
 
 /**
  * 单个提案的读模型（`/vote/:proposalId` 详情页）。
  *
- * 三件事分开读、分开失败：提案正文（`Submit.proposalInfosByProposalIds`）、本轮该提案
- * 收到的总票数（`Vote.voteAmountByProposalId`）、我在这个提案上已投的票数
- * （`Vote.voteAmountByMemberIdByProposalId`）。任一项读失败都只标 `error`，不拿 0 顶替。
+ * 提案正文与本轮推举状态决定能否投票。票数与激励数据可以独立重试。
  */
 export type ProposalDetailStatus = 'unconfigured' | 'loading' | 'error' | 'not-found' | 'ready';
 
@@ -28,10 +27,12 @@ export interface ProposalDetail {
   readonly submitterId: bigint | undefined;
   /** 本轮所有提案合计票数（`totalVoteAmount`）→ 激励阈值与「当轮总投票占比」的分母。 */
   readonly roundTotalVotes: bigint | undefined;
-  /** 本轮社区总治理权（`Stake.totalGovVotes`）→「总治理权占比」的分母。 */
-  readonly roundGovVotes: bigint | undefined;
+  /** 本轮社区总治理权（`Stake.totalGovPower`）→「总治理权占比」的分母。 */
+  readonly roundGovPower: bigint | undefined;
   /** 提案激励门槛比例（`Mint.PROPOSAL_REWARD_MIN_VOTE_RATIO`，1e18 定点）。 */
   readonly minVoteRatio: bigint | undefined;
+  readonly votesStatus: 'loading' | 'error' | 'ready';
+  readonly refetchVotes: () => void;
   readonly refetch: () => void;
 }
 
@@ -40,6 +41,7 @@ export function useProposalDetail(
   round: bigint | undefined,
   memberId: bigint | undefined,
   proposalId: bigint | undefined,
+  refetchIntervalMs: number,
 ): ProposalDetail {
   const submitAddress = configuredAddress('submit');
   const voteAddress = configuredAddress('vote');
@@ -52,64 +54,53 @@ export function useProposalDetail(
     address: submitAddress,
     abi: submitAbi,
     functionName: 'proposalInfosByProposalIds',
-    args: infoEnabled ? [tokenAddress as HexAddress, [proposalId as bigint]] : undefined,
+    args: infoEnabled ? [tokenAddress, [proposalId]] : undefined,
     query: { enabled: infoEnabled },
   });
 
   const roundEnabled =
     voteAddress !== undefined && tokenAddress !== undefined && round !== undefined;
-  const totals = useReadContracts({
-    contracts: [
-      {
-        address: voteAddress as HexAddress,
-        abi: voteAbi,
-        functionName: 'voteAmountByProposalId' as const,
-        args: roundEnabled
-          ? [tokenAddress as HexAddress, round as bigint, proposalId as bigint]
-          : undefined,
-      },
-      {
-        address: voteAddress as HexAddress,
-        abi: voteAbi,
-        functionName: 'voteAmountByMemberIdByProposalId' as const,
-        args:
-          roundEnabled && memberId !== undefined
-            ? [tokenAddress as HexAddress, round as bigint, memberId, proposalId as bigint]
-            : undefined,
-      },
-    ],
-    query: { enabled: roundEnabled && proposalId !== undefined },
-  });
+  const govPowerEnabled =
+    stakeAddress !== undefined && tokenAddress !== undefined && round !== undefined;
+  const votes = useProposalVotes(
+    tokenAddress,
+    round,
+    memberId,
+    proposalId === undefined ? [] : [proposalId],
+  );
 
   // 本轮推举人（`Submit.submitterIdByProposalId`）。
+  const submitterEnabled =
+    submitAddress !== undefined &&
+    tokenAddress !== undefined &&
+    round !== undefined &&
+    proposalId !== undefined;
   const submitter = useReadContract({
     address: submitAddress,
     abi: submitAbi,
     functionName: 'submitterIdByProposalId',
-    args:
-      roundEnabled && proposalId !== undefined
-        ? [tokenAddress as HexAddress, round as bigint, proposalId]
-        : undefined,
-    query: { enabled: roundEnabled && proposalId !== undefined },
+    args: submitterEnabled ? [tokenAddress, round, proposalId] : undefined,
+    query: {
+      enabled: submitterEnabled,
+      // A proposal can enter the round after this page first checks it.
+      refetchInterval: (query) => (query.state.data === 0n ? refetchIntervalMs : false),
+    },
   });
 
   // 本轮总票数 / 本轮社区总治理权：两个「占比」的分母。
-  const roundTotals = useReadContracts({
-    contracts: [
-      {
-        address: voteAddress as HexAddress,
-        abi: voteAbi,
-        functionName: 'totalVoteAmount' as const,
-        args: roundEnabled ? [tokenAddress as HexAddress, round as bigint] : undefined,
-      },
-      {
-        address: stakeAddress as HexAddress,
-        abi: stakeAbi,
-        functionName: 'totalGovVotes' as const,
-        args: roundEnabled ? [tokenAddress as HexAddress, round as bigint] : undefined,
-      },
-    ],
+  const roundVotes = useReadContract({
+    address: voteAddress,
+    abi: voteAbi,
+    functionName: 'totalVoteAmount',
+    args: roundEnabled ? [tokenAddress, round] : undefined,
     query: { enabled: roundEnabled },
+  });
+  const roundGovPower = useReadContract({
+    address: stakeAddress,
+    abi: stakeAbi,
+    functionName: 'totalGovPower',
+    args: govPowerEnabled ? [tokenAddress, round] : undefined,
+    query: { enabled: govPowerEnabled },
   });
 
   // 激励门槛比例（Mint 常量，不随轮次变）。
@@ -120,32 +111,44 @@ export function useProposalDetail(
     query: { enabled: mintAddress !== undefined },
   });
 
+  const refetchVotes = () => {
+    votes.refetch();
+    if (roundEnabled) void roundVotes.refetch();
+    if (govPowerEnabled) void roundGovPower.refetch();
+    if (mintAddress !== undefined) void minVoteRatio.refetch();
+  };
+
   const refetch = () => {
-    void info.refetch();
-    void totals.refetch();
-    void submitter.refetch();
-    void roundTotals.refetch();
-    void minVoteRatio.refetch();
+    if (infoEnabled) void info.refetch();
+    if (submitterEnabled) void submitter.refetch();
+    refetchVotes();
   };
 
   if (submitAddress === undefined || voteAddress === undefined || tokenAddress === undefined) {
     return empty(proposalId ?? 0n, 'unconfigured', refetch);
   }
   if (proposalId === undefined) return empty(0n, 'unconfigured', refetch);
-  if (info.status === 'error' || totals.status === 'error') {
+  if (info.isError || (submitterEnabled && submitter.isError)) {
     return empty(proposalId, 'error', refetch);
   }
-  if (info.status === 'pending' || totals.status === 'pending') {
+  if (info.isPending || !submitterEnabled || submitter.isPending) {
     return empty(proposalId, 'loading', refetch);
   }
 
   const entry = info.data?.[0];
   if (entry === undefined) return empty(proposalId, 'not-found', refetch);
 
-  const totalResult = totals.data?.[0];
-  const mineResult = totals.data?.[1];
-  const roundVotesResult = roundTotals.data?.[0];
-  const roundGovResult = roundTotals.data?.[1];
+  const proposalVotes = votes.byId.get(proposalId);
+  const votesFailed =
+    votes.status === 'error' ||
+    (roundEnabled && roundVotes.isError) ||
+    (govPowerEnabled && roundGovPower.isError) ||
+    (mintAddress !== undefined && minVoteRatio.isError);
+  const votesLoading =
+    votes.status === 'loading' ||
+    (roundEnabled && roundVotes.isPending) ||
+    (govPowerEnabled && roundGovPower.isPending) ||
+    (mintAddress !== undefined && minVoteRatio.isPending);
   return {
     proposalId,
     status: 'ready',
@@ -154,12 +157,14 @@ export function useProposalDetail(
     details: entry.body.details,
     target: entry.body.target,
     targetMode: Number(entry.body.targetMode),
-    mine: mineResult?.status === 'success' ? mineResult.result : undefined,
-    total: totalResult?.status === 'success' ? totalResult.result : undefined,
-    submitterId: submitter.data ?? undefined,
-    roundTotalVotes: roundVotesResult?.status === 'success' ? roundVotesResult.result : undefined,
-    roundGovVotes: roundGovResult?.status === 'success' ? roundGovResult.result : undefined,
-    minVoteRatio: minVoteRatio.data ?? undefined,
+    mine: proposalVotes?.mine,
+    total: proposalVotes?.total,
+    submitterId: submitter.data,
+    roundTotalVotes: roundVotes.isError ? undefined : roundVotes.data,
+    roundGovPower: roundGovPower.isError ? undefined : roundGovPower.data,
+    minVoteRatio: minVoteRatio.isError ? undefined : minVoteRatio.data,
+    votesStatus: votesFailed ? 'error' : votesLoading ? 'loading' : 'ready',
+    refetchVotes,
     refetch,
   };
 }
@@ -181,8 +186,10 @@ function empty(
     total: undefined,
     submitterId: undefined,
     roundTotalVotes: undefined,
-    roundGovVotes: undefined,
+    roundGovPower: undefined,
     minVoteRatio: undefined,
+    votesStatus: 'loading',
+    refetchVotes: refetch,
     refetch,
   };
 }

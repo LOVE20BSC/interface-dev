@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom';
+import { VOTE_DECIMALS } from '@/domain/gov-core';
 import { copy } from '@/shared/config/copy-pages';
 import { formatTokenAmount } from '@/shared/lib/format';
+import { Button } from '@/shared/ui/button';
 import { Card, CardDescription, CardTitle } from '@/shared/ui/card';
-import type { VotePower } from '@/entities/gov-core/model/use-vote-power';
+import { Skeleton } from '@/shared/ui/skeleton';
+import type { ProposalVotesRead } from '@/entities/gov-core/model/use-proposal-votes';
 import type { RoundProposal } from '@/entities/gov-core/model/use-round-proposals';
-import { VOTE_DECIMALS } from '@/features/governance-vote/ui/vote-power-card';
 
 /**
  * 本轮提案列表（`/vote`）：只做「选哪个提案去投」，不再在列表里放输入框
@@ -14,17 +16,17 @@ import { VOTE_DECIMALS } from '@/features/governance-vote/ui/vote-power-card';
  */
 export function RoundProposalList({
   proposals,
-  power,
+  votes,
   symbol,
   roundLabel,
 }: {
   readonly proposals: readonly RoundProposal[];
-  readonly power: VotePower;
+  readonly votes: ProposalVotesRead;
   readonly symbol: string;
   readonly roundLabel: string;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-busy={votes.status === 'loading' || undefined}>
       <div className="flex items-baseline justify-between gap-2 px-1" data-testid="gov-vote-round">
         <h2 className="text-base font-semibold text-foreground">{copy.gov.vote.roundTitle}</h2>
         <span className="text-xs text-muted" data-testid="gov-vote-round-label">
@@ -41,10 +43,25 @@ export function RoundProposalList({
           {copy.gov.vote.proposeAction}
         </Link>
       </div>
+      {votes.status === 'error' ? (
+        <Card data-testid="gov-vote-proposal-votes-error">
+          <CardDescription role="alert">{copy.gov.vote.proposalVotesReadFailed}</CardDescription>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mt-3"
+            data-testid="gov-vote-proposal-votes-retry"
+            onClick={votes.refetch}
+          >
+            {copy.gov.vote.retry}
+          </Button>
+        </Card>
+      ) : null}
+      {votes.status === 'loading' ? <span className="sr-only">{copy.common.loading}</span> : null}
       <ul className="space-y-3" data-testid="gov-vote-list">
         {proposals.map((proposal) => {
           const id = proposal.proposalId.toString();
-          const votes = power.perProposal.get(proposal.proposalId);
+          const count = votes.byId.get(proposal.proposalId);
           const callback = proposal.targetMode !== 0;
           return (
             <li key={id}>
@@ -53,23 +70,27 @@ export function RoundProposalList({
                   <div className="min-w-0">
                     <CardTitle className="truncate">{proposal.title}</CardTitle>
                     <CardDescription>
-                      {copy.gov.vote.detail.authorLabel} #{proposal.submitterId.toString()}
+                      {copy.gov.vote.detail.authorLabel} #{proposal.authorId.toString()}
                     </CardDescription>
                   </div>
                   <span className="shrink-0 font-mono text-xs text-muted">#{id}</span>
                 </div>
-                <div className="mt-3 space-y-1 text-xs leading-5 text-muted">
-                  <p data-testid={`gov-vote-proposal-total-${id}`}>
-                    {votes === undefined || votes.total === undefined
-                      ? copy.common.unknown
-                      : copy.gov.vote.totalVotesOn(formatTokenAmount(votes.total, VOTE_DECIMALS))}
-                  </p>
-                  <p data-testid={`gov-vote-proposal-mine-${id}`}>
-                    {votes === undefined || votes.mine === undefined
-                      ? copy.common.unknown
-                      : copy.gov.vote.myVotesOn(formatTokenAmount(votes.mine, VOTE_DECIMALS))}
-                  </p>
-                </div>
+                {votes.status === 'loading' ? (
+                  <Skeleton className="mt-3 h-9 w-32" />
+                ) : (
+                  <div className="mt-3 space-y-1 text-xs leading-5 text-muted">
+                    <p data-testid={`gov-vote-proposal-total-${id}`}>
+                      {count?.total === undefined
+                        ? copy.common.unknown
+                        : copy.gov.vote.totalVotesOn(formatTokenAmount(count.total, VOTE_DECIMALS))}
+                    </p>
+                    <p data-testid={`gov-vote-proposal-mine-${id}`}>
+                      {count?.mine === undefined
+                        ? copy.common.unknown
+                        : copy.gov.vote.myVotesOn(formatTokenAmount(count.mine, VOTE_DECIMALS))}
+                    </p>
+                  </div>
+                )}
                 {callback ? (
                   <p
                     className="mt-3 text-xs leading-5 text-muted"
